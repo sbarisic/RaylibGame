@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.539
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30503.244
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RaylibTest", "RaylibTest\RaylibTest.csproj", "{4E0D4FCB-68FD-424D-A71C-5CFA4668500A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RaylibGame", "RaylibTest\RaylibGame.csproj", "{4E0D4FCB-68FD-424D-A71C-5CFA4668500A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RaylibSharp", "RaylibSharp\RaylibSharp.csproj", "{EC0BD3B5-199E-4595-9A53-0CD9E2ECE898}"
 	ProjectSection(ProjectDependencies) = postProject

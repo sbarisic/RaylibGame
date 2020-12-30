@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{4E0D4FCB-68FD-424D-A71C-5CFA4668500A}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>RaylibTest</RootNamespace>
-    <AssemblyName>RaylibTest</AssemblyName>
+    <RootNamespace>RaylibGame</RootNamespace>
+    <AssemblyName>RaylibGame</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

@@ -336,7 +336,7 @@ namespace RaylibTest.Graphics {
 		}
 
 		Color CalcAOColor(Vector3 GlobalBlockPos, Vector3 A, Vector3 B, Vector3 C) {
-			int Hits = 0;
+			/*int Hits = 0;
 
 			if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + A)))
 				Hits++;
@@ -348,7 +348,7 @@ namespace RaylibTest.Graphics {
 				Hits++;
 
 			if (Hits != 0)
-				return new Color(0.8f); // 0.9f
+				return new Color(0.8f); // 0.9f*/
 
 			return Color.White;
 		}
@@ -419,7 +419,8 @@ namespace RaylibTest.Graphics {
 							// X++
 							if (!XPosSkipFace) {
 								Vector3 CurDir = new Vector3(1, 0, 0);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
@@ -433,7 +434,7 @@ namespace RaylibTest.Graphics {
 							// X--
 							if (!XNegSkipFace) {
 								Vector3 CurDir = new Vector3(-1, 0, 0);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
@@ -447,7 +448,7 @@ namespace RaylibTest.Graphics {
 							// Y++
 							if (!YPosSkipFace) {
 								Vector3 CurDir = new Vector3(0, 1, 0);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
@@ -461,7 +462,7 @@ namespace RaylibTest.Graphics {
 							// Y--
 							if (!YNegSkipFace) {
 								Vector3 CurDir = new Vector3(0, -1, 0);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
@@ -475,7 +476,7 @@ namespace RaylibTest.Graphics {
 							// Z++
 							if (!ZPosSkipFace) {
 								Vector3 CurDir = new Vector3(0, 0, 1);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
@@ -489,7 +490,7 @@ namespace RaylibTest.Graphics {
 							// Z--
 							if (!ZNegSkipFace) {
 								Vector3 CurDir = new Vector3(0, 0, -1);
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));

@@ -119,7 +119,7 @@ namespace RaylibTest {
 				Vector3 Start = FPSCamera.Position;
 				Vector3 End = FPSCamera.Position + (Dir * MaxLen);
 
-				if (Left)
+				if (Left) {
 					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
 							Map.SetBlock(X, Y, Z, BlockType.None);
@@ -137,6 +137,7 @@ namespace RaylibTest {
 
 						return false;
 					});
+				}
 
 				if (Right) {
 					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {

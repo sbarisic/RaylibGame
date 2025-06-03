@@ -1,6 +1,9 @@
 ﻿using Newtonsoft.Json;
+
 using RaylibSharp;
+
 using RaylibTest.Engine;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -170,6 +173,8 @@ namespace RaylibTest.Graphics {
 						}
 					}
 				}
+
+			ComputeLighting();
 		}
 
 		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos) {
@@ -274,17 +279,17 @@ namespace RaylibTest.Graphics {
 		}
 
 		public void SetBlock(int X, int Y, int Z, BlockType T) {
-			/*if (Chunk.EmitsLight(T)) {
-				SetPlacedBlock(X, Y, Z, new Chunk.PlacedBlock(T, BlockLight.FullBright));
+			/*if (BlockInfo.EmitsLight(T)) {
+				SetPlacedBlock(X, Y, Z, new PlacedBlock(T, BlockLight.FullBright));
 
 				Vector3 Origin = new Vector3(X, Y, Z);
 				int CastDist = 20;
 
 				Utils.RaycastSphere(Origin, CastDist, (XX, YY, ZZ, Norm) => {
-					Chunk.PlacedBlock Cur = GetPlacedBlock(XX, YY, ZZ, out Chunk Chk);
+					PlacedBlock Cur = GetPlacedBlock(XX, YY, ZZ, out Chunk Chk);
 
 					// Ray hit something solid
-					if (Chunk.IsOpaque(Cur)) {
+					if (BlockInfo.IsOpaque(Cur.Type)) {
 						float Dist = (new Vector3(XX, YY, ZZ) - Origin).Length();
 						float Amt = Utils.Clamp(1.0f - (Dist / CastDist), 0, 1);
 
@@ -298,6 +303,8 @@ namespace RaylibTest.Graphics {
 			} else*/
 
 			SetPlacedBlock(X, Y, Z, new PlacedBlock(T));
+
+			//ComputeLighting();
 		}
 
 		IEnumerable<GlobalPlacedBlock> GetAllExistingBlocks() {
@@ -323,9 +330,41 @@ namespace RaylibTest.Graphics {
 					return true;
 
 				return false;
-			}, out MaxHits, 6);
+			}, out MaxHits, 12);
 
 			return Hits;
+		}
+
+		public int CountSphereHits(int X, int Y, int Z, int Distance, int Slices = 16) {
+			int Hits = Utils.RaycastSphere(new Vector3(X, Y, Z), Distance, (XX, YY, ZZ, Face) => {
+				if (GetBlock(XX, YY, ZZ) != BlockType.None)
+					return true;
+
+				return false;
+			}, Slices);
+
+			return Hits;
+		}
+
+		public int CountSphereHits(Vector3 Origin, int Distance, int Slices = 16) {
+			return CountSphereHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Slices);
+		}
+
+		public int CountHits(Vector3 Origin, int Distance, Vector3 Dir, out int MaxHits) {
+			return CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir, out MaxHits);
+		}
+
+		public bool Raycast(int X, int Y, int Z, int Distance, Vector3 Dir) {
+			return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
+				if (GetBlock(XX, YY, ZZ) != BlockType.None)
+					return true;
+
+				return false;
+			});
+		}
+
+		public bool Raycast(Vector3 Origin, int Distance, Vector3 Dir) {
+			return Raycast((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir);
 		}
 
 		public int CountAmbientHits(Vector3 Pos) {
@@ -352,11 +391,16 @@ namespace RaylibTest.Graphics {
 			return true;
 		}
 
-		/*void ComputeLighting() {
-			GlobalPlacedBlock[] PlacedBlocks = GetAllExistingBlocks().ToArray();
+		public void ComputeLighting() {
+			foreach (Chunk C in GetAllChunks()) {
+				C.ComputeLighting();
+				C.MarkDirty();
+			}
+
+			/*GlobalPlacedBlock[] PlacedBlocks = GetAllExistingBlocks().ToArray();
 
 			for (int i = 0; i < PlacedBlocks.Length; i++) {
-				Chunk.PlacedBlock Block = PlacedBlocks[i].Block;
+				PlacedBlock Block = PlacedBlocks[i].Block;
 				if (Block.Type == BlockType.None)
 					continue;
 
@@ -371,7 +415,7 @@ namespace RaylibTest.Graphics {
 				// Ambient occlusion
 				for (int j = 0; j < Utils.MainDirs.Length; j++) {
 					Vector3 Origin = new Vector3(X, Y, Z) + Utils.MainDirs[j];
-					float AmbientHitRatio = ((float)CountAmbientHits(Origin) - 1) / 5;
+					float AmbientHitRatio = ((float)CountAmbientHits(Origin)) / Utils.MainDirs.Length;
 
 
 					int Light = 32 - (int)(AmbientHitRatio * 24);
@@ -384,8 +428,8 @@ namespace RaylibTest.Graphics {
 
 				// Set block back into world
 				// SetPlacedBlock(X, Y, Z, Block, false);
-			}
-		}*/
+			}*/
+		}
 
 		public PlacedBlock GetPlacedBlock(int X, int Y, int Z, out Chunk Chk) {
 			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);

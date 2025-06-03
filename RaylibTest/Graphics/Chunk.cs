@@ -1,5 +1,7 @@
 ﻿using RaylibSharp;
+
 using RaylibTest.Engine;
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -116,7 +118,7 @@ namespace RaylibTest.Graphics {
 		public BlockType Type;
 
 		// Recalculated, always 6
-		BlockLight[] Lights;
+		public BlockLight[] Lights;
 
 		public PlacedBlock(BlockType Type, BlockLight DefaultLight) {
 			Lights = new BlockLight[6];
@@ -196,7 +198,7 @@ namespace RaylibTest.Graphics {
 
 			Dirty = true;
 			ModelValid = false;
-			
+
 			//int TileTexSize = AtlasTex.width / 16;
 		}
 
@@ -297,7 +299,7 @@ namespace RaylibTest.Graphics {
 			return true;
 		}
 
-		void ComputeLighting() {
+		public void ComputeLighting() {
 			for (int i = 0; i < Blocks.Length; i++) {
 				PlacedBlock Block = Blocks[i];
 				if (Block.Type == BlockType.None)
@@ -316,17 +318,70 @@ namespace RaylibTest.Graphics {
 				if (WorldMap.IsCovered(X, Y, Z))
 					continue;
 
-				/*// Ambient occlusion
+
+				// Ambient occlusion
 				for (int j = 0; j < Utils.MainDirs.Length; j++) {
 					Vector3 Origin = new Vector3(X, Y, Z) + Utils.MainDirs[j];
 
-					//float AmbientHits = (float)WorldMap.CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, 2, Utils.MainDirs[j], out int MaxHits) / MaxHits;
-					float AmbientHitRatio = ((float)WorldMap.CountAmbientHits(Origin) - 1) / 5;
 
-					int Light = 32 - (int)(AmbientHitRatio * 24);
+					int AmbientLight = 5;
+					if (!WorldMap.Raycast(Origin, 128, new Vector3(0, 1, 0)))
+						AmbientLight = 28;
+
+					//if (Utils.MainDirs[j] == new Vector3(0, 1, 0)) {
+						const int AddLight = 2;
+
+						//int SkyHits = WorldMap.CountHits(Origin, 128, new Vector3(0, 1, 0), out int MaxSkyHits);
+						//float SkyPerc = (float)SkyHits / MaxSkyHits;
+
+						//int MaxSkyHits = 12;
+						//int SkyHits = WorldMap.CountSphereHits(Origin, 128, MaxSkyHits);
+						//float SkyPerc = (float)(MaxSkyHits - SkyHits) / MaxSkyHits;
+
+						//AmbientLight += (int)(SkyPerc * 16);
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 0))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 0))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, 1))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, -1))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 1))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 1))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, -1))))
+							AmbientLight += AddLight;
+
+						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, -1))))
+							AmbientLight += AddLight;
+					//}
+
+					if (AmbientLight > 28)
+						AmbientLight = 28;
+
+					float AmbientHitRatio = (float)WorldMap.CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, 3, Utils.MainDirs[j], out int MaxHits) / MaxHits;
+					//float AmbientHitRatio = ((float)WorldMap.CountAmbientHits(Origin) - 1) / 5;
+
+					int Light = AmbientLight - (int)(AmbientHitRatio * (AmbientLight - 4));
+
+					//int Light = (int)(AmbientLight * 32) - (24 - (int)(AmbientHitRatio * 24));
+
+					if (Light < 0)
+						Light = 0;
+					if (Light > 32)
+						Light = 32;
 
 					Block.Lights[Utils.DirToByte(Utils.MainDirs[j])] = new BlockLight((byte)(Light));
-				}*/
+				}
 
 				// TODO: Actual lights
 
@@ -419,7 +474,8 @@ namespace RaylibTest.Graphics {
 							// X++
 							if (!XPosSkipFace) {
 								Vector3 CurDir = new Vector3(1, 0, 0);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
@@ -434,7 +490,8 @@ namespace RaylibTest.Graphics {
 							// X--
 							if (!XNegSkipFace) {
 								Vector3 CurDir = new Vector3(-1, 0, 0);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
@@ -448,7 +505,8 @@ namespace RaylibTest.Graphics {
 							// Y++
 							if (!YPosSkipFace) {
 								Vector3 CurDir = new Vector3(0, 1, 0);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
@@ -462,7 +520,8 @@ namespace RaylibTest.Graphics {
 							// Y--
 							if (!YNegSkipFace) {
 								Vector3 CurDir = new Vector3(0, -1, 0);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
@@ -476,7 +535,8 @@ namespace RaylibTest.Graphics {
 							// Z++
 							if (!ZPosSkipFace) {
 								Vector3 CurDir = new Vector3(0, 0, 1);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
@@ -490,7 +550,8 @@ namespace RaylibTest.Graphics {
 							// Z--
 							if (!ZNegSkipFace) {
 								Vector3 CurDir = new Vector3(0, 0, -1);
-								Color FaceClr = Color.White; // Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+								//Color FaceClr = Color.White; 
+								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
 								Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));
@@ -524,6 +585,8 @@ namespace RaylibTest.Graphics {
 			CachedMeshOpaque = GenMesh();
 			CachedModelOpaque = Raylib.LoadModelFromMesh(CachedMeshOpaque);
 			CachedModelOpaque.materials[0].maps[0].texture = ResMgr.AtlasTexture;
+
+			//ComputeLighting();
 
 			ModelValid = true;
 			return CachedModelOpaque;

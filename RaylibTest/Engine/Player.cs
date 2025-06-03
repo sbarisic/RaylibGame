@@ -1,4 +1,5 @@
 ﻿using RaylibSharp;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -100,6 +101,8 @@ namespace RaylibTest.Engine {
 		}
 	}
 
+	delegate void OnKeyPressedFunc();
+
 	unsafe class Player {
 		const bool DEBUG_PLAYER = true;
 
@@ -118,6 +121,9 @@ namespace RaylibTest.Engine {
 
 		bool CursorDisabled = false;
 		bool LocalPlayer;
+
+		public KeyboardKey FuncKey;
+		public OnKeyPressedFunc OnKeyPressed;
 
 		public Player(string ModelName, bool LocalPlayer) {
 			this.LocalPlayer = LocalPlayer;
@@ -172,6 +178,10 @@ namespace RaylibTest.Engine {
 
 			if (Raylib.IsKeyPressed(KeyboardKey.KEY_F1))
 				ToggleMouse();
+
+			if (Raylib.IsKeyPressed(FuncKey))
+				OnKeyPressed();
+
 
 			//PlayerEntity.GetBone("Neck", out int BoneID);
 

@@ -1,4 +1,5 @@
 ﻿using RaylibSharp;
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -294,6 +295,11 @@ namespace RaylibTest {
 			float StepY = Dy > 0 ? 1 : Dy < 0 ? -1 : 0;
 			float StepZ = Dz > 0 ? 1 : Dz < 0 ? -1 : 0;
 
+			/*const float StepScale = 0.2f;
+			StepX *= StepScale;
+			StepY *= StepScale;
+			StepZ *= StepScale;*/
+
 			// See description above. The initial values depend on the fractional
 			// part of the origin.
 			float tMaxX = IntBound(Origin.X, Dx);
@@ -326,7 +332,8 @@ namespace RaylibTest {
 				// has been commented in detail.
 				if (tMaxX < tMaxY) {
 					if (tMaxX < tMaxZ) {
-						if (tMaxX > Length) break;
+						if (tMaxX > Length)
+							break;
 						// Update which cube we are now in.
 						X += StepX;
 						// Adjust tMaxX to the next X-oriented boundary crossing.
@@ -336,7 +343,8 @@ namespace RaylibTest {
 						face.Y = 0;
 						face.Z = 0;
 					} else {
-						if (tMaxZ > Length) break;
+						if (tMaxZ > Length)
+							break;
 						Z += StepZ;
 						tMaxZ += tDeltaZ;
 						face.X = 0;
@@ -345,7 +353,8 @@ namespace RaylibTest {
 					}
 				} else {
 					if (tMaxY < tMaxZ) {
-						if (tMaxY > Length) break;
+						if (tMaxY > Length)
+							break;
 						Y += StepY;
 						tMaxY += tDeltaY;
 						face.X = 0;
@@ -354,7 +363,8 @@ namespace RaylibTest {
 					} else {
 						// Identical to the second case, repeated for simplicity in
 						// the conditionals.
-						if (tMaxZ > Length) break;
+						if (tMaxZ > Length)
+							break;
 						Z += StepZ;
 						tMaxZ += tDeltaZ;
 						face.X = 0;

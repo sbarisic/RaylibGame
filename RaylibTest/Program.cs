@@ -1,6 +1,8 @@
 ﻿using RaylibSharp;
+
 using RaylibTest.Engine;
 using RaylibTest.Graphics;
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,7 +21,7 @@ namespace RaylibTest {
 		public static GameStateImpl OptionsState;
 
 		static void Main(string[] args) {
-			Window = new GameWindow(1366, 768, "3D Test");
+			Window = new GameWindow(1920, 1080, "3D Test");
 			GraphicsUtils.Init();
 			Scripting.Init();
 
@@ -84,6 +86,7 @@ namespace RaylibTest {
 			} else
 				Map.GenerateFloatingIsland(64, 64);
 
+
 			//Map.SetBlock(0, 0, 0, BlockType.Test2);
 
 			/*foreach (var C in Map.GetAllChunks())
@@ -91,6 +94,12 @@ namespace RaylibTest {
 
 			FPSCamera.Position = new Vector3(6, 6, -12);
 			Ply = new Player("snoutx10k", true);
+
+			Ply.FuncKey = KeyboardKey.KEY_F2;
+			Ply.OnKeyPressed = () => {
+					Console.WriteLine("Compute light!");
+					Map.ComputeLighting();
+			};
 		}
 
 
@@ -153,7 +162,29 @@ namespace RaylibTest {
 							Y += (int)Face.Y;
 							Z += (int)Face.Z;
 
-							Map.SetBlock(X, Y, Z, BlockType.Sand);
+							Map.SetBlock(X, Y, Z, BlockType.Dirt);
+							return true;
+						}
+
+						return false;
+					});
+				}
+
+				if (Middle) {
+					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
+						BlockType CurBlockType = BlockType.None;
+
+						/*if (Chunk.EmitsLight(CurBlockType = Map.GetBlock(X, Y, Z))) {
+							Map.SetBlock(X, Y, Z, CurBlockType);
+							return true;
+						}*/
+
+						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
+							X += (int)Face.X;
+							Y += (int)Face.Y;
+							Z += (int)Face.Z;
+
+							Map.SetBlock(X, Y, Z, BlockType.Glowstone);
 							return true;
 						}
 

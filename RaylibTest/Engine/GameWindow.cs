@@ -18,10 +18,12 @@ namespace RaylibTest.Engine {
 
 			Raylib.InitWindow(Width = W, Height = H, Title);
 			Raylib.SetTargetFPS(60);
+			Raylib.SetExitKey(0);
 		}
 
 		public void SetState(GameStateImpl State) {
 			this.State = State;
+			Raylib.EnableCursor();
 			State.SwapTo();
 		}
 

@@ -125,8 +125,11 @@ namespace RaylibTest.Graphics {
 		}
 	}
 
+	//delegate void OnBlockActivateFunc(PlacedBlock Parent, Vector3 BlockPos, Vector2 UV);
+
 	class PlacedBlock {
 		public BlockType Type;
+		//public OnBlockActivateFunc OnBlockActivate;
 
 		// Recalculated, always 6
 		public BlockLight[] Lights;
@@ -483,22 +486,7 @@ namespace RaylibTest.Graphics {
 		}
 
 		void SetBlockTextureUV(BlockType BlockType, Vector3 FaceNormal, MeshBuilder Verts) {
-			int BlockID = (int)BlockType - 1;
-
-			if (BlockType == BlockType.Grass) {
-				if (FaceNormal.Y == 1)
-					BlockID = 240;
-				else if (FaceNormal.Y == 0)
-					BlockID = 241;
-				else
-					BlockID = 1;
-			} else if (BlockType == BlockType.Grass) {
-				if (FaceNormal.Y == 0)
-					BlockID = 242;
-				else
-					BlockID = 243;
-			}
-
+			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
 			int BlockX = BlockID % AtlasSize;
 			int BlockY = BlockID / AtlasSize;
 
@@ -545,95 +533,116 @@ namespace RaylibTest.Graphics {
 								ZNegSkipFace = BlockInfo.IsOpaque(ZNegType);
 							}
 
-							// X++
-							if (!XPosSkipFace) {
-								Vector3 CurDir = new Vector3(1, 0, 0);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							if (BlockInfo.CustomModel(CurBlock.Type)) {
+								if (!XPosSkipFace || !XNegSkipFace || !YPosSkipFace || !YNegSkipFace || !ZPosSkipFace || !ZNegSkipFace) {
 
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+									Model M = BlockInfo.GetCustomModel(CurBlock.Type);
 
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
-								Vertices.Add(new Vector3(1, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(1, 0, 1)));
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
-								Vertices.Add(new Vector3(1, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, -1, -1), new Vector3(1, -1, 0)));
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
-							}
+									SetBlockTextureUV(CurBlock.Type, Vector3.UnitY, Vertices);
 
-							// X--
-							if (!XNegSkipFace) {
-								Vector3 CurDir = new Vector3(-1, 0, 0);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+									for (int i = 0; i < M.meshes[0].vertexCount; i++) {
+										Vector3 Vert = ((Vector3*)M.meshes[0].vertices)[i];
+										Vector2 UV = new Vector2(0,1) + ((Vector2*)M.meshes[0].texcoords)[i] * new Vector2(1, -1);
+										Vertices.Add(Vert + new Vector3(0.5f, 0, 0.5f), UV, Color.White);
+									}
 
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
-								Vertices.Add(new Vector3(0, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, 1, -1), new Vector3(-1, 1, 0)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, -1, -1), new Vector3(-1, -1, 0)));
-								Vertices.Add(new Vector3(0, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, 1), new Vector3(-1, 0, 1)));
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, -1, -1), new Vector3(-1, -1, 0)));
-							}
 
-							// Y++
-							if (!YPosSkipFace) {
-								Vector3 CurDir = new Vector3(0, 1, 0);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
-								Vertices.Add(new Vector3(0, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(-1, 1, -1), new Vector3(-1, 1, 0)));
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 1, 1)));
-								Vertices.Add(new Vector3(1, 1, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(0, 1, 1)));
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 1, 1)));
-							}
+									Console.WriteLine("!");
 
-							// Y--
-							if (!YNegSkipFace) {
-								Vector3 CurDir = new Vector3(0, -1, 0);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+								}
+							} else {
 
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
-								Vertices.Add(new Vector3(0, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(-1, -1, 1), new Vector3(-1, -1, 0)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, -1), new Vector3(0, -1, -1)));
-								Vertices.Add(new Vector3(1, 0, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, -1), new Vector3(0, -1, -1)));
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, -1), new Vector3(0, -1, -1)));
-							}
+								// X++
+								if (!XPosSkipFace) {
+									Vector3 CurDir = new Vector3(1, 0, 0);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
 
-							// Z++
-							if (!ZPosSkipFace) {
-								Vector3 CurDir = new Vector3(0, 0, 1);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
-								Vertices.Add(new Vector3(1, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 0, 1)));
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
-								Vertices.Add(new Vector3(0, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, 1), new Vector3(-1, -1, 1), new Vector3(0, -1, 1)));
-								Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
-								Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
-							}
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
+									Vertices.Add(new Vector3(1, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(1, 0, 1)));
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
+									Vertices.Add(new Vector3(1, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, -1, -1), new Vector3(1, -1, 0)));
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
+								}
 
-							// Z--
-							if (!ZNegSkipFace) {
-								Vector3 CurDir = new Vector3(0, 0, -1);
-								//Color FaceClr = Color.White; 
-								Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-								SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+								// X--
+								if (!XNegSkipFace) {
+									Vector3 CurDir = new Vector3(-1, 0, 0);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
 
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));
-								Vertices.Add(new Vector3(1, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(1, -1, -1), new Vector3(1, 0, -1)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(-1, -1, -1), new Vector3(-1, 0, -1)));
-								Vertices.Add(new Vector3(0, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, 1, -1), new Vector3(0, 1, -1)));
-								Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));
-								Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(-1, -1, -1), new Vector3(-1, 0, -1)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
+									Vertices.Add(new Vector3(0, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, 1, -1), new Vector3(-1, 1, 0)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, -1, -1), new Vector3(-1, -1, 0)));
+									Vertices.Add(new Vector3(0, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, 1), new Vector3(-1, 0, 1)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, -1, -1), new Vector3(-1, -1, 0)));
+								}
+
+								// Y++
+								if (!YPosSkipFace) {
+									Vector3 CurDir = new Vector3(0, 1, 0);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
+									Vertices.Add(new Vector3(0, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(-1, 1, -1), new Vector3(-1, 1, 0)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 1, 1)));
+									Vertices.Add(new Vector3(1, 1, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(0, 1, 1)));
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(0, 1, 1)));
+								}
+
+								// Y--
+								if (!YNegSkipFace) {
+									Vector3 CurDir = new Vector3(0, -1, 0);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
+									Vertices.Add(new Vector3(0, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(-1, -1, 1), new Vector3(-1, -1, 0)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, -1), new Vector3(0, -1, -1)));
+									Vertices.Add(new Vector3(1, 0, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, -1), new Vector3(0, -1, -1)));
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, -1, 0), new Vector3(-1, -1, -1), new Vector3(0, -1, -1)));
+								}
+
+								// Z++
+								if (!ZPosSkipFace) {
+									Vector3 CurDir = new Vector3(0, 0, 1);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
+									Vertices.Add(new Vector3(1, 1, 1), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 0, 1)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
+									Vertices.Add(new Vector3(0, 0, 1), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, 1), new Vector3(-1, -1, 1), new Vector3(0, -1, 1)));
+									Vertices.Add(new Vector3(1, 0, 1), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1)));
+									Vertices.Add(new Vector3(0, 1, 1), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, 1), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1)));
+								}
+
+								// Z--
+								if (!ZNegSkipFace) {
+									Vector3 CurDir = new Vector3(0, 0, -1);
+									//Color FaceClr = Color.White; 
+									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
+
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));
+									Vertices.Add(new Vector3(1, 0, 0), new Vector2(0, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(1, -1, -1), new Vector3(1, 0, -1)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(-1, -1, -1), new Vector3(-1, 0, -1)));
+									Vertices.Add(new Vector3(0, 1, 0), new Vector2(1, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(-1, 0, -1), new Vector3(-1, 1, -1), new Vector3(0, 1, -1)));
+									Vertices.Add(new Vector3(1, 1, 0), new Vector2(0, 1), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1)));
+									Vertices.Add(new Vector3(0, 0, 0), new Vector2(1, 0), FaceClr * CalcAOColor(GlobalBlockPos, new Vector3(0, -1, -1), new Vector3(-1, -1, -1), new Vector3(-1, 0, -1)));
+								}
 							}
 						}
 

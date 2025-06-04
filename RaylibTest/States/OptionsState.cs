@@ -8,5 +8,7 @@ using System.Threading.Tasks;
 
 namespace RaylibGame.States {
 	class OptionsState : GameStateImpl {
+		public OptionsState(GameWindow window) : base(window) {
+		}
 	}
 }

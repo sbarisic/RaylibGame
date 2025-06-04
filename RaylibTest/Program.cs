@@ -30,9 +30,9 @@ namespace RaylibTest {
 			GraphicsUtils.Init();
 			Scripting.Init();
 
-			MainMenuState = new MainMenuState();
-			GameState = new GameState();
-			OptionsState = new OptionsState();
+			MainMenuState = new MainMenuState(Window);
+			GameState = new GameState(Window);
+			OptionsState = new OptionsState(Window);
 
 			Window.SetState(MainMenuState);
 

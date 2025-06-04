@@ -7,6 +7,12 @@ using System.Threading.Tasks;
 
 namespace RaylibTest.Engine {
 	abstract class GameStateImpl {
+		public GameWindow Window;
+
+		public GameStateImpl(GameWindow window) {
+			Window = window;
+		}
+
 		public virtual void SwapTo() {
 		}
 

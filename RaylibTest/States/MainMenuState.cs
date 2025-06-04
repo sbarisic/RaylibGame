@@ -12,6 +12,9 @@ namespace RaylibGame.States {
 	class MainMenuState : GameStateImpl {
 		Camera2D Cam = new Camera2D();
 
+		public MainMenuState(GameWindow window) : base(window) {
+		}
+
 		public override void SwapTo() {
 			Cam.zoom = 1;
 		}

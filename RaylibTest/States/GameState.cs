@@ -75,11 +75,28 @@ namespace RaylibGame.States {
 				}
 			});
 
+			Ply.AddOnKeyPressed(KeyboardKey.KEY_E, () => {
+				Vector3 Start = Ply.Position;
+				Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
+				PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
+
+				float XU = (float)(End.X - Math.Floor(End.X));
+				float YV = (float)(End.Z - Math.Floor(End.Z));
+
+				//Blk.OnBlockActivate?.Invoke(Blk, End, new Vector2(XU, YV));
+
+				if (Blk.Type == BlockType.CraftingTable)
+					Console.WriteLine("Craft! {0}, ({1}, {2})", Face, XU, YV);
+			});
+
 			Ply.SetPosition(32, 73, 19);
 		}
 
 		Vector3 PlyVelocity = Vector3.Zero;
 		bool WasLastLegsOnFloor = false;
+
+		public GameState(GameWindow window) : base(window) {
+		}
 
 		float ClampToZero(float Num, float ClampHyst) {
 			if (Num < 0 && Num > -ClampHyst)
@@ -309,6 +326,11 @@ namespace RaylibGame.States {
 		}
 
 		public override void Update(float Dt) {
+			if (Raylib.IsKeyPressed(KeyboardKey.KEY_ESCAPE)) {
+				Window.SetState(Program.MainMenuState);
+				return;
+			}
+
 			Ply.Update();
 
 			if (Raylib.IsKeyPressed(KeyboardKey.KEY_F5)) {
@@ -388,7 +410,7 @@ namespace RaylibGame.States {
 							Y += (int)Face.Y;
 							Z += (int)Face.Z;
 
-							Map.SetBlock(X, Y, Z, BlockType.Glowstone);
+							Map.SetBlock(X, Y, Z, BlockType.Campfire);
 							return true;
 						}
 

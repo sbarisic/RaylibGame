@@ -5,6 +5,8 @@ using RaylibTest.Graphics;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -103,9 +105,16 @@ namespace RaylibTest {
 
 			Ply = new Player("snoutx10k", true);
 
+			Stopwatch SWatch = Stopwatch.StartNew();
+
 			Ply.AddOnKeyPressed(KeyboardKey.KEY_F2, () => {
 				Console.WriteLine("Compute light!");
+				SWatch.Restart();
+
 				Map.ComputeLighting();
+
+				SWatch.Stop();
+				Console.Title = string.Format("> {0} s", SWatch.ElapsedMilliseconds / 1000.0f);
 			});
 
 			Ply.AddOnKeyPressed(KeyboardKey.KEY_F3, () => {
@@ -132,6 +141,7 @@ namespace RaylibTest {
 		}
 
 		Vector3 PlyVelocity = Vector3.Zero;
+		bool WasLastLegsOnFloor = false;
 
 		float ClampToZero(float Num, float ClampHyst) {
 			if (Num < 0 && Num > -ClampHyst)
@@ -146,6 +156,9 @@ namespace RaylibTest {
 		void UpdatePhysics(float Dt) {
 			Ply.UpdatePhysics(Dt);
 
+			if (!Utils.HasRecord())
+				Utils.BeginRaycastRecord();
+
 			float ClampHyst = 0.001f;
 			PlyVelocity.X = ClampToZero(PlyVelocity.X, ClampHyst);
 			PlyVelocity.Y = ClampToZero(PlyVelocity.Y, ClampHyst);
@@ -156,20 +169,36 @@ namespace RaylibTest {
 			float Gravity = 10.5f;
 			float MaxPlayerVelocity = 3.6f;
 			float MaxPlayerControllableVelocity = 4.0f;
-			float MaxPlayerFallVelocity = 6.0f;
+			float MaxPlayerFallVelocity = 10.0f;
 			float PlayerJumpVelocity = 4.8f;
 			const float PlyMoveSen = 2.2f;
 
 			float PlayerHeight = 1.8f;
 
-			Vector3 TorsoEndPos = Ply.Position + new Vector3(0, -0.8f, 0);
-			Vector3 TorsoPos = Ply.Position + new Vector3(0, -1f, 0);
+			//Vector3 TorsoEndPos = Ply.Position + new Vector3(0, -1.2f, 0);
+			Vector3 TorsoPos = Ply.Position + new Vector3(0, -1.2f, 0);
 
-			Vector3 HitTorso = Map.RaycastPos(TorsoEndPos, 0.2f, new Vector3(0, -1f, 0), out Vector3 Face2);
-			Vector3 HitFloor = Map.RaycastPos(TorsoPos, PlayerHeight - 1, new Vector3(0, -1f, 0), out Vector3 Face1);
+
+
+			//Vector3 HitTorso = Map.RaycastPos(TorsoEndPos, 0.2f, new Vector3(0, -1f, 0), out Vector3 Face2);
+			Vector3 HitFloor = Map.RaycastPos(TorsoPos, 0.6f, new Vector3(0, -1f, 0), out Vector3 Face1);
 
 			bool HasHitFloor = HitFloor != Vector3.Zero;
-			bool HasHitTorso = HitTorso != Vector3.Zero;
+
+			if (Face1.Y != 1)
+				HasHitFloor = false;
+			//bool HasHitTorso = HitTorso != Vector3.Zero;
+
+			if (HasHitFloor) {
+				if (!WasLastLegsOnFloor) {
+					WasLastLegsOnFloor = true;
+					Ply.PhysicsHit(VelLen, false, true, false);
+				} else if (PlyVelocity.Length() >= (MaxPlayerVelocity / 2)) {
+					Ply.PhysicsHit(PlyVelocity.Length(), false, true, true);
+				}
+			} else {
+				WasLastLegsOnFloor = false;
+			}
 
 			bool IsBraking = true;
 
@@ -210,9 +239,7 @@ namespace RaylibTest {
 				} else {
 					if (PlyVelocity.Length() <= MaxPlayerControllableVelocity) {
 
-						if (!HasHitTorso) {
-							PlyVelocity += new Vector3(DesiredPos.X, 0, DesiredPos.Z) * 0.1f;
-						}
+						PlyVelocity += new Vector3(DesiredPos.X, 0, DesiredPos.Z) * 0.1f;
 					}
 				}
 
@@ -245,6 +272,10 @@ namespace RaylibTest {
 
 				PlyVelocity = PlyVelocity - new Vector3(0, Gravity * Dt, 0);
 
+				float Factor = (float)Math.Pow(0.1f, Dt);
+				PlyVelocity.X = PlyVelocity.X * Factor;
+				PlyVelocity.Z = PlyVelocity.Z * Factor;
+
 				if (VelV > MaxPlayerFallVelocity) {
 					if (PlyVelocity.Y < 0)
 						PlyVelocity.Y = -MaxPlayerFallVelocity;
@@ -260,8 +291,50 @@ namespace RaylibTest {
 				PlyVelocity = Vector3.Zero;
 			}*/
 
+			Vector3 LastTorsoHitPos = Vector3.Zero;
+
 			if (PlyVelocity != Vector3.Zero) {
-				Vector3 HitPos = Map.RaycastPos(Ply.Position, PlyVelocity.Length() * Dt, Vector3.Normalize(PlyVelocity), out Vector3 Face);
+				for (int i = 0; i < 360; i += 30) {
+					Vector3 Dir = new Vector3((float)Math.Sin(Utils.ToRad(i)), 0, (float)Math.Cos(Utils.ToRad(i))) * 0.4f;
+
+					for (int jj = 0; jj < 2; jj++) {
+						Vector3 Addr = (jj == 0 ? new Vector3(0, -1.1f, 0) : new Vector3(0, -0.2f, 0));
+
+						Vector3 HitPos = Map.RaycastPos(Ply.Position + Dir + Addr, PlyVelocity.Length() * Dt, Vector3.Normalize(PlyVelocity), out Vector3 Face);
+						if (HitPos != Vector3.Zero) {
+							LastTorsoHitPos = HitPos;
+
+							if (Face.X != 0) {
+								//float DeltaVel = PlyVelocity.Length();
+
+								PlyVelocity.X = 0;
+
+								//DeltaVel = DeltaVel - PlyVelocity.Length();
+								//Ply.PhysicsHit(DeltaVel, true, false);
+							}
+
+							if (Face.Y != 0) {
+								//float DeltaVel = PlyVelocity.Length();
+
+								PlyVelocity.Y = 0;
+
+								//DeltaVel = DeltaVel - PlyVelocity.Length();
+								//Ply.PhysicsHit(DeltaVel, false, Face.Y == 1);
+							}
+
+							if (Face.Z != 0) {
+								//float DeltaVel = PlyVelocity.Length();
+
+								PlyVelocity.Z = 0;
+
+								//DeltaVel = DeltaVel - PlyVelocity.Length();
+								//Ply.PhysicsHit(DeltaVel, true, false);
+							}
+						}
+					}
+				}
+
+				/*Vector3 HitPos = Map.RaycastPos(Ply.Position, PlyVelocity.Length() * Dt, Vector3.Normalize(PlyVelocity), out Vector3 Face);
 				if (HitPos != Vector3.Zero) {
 
 					if (Face.X != 0)
@@ -272,11 +345,28 @@ namespace RaylibTest {
 
 					if (Face.Z != 0)
 						PlyVelocity.Z = 0;
+				}*/
+			}
+
+			if (PlyVelocity != Vector3.Zero) {
+				Vector3 NewPlyPos = Ply.Position + (PlyVelocity * Dt);
+
+
+
+				if (Map.GetBlock(NewPlyPos) == BlockType.None)
+					Ply.SetPosition(NewPlyPos);
+				else
+					PlyVelocity = Vector3.Zero;
+			}
+
+			if (PlyVelocity.Y == 0 && !HasHitFloor) {
+				if (LastTorsoHitPos != Vector3.Zero) {
+					PlyVelocity = PlyVelocity * 0.5f;
+					Ply.Parkour(LastTorsoHitPos + new Vector3(0, PlayerHeight, 0));
 				}
 			}
 
-			if (PlyVelocity != Vector3.Zero)
-				Ply.SetPosition(Ply.Position + (PlyVelocity * Dt));
+			Utils.EndRaycastRecord();
 		}
 
 		public override void Update(float Dt) {
@@ -397,6 +487,8 @@ namespace RaylibTest {
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(100, 0, 0), Color.Red);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 100, 0), Color.Green);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
+
+			Utils.DrawRaycastRecord();
 
 			//Raylib.DrawLine3D(Start, End, Color.White);
 

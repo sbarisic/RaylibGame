@@ -507,6 +507,9 @@ namespace RaylibTest {
 						face.Z = -StepZ;
 					}
 				}
+
+				if (face == Vector3.Zero)
+					return false;
 			}
 
 			if (IsRecording) {

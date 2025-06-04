@@ -471,6 +471,8 @@ namespace RaylibTest.Graphics {
 			Vector3 OutFaceDir = Vector3.Zero;
 
 			if (Utils.Raycast2(Origin, Dir, Distance, 20, (HitPos, Face) => {
+				if (Face == Vector3.Zero)
+					return false;
 
 				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
 					RetPos = HitPos;
@@ -620,7 +622,26 @@ namespace RaylibTest.Graphics {
 		}
 
 		IEnumerable<Tuple<PlacedBlock, Vector3>> GetBlocksInRange(Vector3 Pos, float Range, BlockType[] IgnoreBlocks = null) {
-			foreach (Chunk C in GetAllChunks()) {
+			int Rang = (int)Range;//(int)Math.Ceiling(Range / 2) + 1;
+
+			for (int zz = -Rang; zz < Rang + 1; zz++)
+				for (int yy = -Rang; yy < Rang + 1; yy++)
+					for (int xx = -Rang; xx < Rang + 1; xx++) {
+						Vector3 Offset = new Vector3(xx, yy, zz);
+						Vector3 Pos2 = Pos + Offset;
+
+						if (Vector3.Distance(Pos2, Pos) > Range)
+							continue;
+
+						PlacedBlock PB = GetPlacedBlock((int)Pos2.X, (int)Pos2.Y, (int)Pos2.Z, out Chunk Chk);
+
+						if (IgnoreBlocks != null && IgnoreBlocks.Contains(PB.Type))
+							continue;
+
+						yield return new Tuple<PlacedBlock, Vector3>(PB, new Vector3((int)Pos2.X, (int)Pos2.Y, (int)Pos2.Z));
+					}
+
+			/*foreach (Chunk C in GetAllChunks()) {
 				for (int i = 0; i < C.Blocks.Length; i++) {
 					PlacedBlock B = C.Blocks[i];
 
@@ -633,7 +654,7 @@ namespace RaylibTest.Graphics {
 					if (Vector3.Distance(Pos, BPos) <= Range)
 						yield return new Tuple<PlacedBlock, Vector3>(B, BPos);
 				}
-			}
+			}*/
 		}
 
 		IEnumerable<Vector3> GetVisibleFaces(Vector3 BlockPos, Vector3 CamPos) {
@@ -661,14 +682,14 @@ namespace RaylibTest.Graphics {
 					if (B.Type == BlockType.None)
 						continue;
 
-					B.SetBlockLight(new BlockLight(4));
+					B.SetBlockLight(new BlockLight(8));
 				}
 			}
 
-			if (!Utils.HasRecord()) {
+			/*if (!Utils.HasRecord()) {
 				Console.WriteLine("Begin recording!");
 				Utils.BeginRaycastRecord();
-			}
+			}*/
 
 			foreach (Chunk C in GetAllChunks()) {
 				for (int i = 0; i < C.Blocks.Length; i++) {
@@ -732,12 +753,9 @@ namespace RaylibTest.Graphics {
 				}
 			}
 
-			Utils.EndRaycastRecord();
+			//Utils.EndRaycastRecord();
 
-			//Vector3 SunPos = new Vector3(30, 77, 20);
 			float SunReach = 128;
-
-
 			Matrix4x4 LookAtRot = Matrix4x4.CreateFromYawPitchRoll(Utils.ToRad(-25), Utils.ToRad(90 - 25), Utils.ToRad(0));
 
 
@@ -748,7 +766,7 @@ namespace RaylibTest.Graphics {
 
 			SunRayOrigins.Clear();
 
-			int MaxSize = 30;
+			/*int MaxSize = 30;
 			float StepScale = 1.0f;
 
 			Vector3 CamPos = FPSCamera.Position;
@@ -780,54 +798,13 @@ namespace RaylibTest.Graphics {
 						}
 
 						Console.WriteLine(Neigh);
-
-						//HitPos.X = (int)HitPos.X + 0.5f;
-						//HitPos.Y = (int)HitPos.Y + 0.5f;
-						//HitPos.Z = (int)HitPos.Z + 0.5f;
-
-						// Bounce
-						//PerformLightBounce2(HitPos + FaceNormal * 0.55f, 3);
 					}
 				}
-			}
+			}*/
 
 			foreach (Chunk C in GetAllChunks()) {
-				//C.ComputeLighting();
 				C.MarkDirty();
 			}
-
-			/*GlobalPlacedBlock[] PlacedBlocks = GetAllExistingBlocks().ToArray();
-
-			for (int i = 0; i < PlacedBlocks.Length; i++) {
-				PlacedBlock Block = PlacedBlocks[i].Block;
-				if (Block.Type == BlockType.None)
-					continue;
-
-				Vector3 GlobalPos = PlacedBlocks[i].GlobalPos;
-				int X = (int)GlobalPos.X;
-				int Y = (int)GlobalPos.Y;
-				int Z = (int)GlobalPos.Z;
-
-				if (IsCovered(X, Y, Z))
-					continue;
-
-				// Ambient occlusion
-				for (int j = 0; j < Utils.MainDirs.Length; j++) {
-					Vector3 Origin = new Vector3(X, Y, Z) + Utils.MainDirs[j];
-					float AmbientHitRatio = ((float)CountAmbientHits(Origin)) / Utils.MainDirs.Length;
-
-
-					int Light = 32 - (int)(AmbientHitRatio * 24);
-
-					Block.Lights[Utils.DirToByte(Utils.MainDirs[j])] = new BlockLight((byte)(Light));
-					PlacedBlocks[i].Chunk.MarkDirty();
-				}
-
-				// TODO: Actual lights
-
-				// Set block back into world
-				// SetPlacedBlock(X, Y, Z, Block, false);
-			}*/
 		}
 
 		public PlacedBlock GetPlacedBlock(int X, int Y, int Z, out Chunk Chk) {
@@ -855,11 +832,11 @@ namespace RaylibTest.Graphics {
 				KV.Value.Draw(ChunkPos);
 			}
 
-			foreach (Vector3 Orig in SunRayOrigins) {
+			/*foreach (Vector3 Orig in SunRayOrigins) {
 				Vector3 Dst = Orig + SunDir * 64;
 
 				Raylib.DrawLine3D(Orig, Dst, Color.Orange);
-			}
+			}*/
 
 			Utils.DrawRaycastRecord();
 		}

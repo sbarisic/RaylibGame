@@ -463,7 +463,7 @@ namespace RaylibTest.Graphics {
 		}
 
 		Color CalcAOColor(Vector3 GlobalBlockPos, Vector3 A, Vector3 B, Vector3 C) {
-			/*int Hits = 0;
+			int Hits = 0;
 
 			if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + A)))
 				Hits++;
@@ -475,9 +475,11 @@ namespace RaylibTest.Graphics {
 				Hits++;
 
 			if (Hits != 0)
-				return new Color(0.8f); // 0.9f*/
+				return new Color(1.0f - (Hits * 0.2f)); // 0.9f*/
 
-			return Color.White;
+			return new Color(1.0f);
+
+			//return Color.White;
 		}
 
 		void SetBlockTextureUV(BlockType BlockType, Vector3 FaceNormal, MeshBuilder Verts) {

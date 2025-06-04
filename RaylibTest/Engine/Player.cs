@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -124,6 +125,9 @@ namespace RaylibTest.Engine {
 
 		Dictionary<KeyboardKey, Action> OnKeyFuncs = new Dictionary<KeyboardKey, Action>();
 
+		Stopwatch LegTimer = Stopwatch.StartNew();
+		long LastWalkSound = 0;
+
 		public Player(string ModelName, bool LocalPlayer) {
 			this.LocalPlayer = LocalPlayer;
 			PlayerEntity = Entities.Load(ModelName);
@@ -161,7 +165,24 @@ namespace RaylibTest.Engine {
 		}
 
 		public void UpdatePhysics(float Dt) {
-		
+
+		}
+
+		public void PhysicsHit(float Force, bool Side, bool Feet, bool Walk) {
+			if (Walk) {
+				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
+					LastWalkSound = LegTimer.ElapsedMilliseconds;
+
+					Console.WriteLine("Walk");
+				}
+			} else {
+				Console.WriteLine("Sid: {0}, Ft: {1}, F: {2}, W: {3}", Side, Feet, Force, Walk);
+			}
+		}
+
+		public void Parkour(Vector3 NewPos) {
+			Console.WriteLine("Parkour!");
+			SetPosition(NewPos);
 		}
 
 		public void Update() {

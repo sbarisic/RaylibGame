@@ -31,8 +31,15 @@ namespace RaylibTest {
 
 			Window.SetState(MainMenuState);
 
+			float Dt = 0;
+
 			while (Window.IsOpen()) {
-				Window.Update();
+				Dt = Raylib.GetFrameTime();
+
+				if (Dt != 0 && Dt < 1.5f) {
+					Window.Update(Dt);
+				}
+
 				Window.Draw();
 			}
 		}
@@ -75,6 +82,8 @@ namespace RaylibTest {
 		ChunkMap Map;
 		Player Ply;
 
+		List<Tuple<Vector3, Vector3>> MarkerList = new List<Tuple<Vector3, Vector3>>();
+
 		public override void SwapTo() {
 			Map = new ChunkMap();
 			//Map.LoadFromChunk("data/map0.chunk");
@@ -92,19 +101,176 @@ namespace RaylibTest {
 			/*foreach (var C in Map.GetAllChunks())
 				C.Fill((BlockType)Utils.Random(1, 11));*/
 
-			FPSCamera.Position = new Vector3(6, 6, -12);
 			Ply = new Player("snoutx10k", true);
 
-			Ply.FuncKey = KeyboardKey.KEY_F2;
-			Ply.OnKeyPressed = () => {
-					Console.WriteLine("Compute light!");
-					Map.ComputeLighting();
-			};
+			Ply.AddOnKeyPressed(KeyboardKey.KEY_F2, () => {
+				Console.WriteLine("Compute light!");
+				Map.ComputeLighting();
+			});
+
+			Ply.AddOnKeyPressed(KeyboardKey.KEY_F3, () => {
+				Console.WriteLine("Pos: {0}", Ply.Position);
+			});
+
+			Ply.AddOnKeyPressed(KeyboardKey.KEY_F, () => {
+				Console.WriteLine("Pew pew!");
+
+				Vector3 Start = Ply.Position;
+				Vector3 End = Map.RaycastPos(Start, 10, FPSCamera.GetForward(), out Vector3 Face);
+
+				if (End != Vector3.Zero) {
+					MarkerList.Add(new Tuple<Vector3, Vector3>(Start, End));
+				}
+			});
+
+			Ply.SetPosition(32, 73, 19);
 		}
 
+		Vector3 PlyVelocity = Vector3.Zero;
+
+		float ClampToZero(float Num, float ClampHyst) {
+			if (Num < 0 && Num > -ClampHyst)
+				return 0;
+
+			if (Num > 0 && Num < ClampHyst)
+				return 0;
+
+			return Num;
+		}
+
+		void UpdatePhysics(float Dt) {
+			Ply.UpdatePhysics(Dt);
+
+			float ClampHyst = 0.001f;
+			PlyVelocity.X = ClampToZero(PlyVelocity.X, ClampHyst);
+			PlyVelocity.Y = ClampToZero(PlyVelocity.Y, ClampHyst);
+			PlyVelocity.Z = ClampToZero(PlyVelocity.Z, ClampHyst);
+
+			float VelLen = PlyVelocity.Length();
+
+			float Gravity = 9.8f;
+			float MaxPlayerVelocity = 3.2f;
+			float MaxPlayerControllableVelocity = 4.0f;
+			float MaxPlayerFallVelocity = 6.0f;
+			float PlayerJumpVelocity = 4.0f;
+
+			float PlayerHeight = 1.8f;
+
+			Vector3 TorsoEndPos = Ply.Position + new Vector3(0, -0.8f, 0);
+			Vector3 TorsoPos = Ply.Position + new Vector3(0, -1f, 0);
+
+			Vector3 HitTorso = Map.RaycastPos(TorsoEndPos, 0.2f, new Vector3(0, -1f, 0), out Vector3 Face2);
+			Vector3 HitFloor = Map.RaycastPos(TorsoPos, PlayerHeight - 1, new Vector3(0, -1f, 0), out Vector3 Face1);
+
+			bool HasHitFloor = HitFloor != Vector3.Zero;
+			bool HasHitTorso = HitTorso != Vector3.Zero;
+
+			bool IsBraking = true;
+
+			{
+				const float PlyMoveSen = 1.2f;
+				Vector3 DesiredPos = Vector3.Zero;
+				Vector3 Forward = FPSCamera.GetForward();
+				Vector3 Left = FPSCamera.GetLeft();
+				Vector3 Up = FPSCamera.GetUp();
+
+				if (Raylib.IsKeyDown('W'))
+					DesiredPos += Forward * PlyMoveSen;
+				if (Raylib.IsKeyDown('S'))
+					DesiredPos -= Forward * PlyMoveSen;
+
+				if (Raylib.IsKeyDown('A'))
+					DesiredPos += Left * PlyMoveSen;
+				if (Raylib.IsKeyDown('D'))
+					DesiredPos -= Left * PlyMoveSen;
+
+				if (Raylib.IsKeyDown(' ')) {
+					//DesiredPos += Up * PlyMoveSen;
+
+					if (HasHitFloor) {
+						PlyVelocity += new Vector3(0, PlayerJumpVelocity, 0);
+						HasHitFloor = false;
+					}
+				}
+
+				if (Raylib.IsKeyDown('C'))
+					DesiredPos -= Up * PlyMoveSen;
+
+				if (HasHitFloor) {
+					PlyVelocity += DesiredPos;
+				} else {
+					if (PlyVelocity.Length() <= MaxPlayerControllableVelocity) {
+
+						if (!HasHitTorso) {
+							PlyVelocity += new Vector3(DesiredPos.X, 0, DesiredPos.Z) * 0.1f;
+						}
+					}
+				}
+
+				if (DesiredPos != Vector3.Zero)
+					IsBraking = false;
+			}
+
+			Vector2 PlyVelocityH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+			float VelH = PlyVelocityH.Length();
+			float VelV = Math.Abs(PlyVelocity.Y);
+			float Vel = PlyVelocity.Length();
+
+			if (HasHitFloor) {
+				if (VelH > MaxPlayerVelocity) {
+					Vector2 NewHorizontal = Vector2.Normalize(PlyVelocityH) * MaxPlayerVelocity;
+					PlyVelocity.X = NewHorizontal.X;
+					PlyVelocity.Z = NewHorizontal.Y;
+				}
+
+				PlyVelocity.Y = 0;
+
+				if (IsBraking)
+					PlyVelocity = PlyVelocity * 0.6f;
+
+				Ply.SetPosition(HitFloor + new Vector3(0, PlayerHeight, 0));
+			} else {
+				//Console.WriteLine("Falling!");
 
 
-		public override void Update() {
+
+				PlyVelocity = PlyVelocity - new Vector3(0, Gravity * Dt, 0);
+
+				if (VelV > MaxPlayerFallVelocity) {
+					if (PlyVelocity.Y < 0)
+						PlyVelocity.Y = -MaxPlayerFallVelocity;
+					else
+						PlyVelocity.Y = MaxPlayerFallVelocity;
+				}
+			}
+
+			//Console.WriteLine("{0}", PlyVelocity.Length());
+
+			/*bool MoveHits = Map.RaycastPoint(Ply.Position + PlyVelocity * Dt);
+			if (MoveHits) {
+				PlyVelocity = Vector3.Zero;
+			}*/
+
+			if (PlyVelocity != Vector3.Zero) {
+				Vector3 HitPos = Map.RaycastPos(Ply.Position, PlyVelocity.Length() * Dt, Vector3.Normalize(PlyVelocity), out Vector3 Face);
+				if (HitPos != Vector3.Zero) {
+
+					if (Face.X != 0)
+						PlyVelocity.X = 0;
+
+					if (Face.Y != 0)
+						PlyVelocity.Y = 0;
+
+					if (Face.Z != 0)
+						PlyVelocity.Z = 0;
+				}
+			}
+
+			if (PlyVelocity != Vector3.Zero)
+				Ply.SetPosition(Ply.Position + (PlyVelocity * Dt));
+		}
+
+		public override void Update(float Dt) {
 			Ply.Update();
 
 			if (Raylib.IsKeyPressed(KeyboardKey.KEY_F5)) {
@@ -192,6 +358,8 @@ namespace RaylibTest {
 					});
 				}
 			}
+
+			UpdatePhysics(Dt);
 		}
 
 		public override void Draw() {
@@ -212,6 +380,10 @@ namespace RaylibTest {
 			Map.DrawTransparent();
 
 			Ply.Draw();
+
+			foreach (var L in MarkerList) {
+				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);
+			}
 
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(100, 0, 0), Color.Red);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 100, 0), Color.Green);

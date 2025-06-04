@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace RaylibTest {
 	delegate bool RaycastCallbackFunc(int X, int Y, int Z, Vector3 FaceNormal);
+	delegate bool Raycast2CallbackFunc(Vector3 Pos, Vector3 FaceNormal);
 
 	static class Utils {
 		public static Random Rnd = new Random();
@@ -250,19 +251,19 @@ namespace RaylibTest {
 			return DirectionsArray;
 		}
 
-		public static int RaycastSphere(Vector3 Origin, int Radius, RaycastCallbackFunc Callback, int Slices = 32) {
+		public static int RaycastSphere(Vector3 Origin, float Radius, Raycast2CallbackFunc Callback, int Slices = 32) {
 			Vector3[] Dirs = CalculateSphereDirections(Slices);
 			int Hits = 0;
 
 			foreach (var Dir in Dirs) {
-				if (Raycast(Origin, Dir, Radius, Callback))
+				if (Raycast2(Origin, Dir, Radius, 10, Callback))
 					Hits++;
 			}
 
 			return Hits;
 		}
 
-		public static int RaycastHalfSphere(Vector3 Origin, Vector3 HalfSphereDir, int Radius, RaycastCallbackFunc Callback, out int MaxHits, int Slices = 32) {
+		public static int RaycastHalfSphere(Vector3 Origin, Vector3 HalfSphereDir, int Radius, Raycast2CallbackFunc Callback, out int MaxHits, int Slices = 32) {
 			Vector3[] Dirs = CalculateSphereDirections(Slices);
 			int Hits = 0;
 			MaxHits = 0;
@@ -271,7 +272,7 @@ namespace RaylibTest {
 				if (Vector3.Dot(Dir, HalfSphereDir) > 0) {
 					MaxHits++;
 
-					if (Raycast(Origin, Dir, Radius, Callback))
+					if (Raycast2(Origin, Dir, Radius, 10, Callback))
 						Hits++;
 				}
 			}
@@ -377,6 +378,107 @@ namespace RaylibTest {
 			return false;
 		}
 
+		public static bool Raycast2(Vector3 Origin, Vector3 Direction, float Length, float CastScale, Raycast2CallbackFunc Callback) {
+			Origin = Origin * CastScale;
+			Length = Length * CastScale;
+
+			// Cube containing origin point.
+			float X = Origin.X;
+			float Y = Origin.Y;
+			float Z = Origin.Z;
+
+			// Break out direction vector.
+			float Dx = Direction.X;
+			float Dy = Direction.Y;
+			float Dz = Direction.Z;
+
+			// Direction to increment x,y,z when stepping.
+			float StepX = Dx > 0 ? 1 : Dx < 0 ? -1 : 0;
+			float StepY = Dy > 0 ? 1 : Dy < 0 ? -1 : 0;
+			float StepZ = Dz > 0 ? 1 : Dz < 0 ? -1 : 0;
+
+			/*const float StepScale = 0.2f;
+			StepX *= StepScale;
+			StepY *= StepScale;
+			StepZ *= StepScale;*/
+
+			// See description above. The initial values depend on the fractional
+			// part of the origin.
+			float tMaxX = IntBound(Origin.X, Dx);
+			float tMaxY = IntBound(Origin.Y, Dy);
+			float tMaxZ = IntBound(Origin.Z, Dz);
+
+			// The change in t when taking a step (always positive).
+			float tDeltaX = StepX / Dx;
+			float tDeltaY = StepY / Dy;
+			float tDeltaZ = StepZ / Dz;
+
+			// Buffer for reporting faces to the callback.
+			var face = new Vector3();
+
+			// Avoids an infinite loop.
+			if (Dx == 0 && Dy == 0 && Dz == 0)
+				throw new Exception("Raycast in zero direction!");
+
+			// Rescale from units of 1 cube-edge to units of 'direction' so we can
+			// compare with 't'.
+			Length /= (float)Math.Sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
+
+			while (true) {
+				if (Callback(new Vector3((X / CastScale), (Y / CastScale), (Z / CastScale)), face))
+					return true;
+
+				// tMaxX stores the t-value at which we cross a cube boundary along the
+				// X axis, and similarly for Y and Z. Therefore, choosing the least tMax
+				// chooses the closest cube boundary. Only the first case of the four
+				// has been commented in detail.
+				if (tMaxX < tMaxY) {
+					if (tMaxX < tMaxZ) {
+						if (tMaxX > Length)
+							break;
+						// Update which cube we are now in.
+						X += StepX;
+						// Adjust tMaxX to the next X-oriented boundary crossing.
+						tMaxX += tDeltaX;
+						// Record the normal vector of the cube face we entered.
+						face.X = -StepX;
+						face.Y = 0;
+						face.Z = 0;
+					} else {
+						if (tMaxZ > Length)
+							break;
+						Z += StepZ;
+						tMaxZ += tDeltaZ;
+						face.X = 0;
+						face.Y = 0;
+						face.Z = -StepZ;
+					}
+				} else {
+					if (tMaxY < tMaxZ) {
+						if (tMaxY > Length)
+							break;
+						Y += StepY;
+						tMaxY += tDeltaY;
+						face.X = 0;
+						face.Y = -StepY;
+						face.Z = 0;
+					} else {
+						// Identical to the second case, repeated for simplicity in
+						// the conditionals.
+						if (tMaxZ > Length)
+							break;
+						Z += StepZ;
+						tMaxZ += tDeltaZ;
+						face.X = 0;
+						face.Y = 0;
+						face.Z = -StepZ;
+					}
+				}
+			}
+
+			return false;
+		}
+
 		static float IntBound(float S, float Ds) {
 			if (Ds < 0) {
 				Ds = -Ds;
@@ -414,6 +516,14 @@ namespace RaylibTest {
 		public static T Random<T>(this IEnumerable<T> Collection) {
 			T[] Elements = Collection.ToArray();
 			return Elements[Random(0, Elements.Length)];
+		}
+
+		public static float ToDeg(float Rad) {
+			return (float)((Rad * 180) / Math.PI);
+		}
+
+		public static float ToRad(float Deg) {
+			return (float)(Deg * (Math.PI / 180));
 		}
 	}
 }

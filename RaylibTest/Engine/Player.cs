@@ -115,15 +115,14 @@ namespace RaylibTest.Engine {
 		bool MoveLt;
 		bool MoveRt;
 
-		Vector3 Position;
-		Matrix4x4 Rotation;
-		Matrix4x4 UpperBodyRotation;
+		public Vector3 Position;
+		public Matrix4x4 Rotation;
+		public Matrix4x4 UpperBodyRotation;
 
 		bool CursorDisabled = false;
 		bool LocalPlayer;
 
-		public KeyboardKey FuncKey;
-		public OnKeyPressedFunc OnKeyPressed;
+		Dictionary<KeyboardKey, Action> OnKeyFuncs = new Dictionary<KeyboardKey, Action>();
 
 		public Player(string ModelName, bool LocalPlayer) {
 			this.LocalPlayer = LocalPlayer;
@@ -153,6 +152,18 @@ namespace RaylibTest.Engine {
 			CursorDisabled = !CursorDisabled;
 		}
 
+		public void SetPosition(int X, int Y, int Z) {
+			Position = FPSCamera.Position = new Vector3(X, Y, Z);
+		}
+
+		public void SetPosition(Vector3 Pos) {
+			Position = FPSCamera.Position = Pos;
+		}
+
+		public void UpdatePhysics(float Dt) {
+		
+		}
+
 		public void Update() {
 			string AnimName = "idle";
 
@@ -173,19 +184,20 @@ namespace RaylibTest.Engine {
 				CurAnim.Apply();
 			}
 
-			if (CursorDisabled)
-				FPSCamera.Update(ref Cam);
+			FPSCamera.Update(CursorDisabled, ref Cam);
 
 			if (Raylib.IsKeyPressed(KeyboardKey.KEY_F1))
 				ToggleMouse();
 
-			if (Raylib.IsKeyPressed(FuncKey))
-				OnKeyPressed();
+			foreach (var KV in OnKeyFuncs) {
+				if (Raylib.IsKeyPressed(KV.Key))
+					KV.Value();
+			}
 
 
 			//PlayerEntity.GetBone("Neck", out int BoneID);
 
-			Position = FPSCamera.Position - new Vector3(0, 1.8f, 0);
+			Position = FPSCamera.Position;
 			Rotation = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI / 2, 0) /** Matrix4x4.CreateFromYawPitchRoll(0, 0, (float)((Math.PI / 2) - (FPSCamera.CamAngle.X * (Math.PI / 180))))*/;
 			/// CurAnim.Step();
 		}
@@ -194,11 +206,17 @@ namespace RaylibTest.Engine {
 			if (!DEBUG_PLAYER && LocalPlayer)
 				return;
 
+			Vector3 DrawPos = Position - new Vector3(0, 1.8f, 0);
+
 			if (DEBUG_PLAYER)
-				Position = Vector3.Zero;
+				DrawPos = Vector3.Zero;
 
 			PlayerEntity.Mdl.transform = Rotation;
-			Raylib.DrawModel(PlayerEntity.Mdl, Position, 0.25f, Color.White);
+			Raylib.DrawModel(PlayerEntity.Mdl, DrawPos, 0.25f, Color.White);
+		}
+
+		public void AddOnKeyPressed(KeyboardKey K, Action Act) {
+			OnKeyFuncs.Add(K, Act);
 		}
 	}
 }

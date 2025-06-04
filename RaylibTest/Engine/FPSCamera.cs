@@ -1,4 +1,5 @@
 ﻿using RaylibSharp;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,6 +9,8 @@ using System.Threading.Tasks;
 
 namespace RaylibTest.Engine {
 	static class FPSCamera {
+		const bool UseCameraMove = false;
+
 		const float MouseMoveSen = 0.5f;
 		const float PlyMoveSen = 0.2f;
 		const float FocusDist = 25.0f;
@@ -22,8 +25,12 @@ namespace RaylibTest.Engine {
 		static Vector3 LeftNormal = Vector3.UnitX;
 		static Vector3 ForwardNormal = Vector3.UnitZ;
 
-		public static void Update(ref Camera3D Cam) {
+		public static void Update(bool HandleRotation, ref Camera3D Cam) {
 			Vector2 MousePos = new Vector2(Raylib.GetMouseX(), Raylib.GetMouseY());
+
+			if (!HandleRotation) {
+				MousePos = MousePrev;
+			}
 
 			if (!MousePrevInit) {
 				MousePrevInit = true;
@@ -46,25 +53,26 @@ namespace RaylibTest.Engine {
 			if (CamAngle.Y < -89.9f)
 				CamAngle.Y = -89.9f;
 
-
 			Vector3 Forward = GetForward();
-			Vector3 Left = GetLeft();
-			Vector3 Up = GetUp();
+			if (UseCameraMove) {
+				Vector3 Left = GetLeft();
+				Vector3 Up = GetUp();
 
-			if (Raylib.IsKeyDown('W'))
-				Position += Forward * PlyMoveSen;
-			if (Raylib.IsKeyDown('S'))
-				Position -= Forward * PlyMoveSen;
+				if (Raylib.IsKeyDown('W'))
+					Position += Forward * PlyMoveSen;
+				if (Raylib.IsKeyDown('S'))
+					Position -= Forward * PlyMoveSen;
 
-			if (Raylib.IsKeyDown('A'))
-				Position += Left * PlyMoveSen;
-			if (Raylib.IsKeyDown('D'))
-				Position -= Left * PlyMoveSen;
+				if (Raylib.IsKeyDown('A'))
+					Position += Left * PlyMoveSen;
+				if (Raylib.IsKeyDown('D'))
+					Position -= Left * PlyMoveSen;
 
-			if (Raylib.IsKeyDown(' '))
-				Position += Up * PlyMoveSen;
-			if (Raylib.IsKeyDown('C'))
-				Position -= Up * PlyMoveSen;
+				if (Raylib.IsKeyDown(' '))
+					Position += Up * PlyMoveSen;
+				if (Raylib.IsKeyDown('C'))
+					Position -= Up * PlyMoveSen;
+			}
 
 			Cam.position = Position;
 			Cam.target = Position + (Forward * FocusDist);

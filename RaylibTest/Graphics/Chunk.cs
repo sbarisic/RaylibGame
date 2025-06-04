@@ -112,6 +112,17 @@ namespace RaylibTest.Graphics {
 			byte BB = (byte)Utils.Clamp(B * LightLevels, 0, 255);
 			return new Color(RR, GG, BB);
 		}
+
+		public static BlockLight operator +(BlockLight BL, byte Amt) {
+			byte Res = BL.R;
+
+			if (Res + Amt > 255)
+				Res = 255;
+			else
+				Res = (byte)(Res + Amt);
+
+			return new BlockLight(Res);
+		}
 	}
 
 	class PlacedBlock {
@@ -176,7 +187,7 @@ namespace RaylibTest.Graphics {
 		public const float BlockSize = 1;
 		public const int AtlasSize = 16;
 
-		PlacedBlock[] Blocks;
+		public PlacedBlock[] Blocks;
 		bool Dirty;
 		bool ModelValid;
 
@@ -185,8 +196,11 @@ namespace RaylibTest.Graphics {
 
 		public Color ChunkColor = Color.White;
 
-		Vector3 GlobalChunkIndex;
+		public Vector3 GlobalChunkIndex;
 		ChunkMap WorldMap;
+
+		List<Vector3> SunRayOrigins = new List<Vector3>();
+		Vector3 SunDir = -Vector3.UnitY;
 
 		public Chunk(Vector3 GlobalChunkIndex, ChunkMap WorldMap) {
 			this.GlobalChunkIndex = GlobalChunkIndex;
@@ -255,6 +269,10 @@ namespace RaylibTest.Graphics {
 			return Blocks[X + ChunkSize * (Y + ChunkSize * Z)];
 		}
 
+		public PlacedBlock GetBlock(Vector3 Orig) {
+			return GetBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z);
+		}
+
 		public void SetBlock(int X, int Y, int Z, PlacedBlock Block) {
 			Blocks[X + ChunkSize * (Y + ChunkSize * Z)] = Block;
 			Dirty = true;
@@ -301,9 +319,47 @@ namespace RaylibTest.Graphics {
 
 		public void ComputeLighting() {
 			for (int i = 0; i < Blocks.Length; i++) {
-				PlacedBlock Block = Blocks[i];
-				if (Block.Type == BlockType.None)
+				if (Blocks[i].Type == BlockType.None)
 					continue;
+
+				Blocks[i].SetBlockLight(new BlockLight(2));
+			}
+
+			Vector3 SunPos = new Vector3(29.63366f, 100.57468f, 23.19503f);
+			Vector3 SunTgt = new Vector3(31.13366f, 63.97468f, 24.74503f);
+			//Vector3  SunDir = Vector3.Normalize(SunTgt - SunPos);
+
+			Matrix4x4 LookAtRot = Matrix4x4.CreateLookAt(SunPos, SunTgt, Vector3.UnitY);
+			Vector3 Left = Vector3.Transform(Vector3.UnitX, LookAtRot);
+			Vector3 Up = Vector3.Transform(Vector3.UnitY, LookAtRot);
+			Vector3 Fwd = Vector3.Transform(Vector3.UnitZ, LookAtRot);
+
+			SunDir = Fwd;
+			SunRayOrigins.Clear();
+
+			for (int yy = 0; yy < 20; yy++) {
+				for (int xx = 0; xx < 20; xx++) {
+					Vector3 PosOffset = (Left * (xx - 10)) + (Up * (yy - 10));
+
+					SunRayOrigins.Add(SunPos + PosOffset);
+
+					Vector3 HitPos = WorldMap.RaycastPos(SunPos + PosOffset, 64, Fwd, out Vector3 FaceNormal);
+					if (HitPos != Vector3.Zero) {
+
+						Vector3 BlokPos = HitPos - (FaceNormal * 0.5f);
+						PlacedBlock Blk = WorldMap.GetPlacedBlock((int)BlokPos.X, (int)BlokPos.Y, (int)BlokPos.Z, out Chunk Chk);
+
+						Blk.Lights[Utils.DirToByte(FaceNormal)] = new BlockLight(28);
+
+					}
+				}
+			}
+
+			for (int i = 0; i < Blocks.Length; i++) {
+				if (Blocks[i].Type == BlockType.None)
+					continue;
+
+				PlacedBlock Block = Blocks[i];
 
 				To3D(i, out int LocalX, out int LocalY, out int LocalZ);
 				if (IsCovered(LocalX, LocalY, LocalZ))
@@ -319,59 +375,74 @@ namespace RaylibTest.Graphics {
 					continue;
 
 
+
 				// Ambient occlusion
-				for (int j = 0; j < Utils.MainDirs.Length; j++) {
+				for (int j = 0; j < /*Utils.MainDirs.Length*/ -1; j++) {
 					Vector3 Origin = new Vector3(X, Y, Z) + Utils.MainDirs[j];
+
+					if (WorldMap.GetBlock(Origin) != BlockType.None)
+						continue; // Side covered
 
 
 					int AmbientLight = 5;
-					if (!WorldMap.Raycast(Origin, 128, new Vector3(0, 1, 0)))
+					if (!WorldMap.Raycast(Origin, 128, new Vector3(0, 1, 0))) {
 						AmbientLight = 28;
 
+						/*WorldMap.RaycastSphere(Origin + new Vector3(0, 0.5f, 0), 6, (Orig, Norm) => {
+							PlacedBlock PB = GetBlock(Orig);
+							PB.Lights[Utils.DirToByte(Norm)] = PB.Lights[Utils.DirToByte(Norm)] + 2;
+
+							return false;
+						});*/
+					}
+
 					//if (Utils.MainDirs[j] == new Vector3(0, 1, 0)) {
-						const int AddLight = 2;
+					const int AddLight = 2;
 
-						//int SkyHits = WorldMap.CountHits(Origin, 128, new Vector3(0, 1, 0), out int MaxSkyHits);
-						//float SkyPerc = (float)SkyHits / MaxSkyHits;
+					//int SkyHits = WorldMap.CountHits(Origin, 128, new Vector3(0, 1, 0), out int MaxSkyHits);
+					//float SkyPerc = (float)SkyHits / MaxSkyHits;
 
-						//int MaxSkyHits = 12;
-						//int SkyHits = WorldMap.CountSphereHits(Origin, 128, MaxSkyHits);
-						//float SkyPerc = (float)(MaxSkyHits - SkyHits) / MaxSkyHits;
+					//int MaxSkyHits = 12;
+					//int SkyHits = WorldMap.CountSphereHits(Origin, 128, MaxSkyHits);
+					//float SkyPerc = (float)(MaxSkyHits - SkyHits) / MaxSkyHits;
 
-						//AmbientLight += (int)(SkyPerc * 16);
+					//AmbientLight += (int)(SkyPerc * 16);
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 0))))
-							AmbientLight += AddLight;
+					/*if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 0))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 0))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 0))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, 1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, 1))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, -1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, -1))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 1))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 1))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, -1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, -1))))
+						AmbientLight += AddLight;
 
-						if (!WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, -1))))
-							AmbientLight += AddLight;
+					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, -1))))
+						AmbientLight += AddLight;*/
+
+
 					//}
 
 					if (AmbientLight > 28)
 						AmbientLight = 28;
 
-					float AmbientHitRatio = (float)WorldMap.CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, 3, Utils.MainDirs[j], out int MaxHits) / MaxHits;
-					//float AmbientHitRatio = ((float)WorldMap.CountAmbientHits(Origin) - 1) / 5;
+					// float AmbientHitRatio = (float)WorldMap.CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, 3, Utils.MainDirs[j], out int MaxHits) / MaxHits;
 
-					int Light = AmbientLight - (int)(AmbientHitRatio * (AmbientLight - 4));
+					// float AmbientHitRatio = ((float)WorldMap.CountAmbientHits(Origin) - 1) / 5;
+
+					int Light = AmbientLight;//- (int)(AmbientHitRatio * (AmbientLight - 4));
 
 					//int Light = (int)(AmbientLight * 32) - (24 - (int)(AmbientHitRatio * 24));
 
@@ -380,7 +451,8 @@ namespace RaylibTest.Graphics {
 					if (Light > 32)
 						Light = 32;
 
-					Block.Lights[Utils.DirToByte(Utils.MainDirs[j])] = new BlockLight((byte)(Light));
+					if (Light > 0)
+						Block.Lights[Utils.DirToByte(Utils.MainDirs[j])] += (byte)Light;
 				}
 
 				// TODO: Actual lights

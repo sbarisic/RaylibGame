@@ -325,8 +325,8 @@ namespace RaylibTest.Graphics {
 		}
 
 		public int CountHits(int X, int Y, int Z, int Distance, Vector3 Dir, out int MaxHits) {
-			int Hits = Utils.RaycastHalfSphere(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
-				if (GetBlock(XX, YY, ZZ) != BlockType.None)
+			int Hits = Utils.RaycastHalfSphere(new Vector3(X, Y, Z), Dir, Distance, (Orig, Face) => {
+				if (GetBlock(Orig) != BlockType.None)
 					return true;
 
 				return false;
@@ -336,8 +336,8 @@ namespace RaylibTest.Graphics {
 		}
 
 		public int CountSphereHits(int X, int Y, int Z, int Distance, int Slices = 16) {
-			int Hits = Utils.RaycastSphere(new Vector3(X, Y, Z), Distance, (XX, YY, ZZ, Face) => {
-				if (GetBlock(XX, YY, ZZ) != BlockType.None)
+			int Hits = Utils.RaycastSphere(new Vector3(X, Y, Z), Distance, (Orig, Face) => {
+				if (GetBlock(Orig) != BlockType.None)
 					return true;
 
 				return false;
@@ -354,17 +354,98 @@ namespace RaylibTest.Graphics {
 			return CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir, out MaxHits);
 		}
 
-		public bool Raycast(int X, int Y, int Z, int Distance, Vector3 Dir) {
-			return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
+		public bool Raycast(int X, int Y, int Z, float Distance, Vector3 Dir) {
+			/*return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
 				if (GetBlock(XX, YY, ZZ) != BlockType.None)
 					return true;
 
 				return false;
-			});
+			});*/
+
+
+			if (Utils.Raycast2(new Vector3(X, Y, Z), Dir, Distance, 10, (HitPos, Face) => {
+				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
+					return true;
+				}
+
+				return false;
+			})) {
+				return true;
+			}
+
+			return false;
 		}
 
-		public bool Raycast(Vector3 Origin, int Distance, Vector3 Dir) {
+		public bool Raycast(Vector3 Origin, float Distance, Vector3 Dir) {
 			return Raycast((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir);
+		}
+
+		public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir) {
+			Vector3 RetPos = Vector3.Zero;
+			Vector3 OutFaceDir = Vector3.Zero;
+
+			if (Utils.Raycast2(Origin, Dir, Distance, 20, (HitPos, Face) => {
+
+				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
+					RetPos = HitPos;
+					OutFaceDir = Face;
+					return true;
+				}
+
+				return false;
+			})) {
+
+			}
+
+			FaceDir = OutFaceDir;
+			return RetPos;
+		}
+
+		public Vector3 RaycastPosEx(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir, out Vector3 Block) {
+			Vector3 RetPos = Vector3.Zero;
+			Vector3 OutFaceDir = Vector3.Zero;
+			Vector3 Blk = Vector3.Zero;
+
+			if (Utils.Raycast2(Origin, Dir, Distance, 20, (HitPos, Face) => {
+
+				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
+					RetPos = HitPos;
+					OutFaceDir = Face;
+					Blk = new Vector3((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z);
+					return true;
+				}
+
+				return false;
+			})) {
+
+			}
+
+			FaceDir = OutFaceDir;
+			Block = Blk;
+			return RetPos;
+		}
+
+		public int RaycastSphere(Vector3 Origin, float Distance, Raycast2CallbackFunc OnHit, BlockType[] SkipArray = null, int Slices = 26) {
+			return Utils.RaycastSphere(Origin, Distance, (Orig, Face) => {
+				BlockType BT = BlockType.None;
+
+				if ((BT = GetBlock(Orig)) != BlockType.None) {
+					if (SkipArray != null && SkipArray.Contains(BT))
+						return false;
+
+					OnHit(Orig, Face);
+					return true;
+				}
+
+				return false;
+			}, Slices);
+		}
+
+		public bool RaycastPoint(Vector3 Origin) {
+			if (GetBlock((int)Origin.X, (int)Origin.Y, (int)Origin.Z) != BlockType.None)
+				return true;
+
+			return false;
 		}
 
 		public int CountAmbientHits(Vector3 Pos) {
@@ -391,9 +472,137 @@ namespace RaylibTest.Graphics {
 			return true;
 		}
 
+		List<Vector3> SunRayOrigins = new List<Vector3>();
+		Vector3 SunDir = -Vector3.UnitY;
+
+		// HitPos + FaceNormal * 0.1f
+		// 4
+		void PerformLightBounce(Vector3 Origin, float Distance) {
+			RaycastSphere(Origin, Distance, (Orig, Norm) => {
+				PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
+
+				if (PB.Type != BlockType.None && Norm != Vector3.Zero) {
+
+					if (PB.Lights[Utils.DirToByte(Norm)].R <= 27) {
+						PB.Lights[Utils.DirToByte(Norm)] += 1;
+					}
+
+				}
+
+				return false;
+			});
+		}
+
 		public void ComputeLighting() {
 			foreach (Chunk C in GetAllChunks()) {
-				C.ComputeLighting();
+				foreach (PlacedBlock B in C.Blocks) {
+					if (B.Type == BlockType.None)
+						continue;
+
+					B.SetBlockLight(new BlockLight(4));
+				}
+			}
+
+			foreach (Chunk C in GetAllChunks()) {
+				for (int i = 0; i < C.Blocks.Length; i++) {
+					PlacedBlock B = C.Blocks[i];
+
+					if (B.Type == BlockType.None)
+						continue;
+
+					C.To3D(i, out int LX, out int LY, out int LZ);
+					GetWorldPos(LX, LY, LZ, C.GlobalChunkIndex, out Vector3 BPos);
+
+					if (B.Type == BlockType.Glowstone) {
+						Console.WriteLine("Glowstone!");
+
+						B.SetBlockLight(new BlockLight(28));
+
+						Vector3 SphereCenter = BPos + new Vector3(0.5f, 0.5f, 0.5f);
+						float SphereRadius = 7;
+
+						RaycastSphere(SphereCenter, SphereRadius, (Orig, Norm) => {
+							PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
+
+							Orig = new Vector3((int)Orig.X, (int)Orig.Y, (int)Orig.Z) + new Vector3(0.5f, 0.5f, 0.5f);
+
+							if (PB.Type != BlockType.None && Norm != Vector3.Zero) {
+
+								float Dist = Vector3.Distance(SphereCenter, Orig);
+
+								//if (Dist < 3)
+								//	Debugger.Break();
+
+								PB.Lights[Utils.DirToByte(Norm)] += (byte)(SphereRadius - Dist);
+
+								if (PB.Lights[Utils.DirToByte(Norm)].R >= 28) {
+									PB.Lights[Utils.DirToByte(Norm)] = new BlockLight(28);
+
+								}
+								
+								//PerformLightBounce(Orig + Norm * 0.1f, 2);
+							}
+
+							return false;
+						}, new[] { BlockType.Glowstone }, 32);
+					}
+				}
+			}
+
+			Vector3 SunPos = new Vector3(30, 77, 20);
+			float SunReach = 128;
+
+
+			Matrix4x4 LookAtRot = Matrix4x4.CreateFromYawPitchRoll(Utils.ToRad(-30), Utils.ToRad(90 - 30), Utils.ToRad(0));
+
+
+			Vector3 Left = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, LookAtRot));
+			Vector3 Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, LookAtRot));
+			Vector3 Fwd = Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, LookAtRot));
+			SunDir = Fwd;
+
+			SunRayOrigins.Clear();
+
+			int MaxSize = 20;
+			float StepScale = 0.4f;
+
+			for (int yy = 0; yy < MaxSize; yy++) {
+				for (int xx = 0; xx < MaxSize; xx++) {
+					Vector3 PosOffset = new Vector3(xx, 0, yy) * StepScale;
+
+					SunRayOrigins.Add(SunPos + PosOffset);
+
+					Vector3 HitPos = RaycastPosEx(SunPos + PosOffset, SunReach, Fwd, out Vector3 FaceNormal, out Vector3 BlokPos);
+					if (HitPos != Vector3.Zero && FaceNormal != Vector3.Zero) {
+						PlacedBlock Blk = GetPlacedBlock((int)BlokPos.X, (int)BlokPos.Y, (int)BlokPos.Z, out Chunk Chk);
+						Blk.Lights[Utils.DirToByte(FaceNormal)] = new BlockLight(28);
+						Chk.MarkDirty();
+
+						// Bounce
+
+
+						// HitPos + FaceNormal * 0.1f
+						// 4
+						PerformLightBounce(HitPos + FaceNormal * 0.1f, 4);
+						/*RaycastSphere(HitPos + FaceNormal * 0.1f, 4, (Orig, Norm) => {
+							PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
+
+							if (PB.Type != BlockType.None && Norm != Vector3.Zero) {
+
+								if (PB.Lights[Utils.DirToByte(Norm)].R <= 27) {
+									PB.Lights[Utils.DirToByte(Norm)] += 1;
+								}
+
+							}
+
+							return false;
+						});*/
+					}
+				}
+			}
+
+			foreach (Chunk C in GetAllChunks()) {
+				//C.ComputeLighting();
 				C.MarkDirty();
 			}
 
@@ -454,6 +663,12 @@ namespace RaylibTest.Graphics {
 			foreach (var KV in Chunks) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 				KV.Value.Draw(ChunkPos);
+			}
+
+			foreach (Vector3 Orig in SunRayOrigins) {
+				Vector3 Dst = Orig + SunDir * 64;
+
+				Raylib.DrawLine3D(Orig, Dst, Color.Orange);
 			}
 		}
 

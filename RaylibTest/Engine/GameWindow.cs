@@ -33,8 +33,8 @@ namespace RaylibTest.Engine {
 			Open = false;
 		}
 
-		public void Update() {
-			State.Update();
+		public void Update(float Dt) {
+			State.Update(Dt);
 		}
 
 		public void Draw() {

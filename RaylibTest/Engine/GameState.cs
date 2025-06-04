@@ -10,7 +10,7 @@ namespace RaylibTest.Engine {
 		public virtual void SwapTo() {
 		}
 
-		public virtual void Update() {
+		public virtual void Update(float Dt) {
 		}
 
 		public virtual void Draw() {

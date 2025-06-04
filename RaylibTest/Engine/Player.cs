@@ -1,4 +1,6 @@
-﻿using RaylibSharp;
+﻿using RaylibGame.Engine;
+
+using RaylibSharp;
 
 using System;
 using System.Collections.Generic;
@@ -127,8 +129,13 @@ namespace RaylibTest.Engine {
 
 		Stopwatch LegTimer = Stopwatch.StartNew();
 		long LastWalkSound = 0;
+		long LastJumpSound = 0;
+		long LastCrashSound = 0;
 
-		public Player(string ModelName, bool LocalPlayer) {
+		SoundMgr Snd;
+
+		public Player(string ModelName, bool LocalPlayer, SoundMgr Snd) {
+			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
 			PlayerEntity = Entities.Load(ModelName);
 
@@ -168,12 +175,33 @@ namespace RaylibTest.Engine {
 
 		}
 
-		public void PhysicsHit(float Force, bool Side, bool Feet, bool Walk) {
+		public void PhysicsHit(float Force, bool Side, bool Feet, bool Walk, bool Jump) {
 			if (Walk) {
 				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
 					LastWalkSound = LegTimer.ElapsedMilliseconds;
 
-					Console.WriteLine("Walk");
+					//Console.WriteLine("Walk");
+					Snd.PlayCombo("walk");
+				}
+			} else if (Jump) {
+				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350) {
+					LastJumpSound = LegTimer.ElapsedMilliseconds;
+
+					//Console.WriteLine("Walk");
+					Snd.PlayCombo("jump");
+				}
+			} else if (Feet && !Side) {
+
+				if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350) {
+					LastCrashSound = LegTimer.ElapsedMilliseconds;
+
+					if (Force < 4) {
+						Snd.PlayCombo("crash1");
+					} else if (Force >= 4 && Force < 8) {
+						Snd.PlayCombo("crash2");
+					} else if (Force >= 8) {
+						Snd.PlayCombo("crash3");
+					}
 				}
 			} else {
 				Console.WriteLine("Sid: {0}, Ft: {1}, F: {2}, W: {3}", Side, Feet, Force, Walk);

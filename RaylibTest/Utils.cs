@@ -378,6 +378,32 @@ namespace RaylibTest {
 			return false;
 		}
 
+		static bool IsRecording = false;
+		static List<Tuple<Vector3, Vector3, Color>> RaycastDrawList = new List<Tuple<Vector3, Vector3, Color>>();
+
+		public static void ClearRaycastRecord() {
+			RaycastDrawList.Clear();
+		}
+
+		public static void BeginRaycastRecord() {
+			ClearRaycastRecord();
+			IsRecording = true;
+		}
+
+		public static void EndRaycastRecord() {
+			IsRecording = false;
+		}
+
+		public static void DrawRaycastRecord() {
+			foreach (var Tupl in RaycastDrawList) {
+				Raylib.DrawLine3D(Tupl.Item1, Tupl.Item2, Tupl.Item3);
+			}
+		}
+
+		public static bool HasRecord() {
+			return RaycastDrawList.Count > 0;
+		}
+
 		public static bool Raycast2(Vector3 Origin, Vector3 Direction, float Length, float CastScale, Raycast2CallbackFunc Callback) {
 			Origin = Origin * CastScale;
 			Length = Length * CastScale;
@@ -425,8 +451,15 @@ namespace RaylibTest {
 			Length /= (float)Math.Sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
 
 			while (true) {
-				if (Callback(new Vector3((X / CastScale), (Y / CastScale), (Z / CastScale)), face))
+				Vector3 hitPos = new Vector3((X / CastScale), (Y / CastScale), (Z / CastScale));
+
+				if (Callback(hitPos, face)) {
+					if (IsRecording) {
+						RaycastDrawList.Add(new Tuple<Vector3, Vector3, Color>(Origin / CastScale, hitPos, Color.Red));
+					}
+
 					return true;
+				}
 
 				// tMaxX stores the t-value at which we cross a cube boundary along the
 				// X axis, and similarly for Y and Z. Therefore, choosing the least tMax
@@ -476,6 +509,9 @@ namespace RaylibTest {
 				}
 			}
 
+			if (IsRecording) {
+				RaycastDrawList.Add(new Tuple<Vector3, Vector3, Color>(Origin / CastScale, (Origin + (Direction * Length)) / CastScale, Color.Blue));
+			}
 			return false;
 		}
 

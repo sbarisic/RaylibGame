@@ -112,6 +112,11 @@ namespace RaylibTest {
 				Console.WriteLine("Pos: {0}", Ply.Position);
 			});
 
+			Ply.AddOnKeyPressed(KeyboardKey.KEY_F4, () => {
+				Console.WriteLine("Clearing records");
+				Utils.ClearRaycastRecord();
+			});
+
 			Ply.AddOnKeyPressed(KeyboardKey.KEY_F, () => {
 				Console.WriteLine("Pew pew!");
 
@@ -148,11 +153,12 @@ namespace RaylibTest {
 
 			float VelLen = PlyVelocity.Length();
 
-			float Gravity = 9.8f;
-			float MaxPlayerVelocity = 3.2f;
+			float Gravity = 10.5f;
+			float MaxPlayerVelocity = 3.6f;
 			float MaxPlayerControllableVelocity = 4.0f;
 			float MaxPlayerFallVelocity = 6.0f;
-			float PlayerJumpVelocity = 4.0f;
+			float PlayerJumpVelocity = 4.8f;
+			const float PlyMoveSen = 2.2f;
 
 			float PlayerHeight = 1.8f;
 
@@ -168,9 +174,12 @@ namespace RaylibTest {
 			bool IsBraking = true;
 
 			{
-				const float PlyMoveSen = 1.2f;
 				Vector3 DesiredPos = Vector3.Zero;
+
 				Vector3 Forward = FPSCamera.GetForward();
+				Forward.Y = 0;
+				Forward = Vector3.Normalize(Forward);
+
 				Vector3 Left = FPSCamera.GetLeft();
 				Vector3 Up = FPSCamera.GetUp();
 

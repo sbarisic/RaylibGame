@@ -31,6 +31,7 @@ namespace RaylibTest.Graphics {
 
 	class ChunkMap {
 		Dictionary<Vector3, Chunk> Chunks;
+		Random Rnd = new Random();
 
 		public ChunkMap() {
 			Chunks = new Dictionary<Vector3, Chunk>();
@@ -354,6 +355,91 @@ namespace RaylibTest.Graphics {
 			return CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir, out MaxHits);
 		}
 
+		bool Chk(int X, int Y, int Z) {
+			return GetBlock(X, Y, Z) != BlockType.None;
+		}
+
+		IEnumerable<Vector3> GetPlaneNeighbours(int X, int Y, int Z, Vector3 faceNormal) {
+			//Vector3 BlockPos = new Vector3(X, Y, Z) + new Vector3(0.5f);
+
+			int Range = 1;
+
+			for (int yy = -Range; yy < Range + 1; yy++) {
+				for (int xx = -Range; xx < Range + 1; xx++) {
+					if (faceNormal.Y == 1 || faceNormal.Y == -1) {
+						bool C1 = Chk(X + xx, Y, Z + yy);
+						bool C2 = Chk(X + xx, (int)(Y + faceNormal.Y), Z + yy);
+
+						if (C1 && !C2)
+							yield return new Vector3(X + xx, Y, Z + yy);
+						/*else if (C1 && C2)
+							yield break;*/
+
+					} else if (faceNormal.X == 1 || faceNormal.X == -1) {
+						bool C1 = Chk(X, Y + xx, Z + yy);
+						bool C2 = Chk((int)(X + faceNormal.X), Y + xx, Z + yy);
+
+						if (C1 && !C2)
+							yield return new Vector3(X, Y + xx, Z + yy);
+						/*else if (C1 && C2)
+							yield break;*/
+
+					} else if (faceNormal.Z == 1 || faceNormal.Z == -1) {
+						bool C1 = Chk(X + xx, Y + yy, Z);
+						bool C2 = Chk(X + xx, Y + yy, (int)(Z + faceNormal.Z));
+
+						if (C1 && !C2)
+							yield return new Vector3(X + xx, Y + yy, Z);
+						/*else if (C1 && C2)
+							yield break;*/
+
+					}
+				}
+
+
+
+			}
+		}
+
+		public int RayTest(Vector3 Start, Vector3 End, Vector3[] IgnorePos = null, BlockType[] IgnoreBlocks = null) {
+			//Start = new Vector3((int)Start.X, (int)Start.Y, (int)Start.Z);
+			//End = new Vector3((int)End.X, (int)End.Y, (int)End.Z);
+
+			Vector3 Half = Vector3.Zero; //new Vector3(0.5f, 0.5f, 0.5f);
+			Start += Half;
+			End += Half;
+
+			float Dist = (End - Start).Length() - 0f;
+
+			// Dist = Math.Max(0.1f, Dist);
+			int Count = 0;
+
+			Vector3 Dir = Vector3.Normalize(End - Start);
+			Utils.Raycast2(Start, Dir, Dist, 10, (HitPos, Face) => {
+				BlockType BT = BlockType.None;
+
+				if (IgnorePos != null) {
+					foreach (var Ign in IgnorePos) {
+						if ((int)Ign.X == (int)HitPos.X && (int)Ign.Y == (int)HitPos.Y && (int)Ign.Z == (int)HitPos.Z)
+							return false;
+					}
+				}
+
+				if ((BT = GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z)) != BlockType.None) {
+					if (IgnoreBlocks != null && IgnoreBlocks.Contains(BT))
+						return false;
+
+					//return true;
+					Count++;
+					return true;
+				}
+
+				return false;
+			});
+
+			return Count;
+		}
+
 		public bool Raycast(int X, int Y, int Z, float Distance, Vector3 Dir) {
 			/*return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
 				if (GetBlock(XX, YY, ZZ) != BlockType.None)
@@ -475,6 +561,46 @@ namespace RaylibTest.Graphics {
 		List<Vector3> SunRayOrigins = new List<Vector3>();
 		Vector3 SunDir = -Vector3.UnitY;
 
+		void PerformLightBounce2(Vector3 Origin, float Distance) {
+			Vector3 SphereCenter = Origin;
+			float SphereRadius = Distance;
+
+			IEnumerable<Tuple<PlacedBlock, Vector3>> BlocksAround = GetBlocksInRange(SphereCenter, SphereRadius, new[] { BlockType.None });
+			foreach (var BA in BlocksAround) {
+				if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
+					continue;
+
+				float Dist = Vector3.Distance(SphereCenter, BA.Item2);
+
+				if (Dist > SphereRadius)
+					continue;
+
+				foreach (var Face in GetVisibleFaces(BA.Item2, SphereCenter)) {
+					if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
+						continue;
+
+					if (GetBlock(BA.Item2 + Face) != BlockType.None)
+						continue;
+
+					int RT = RayTest(SphereCenter, BA.Item2 + new Vector3(0.5f, 0.5f, 0.5f) + Face * 0.6f, null, new[] { BlockType.None, BlockType.Glowstone });
+					if (RT > 0)
+						continue;
+
+					//byte TargetLight = Math.Max((byte)(SphereRadius - Dist), (byte)0);
+					//float TgtLightPerc = 1 - (float)(Dist / SphereRadius);
+					byte AdditiveLightLevel = (byte)1;
+
+					// byte TargetLight = (byte)(TgtLightPerc * 28);
+					byte TargetLight = (byte)(BA.Item1.Lights[Utils.DirToByte(Face)].R + AdditiveLightLevel);
+
+					if (TargetLight > 28)
+						TargetLight = 28;
+
+					BA.Item1.Lights[Utils.DirToByte(Face)] = new BlockLight(TargetLight);
+				}
+			}
+		}
+
 		// HitPos + FaceNormal * 0.1f
 		// 4
 		void PerformLightBounce(Vector3 Origin, float Distance) {
@@ -493,6 +619,42 @@ namespace RaylibTest.Graphics {
 			});
 		}
 
+		IEnumerable<Tuple<PlacedBlock, Vector3>> GetBlocksInRange(Vector3 Pos, float Range, BlockType[] IgnoreBlocks = null) {
+			foreach (Chunk C in GetAllChunks()) {
+				for (int i = 0; i < C.Blocks.Length; i++) {
+					PlacedBlock B = C.Blocks[i];
+
+					if (IgnoreBlocks != null && IgnoreBlocks.Contains(B.Type))
+						continue;
+
+					C.To3D(i, out int LX, out int LY, out int LZ);
+					GetWorldPos(LX, LY, LZ, C.GlobalChunkIndex, out Vector3 BPos);
+
+					if (Vector3.Distance(Pos, BPos) <= Range)
+						yield return new Tuple<PlacedBlock, Vector3>(B, BPos);
+				}
+			}
+		}
+
+		IEnumerable<Vector3> GetVisibleFaces(Vector3 BlockPos, Vector3 CamPos) {
+			Vector3 Delta = CamPos - BlockPos;
+
+			if (Delta.X > 0)
+				yield return new Vector3(1, 0, 0);
+			else if (Delta.X < 0)
+				yield return new Vector3(-1, 0, 0);
+
+			if (Delta.Y > 0)
+				yield return new Vector3(0, 1, 0);
+			else if (Delta.Y < 0)
+				yield return new Vector3(0, -1, 0);
+
+			if (Delta.Z > 0)
+				yield return new Vector3(0, 0, 1);
+			else if (Delta.Z < 0)
+				yield return new Vector3(0, 0, -1);
+		}
+
 		public void ComputeLighting() {
 			foreach (Chunk C in GetAllChunks()) {
 				foreach (PlacedBlock B in C.Blocks) {
@@ -501,6 +663,11 @@ namespace RaylibTest.Graphics {
 
 					B.SetBlockLight(new BlockLight(4));
 				}
+			}
+
+			if (!Utils.HasRecord()) {
+				Console.WriteLine("Begin recording!");
+				Utils.BeginRaycastRecord();
 			}
 
 			foreach (Chunk C in GetAllChunks()) {
@@ -513,90 +680,113 @@ namespace RaylibTest.Graphics {
 					C.To3D(i, out int LX, out int LY, out int LZ);
 					GetWorldPos(LX, LY, LZ, C.GlobalChunkIndex, out Vector3 BPos);
 
+					if (IsCovered((int)BPos.X, (int)BPos.Y, (int)BPos.Z))
+						continue;
+
 					if (B.Type == BlockType.Glowstone) {
 						Console.WriteLine("Glowstone!");
 
 						B.SetBlockLight(new BlockLight(28));
 
 						Vector3 SphereCenter = BPos + new Vector3(0.5f, 0.5f, 0.5f);
-						float SphereRadius = 7;
+						float SphereRadius = 8;
 
-						RaycastSphere(SphereCenter, SphereRadius, (Orig, Norm) => {
-							PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
 
-							Orig = new Vector3((int)Orig.X, (int)Orig.Y, (int)Orig.Z) + new Vector3(0.5f, 0.5f, 0.5f);
 
-							if (PB.Type != BlockType.None && Norm != Vector3.Zero) {
+						IEnumerable<Tuple<PlacedBlock, Vector3>> BlocksAround = GetBlocksInRange(SphereCenter, SphereRadius, new[] { BlockType.None, BlockType.Glowstone });
 
-								float Dist = Vector3.Distance(SphereCenter, Orig);
+						foreach (var BA in BlocksAround) {
+							if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
+								continue;
 
-								//if (Dist < 3)
-								//	Debugger.Break();
+							float Dist = Vector3.Distance(SphereCenter, BA.Item2);
 
-								PB.Lights[Utils.DirToByte(Norm)] += (byte)(SphereRadius - Dist);
+							if (Dist > SphereRadius)
+								continue;
 
-								if (PB.Lights[Utils.DirToByte(Norm)].R >= 28) {
-									PB.Lights[Utils.DirToByte(Norm)] = new BlockLight(28);
+							foreach (var Face in GetVisibleFaces(BA.Item2, SphereCenter)) {
+								if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
+									continue;
 
-								}
-								
-								//PerformLightBounce(Orig + Norm * 0.1f, 2);
+								if (GetBlock(BA.Item2 + Face) != BlockType.None)
+									continue;
+
+								int RT = RayTest(SphereCenter, BA.Item2 + new Vector3(0.5f, 0.5f, 0.5f) + Face * 0.6f, null, new[] { BlockType.Glowstone });
+								if (RT > 0)
+									continue;
+
+								//byte TargetLight = Math.Max((byte)(SphereRadius - Dist), (byte)0);
+								float TgtLightPerc = 1 - (float)(Dist / SphereRadius);
+								byte AdditiveLightLevel = (byte)(TgtLightPerc * 28);
+
+								// byte TargetLight = (byte)(TgtLightPerc * 28);
+								byte TargetLight = (byte)(BA.Item1.Lights[Utils.DirToByte(Face)].R + AdditiveLightLevel);
+
+								if (TargetLight > 28)
+									TargetLight = 28;
+
+								BA.Item1.Lights[Utils.DirToByte(Face)] = new BlockLight(TargetLight);
 							}
-
-							return false;
-						}, new[] { BlockType.Glowstone }, 32);
+						}
 					}
 				}
 			}
 
-			Vector3 SunPos = new Vector3(30, 77, 20);
+			Utils.EndRaycastRecord();
+
+			//Vector3 SunPos = new Vector3(30, 77, 20);
 			float SunReach = 128;
 
 
-			Matrix4x4 LookAtRot = Matrix4x4.CreateFromYawPitchRoll(Utils.ToRad(-30), Utils.ToRad(90 - 30), Utils.ToRad(0));
+			Matrix4x4 LookAtRot = Matrix4x4.CreateFromYawPitchRoll(Utils.ToRad(-25), Utils.ToRad(90 - 25), Utils.ToRad(0));
 
 
-			Vector3 Left = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, LookAtRot));
-			Vector3 Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, LookAtRot));
+			//Vector3 Left = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, LookAtRot));
+			//Vector3 Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, LookAtRot));
 			Vector3 Fwd = Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, LookAtRot));
 			SunDir = Fwd;
 
 			SunRayOrigins.Clear();
 
-			int MaxSize = 20;
-			float StepScale = 0.4f;
+			int MaxSize = 30;
+			float StepScale = 1.0f;
+
+			Vector3 CamPos = FPSCamera.Position;
+			Vector2 CamPos2D = new Vector2(CamPos.X, CamPos.Z);
+
+			Rnd = new Random(42096);
 
 			for (int yy = 0; yy < MaxSize; yy++) {
 				for (int xx = 0; xx < MaxSize; xx++) {
-					Vector3 PosOffset = new Vector3(xx, 0, yy) * StepScale;
+					Vector3 PosOffset = new Vector3(CamPos2D.X + (xx - (MaxSize / 2)) * StepScale, 100, CamPos2D.Y + (yy - (MaxSize / 2)) * StepScale);
 
-					SunRayOrigins.Add(SunPos + PosOffset);
+					PosOffset.X += (float)((Rnd.Next(0, 2) == 1 ? -1 : 1) * Rnd.NextDouble() * 0.5f);
+					PosOffset.Z += (float)((Rnd.Next(0, 2) == 1 ? -1 : 1) * Rnd.NextDouble() * 0.5f);
 
-					Vector3 HitPos = RaycastPosEx(SunPos + PosOffset, SunReach, Fwd, out Vector3 FaceNormal, out Vector3 BlokPos);
+					SunRayOrigins.Add(PosOffset);
+
+					Vector3 HitPos = RaycastPosEx(PosOffset, SunReach, Fwd, out Vector3 FaceNormal, out Vector3 BlokPos);
 					if (HitPos != Vector3.Zero && FaceNormal != Vector3.Zero) {
 						PlacedBlock Blk = GetPlacedBlock((int)BlokPos.X, (int)BlokPos.Y, (int)BlokPos.Z, out Chunk Chk);
 						Blk.Lights[Utils.DirToByte(FaceNormal)] = new BlockLight(28);
 						Chk.MarkDirty();
 
+						Vector3[] Neigh = GetPlaneNeighbours((int)BlokPos.X, (int)BlokPos.Y, (int)BlokPos.Z, FaceNormal).ToArray();
+
+						foreach (var Neig in Neigh) {
+							PlacedBlock PB = GetPlacedBlock((int)Neig.X, (int)Neig.Y, (int)Neig.Z, out Chunk Chk2);
+							PB.Lights[Utils.DirToByte(FaceNormal)] = new BlockLight(28);
+
+						}
+
+						Console.WriteLine(Neigh);
+
+						//HitPos.X = (int)HitPos.X + 0.5f;
+						//HitPos.Y = (int)HitPos.Y + 0.5f;
+						//HitPos.Z = (int)HitPos.Z + 0.5f;
+
 						// Bounce
-
-
-						// HitPos + FaceNormal * 0.1f
-						// 4
-						PerformLightBounce(HitPos + FaceNormal * 0.1f, 4);
-						/*RaycastSphere(HitPos + FaceNormal * 0.1f, 4, (Orig, Norm) => {
-							PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
-
-							if (PB.Type != BlockType.None && Norm != Vector3.Zero) {
-
-								if (PB.Lights[Utils.DirToByte(Norm)].R <= 27) {
-									PB.Lights[Utils.DirToByte(Norm)] += 1;
-								}
-
-							}
-
-							return false;
-						});*/
+						//PerformLightBounce2(HitPos + FaceNormal * 0.55f, 3);
 					}
 				}
 			}
@@ -670,6 +860,8 @@ namespace RaylibTest.Graphics {
 
 				Raylib.DrawLine3D(Orig, Dst, Color.Orange);
 			}
+
+			Utils.DrawRaycastRecord();
 		}
 
 		public void DrawTransparent() {

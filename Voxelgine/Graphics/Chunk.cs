@@ -534,17 +534,19 @@ namespace Voxelgine.Graphics {
 								ZNegSkipFace = BlockInfo.IsOpaque(ZNegType);
 							}
 
-							/*if (BlockInfo.CustomModel(CurBlock.Type)) {
+							if (BlockInfo.CustomModel(CurBlock.Type)) {
 								if (!XPosSkipFace || !XNegSkipFace || !YPosSkipFace || !YNegSkipFace || !ZPosSkipFace || !ZNegSkipFace) {
 
 									Model Mdl = BlockInfo.GetCustomModel(CurBlock.Type);
 
 									SetBlockTextureUV(CurBlock.Type, Vector3.UnitY, Vertices);
 
-									for (int i = 0; i < Mdl.Meshes[0].VertexCount; i++) {
-										Vector3 Vert = ((Vector3*)Mdl.Meshes[0].Vertices)[i];
-										Vector2 UV = new Vector2(0, 1) + ((Vector2*)Mdl.Meshes[0].TexCoords)[i] * new Vector2(1, -1);
-										Vertices.Add(Vert + new Vector3(0.5f, 0, 0.5f), UV, Color.White);
+									for (int j = 0; j < Mdl.MeshCount; j++) {
+										for (int i = 0; i < Mdl.Meshes[j].VertexCount; i++) {
+											Vector3 Vert = ((Vector3*)Mdl.Meshes[j].Vertices)[i];
+											Vector2 UV = new Vector2(0, 1) + ((Vector2*)Mdl.Meshes[j].TexCoords)[i] * new Vector2(1, -1);
+											Vertices.Add(Vert + new Vector3(0.5f, 0, 0.5f), UV, Vector3.Zero, Color.White);
+										}
 									}
 
 
@@ -552,8 +554,7 @@ namespace Voxelgine.Graphics {
 									Console.WriteLine("!");
 
 								}
-							} else */
-							{
+							} else {
 
 								// X++
 								if (!XPosSkipFace) {

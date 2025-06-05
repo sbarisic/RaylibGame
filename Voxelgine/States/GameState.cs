@@ -423,6 +423,8 @@ namespace RaylibGame.States {
 		}
 
 		public override void Draw() {
+			Raylib.EndBlendMode();
+
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
 			Draw3D();

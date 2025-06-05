@@ -91,27 +91,20 @@ namespace Voxelgine.Engine {
 			Vertex3[] Vts = Verts.ToArray();
 
 			Mesh M = new Mesh(Vts.Length, Vts.Length / 3);
-		
+
 			M.Vertices = (float*)Marshal.AllocHGlobal(sizeof(Vector3) * Vts.Length);
 			M.Normals = (float*)Marshal.AllocHGlobal(sizeof(Vector3) * Vts.Length);
 			M.TexCoords = (float*)Marshal.AllocHGlobal(sizeof(Vector2) * Vts.Length);
 			M.Indices = (ushort*)Marshal.AllocHGlobal(sizeof(ushort) * Vts.Length);
-			M.Colors = (byte*)Marshal.AllocHGlobal(sizeof(Vector4) * Vts.Length);
+			M.Colors = (byte*)Marshal.AllocHGlobal(sizeof(Color) * Vts.Length);
 
 			for (int i = 0; i < Vts.Length; i++) {
-				M.Indices[i] = (ushort)i;
+				M.IndicesAs<ushort>()[i] = (ushort)i;
 
-				Vector3* Vert = (Vector3*)M.Vertices;
-				Vector3* Nrm = (Vector3*)M.Normals;
-				Vector2* Tex = (Vector2*)M.TexCoords;
-				Vector4* Cols = (Vector4*)M.Colors;
-
-				Vert[i] = Verts[i].Position;
-				Tex[i] = Verts[i].UV;
-				Cols[i] = Utils.ColorVec(Verts[i].Color);
-				Nrm[i] = Verts[i].Normal;
-
-				//Cols[i] = new Vector4(1, 1, 1, 1);
+				M.VerticesAs<Vector3>()[i] = Verts[i].Position;
+				M.TexCoordsAs<Vector2>()[i] = Verts[i].UV;
+				M.ColorsAs<Color>()[i] = Verts[i].Color;
+				M.NormalsAs<Vector3>()[i] = Verts[i].Normal;
 			}
 
 			Raylib.UploadMesh(ref M, false);

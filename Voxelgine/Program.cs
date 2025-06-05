@@ -14,7 +14,7 @@ namespace Voxelgine {
 		public static GameStateImpl OptionsState;
 
 		static void Main(string[] args) {
-			Window = new GameWindow(1920, 1080, "3D Test");
+			Window = new GameWindow(1920, 1080, nameof(Voxelgine));
 			GraphicsUtils.Init();
 			Scripting.Init();
 

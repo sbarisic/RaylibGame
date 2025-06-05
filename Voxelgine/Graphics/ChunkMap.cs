@@ -427,6 +427,9 @@ namespace Voxelgine.Graphics {
 				}
 
 				if ((BT = GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z)) != BlockType.None) {
+					if (!BlockInfo.IsOpaque(BT))
+						return false;
+
 					if (IgnoreBlocks != null && IgnoreBlocks.Contains(BT))
 						return false;
 

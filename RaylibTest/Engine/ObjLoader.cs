@@ -1,5 +1,5 @@
 ﻿using RaylibSharp;
-using RaylibTest.Graphics;
+using Voxelgine.Graphics;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,9 +7,9 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-using GenericMesh = RaylibTest.Graphics.VectorMesh;
+using GenericMesh = Voxelgine.Graphics.VectorMesh;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	static class Obj {
 		public static GenericMesh[] LoadRaw(string Raw, bool SwapWindingOrder = true) {
 			List<GenericMesh> Meshes = new List<GenericMesh>();

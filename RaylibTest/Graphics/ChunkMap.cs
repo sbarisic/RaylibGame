@@ -2,7 +2,7 @@
 
 using RaylibSharp;
 
-using RaylibTest.Engine;
+using Voxelgine.Engine;
 
 using System;
 using System.Collections.Generic;
@@ -16,7 +16,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Graphics {
+namespace Voxelgine.Graphics {
 	struct GlobalPlacedBlock {
 		public Vector3 GlobalPos;
 		public PlacedBlock Block;

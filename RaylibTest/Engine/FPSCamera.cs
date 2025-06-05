@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	static class FPSCamera {
 		const bool UseCameraMove = false;
 

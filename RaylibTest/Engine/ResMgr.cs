@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	unsafe static class ResMgr {
 		static Dictionary<string, Texture2D> Textures = new Dictionary<string, Texture2D>();
 		static Dictionary<string, Model> Models = new Dictionary<string, Model>();

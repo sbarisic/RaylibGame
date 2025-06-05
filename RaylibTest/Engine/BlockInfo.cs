@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	enum BlockType : ushort {
 		None,
 		Stone,

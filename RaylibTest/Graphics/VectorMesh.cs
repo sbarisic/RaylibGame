@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Graphics {
+namespace Voxelgine.Graphics {
 	class VectorMesh {
 		public List<Vertex3> Vertices;
 

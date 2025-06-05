@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	abstract class GameStateImpl {
 		public GameWindow Window;
 

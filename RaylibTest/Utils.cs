@@ -8,7 +8,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest {
+namespace Voxelgine {
 	delegate bool RaycastCallbackFunc(int X, int Y, int Z, Vector3 FaceNormal);
 	delegate bool Raycast2CallbackFunc(Vector3 Pos, Vector3 FaceNormal);
 

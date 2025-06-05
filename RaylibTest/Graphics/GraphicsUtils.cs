@@ -1,5 +1,5 @@
 ﻿using RaylibSharp;
-using RaylibTest.Engine;
+using Voxelgine.Engine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Graphics {
+namespace Voxelgine.Graphics {
 	static class GraphicsUtils {
 		static Dictionary<Vector3, List<Vertex3>> CubeSides;
 

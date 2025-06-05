@@ -2,8 +2,8 @@
 
 using RaylibSharp;
 
-using RaylibTest.Engine;
-using RaylibTest.Graphics;
+using Voxelgine.Engine;
+using Voxelgine.Graphics;
 
 using System;
 using System.Collections.Generic;
@@ -17,7 +17,7 @@ using System.Text;
 using System.Threading.Tasks;
 using RaylibGame.States;
 
-namespace RaylibTest {
+namespace Voxelgine {
 	class Program {
 		public static GameWindow Window;
 

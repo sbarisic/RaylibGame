@@ -277,12 +277,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\RaylibSharp\RaylibSharp.csproj">
-      <Project>{ec0bd3b5-199e-4595-9a53-0cd9e2ece898}</Project>
-      <Name>RaylibSharp</Name>
-    </ProjectReference>
-  </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

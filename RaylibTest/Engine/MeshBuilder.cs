@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	delegate Color AOCalcFunc(Vector3 VertexPos);
 
 	class MeshBuilder {

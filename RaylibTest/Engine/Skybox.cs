@@ -1,12 +1,12 @@
 ﻿using RaylibSharp;
-using RaylibTest.Engine;
+using Voxelgine.Engine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	class Skybox {
 		public Skybox() {
 			Mesh CubeMesh = Raylib.GenMeshCube(1, 1, 1);

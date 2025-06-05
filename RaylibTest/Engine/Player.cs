@@ -10,7 +10,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	public unsafe class BoneInformation {
 		public string Name;
 		public int ID;

@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RaylibTest.Engine {
+namespace Voxelgine.Engine {
 	[MoonSharpUserData]
 	public unsafe class AnimatedEntity {
 		[MoonSharpHidden]

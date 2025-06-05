@@ -453,6 +453,11 @@ static void parseFloat3(float *x, float *y, float *z, const char **token) {
   (*z) = parseFloat(token);
 }
 
+static unsigned int my_strnlen(const char *s, unsigned int n) {
+    const char *p = memchr(s, 0, n);
+    return p ? (unsigned int)(p - s) : n;
+}
+
 static char *my_strdup(const char *s, unsigned int max_length) {
   char *d;
   unsigned int len;
@@ -478,15 +483,13 @@ static char *my_strndup(const char *s, unsigned int len) {
   if (s == NULL) return NULL;
   if (len == 0) return NULL;
 
-  d = (char *)TINYOBJ_MALLOC(len + 1); /* + '\0' */
-  slen = strlen(s);
-  if (slen < len) {
-    memcpy(d, s, slen);
-    d[slen] = '\0';
-  } else {
-    memcpy(d, s, len);
-    d[len] = '\0';
+  slen = my_strnlen(s, len);
+  d = (char *)TINYOBJ_MALLOC(slen + 1); /* + '\0' */
+  if (!d) {
+    return NULL;
   }
+  memcpy(d, s, slen);
+  d[slen] = '\0';
 
   return d;
 }
@@ -743,7 +746,7 @@ static int tinyobj_parse_and_index_mtl_file(tinyobj_material_t **materials_out,
   (*materials_out) = NULL;
   (*num_materials_out) = 0;
 
-  fp = fopen(filename, "r");
+  fp = fopen(filename, "rt");
   if (!fp) {
     fprintf(stderr, "TINYOBJ: Error reading file '%s': %s (%d)\n", filename, strerror(errno), errno);
     return TINYOBJ_ERROR_FILE_OPERATION;
@@ -944,6 +947,8 @@ static int tinyobj_parse_and_index_mtl_file(tinyobj_material_t **materials_out,
 
     /* @todo { unknown parameter } */
   }
+
+  fclose(fp);
 
   if (material.name) {
     /* Flush last material element */
@@ -1264,6 +1269,11 @@ int tinyobj_parse_obj(tinyobj_attrib_t *attrib, tinyobj_shape_t **shapes,
       if (is_line_ending(buf, i, end_idx)) {
         line_infos[line_no].pos = prev_pos;
         line_infos[line_no].len = i - prev_pos;
+         
+// ---- QUICK BUG FIX : https://github.com/raysan5/raylib/issues/3473
+        if ( i > 0 && buf[i-1] == '\r' ) line_infos[line_no].len--;
+// --------
+
         prev_pos = i + 1;
         line_no++;
       }
@@ -1374,7 +1384,7 @@ int tinyobj_parse_obj(tinyobj_attrib_t *attrib, tinyobj_shape_t **shapes,
           /* Create a null terminated string */
           char* material_name_null_term = (char*) TINYOBJ_MALLOC(commands[i].material_name_len + 1);
           memcpy((void*) material_name_null_term, (const void*) commands[i].material_name, commands[i].material_name_len);
-          material_name_null_term[commands[i].material_name_len - 1] = 0;
+          material_name_null_term[commands[i].material_name_len] = 0;
 
           if (hash_table_exists(material_name_null_term, &material_table))
             material_id = (int)hash_table_get(material_name_null_term, &material_table);

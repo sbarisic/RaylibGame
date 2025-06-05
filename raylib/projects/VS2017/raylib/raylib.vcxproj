@@ -34,6 +34,26 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\raudio.c" />
+    <ClCompile Include="..\..\..\src\rcore.c" />
+    <ClCompile Include="..\..\..\src\rglfw.c" />
+    <ClCompile Include="..\..\..\src\rmodels.c" />
+    <ClCompile Include="..\..\..\src\rshapes.c" />
+    <ClCompile Include="..\..\..\src\rtext.c" />
+    <ClCompile Include="..\..\..\src\rtextures.c" />
+    <ClCompile Include="..\..\..\src\utils.c" />
+    <ClCompile Include="models_custom.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\config.h" />
+    <ClInclude Include="..\..\..\src\raylib.h" />
+    <ClInclude Include="..\..\..\src\raymath.h" />
+    <ClInclude Include="..\..\..\src\rcamera.h" />
+    <ClInclude Include="..\..\..\src\rgestures.h" />
+    <ClInclude Include="..\..\..\src\rlgl.h" />
+    <ClInclude Include="..\..\..\src\utils.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{E89D61AC-55DE-4482-AFD4-DF7242EBC859}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -175,7 +195,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions);GRAPHICS_API_OPENGL_33;PLATFORM_DESKTOP;BUILD_LIBTYPE_SHARED;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions);GRAPHICS_API_OPENGL_33;PLATFORM_DESKTOP</PreprocessorDefinitions>
       <CompileAs>CompileAsC</CompileAs>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\release\include;$(ProjectDir)..\..\..\src\external\glfw\include</AdditionalIncludeDirectories>
       <StructMemberAlignment>Default</StructMemberAlignment>
@@ -184,6 +204,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Lib>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -260,7 +281,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions);GRAPHICS_API_OPENGL_33;PLATFORM_DESKTOP;BUILD_LIBTYPE_SHARED;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions);GRAPHICS_API_OPENGL_33;PLATFORM_DESKTOP</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\release\include;$(ProjectDir)..\..\..\src\external\glfw\include</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
       <StructMemberAlignment>Default</StructMemberAlignment>
@@ -271,6 +292,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release.DLL|Win32'">
@@ -317,41 +339,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\src\raudio.c" />
-    <ClCompile Include="..\..\..\src\core.c" />
-    <ClCompile Include="..\..\..\src\models.c" />
-    <ClCompile Include="..\..\..\src\raygui.c" />
-    <ClCompile Include="..\..\..\src\rglfw.c" />
-    <ClCompile Include="..\..\..\src\shapes.c" />
-    <ClCompile Include="..\..\..\src\text.c" />
-    <ClCompile Include="..\..\..\src\textures.c" />
-    <ClCompile Include="..\..\..\src\utils.c" />
-    <ClCompile Include="models_custom.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\src\camera.h" />
-    <ClInclude Include="..\..\..\src\external\glad.h" />
-    <ClInclude Include="..\..\..\src\external\jar_mod.h" />
-    <ClInclude Include="..\..\..\src\external\jar_xm.h" />
-    <ClInclude Include="..\..\..\src\external\miniaudio.h" />
-    <ClInclude Include="..\..\..\src\external\stb_image.h" />
-    <ClInclude Include="..\..\..\src\external\stb_image_resize.h" />
-    <ClInclude Include="..\..\..\src\external\stb_image_write.h" />
-    <ClInclude Include="..\..\..\src\external\stb_rect_pack.h" />
-    <ClInclude Include="..\..\..\src\external\stb_truetype.h" />
-    <ClInclude Include="..\..\..\src\external\stb_vorbis.h" />
-    <ClInclude Include="..\..\..\src\gestures.h" />
-    <ClInclude Include="..\..\..\src\raygui.h" />
-    <ClInclude Include="..\..\..\src\raylib.h" />
-    <ClInclude Include="..\..\..\src\raymath.h" />
-    <ClInclude Include="..\..\..\src\ricons.h" />
-    <ClInclude Include="..\..\..\src\rlgl.h" />
-    <ClInclude Include="..\..\..\src\utils.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

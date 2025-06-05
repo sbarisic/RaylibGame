@@ -11,7 +11,7 @@ uniform vec4 colDiffuse;
 // Output fragment color
 out vec4 finalColor;
 
-// NOTE: Add here your custom variables
+// NOTE: Add your custom variables here
 
 void main()
 {
@@ -21,12 +21,12 @@ void main()
     colors[0] = vec3(0.0, 0.0, 1.0);
     colors[1] = vec3(1.0, 1.0, 0.0);
     colors[2] = vec3(1.0, 0.0, 0.0);
-    
+
     float lum = (texelColor.r + texelColor.g + texelColor.b)/3.0;
-    
+
     int ix = (lum < 0.5)? 0:1;
-    
+
     vec3 tc = mix(colors[ix], colors[ix + 1], (lum - float(ix)*0.5)/0.5);
-    
+
     finalColor = vec4(tc, 1.0);
 }

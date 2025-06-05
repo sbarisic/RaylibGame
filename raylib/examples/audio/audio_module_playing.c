@@ -2,10 +2,14 @@
 *
 *   raylib [audio] example - Module playing (streaming)
 *
-*   This example has been created using raylib 1.5 (www.raylib.com)
-*   raylib is licensed under an unmodified zlib/libpng license (View raylib.h for details)
+*   Example complexity rating: [★☆☆☆] 1/4
 *
-*   Copyright (c) 2016 Ramon Santamaria (@raysan5)
+*   Example originally created with raylib 1.5, last time updated with raylib 3.5
+*
+*   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
+*   BSD-like license that allows static linking with closed source software
+*
+*   Copyright (c) 2016-2025 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -21,6 +25,9 @@ typedef struct {
     Color color;
 } CircleWave;
 
+//------------------------------------------------------------------------------------
+// Program main entry point
+//------------------------------------------------------------------------------------
 int main(void)
 {
     // Initialization
@@ -37,22 +44,24 @@ int main(void)
     Color colors[14] = { ORANGE, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK,
                          YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE };
 
-    // Creates ome circles for visual effect
+    // Creates some circles for visual effect
     CircleWave circles[MAX_CIRCLES] = { 0 };
 
     for (int i = MAX_CIRCLES - 1; i >= 0; i--)
     {
         circles[i].alpha = 0.0f;
-        circles[i].radius = GetRandomValue(10, 40);
-        circles[i].position.x = GetRandomValue(circles[i].radius, screenWidth - circles[i].radius);
-        circles[i].position.y = GetRandomValue(circles[i].radius, screenHeight - circles[i].radius);
-        circles[i].speed = (float)GetRandomValue(1, 100)/20000.0f;
+        circles[i].radius = (float)GetRandomValue(10, 40);
+        circles[i].position.x = (float)GetRandomValue((int)circles[i].radius, (int)(screenWidth - circles[i].radius));
+        circles[i].position.y = (float)GetRandomValue((int)circles[i].radius, (int)(screenHeight - circles[i].radius));
+        circles[i].speed = (float)GetRandomValue(1, 100)/2000.0f;
         circles[i].color = colors[GetRandomValue(0, 13)];
     }
 
-    Music xm = LoadMusicStream("resources/chiptun1.mod");
+    Music music = LoadMusicStream("resources/mini1111.xm");
+    music.looping = false;
+    float pitch = 1.0f;
 
-    PlayMusicStream(xm);
+    PlayMusicStream(music);
 
     float timePlayed = 0.0f;
     bool pause = false;
@@ -65,13 +74,14 @@ int main(void)
     {
         // Update
         //----------------------------------------------------------------------------------
-        UpdateMusicStream(xm);        // Update music buffer with new stream data
+        UpdateMusicStream(music);      // Update music buffer with new stream data
 
         // Restart music playing (stop and play)
         if (IsKeyPressed(KEY_SPACE))
         {
-            StopMusicStream(xm);
-            PlayMusicStream(xm);
+            StopMusicStream(music);
+            PlayMusicStream(music);
+            pause = false;
         }
 
         // Pause/Resume music playing
@@ -79,12 +89,17 @@ int main(void)
         {
             pause = !pause;
 
-            if (pause) PauseMusicStream(xm);
-            else ResumeMusicStream(xm);
+            if (pause) PauseMusicStream(music);
+            else ResumeMusicStream(music);
         }
 
+        if (IsKeyDown(KEY_DOWN)) pitch -= 0.01f;
+        else if (IsKeyDown(KEY_UP)) pitch += 0.01f;
+
+        SetMusicPitch(music, pitch);
+
         // Get timePlayed scaled to bar dimensions
-        timePlayed = GetMusicTimePlayed(xm)/GetMusicTimeLength(xm)*(screenWidth - 40);
+        timePlayed = GetMusicTimePlayed(music)/GetMusicTimeLength(music)*(screenWidth - 40);
 
         // Color circles animation
         for (int i = MAX_CIRCLES - 1; (i >= 0) && !pause; i--)
@@ -97,11 +112,11 @@ int main(void)
             if (circles[i].alpha <= 0.0f)
             {
                 circles[i].alpha = 0.0f;
-                circles[i].radius = GetRandomValue(10, 40);
-                circles[i].position.x = GetRandomValue(circles[i].radius, screenWidth - circles[i].radius);
-                circles[i].position.y = GetRandomValue(circles[i].radius, screenHeight - circles[i].radius);
+                circles[i].radius = (float)GetRandomValue(10, 40);
+                circles[i].position.x = (float)GetRandomValue((int)circles[i].radius, (int)(screenWidth - circles[i].radius));
+                circles[i].position.y = (float)GetRandomValue((int)circles[i].radius, (int)(screenHeight - circles[i].radius));
                 circles[i].color = colors[GetRandomValue(0, 13)];
-                circles[i].speed = (float)GetRandomValue(1, 100)/20000.0f;
+                circles[i].speed = (float)GetRandomValue(1, 100)/2000.0f;
             }
         }
         //----------------------------------------------------------------------------------
@@ -122,13 +137,21 @@ int main(void)
             DrawRectangle(20, screenHeight - 20 - 12, (int)timePlayed, 12, MAROON);
             DrawRectangleLines(20, screenHeight - 20 - 12, screenWidth - 40, 12, GRAY);
 
+            // Draw help instructions
+            DrawRectangle(20, 20, 425, 145, WHITE);
+            DrawRectangleLines(20, 20, 425, 145, GRAY);
+            DrawText("PRESS SPACE TO RESTART MUSIC", 40, 40, 20, BLACK);
+            DrawText("PRESS P TO PAUSE/RESUME", 40, 70, 20, BLACK);
+            DrawText("PRESS UP/DOWN TO CHANGE SPEED", 40, 100, 20, BLACK);
+            DrawText(TextFormat("SPEED: %f", pitch), 40, 130, 20, MAROON);
+
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    UnloadMusicStream(xm);          // Unload music stream buffers from RAM
+    UnloadMusicStream(music);          // Unload music stream buffers from RAM
 
     CloseAudioDevice();     // Close audio device (music streaming is automatically stopped)
 

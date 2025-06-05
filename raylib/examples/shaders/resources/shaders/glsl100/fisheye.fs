@@ -10,7 +10,7 @@ varying vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
-// NOTE: Add here your custom variables
+// NOTE: Add your custom variables here
 
 const float PI = 3.1415926535;
 
@@ -23,7 +23,7 @@ void main()
     vec2 uv = vec2(0.0);
     vec2 xy = 2.0 * fragTexCoord.xy - 1.0;
     float d = length(xy);
-    
+
     if (d < (2.0 - maxFactor))
     {
         d = length(xy * maxFactor);

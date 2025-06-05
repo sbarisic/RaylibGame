@@ -1,11 +1,15 @@
 /*******************************************************************************************
 *
-*   raylib example - particles blending
+*   raylib [textures] example - particles blending
 *
-*   This example has been created using raylib 1.7 (www.raylib.com)
-*   raylib is licensed under an unmodified zlib/libpng license (View raylib.h for details)
+*   Example complexity rating: [★☆☆☆] 1/4
 *
-*   Copyright (c) 2017 Ramon Santamaria (@raysan5)
+*   Example originally created with raylib 1.7, last time updated with raylib 3.5
+*
+*   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
+*   BSD-like license that allows static linking with closed source software
+*
+*   Copyright (c) 2017-2025 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -23,6 +27,9 @@ typedef struct {
     bool active;        // NOTE: Use it to activate/deactive particle
 } Particle;
 
+//------------------------------------------------------------------------------------
+// Program main entry point
+//------------------------------------------------------------------------------------
 int main(void)
 {
     // Initialization
@@ -48,7 +55,7 @@ int main(void)
 
     float gravity = 3.0f;
 
-    Texture2D smoke = LoadTexture("resources/smoke.png");
+    Texture2D smoke = LoadTexture("resources/spark_flame.png");
 
     int blending = BLEND_ALPHA;
 
@@ -80,12 +87,12 @@ int main(void)
         {
             if (mouseTail[i].active)
             {
-                mouseTail[i].position.y += gravity;
-                mouseTail[i].alpha -= 0.01f;
+                mouseTail[i].position.y += gravity/2;
+                mouseTail[i].alpha -= 0.005f;
 
                 if (mouseTail[i].alpha <= 0.0f) mouseTail[i].active = false;
 
-                mouseTail[i].rotation += 5.0f;
+                mouseTail[i].rotation += 2.0f;
             }
         }
 

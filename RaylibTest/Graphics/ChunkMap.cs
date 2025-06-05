@@ -29,7 +29,7 @@ namespace RaylibTest.Graphics {
 		}
 	}
 
-	class ChunkMap {
+	unsafe class ChunkMap {
 		Dictionary<Vector3, Chunk> Chunks;
 		Random Rnd = new Random();
 
@@ -474,7 +474,26 @@ namespace RaylibTest.Graphics {
 				if (Face == Vector3.Zero)
 					return false;
 
-				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
+				BlockType BT = GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z);
+
+				if (BT == BlockType.Campfire) {
+
+					Model CampfireModel = BlockInfo.GetCustomModel(BlockType.Campfire);
+					BoundingBox BBox = Raylib.MeshBoundingBox(CampfireModel.meshes[0]);
+
+
+					Ray R = new Ray();
+					R.direction = Dir;
+					R.position = Origin - HitPos - new Vector3(0.5f, 0, 0.5f);
+					if (Raylib.CheckCollisionRayBox(R, BBox)) {
+						RetPos = HitPos;
+						OutFaceDir = Face;
+						return true;
+					}
+
+					return false;
+
+				} else if (BT != BlockType.None) {
 					RetPos = HitPos;
 					OutFaceDir = Face;
 					return true;

@@ -302,17 +302,19 @@ namespace Voxelgine.GUI {
 
 		public override void Update(float Dt) {
 			int KeyPressed = 0;
-			do {
-				KeyPressed = Raylib.GetCharPressed();
-				if (KeyPressed == 0)
-					break;
 
-				char K = (char)KeyPressed;
-				//Console.WriteLine("{0} - '{1}'", KeyPressed, K);
+			if (IsReading) {
+				do {
+					KeyPressed = Raylib.GetCharPressed();
+					if (KeyPressed == 0)
+						break;
 
-				if (IsReading)
+					char K = (char)KeyPressed;
+					//Console.WriteLine("{0} - '{1}'", KeyPressed, K);
+
 					Input(K.ToString());
-			} while (KeyPressed != 0);
+				} while (KeyPressed != 0);
+			}
 
 			if ((Raylib.IsKeyDown(KeyboardKey.LeftControl) || Raylib.IsKeyDown(KeyboardKey.RightControl)) && IsReading) {
 				if (Raylib.IsKeyPressed(KeyboardKey.A)) {

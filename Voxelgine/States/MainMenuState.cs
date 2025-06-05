@@ -22,13 +22,20 @@ namespace RaylibGame.States {
 		public MainMenuState(GameWindow window) : base(window) {
 			GUI = new GUIManager();
 
-			Lbl = new GUILabel(GUI, 64);
-			Lbl.Pos = new Vector2(430, 700);
+			float W = window.Width;
+			float H = window.Height;
 
+			Lbl = new GUILabel(GUI, 80);
 			OutLbl = new GUILabel(GUI);
-			OutLbl.Pos = new Vector2(430, 200);
+
 			OutLbl.Size = new Vector2(Lbl.Size.X, 500);
+			OutLbl.Pos = new Vector2(W / 2 - OutLbl.Size.X / 2, H - (H / 2 + OutLbl.Size.Y / 2 + H * 0.05f));
 			OutLbl.ScrollText = true;
+			GUI.AddElement(OutLbl);
+
+			Lbl.Pos = new Vector2(OutLbl.Pos.X, OutLbl.Pos.Y + OutLbl.Size.Y);
+			Lbl.IsReading = true;
+			GUI.AddElement(Lbl);
 
 			Lbl.OnInputFunc = (Txt) => {
 				OutLbl.WriteLine(Txt);
@@ -41,9 +48,7 @@ namespace RaylibGame.States {
 
 		public override void Update(float Dt) {
 			MousePos = Raylib.GetMousePosition();
-
-			Lbl.Update(Dt);
-			OutLbl.Update(Dt);
+			GUI.Update(Dt);
 		}
 
 		public override void Draw() {
@@ -56,11 +61,7 @@ namespace RaylibGame.States {
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode2D(Cam);
 
-			Lbl.IsReading = Lbl.IsInside(MousePos) || OutLbl.IsInside(MousePos);
-			Lbl.Draw(Lbl.IsReading, Raylib.IsMouseButtonPressed(MouseButton.Left), Raylib.IsMouseButtonDown(MouseButton.Left));
-
-			OutLbl.Draw(Lbl.IsReading, Raylib.IsMouseButtonPressed(MouseButton.Left), Raylib.IsMouseButtonDown(MouseButton.Left));
-
+			GUI.Draw();
 
 			/*if (Raygui.GuiButton(new Rectangle(BtnX, 100 + (BtnHeight + BtnPadding) * 0, BtnWidth, BtnHeight), "New Game"))
 				Program.Window.SetState(Program.GameState);

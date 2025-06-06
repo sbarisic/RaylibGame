@@ -32,7 +32,7 @@ namespace RaylibGame.States {
 			Btn_NewGame.Pos = Pos;
 			Btn_NewGame.Size = BtnSize;
 			Btn_NewGame.Text = "New Game";
-			Btn_NewGame.OnClickedFunc = () => {
+			Btn_NewGame.OnClickedFunc = (E) => {
 				Program.Window.SetState(Program.GameState);
 			};
 			GUI.AddElement(Btn_NewGame);
@@ -43,7 +43,7 @@ namespace RaylibGame.States {
 			Btn_Quit.Pos = Pos;
 			Btn_Quit.Size = BtnSize;
 			Btn_Quit.Text = "Quit";
-			Btn_Quit.OnClickedFunc = () => {
+			Btn_Quit.OnClickedFunc = (E) => {
 				Program.Window.Close();
 			};
 			GUI.AddElement(Btn_Quit);
@@ -53,6 +53,9 @@ namespace RaylibGame.States {
 			IBox.Size = new Vector2(64, 64);
 			IBox.IsSelected = true;
 			IBox.Text = "64";
+			IBox.OnClickedFunc = (E) => {
+				Console.WriteLine("Clicked item!");
+			};
 			GUI.AddElement(IBox);
 
 

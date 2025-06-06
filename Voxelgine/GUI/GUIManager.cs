@@ -86,10 +86,10 @@ namespace Voxelgine.GUI {
 			DrawText(Txt, Pos, Clr);
 		}
 
-		public void DrawTexture(Texture2D Tex, Vector2 Pos, float Rot, float Scale) {
+		public void DrawTexture(Texture2D Tex, Vector2 Pos, float Rot, float Scale, Color? Clr = null) {
 			Vector2 TexSize = new Vector2(Tex.Width, Tex.Height);
 			Vector2 Origin = (TexSize * Scale) / 2;
-			Raylib.DrawTexturePro(Tex, new Rectangle(Vector2.Zero, TexSize), new Rectangle(Pos, TexSize * Scale), Origin, Rot, Color.White);
+			Raylib.DrawTexturePro(Tex, new Rectangle(Vector2.Zero, TexSize), new Rectangle(Pos, TexSize * Scale), Origin, Rot, Clr ?? Color.White);
 		}
 
 		public void DrawRectLines(Vector2 Pos, Vector2 Sz, Color Clr) {

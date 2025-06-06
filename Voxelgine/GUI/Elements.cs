@@ -20,6 +20,8 @@ using Windows.Graphics.Printing3D;
 using Windows.Media.Core;
 
 namespace Voxelgine.GUI {
+	delegate void OnMouseClickedFunc(GUIElement El);
+
 	abstract class GUIElement {
 		public Vector2 Pos;
 		public Vector2 Size;
@@ -406,7 +408,7 @@ namespace Voxelgine.GUI {
 		GUIManager Mgr;
 
 		public string Text;
-		public Action OnClickedFunc;
+		public OnMouseClickedFunc OnClickedFunc;
 
 		public GUIButton(GUIManager Mgr) {
 			this.Mgr = Mgr;
@@ -431,7 +433,7 @@ namespace Voxelgine.GUI {
 		}
 
 		public virtual void OnMouseClick() {
-			OnClickedFunc?.Invoke();
+			OnClickedFunc?.Invoke(this);
 		}
 
 		bool ButtonHeldDown = false;
@@ -443,13 +445,20 @@ namespace Voxelgine.GUI {
 
 			if (IsInside(MousePos)) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					ButtonHeldDown = true;
+					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {
+						ButtonHeldDown = true;
+					} else {
+					}
 				} else if (Raylib.IsMouseButtonReleased(MouseButton.Left)) {
 					if (ButtonHeldDown) {
 						ButtonHeldDown = false;
 						OnMouseClick();
 					}
 				} else {
+					ButtonHeldDown = false;
+				}
+			} else {
+				if (!Raylib.IsMouseButtonDown(MouseButton.Left)) {
 					ButtonHeldDown = false;
 				}
 			}
@@ -510,6 +519,8 @@ namespace Voxelgine.GUI {
 
 		GUIManager Mgr;
 
+		public OnMouseClickedFunc OnClickedFunc;
+
 		public GUIItemBox(GUIManager Mgr) {
 			this.Mgr = Mgr;
 
@@ -529,7 +540,32 @@ namespace Voxelgine.GUI {
 			}
 		}
 
+		public virtual void OnMouseClick() {
+			OnClickedFunc?.Invoke(this);
+		}
+
+		bool ButtonHeldDown = false;
+
 		public override void Update(float Dt) {
+			if (IsInside(MousePos)) {
+				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
+					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {
+						ButtonHeldDown = true;
+					} else {
+					}
+				} else if (Raylib.IsMouseButtonReleased(MouseButton.Left)) {
+					if (ButtonHeldDown) {
+						ButtonHeldDown = false;
+						OnMouseClick();
+					}
+				} else {
+					ButtonHeldDown = false;
+				}
+			} else {
+				if (!Raylib.IsMouseButtonDown(MouseButton.Left)) {
+					ButtonHeldDown = false;
+				}
+			}
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
@@ -541,7 +577,9 @@ namespace Voxelgine.GUI {
 				Mgr.Draw9Patch(Tex, BtnLoc, Color.White);
 			}
 
-			Mgr.DrawTexture(Icon, Pos + Size / 2, 0, IconScale);
+			float Clr = ButtonHeldDown ? 0.8f : 1.0f;
+
+			Mgr.DrawTexture(Icon, Pos + Size / 2, 0, IconScale, new Color(Clr, Clr, Clr));
 
 			if (!string.IsNullOrEmpty(Text)) {
 				Mgr.DrawTextOutline(Text, Pos + Size / 2, Color.White, 2);

@@ -21,25 +21,7 @@ namespace RaylibGame.States {
 
 		public MainMenuState(GameWindow window) : base(window) {
 			GUI = new GUIManager();
-
-			float W = window.Width;
-			float H = window.Height;
-
-			Lbl = new GUILabel(GUI, 80);
-			OutLbl = new GUILabel(GUI);
-
-			OutLbl.Size = new Vector2(Lbl.Size.X, 500);
-			OutLbl.Pos = new Vector2(W / 2 - OutLbl.Size.X / 2, H - (H / 2 + OutLbl.Size.Y / 2 + H * 0.05f));
-			OutLbl.ScrollText = true;
-			GUI.AddElement(OutLbl);
-
-			Lbl.Pos = new Vector2(OutLbl.Pos.X, OutLbl.Pos.Y + OutLbl.Size.Y);
-			Lbl.IsReading = true;
-			GUI.AddElement(Lbl);
-
-			Lbl.OnInputFunc = (Txt) => {
-				OutLbl.WriteLine(Txt);
-			};
+			GUI.CreateConsole(window, out Lbl, out OutLbl);
 		}
 
 		public override void SwapTo() {

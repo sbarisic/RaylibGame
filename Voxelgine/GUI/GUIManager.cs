@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Engine;
+
 namespace Voxelgine.GUI {
 	class GUIManager {
 		public int FntSize = 32;
@@ -20,6 +22,10 @@ namespace Voxelgine.GUI {
 		public GUIManager() {
 			TxtFont = Raylib.LoadFontEx("data/fonts/medodica.otf", FntSize, null, 128);
 			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Point);
+		}
+
+		public void Clear() {
+			Elements.Clear();
 		}
 
 		public void AddElement(GUIElement E) {
@@ -61,6 +67,23 @@ namespace Voxelgine.GUI {
 
 		public void DrawRectLines(Vector2 Pos, Vector2 Sz, Color Clr) {
 			Raylib.DrawRectangleLinesEx(new Rectangle(Pos, Sz), 1, Clr);
+		}
+
+		public void CreateConsole(GameWindow window, out GUILabel Lbl, out GUILabel OutLbl) {
+			float W = window.Width;
+			float H = window.Height;
+
+			Lbl = new GUILabel(this, 80);
+			OutLbl = new GUILabel(this);
+
+			OutLbl.Size = new Vector2(Lbl.Size.X, 500);
+			OutLbl.Pos = new Vector2(W / 2 - OutLbl.Size.X / 2, H - (H / 2 + OutLbl.Size.Y / 2 + H * 0.05f));
+			OutLbl.ScrollText = true;
+			AddElement(OutLbl);
+
+			Lbl.Pos = new Vector2(OutLbl.Pos.X, OutLbl.Pos.Y + OutLbl.Size.Y);
+			Lbl.IsReading = true;
+			AddElement(Lbl);
 		}
 	}
 }

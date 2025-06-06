@@ -67,10 +67,12 @@ namespace RaylibGame.States {
 
 			IB.Add(Btn_Wat);
 
-			DbgRect = new Rectangle(new Vector2(100, 100), new Vector2(400, 500));
+			Vector2 CenterSize = new Vector2(400, 500);
+
+			DbgRect = new Rectangle(new Vector2(Window.Width, Window.Height) / 2 - CenterSize / 2, CenterSize);
 			GUI.CenterVertical(DbgRect.Position, DbgRect.Size, new Vector2(15, 10), 5, IB.ToArray());
 
-			GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
+			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
 			IcnBar.Pos = new Vector2(800, 200);
 			IcnBar.Txt = "XP Level";
 			GUI.AddElement(IcnBar);
@@ -80,7 +82,7 @@ namespace RaylibGame.States {
 			IcnBar2.TxtOffset = new Vector2(0, -10);
 			IcnBar2.Txt = "Helth";
 			IcnBar2.Value = 20;
-			GUI.AddElement(IcnBar2);
+			GUI.AddElement(IcnBar2);*/
 
 
 			Texture2D Icon = ResMgr.GetTexture("items/pickaxe.png");
@@ -93,11 +95,7 @@ namespace RaylibGame.States {
 
 			//============
 
-			GUIItemBox Box_Health = new GUIItemBox(GUI);
-			Box_Health.Pos = new Vector2(64, Window.Height - 64 - 64);
-			Box_Health.Text = "100";
-			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
-			GUI.AddElement(Box_Health);
+
 		}
 
 		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {

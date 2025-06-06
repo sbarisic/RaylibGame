@@ -98,6 +98,22 @@ namespace RaylibGame.States {
 			Ply.SetPosition(32, 73, 19);
 		}
 
+		GUIElement AddButton(string Txt, OnMouseClickedFunc OnClick) {
+
+			GUIButton Btn = new GUIButton(GUI);
+			Btn.Pos = GUI.WindowScale(new Vector2(0.1f, 0.1f));
+			Btn.Size = new Vector2(180, 45);
+			Btn.Text = Txt;
+			Btn.OnClickedFunc = OnClick;
+			GUI.AddElement(Btn);
+
+			return Btn;
+
+		}
+
+		GUIItemBox Box_Health;
+		GUILabel InfoLbl;
+
 		void InitGUI() {
 			/*GUIIconBar Bar_Health = new GUIIconBar(GUI, IconBarStyle.Hearts, 10, 2.0f);
 			Bar_Health.Pos = new Vector2(100, Window.Height - 80);
@@ -105,9 +121,33 @@ namespace RaylibGame.States {
 			Bar_Health.Txt = "Helth";
 			GUI.AddElement(Bar_Health);*/
 
-			GUIItemBox Box_Health = new GUIItemBox(GUI);
-			Box_Health.Pos = new Vector2(100, Window.Height - 80);
+			Box_Health = new GUIItemBox(GUI);
+			Box_Health.Pos = new Vector2(64, Window.Height - 64 - 64);
+			Box_Health.Text = "100";
+			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
 			GUI.AddElement(Box_Health);
+
+			InfoLbl = new GUILabel(GUI);
+			InfoLbl.Pos = new Vector2(16, 40);
+			InfoLbl.Size = new Vector2(300, 250);
+			InfoLbl.Clear();
+			InfoLbl.WriteLine("Hello World!");
+			GUI.AddElement(InfoLbl);
+
+			List<GUIElement> Els = new List<GUIElement>();
+
+			Els.Add(AddButton("Func 1", (E) => { }));
+			Els.Add(AddButton("Func 2", (E) => { }));
+			Els.Add(AddButton("Func 3", (E) => { }));
+			Els.Add(AddButton("Func 4", (E) => { }));
+
+			GUI.CenterVertical(new Vector2(Window.Width - 180, 10), new Vector2(180, 400), new Vector2(10, 0), 1, Els.ToArray());
+		}
+
+		void UpdateGUI() {
+			InfoLbl.Clear();
+			InfoLbl.WriteLine("Pos: {0}, {1}, {2}", (int)Ply.Position.X, (int)Ply.Position.Y, (int)Ply.Position.Z);
+			InfoLbl.WriteLine("Vel: {0}", MathF.Round(PlyVelocity.Length(), 2));
 		}
 
 
@@ -365,7 +405,7 @@ namespace RaylibGame.States {
 			bool Middle = Raylib.IsMouseButtonPressed(MouseButton.Middle);
 			const float MaxLen = 20;
 
-			if (Left || Right || Middle) {
+			if ((Left || Right || Middle) && Ply.CursorDisabled) {
 				Vector3 Dir = FPSCamera.GetForward();
 				Vector3 Start = FPSCamera.Position;
 				Vector3 End = FPSCamera.Position + (Dir * MaxLen);
@@ -440,7 +480,12 @@ namespace RaylibGame.States {
 			}
 
 			UpdatePhysics(Dt);
-			GUI.Update(Dt);
+
+			if (!Ply.CursorDisabled) {
+				GUI.Update(Dt);
+			}
+
+			UpdateGUI();
 		}
 
 		public override void Draw() {

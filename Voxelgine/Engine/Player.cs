@@ -122,7 +122,7 @@ namespace Voxelgine.Engine {
 		public Matrix4x4 Rotation;
 		public Matrix4x4 UpperBodyRotation;
 
-		bool CursorDisabled = false;
+		public bool CursorDisabled = false;
 		bool LocalPlayer;
 
 		Dictionary<KeyboardKey, Action> OnKeyFuncs = new Dictionary<KeyboardKey, Action>();

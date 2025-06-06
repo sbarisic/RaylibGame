@@ -39,6 +39,14 @@ namespace Voxelgine.GUI {
 			Size.X = Size.X * (InputCharCount + 1);
 		}
 
+		public void Clear() {
+			TextBuilder.Clear();
+			Text = "";
+			Cursor = 0;
+			SelectionStart = 0;
+			SelectionLen = 0;
+		}
+
 		public void Input(string Str) {
 			if (string.IsNullOrEmpty(Str))
 				return;

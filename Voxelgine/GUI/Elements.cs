@@ -6,12 +6,15 @@ using RaylibGame.States;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
 using TextCopy;
+
+using Voxelgine.Engine;
 
 using Windows.Graphics.Printing3D;
 using Windows.Media.Core;
@@ -20,6 +23,7 @@ namespace Voxelgine.GUI {
 	abstract class GUIElement {
 		public Vector2 Pos;
 		public Vector2 Size;
+		public Vector2 MousePos;
 
 		public virtual bool IsInside(Vector2 Pos2) {
 			Rectangle Rect = new Rectangle(Pos, Size);
@@ -386,6 +390,161 @@ namespace Voxelgine.GUI {
 
 			if ((Raylib.IsKeyPressed(KeyboardKey.Down) || Raylib.IsKeyPressedRepeat(KeyboardKey.Down)) && !IsReading) {
 				Scroll = Scroll - 16;
+			}
+		}
+	}
+
+	class GUIButton : GUIElement {
+		Texture2D BtnTex;
+		Texture2D BtnHoverTex;
+		Texture2D BtnPressTex;
+
+		Texture2D Icon;
+		float IconScale = 3;
+		bool HasIcon = false;
+
+		GUIManager Mgr;
+
+		public string Text;
+		public Action OnClickedFunc;
+
+		public GUIButton(GUIManager Mgr) {
+			this.Mgr = Mgr;
+
+			BtnTex = ResMgr.GetTexture("gui/btn.png");
+			Raylib.SetTextureFilter(BtnTex, TextureFilter.Point);
+
+			BtnHoverTex = ResMgr.GetTexture("gui/btn_hover.png");
+			Raylib.SetTextureFilter(BtnHoverTex, TextureFilter.Point);
+
+			BtnPressTex = ResMgr.GetTexture("gui/btn_press.png");
+			Raylib.SetTextureFilter(BtnPressTex, TextureFilter.Point);
+		}
+
+		public void SetIcon(Texture2D? Icon) {
+			if (Icon.HasValue) {
+				HasIcon = true;
+				this.Icon = Icon.Value;
+			} else {
+				HasIcon = false;
+			}
+		}
+
+		public virtual void OnMouseClick() {
+			OnClickedFunc?.Invoke();
+		}
+
+		bool ButtonHeldDown = false;
+
+		//Stopwatch SWatc = Stopwatch.StartNew();
+
+		public override void Update(float Dt) {
+			//IconScale = 1 + ((MathF.Sin(SWatc.ElapsedMilliseconds / 1000.0f) + 1) / 2) * 3;
+
+			if (IsInside(MousePos)) {
+				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
+					ButtonHeldDown = true;
+				} else if (Raylib.IsMouseButtonReleased(MouseButton.Left)) {
+					if (ButtonHeldDown) {
+						ButtonHeldDown = false;
+						OnMouseClick();
+					}
+				} else {
+					ButtonHeldDown = false;
+				}
+			}
+		}
+
+		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
+			Rectangle BtnLoc = new Rectangle(Pos, Size);
+			Texture2D Tex = BtnTex;
+			Vector2 DrawOffset = Vector2.Zero;
+
+			if (Hovered) {
+				if (MouseDown) {
+					Tex = BtnPressTex;
+					DrawOffset = new Vector2(4, 4);
+				} else
+					Tex = BtnHoverTex;
+			}
+
+			Mgr.Draw9Patch(Tex, BtnLoc, Color.White);
+
+			Vector2 IconSize = Vector2.Zero;
+			Vector2 IconOffset = Vector2.Zero;
+			if (HasIcon) {
+				IconSize = new Vector2(Icon.Width, Icon.Height) * IconScale;
+				IconOffset = new Vector2(IconSize.X / 2 + 10, 0);
+			}
+
+			Vector2 TxtSize = Mgr.MeasureText(Text) - IconOffset;
+			Vector2 TxtPos = Pos + Size / 2 - TxtSize / 2;
+
+			Mgr.DrawText(Text, TxtPos + DrawOffset, Color.White);
+
+			if (HasIcon) {
+				// Vector2 IconPos = Pos + (Size / 2) - (TxtSize / 2) + DrawOffset - (IconSize / 2);
+				Vector2 IconPos = TxtPos + new Vector2(0, TxtSize.Y / 2) - IconOffset;
+
+				//float TT = SWatc.ElapsedMilliseconds / 1000.0f * 50;
+				float TT = 0;
+
+				//Mgr.DrawRectLines(IconPos + DrawOffset, IconSize, Color.Blue);
+				Mgr.DrawTexture(Icon, IconPos + DrawOffset, TT, IconScale);
+			}
+		}
+	}
+
+	class GUIItemBox : GUIElement {
+		public bool IsSelected = false;
+
+		public string Text;
+
+		Texture2D Tex;
+		Texture2D TexSel;
+
+		Vector2 IconSize;
+		Texture2D Icon;
+		bool HasIcon = false;
+		float IconScale = 2.0f;
+
+		GUIManager Mgr;
+
+		public GUIItemBox(GUIManager Mgr) {
+			this.Mgr = Mgr;
+
+			Tex = ResMgr.GetTexture("gui/itembox.png");
+			TexSel = ResMgr.GetTexture("gui/itembox_sel.png");
+			Raylib.SetTextureFilter(Tex, TextureFilter.Point);
+		}
+
+		public void SetIcon(Texture2D? Icon, float Scale) {
+			if (Icon.HasValue) {
+				HasIcon = true;
+				this.Icon = Icon.Value;
+				this.IconScale = Scale;
+				IconSize = new Vector2(this.Icon.Width, this.Icon.Height);
+			} else {
+				HasIcon = false;
+			}
+		}
+
+		public override void Update(float Dt) {
+		}
+
+		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
+			Rectangle BtnLoc = new Rectangle(Pos, Size);
+
+			if (IsSelected) {
+				Mgr.Draw9Patch(TexSel, BtnLoc, Color.White);
+			} else {
+				Mgr.Draw9Patch(Tex, BtnLoc, Color.White);
+			}
+
+			Mgr.DrawTexture(Icon, Pos + Size / 2, 0, IconScale);
+
+			if (!string.IsNullOrEmpty(Text)) {
+				Mgr.DrawTextOutline(Text, Pos + Size / 2, Color.White, 2);
 			}
 		}
 	}

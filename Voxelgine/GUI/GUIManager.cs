@@ -14,14 +14,23 @@ namespace Voxelgine.GUI {
 		public int FntSize = 32;
 		public Font TxtFont;
 
-		GUILabel Lbl;
+		GameWindow Window;
 
 		List<GUIElement> Elements = new List<GUIElement>();
 		Vector2 MousePos = Vector2.Zero;
 
-		public GUIManager() {
+		public GUIManager(GameWindow Window) {
+			this.Window = Window;
 			TxtFont = Raylib.LoadFontEx("data/fonts/medodica.otf", FntSize, null, 128);
 			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Point);
+		}
+
+		public Vector2 CenterWindow(Vector2 Pos) {
+			return new Vector2(Window.Width, Window.Height) / 2 + Pos;
+		}
+
+		public Vector2 WindowScale(Vector2 Pos) {
+			return Pos * new Vector2(Window.Width, Window.Height);
 		}
 
 		public void Clear() {
@@ -36,6 +45,7 @@ namespace Voxelgine.GUI {
 			MousePos = Raylib.GetMousePosition();
 
 			foreach (GUIElement E in Elements) {
+				E.MousePos = MousePos;
 				E.Update(Dt);
 			}
 		}
@@ -65,8 +75,42 @@ namespace Voxelgine.GUI {
 			//Raylib.DrawRectangleLinesEx(new Rectangle(Pos, Sz), 1, Color.Red);
 		}
 
+		public void DrawTextOutline(string Txt, Vector2 Pos, Color Clr, float Outline) {
+			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Bilinear);
+			DrawText(Txt, Pos + new Vector2(Outline, 0), Color.Black);
+			DrawText(Txt, Pos + new Vector2(-Outline, 0), Color.Black);
+			DrawText(Txt, Pos + new Vector2(0, Outline), Color.Black);
+			DrawText(Txt, Pos + new Vector2(0, -Outline), Color.Black);
+			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Point);
+
+			DrawText(Txt, Pos, Clr);
+		}
+
+		public void DrawTexture(Texture2D Tex, Vector2 Pos, float Rot, float Scale) {
+			Vector2 TexSize = new Vector2(Tex.Width, Tex.Height);
+			Vector2 Origin = (TexSize * Scale) / 2;
+			Raylib.DrawTexturePro(Tex, new Rectangle(Vector2.Zero, TexSize), new Rectangle(Pos, TexSize * Scale), Origin, Rot, Color.White);
+		}
+
 		public void DrawRectLines(Vector2 Pos, Vector2 Sz, Color Clr) {
 			Raylib.DrawRectangleLinesEx(new Rectangle(Pos, Sz), 1, Clr);
+		}
+
+		public Vector2 MeasureText(string Txt) {
+			return Raylib.MeasureTextEx(TxtFont, Txt, FntSize, 1);
+		}
+
+		public void Draw9Patch(Texture2D Tex, Rectangle Dest, Color Clr) {
+			NPatchInfo NInf = new NPatchInfo();
+
+			NInf.Layout = NPatchLayout.NinePatch;
+			NInf.Left = 8;
+			NInf.Right = 8;
+			NInf.Top = 8;
+			NInf.Bottom = 8;
+			NInf.Source = new Rectangle(0, 0, Tex.Width, Tex.Height);
+
+			Raylib.DrawTextureNPatch(Tex, NInf, Dest, Vector2.Zero, 0, Clr);
 		}
 
 		public void CreateConsole(GameWindow window, out GUILabel Lbl, out GUILabel OutLbl) {

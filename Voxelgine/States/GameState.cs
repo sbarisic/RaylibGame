@@ -147,9 +147,9 @@ namespace RaylibGame.States {
 			if (HasHitFloor) {
 				if (!WasLastLegsOnFloor) {
 					WasLastLegsOnFloor = true;
-					Ply.PhysicsHit(VelLen, false, true, false, false);
+					Ply.PhysicsHit(HitFloor, VelLen, false, true, false, false);
 				} else if (PlyVelocity.Length() >= (MaxPlayerVelocity / 2)) {
-					Ply.PhysicsHit(PlyVelocity.Length(), false, true, true, false);
+					Ply.PhysicsHit(HitFloor, PlyVelocity.Length(), false, true, true, false);
 				}
 			} else {
 				WasLastLegsOnFloor = false;
@@ -183,7 +183,7 @@ namespace RaylibGame.States {
 					if (HasHitFloor) {
 						PlyVelocity += new Vector3(0, PlayerJumpVelocity, 0);
 						HasHitFloor = false;
-						Ply.PhysicsHit(PlyVelocity.Length(), false, false, false, true);
+						Ply.PhysicsHit(HitFloor, PlyVelocity.Length(), false, false, false, true);
 					}
 				}
 
@@ -357,6 +357,8 @@ namespace RaylibGame.States {
 				if (Left) {
 					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
+
+							Snd.PlayCombo("block_break", Start, Dir, new Vector3(X, Y, Z));
 							Map.SetBlock(X, Y, Z, BlockType.None);
 							return true;
 						}
@@ -388,6 +390,7 @@ namespace RaylibGame.States {
 							Y += (int)Face.Y;
 							Z += (int)Face.Z;
 
+							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
 							Map.SetBlock(X, Y, Z, BlockType.Dirt);
 							return true;
 						}
@@ -410,6 +413,7 @@ namespace RaylibGame.States {
 							Y += (int)Face.Y;
 							Z += (int)Face.Z;
 
+							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
 							Map.SetBlock(X, Y, Z, BlockType.Campfire);
 							return true;
 						}

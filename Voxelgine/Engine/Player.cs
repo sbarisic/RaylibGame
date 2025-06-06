@@ -143,7 +143,7 @@ namespace Voxelgine.Engine {
 			Rotation = Matrix4x4.Identity;
 			UpperBodyRotation = Matrix4x4.Identity;
 
-		
+
 			// UPDATE: ?
 			//Raylib.SetCameraMode(Cam, CameraMode.CAMERA_CUSTOM);
 			ToggleMouse();
@@ -177,20 +177,22 @@ namespace Voxelgine.Engine {
 
 		}
 
-		public void PhysicsHit(float Force, bool Side, bool Feet, bool Walk, bool Jump) {
+		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump) {
+			Vector3 Fwd = FPSCamera.GetForward();
+
 			if (Walk) {
 				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
 					LastWalkSound = LegTimer.ElapsedMilliseconds;
 
 					//Console.WriteLine("Walk");
-					Snd.PlayCombo("walk");
+					Snd.PlayCombo("walk", FPSCamera.Position, Fwd, Pos);
 				}
 			} else if (Jump) {
 				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350) {
 					LastJumpSound = LegTimer.ElapsedMilliseconds;
 
 					//Console.WriteLine("Walk");
-					Snd.PlayCombo("jump");
+					Snd.PlayCombo("jump", FPSCamera.Position, Fwd, Pos);
 				}
 			} else if (Feet && !Side) {
 
@@ -198,11 +200,11 @@ namespace Voxelgine.Engine {
 					LastCrashSound = LegTimer.ElapsedMilliseconds;
 
 					if (Force < 4) {
-						Snd.PlayCombo("crash1");
+						Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
 					} else if (Force >= 4 && Force < 8) {
-						Snd.PlayCombo("crash2");
+						Snd.PlayCombo("crash2", FPSCamera.Position, Fwd, Pos);
 					} else if (Force >= 8) {
-						Snd.PlayCombo("crash3");
+						Snd.PlayCombo("crash3", FPSCamera.Position, Fwd, Pos);
 					}
 				}
 			} else {

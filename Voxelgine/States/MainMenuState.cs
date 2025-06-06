@@ -20,8 +20,53 @@ namespace RaylibGame.States {
 		Vector2 MousePos;
 
 		public MainMenuState(GameWindow window) : base(window) {
-			GUI = new GUIManager();
-			GUI.CreateConsole(window, out Lbl, out OutLbl);
+			GUI = new GUIManager(window);
+			//GUI.CreateConsole(window, out Lbl, out OutLbl);
+
+			float BtnMargin = 16;
+			Vector2 BtnSize = GUI.WindowScale(new Vector2(0.2f, 0.07f));
+			Vector2 Offset = new Vector2(0, 0);
+			Vector2 Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
+
+			GUIButton Btn_NewGame = new GUIButton(GUI);
+			Btn_NewGame.Pos = Pos;
+			Btn_NewGame.Size = BtnSize;
+			Btn_NewGame.Text = "New Game";
+			Btn_NewGame.OnClickedFunc = () => {
+				Program.Window.SetState(Program.GameState);
+			};
+			GUI.AddElement(Btn_NewGame);
+
+			Pos.Y = Pos.Y + BtnSize.Y + BtnMargin;
+
+			GUIButton Btn_Quit = new GUIButton(GUI);
+			Btn_Quit.Pos = Pos;
+			Btn_Quit.Size = BtnSize;
+			Btn_Quit.Text = "Quit";
+			Btn_Quit.OnClickedFunc = () => {
+				Program.Window.Close();
+			};
+			GUI.AddElement(Btn_Quit);
+
+			GUIItemBox IBox = new GUIItemBox(GUI);
+			IBox.Pos = new Vector2(100, 100);
+			IBox.Size = new Vector2(64, 64);
+			IBox.IsSelected = true;
+			IBox.Text = "64";
+			GUI.AddElement(IBox);
+
+
+			Texture2D Icon = ResMgr.GetTexture("items/pickaxe.png");
+			Raylib.SetTextureFilter(Icon, TextureFilter.Point);
+			Btn_NewGame.SetIcon(Icon);
+
+			Texture2D Icon2 = ResMgr.GetTexture("items/lava.png");
+			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
+			Btn_Quit.SetIcon(Icon2);
+
+			Texture2D Icon3 = ResMgr.GetTexture("items/lava.png");
+			Raylib.SetTextureFilter(Icon3, TextureFilter.Point);
+			IBox.SetIcon(Icon3, 3);
 		}
 
 		public override void SwapTo() {

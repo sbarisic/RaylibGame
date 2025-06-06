@@ -129,5 +129,41 @@ namespace Voxelgine.GUI {
 			Lbl.IsReading = true;
 			AddElement(Lbl);
 		}
+
+		public void CenterVertical(Vector2 Pos, Vector2 Size, Vector2 Margin, float IconMargin, params GUIElement[] Elements) {
+			Vector2 Offset = Vector2.Zero;
+			Vector2 NewOffs = new Vector2(0, Margin.Y);
+
+			int Counter = 0;
+			GUIElement LastE = null;
+			foreach (GUIElement E in Elements) {
+				Counter++;
+
+				NewOffs = new Vector2(Margin.X, NewOffs.Y);
+				Vector2 NewPos = Pos + NewOffs;
+
+				bool SkipSomeCalcs = false;
+
+				if (LastE is GUIItemBox && E is GUIItemBox) {
+					NewPos = Pos + new Vector2(LastE.Pos.X + LastE.Size.X - Pos.X + IconMargin, LastE.Pos.Y - Pos.Y);
+					SkipSomeCalcs = true;
+				}
+
+				E.Pos = NewPos;
+
+				float EndX = E.Pos.X + E.Size.X;
+				float MaxX = Pos.X + Size.X - Margin.X;
+
+				if (EndX > MaxX) {
+					E.Size.X = E.Size.X - (EndX - MaxX);
+				}
+
+				if (!SkipSomeCalcs) {
+					NewOffs.Y += E.Size.Y + Margin.Y;
+				}
+
+				LastE = E;
+			}
+		}
 	}
 }

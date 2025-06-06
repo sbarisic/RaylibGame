@@ -364,6 +364,8 @@ namespace Voxelgine.GUI {
 			if ((Raylib.IsKeyPressed(KeyboardKey.Down) || Raylib.IsKeyPressedRepeat(KeyboardKey.Down)) && !IsReading) {
 				Scroll = Scroll - 16;
 			}
+
+			base.Update(Dt);
 		}
 	}
 }

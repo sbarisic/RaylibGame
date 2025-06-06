@@ -25,14 +25,16 @@ namespace Voxelgine.GUI {
 
 		GUIManager Mgr;
 
-		public OnMouseClickedFunc OnClickedFunc;
-
 		public GUIItemBox(GUIManager Mgr) {
 			this.Mgr = Mgr;
 
+			Size = new Vector2(64, 64);
+
 			Tex = ResMgr.GetTexture("gui/itembox.png");
-			TexSel = ResMgr.GetTexture("gui/itembox_sel.png");
 			Raylib.SetTextureFilter(Tex, TextureFilter.Point);
+
+			TexSel = ResMgr.GetTexture("gui/itembox_sel.png");
+			Raylib.SetTextureFilter(TexSel, TextureFilter.Point);
 		}
 
 		public void SetIcon(Texture2D? Icon, float Scale) {
@@ -41,41 +43,20 @@ namespace Voxelgine.GUI {
 				this.Icon = Icon.Value;
 				this.IconScale = Scale;
 				IconSize = new Vector2(this.Icon.Width, this.Icon.Height);
+
+				Raylib.SetTextureFilter(this.Icon, TextureFilter.Point);
 			} else {
 				HasIcon = false;
 			}
 		}
 
-		public virtual void OnMouseClick() {
-			OnClickedFunc?.Invoke(this);
-		}
-
-		bool ButtonHeldDown = false;
-
 		public override void Update(float Dt) {
-			if (IsInside(MousePos)) {
-				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {
-						ButtonHeldDown = true;
-					} else {
-					}
-				} else if (Raylib.IsMouseButtonReleased(MouseButton.Left)) {
-					if (ButtonHeldDown) {
-						ButtonHeldDown = false;
-						OnMouseClick();
-					}
-				} else {
-					ButtonHeldDown = false;
-				}
-			} else {
-				if (!Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					ButtonHeldDown = false;
-				}
-			}
+			base.Update(Dt);
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			Rectangle BtnLoc = new Rectangle(Pos, Size);
+			Vector2 DrawOffset = Vector2.Zero;
 
 			if (IsSelected) {
 				Mgr.Draw9Patch(TexSel, BtnLoc, Color.White);
@@ -83,12 +64,20 @@ namespace Voxelgine.GUI {
 				Mgr.Draw9Patch(Tex, BtnLoc, Color.White);
 			}
 
-			float Clr = ButtonHeldDown ? 0.8f : 1.0f;
+			float Clr = 1.0f;
 
-			Mgr.DrawTexture(Icon, Pos + Size / 2, 0, IconScale, new Color(Clr, Clr, Clr));
+			if (MouseDown_Left) {
+				DrawOffset = new Vector2(2, 2);
+				Clr = 0.7f;
+			}
+
+			if (HasIcon) {
+				Mgr.DrawTexture(Icon, Pos + Size / 2 + DrawOffset, 0, IconScale, new Color(Clr, Clr, Clr));
+			}
 
 			if (!string.IsNullOrEmpty(Text)) {
-				Mgr.DrawTextOutline(Text, Pos + Size / 2, Color.White, 2);
+				Vector2 TextSize = Mgr.MeasureText(Text);
+				Mgr.DrawTextOutline(Text, Pos - new Vector2(TextSize.X - Size.X + 4, -Size.Y + TextSize.Y), Color.White, 2);
 			}
 		}
 	}

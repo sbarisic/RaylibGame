@@ -22,7 +22,6 @@ namespace Voxelgine.GUI {
 		GUIManager Mgr;
 
 		public string Text;
-		public OnMouseClickedFunc OnClickedFunc;
 
 		public GUIButton(GUIManager Mgr) {
 			this.Mgr = Mgr;
@@ -46,36 +45,10 @@ namespace Voxelgine.GUI {
 			}
 		}
 
-		public virtual void OnMouseClick() {
-			OnClickedFunc?.Invoke(this);
-		}
-
-		bool ButtonHeldDown = false;
-
 		//Stopwatch SWatc = Stopwatch.StartNew();
 
 		public override void Update(float Dt) {
-			//IconScale = 1 + ((MathF.Sin(SWatc.ElapsedMilliseconds / 1000.0f) + 1) / 2) * 3;
-
-			if (IsInside(MousePos)) {
-				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {
-						ButtonHeldDown = true;
-					} else {
-					}
-				} else if (Raylib.IsMouseButtonReleased(MouseButton.Left)) {
-					if (ButtonHeldDown) {
-						ButtonHeldDown = false;
-						OnMouseClick();
-					}
-				} else {
-					ButtonHeldDown = false;
-				}
-			} else {
-				if (!Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					ButtonHeldDown = false;
-				}
-			}
+			base.Update(Dt);
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {

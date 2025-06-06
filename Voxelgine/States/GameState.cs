@@ -12,6 +12,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.GUI;
 
 namespace RaylibGame.States {
 	unsafe class GameState : GameStateImpl {
@@ -21,7 +22,12 @@ namespace RaylibGame.States {
 
 		List<Tuple<Vector3, Vector3>> MarkerList = new List<Tuple<Vector3, Vector3>>();
 
-		public override void SwapTo() {
+		GUIManager GUI;
+
+		public GameState(GameWindow window) : base(window) {
+			GUI = new GUIManager(window);
+			InitGUI();
+
 			Snd = new SoundMgr();
 			Snd.Init();
 
@@ -92,11 +98,21 @@ namespace RaylibGame.States {
 			Ply.SetPosition(32, 73, 19);
 		}
 
+		void InitGUI() {
+			/*GUIIconBar Bar_Health = new GUIIconBar(GUI, IconBarStyle.Hearts, 10, 2.0f);
+			Bar_Health.Pos = new Vector2(100, Window.Height - 80);
+			Bar_Health.TxtOffset = new Vector2(0, -10);
+			Bar_Health.Txt = "Helth";
+			GUI.AddElement(Bar_Health);*/
+
+			GUIItemBox Box_Health = new GUIItemBox(GUI);
+			Box_Health.Pos = new Vector2(100, Window.Height - 80);
+			GUI.AddElement(Box_Health);
+		}
+
+
 		Vector3 PlyVelocity = Vector3.Zero;
 		bool WasLastLegsOnFloor = false;
-
-		public GameState(GameWindow window) : base(window) {
-		}
 
 		float ClampToZero(float Num, float ClampHyst) {
 			if (Num < 0 && Num > -ClampHyst)
@@ -424,6 +440,7 @@ namespace RaylibGame.States {
 			}
 
 			UpdatePhysics(Dt);
+			GUI.Update(Dt);
 		}
 
 		public override void Draw() {
@@ -434,8 +451,13 @@ namespace RaylibGame.States {
 			Draw3D();
 			Raylib.EndMode3D();
 
+			//Camera2D GUICam = new Camera2D();
+			//Raylib.BeginMode2D(GUICam);
+			GUI.Draw();
+
 			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
 
+			//Raylib.EndMode2D();
 			Raylib.DrawFPS(10, 10);
 		}
 

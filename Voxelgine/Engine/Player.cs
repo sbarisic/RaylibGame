@@ -178,6 +178,8 @@ namespace Voxelgine.Engine {
 		}
 
 		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump) {
+			return;
+
 			Vector3 Fwd = FPSCamera.GetForward();
 
 			if (Walk) {

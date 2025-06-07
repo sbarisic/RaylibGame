@@ -1,5 +1,7 @@
 ﻿using Raylib_cs;
 
+using RaylibGame.States;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,17 +14,19 @@ namespace Voxelgine.Engine {
 		public Vector3 Position;
 		public Vector3 Size;
 
-		//public Texture2D Texture;
-		public Model Model;
+		public bool HasCollision = true;
 
-		CustomModel CModel;
+		
+		public CustomModel Model;
+		GameState State;
 
-		public GameEntity(Vector3 Position) {
+		public GameEntity(GameState State, Vector3 Position) {
 			this.Position = Position;
+			this.State = State;
 
 			MinecraftModel JMdl = ResMgr.GetJsonModel("npc/humanoid.json");
-			CModel = MeshGenerator.Generate(JMdl);
-			CModel.Position = Position;
+			Model = MeshGenerator.Generate(JMdl);
+			Model.Position = Position;
 
 			//Texture = ResMgr.GetTexture("npc/humanoid.png");
 			/*Model = ResMgr.GetModel("npc/humanoid.fbx");
@@ -40,11 +44,12 @@ namespace Voxelgine.Engine {
 		}
 
 		public virtual void Update(float Dt) {
+			//Model.LookDirection = Vector3.Normalize(State.Ply.Position - Model.Position);
 		}
 
 		public virtual void Draw() {
 
-			CModel.Draw();
+			Model.Draw();
 
 			//Raylib.DrawModel(Model, Position, 1, Color.White);
 		}

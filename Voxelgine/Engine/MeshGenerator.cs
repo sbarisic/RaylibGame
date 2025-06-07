@@ -25,37 +25,94 @@ namespace Voxelgine.Engine {
 	}
 
 	class CustomMesh {
+		public string Name;
+		public Vector3 RotationOrigin;
+
 		public CustomMaterial Material;
 		public Mesh Mesh;
+
+		public Matrix4x4 Matrix;
 
 		public CustomMesh(Mesh M) {
 			Mesh = M;
 			Material = new CustomMaterial();
-
-
+			Matrix = Matrix4x4.Identity;
 		}
 
-		public void Draw(Vector3 Position) {
-			Raylib.DrawMesh(Mesh, Material.Mat, Matrix4x4.Transpose(Matrix4x4.CreateTranslation(Position)));
+		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
+			Matrix4x4 MeshMat = Matrix4x4.Identity;
+
+			//if (Name != "body") {
+			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotationOrigin);
+			MeshMat = MeshMat * Matrix;
+			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotationOrigin);
+			//}
+
+			MeshMat = MeshMat * Model;
+			return MeshMat;
+		}
+
+		public void Draw(Matrix4x4 Model) {
+			Raylib.DrawMesh(Mesh, Material.Mat, Matrix4x4.Transpose(GetWorldMatrix(Model)));
 		}
 	}
 
 	class CustomModel {
 		public Vector3 Position;
+		public Vector3 LookDirection;
 		public List<CustomMesh> Meshes = new List<CustomMesh>();
 
-		public CustomModel() {
-
+		public CustomModel(Vector3 Position, Vector3 LookDirection) {
+			this.Position = Position;
+			this.LookDirection = Vector3.Normalize(LookDirection);
 		}
 
-		public void AddMesh(Mesh M) {
-			Meshes.Add(new CustomMesh(M));
-			;
+		public CustomMesh AddMesh(Mesh M) {
+			CustomMesh CMesh = new CustomMesh(M);
+			Meshes.Add(CMesh);
+			return CMesh;
+		}
+
+		public RayCollision Collide(Ray R, out CustomMesh HitMesh) {
+			Matrix4x4 Model = GetModelMatrix();
+			HitMesh = null;
+
+			foreach (CustomMesh CM in Meshes) {
+				Matrix4x4 World = CM.GetWorldMatrix(Model);
+
+				RayCollision Col = Raylib.GetRayCollisionMesh(R, CM.Mesh, Matrix4x4.Transpose(World));
+				if (Col.Hit) {
+					Console.WriteLine("Hit!");
+
+					HitMesh = CM;
+					return Col;
+				}
+			}
+
+			return new RayCollision() { Hit = false };
+		}
+
+		Matrix4x4 GetModelMatrix() {
+			Vector2 Dir = Vector2.Normalize(new Vector2(LookDirection.X, LookDirection.Z));
+
+			float R = MathF.Sqrt(Dir.X * Dir.X + Dir.Y * Dir.Y);
+			float Ang = MathF.Atan2(Dir.X, Dir.Y) + Utils.ToRad(-180);
+			//float Ang = Utils.ToRad(45);
+
+
+			//Console.WriteLine(Utils.ToDeg(Ang));
+
+			Matrix4x4 RotMat = Matrix4x4.CreateRotationY(Ang);
+
+			Matrix4x4 Model = RotMat * Matrix4x4.CreateTranslation(Position);
+			return Model;
 		}
 
 		public void Draw() {
+			Matrix4x4 Model = GetModelMatrix();
+
 			foreach (var Msh in Meshes) {
-				Msh.Draw(Position);
+				Msh.Draw(Model);
 			}
 		}
 	}
@@ -88,15 +145,17 @@ namespace Voxelgine.Engine {
 		}
 
 		public static CustomModel Generate(MinecraftModel JMdl) {
-			CustomModel CMdl = new CustomModel();
+			CustomModel CMdl = new CustomModel(Vector3.Zero, new Vector3(1, 0, 1));
 
 			foreach (MinecraftMdlElement E in JMdl.Elements) {
-				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin);
+				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin) / GlobalScale;
 
 				Vertex3[] ElementVerts = Generate(JMdl, E).ToArray();
 
 				Mesh ElMesh = ToMesh(ElementVerts);
-				CMdl.AddMesh(ElMesh);
+				CustomMesh CMesh = CMdl.AddMesh(ElMesh);
+				CMesh.Name = E.Name;
+				CMesh.RotationOrigin = RotOrig;
 			}
 
 			return CMdl;
@@ -145,6 +204,9 @@ namespace Voxelgine.Engine {
 			GenDivideUV = Vector2.One;
 		}
 
+		static Vector3 GlobalScale = new Vector3(16, 16, 16);
+		static Vector3 GlobalOffset = new Vector3(-0.5f, 0, -0.5f);
+
 		static Vector3 GenSize = Vector3.Zero;
 		static Vector3 GenOffset = Vector3.Zero;
 		static Vector2 GenDivideUV = Vector2.One;
@@ -154,7 +216,6 @@ namespace Voxelgine.Engine {
 		static Vector2 GenUV2 = Vector2.Zero;
 
 		static Vertex3 Gen(Vector3 Pos, Vector2 UV, Vector3 Normal, Color Clr) {
-			Vector3 GlobalScale = new Vector3(16, 16, 16);
 
 			if (GenUseUVs) {
 				float XVal = float.Lerp(GenUV1.X, GenUV2.X, UV.X);
@@ -164,9 +225,9 @@ namespace Voxelgine.Engine {
 				XVal /= GlobalScale.X;
 				YVal /= GlobalScale.Y;
 
-				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)), new Vector2(XVal, YVal), Normal, Clr);
+				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)) + GlobalOffset, new Vector2(XVal, YVal), Normal, Clr);
 			} else {
-				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)), UV, Normal, Clr);
+				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)) + GlobalOffset, UV, Normal, Clr);
 			}
 		}
 

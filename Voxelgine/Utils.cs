@@ -589,5 +589,16 @@ namespace Voxelgine {
 		public static Vector3 ToVec3(float[] F) {
 			return new Vector3(F[0], F[1], F[2]);
 		}
+
+		public static Vector3 ProjectOnPlane(Vector3 Vec, Vector3 Normal) {
+			float SqrMag = Vector3.Dot(Normal, Normal);
+
+			if (SqrMag < float.Epsilon) {
+				return Vec;
+			} else {
+				float Dot = Vector3.Dot(Vec, Normal);
+				return new Vector3(Vec.X - Normal.X * Dot / SqrMag, Vec.Y - Normal.Y * Dot / SqrMag, Vec.Z - Normal.Z * Dot / SqrMag);
+			}
+		}
 	}
 }

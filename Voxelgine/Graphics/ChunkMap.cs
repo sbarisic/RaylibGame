@@ -16,6 +16,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using RaylibGame.States;
 
 namespace Voxelgine.Graphics {
 	struct GlobalPlacedBlock {
@@ -31,11 +32,17 @@ namespace Voxelgine.Graphics {
 	}
 
 	unsafe class ChunkMap {
+		List<GameEntity> Entities = new List<GameEntity>();
+
 		Dictionary<Vector3, Chunk> Chunks;
 		Random Rnd = new Random();
 
-		public ChunkMap() {
+		public ChunkMap(GameState GS) {
 			Chunks = new Dictionary<Vector3, Chunk>();
+
+
+			GameEntity Ent = new GameEntity(GS, new Vector3(30.5f, 64, 22.5f));
+			Entities.Add(Ent);
 		}
 
 		/*public void LoadFromChunk(string FileName) {
@@ -177,6 +184,17 @@ namespace Voxelgine.Graphics {
 				}
 
 			ComputeLighting();
+		}
+
+		public RayCollision RaycastEnt(Ray Ray) {
+			foreach (GameEntity E in Entities) {
+				RayCollision Col = E.Model.Collide(Ray, out CustomMesh HitMesh);
+
+				if (Col.Hit)
+					return Col;
+			}
+
+			return new RayCollision() { Hit = false };
 		}
 
 		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos) {
@@ -471,7 +489,32 @@ namespace Voxelgine.Graphics {
 		}
 
 		public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir) {
-			Vector3 RetPos = Vector3.Zero;
+
+			Ray R = new Ray(Origin, Dir);
+			RayCollision Col = Collide(R);
+
+			FaceDir = Vector3.Zero;
+
+			if (Col.Hit && Col.Distance <= Distance) {
+				FaceDir = Col.Normal;
+				return Col.Point;
+			}
+
+			foreach (var E in Entities) {
+				if (!E.HasCollision)
+					continue;
+
+				Col = E.Model.Collide(R, out CustomMesh HitMesh);
+
+				if (Col.Hit && Col.Distance <= Distance) {
+					FaceDir = Col.Normal;
+					return Col.Point;
+				}
+			}
+
+			return Vector3.Zero;
+
+			/*Vector3 RetPos = Vector3.Zero;
 			Vector3 OutFaceDir = Vector3.Zero;
 
 			if (Utils.Raycast2(Origin, Dir, Distance, 20, (HitPos, Face) => {
@@ -511,7 +554,7 @@ namespace Voxelgine.Graphics {
 			}
 
 			FaceDir = OutFaceDir;
-			return RetPos;
+			return RetPos;*/
 		}
 
 		public Vector3 RaycastPosEx(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir, out Vector3 Block) {
@@ -851,10 +894,51 @@ namespace Voxelgine.Graphics {
 			return GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z);
 		}
 
-		public void Draw() {
+		public RayCollision Collide(Ray R) {
+			// TODO: Do it in a more efficient way
+			List<RayCollision> Hits = new List<RayCollision>();
+
+			foreach (var KV in Chunks) {
+				Vector3 ChunkPos = KV.Value.Position;
+				if (Vector3.Distance(ChunkPos, R.Position) > 32)
+					continue;
+
+				RayCollision Hit = KV.Value.Collide(R);
+
+				if (Hit.Hit)
+					Hits.Add(Hit);
+			}
+
+			if (Hits.Count == 0)
+				return new RayCollision() { Hit = false };
+
+			return Hits.OrderBy((RC) => RC.Distance).First();
+		}
+
+		public bool Collide(Vector3 Pos) {
+			if (GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z) != BlockType.None)
+				return true;
+
+			return false;
+		}
+
+		public void Update(float Dt) {
+			foreach (var E in Entities) {
+				E.Update(Dt);
+			}
+
 			foreach (var KV in Chunks) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
-				KV.Value.Draw(ChunkPos);
+				KV.Value.SetPosition(ChunkPos);
+			}
+		}
+
+		public void Draw() {
+			foreach (var KV in Chunks)
+				KV.Value.Draw();
+
+			foreach (var E in Entities) {
+				E.Draw();
 			}
 
 			/*foreach (Vector3 Orig in SunRayOrigins) {
@@ -867,10 +951,8 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void DrawTransparent() {
-			foreach (var KV in Chunks) {
-				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
-				KV.Value.DrawTransparent(ChunkPos);
-			}
+			foreach (var KV in Chunks)
+				KV.Value.DrawTransparent();
 		}
 	}
 }

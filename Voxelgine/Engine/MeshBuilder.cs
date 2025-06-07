@@ -101,10 +101,10 @@ namespace Voxelgine.Engine {
 			for (int i = 0; i < Vts.Length; i++) {
 				M.IndicesAs<ushort>()[i] = (ushort)i;
 
-				M.VerticesAs<Vector3>()[i] = Verts[i].Position;
-				M.TexCoordsAs<Vector2>()[i] = Verts[i].UV;
-				M.ColorsAs<Color>()[i] = Verts[i].Color;
-				M.NormalsAs<Vector3>()[i] = Verts[i].Normal;
+				M.VerticesAs<Vector3>()[i] = Vts[i].Position;
+				M.TexCoordsAs<Vector2>()[i] = Vts[i].UV;
+				M.ColorsAs<Color>()[i] = Vts[i].Color;
+				M.NormalsAs<Vector3>()[i] = Vts[i].Normal;
 			}
 
 			Raylib.UploadMesh(ref M, false);

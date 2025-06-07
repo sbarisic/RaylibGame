@@ -20,6 +20,8 @@ namespace RaylibGame.States {
 		Player Ply;
 		SoundMgr Snd;
 
+		List<GameEntity> Entities = new List<GameEntity>();
+
 		List<Tuple<Vector3, Vector3>> MarkerList = new List<Tuple<Vector3, Vector3>>();
 
 		GUIManager GUI;
@@ -96,6 +98,11 @@ namespace RaylibGame.States {
 			});
 
 			Ply.SetPosition(32, 73, 19);
+
+
+			GameEntity Ent = new GameEntity(new Vector3(30, 64, 22));
+
+			Entities.Add(Ent);
 		}
 
 		GUIElement AddButton(string Txt, OnMouseClickedFunc OnClick) {
@@ -387,6 +394,10 @@ namespace RaylibGame.States {
 				return;
 			}
 
+			foreach (var E in Entities) {
+				E.Update(Dt);
+			}
+
 			Ply.Update();
 
 			if (Raylib.IsKeyPressed(KeyboardKey.F5)) {
@@ -507,6 +518,9 @@ namespace RaylibGame.States {
 		}
 
 		void Draw3D() {
+			foreach (var E in Entities) {
+				E.Draw();
+			}
 
 			//Raylib.DrawGrid(100, 1);
 			Map.Draw();
@@ -523,6 +537,8 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
 
 			Utils.DrawRaycastRecord();
+
+
 
 			//Raylib.DrawLine3D(Start, End, Color.White);
 

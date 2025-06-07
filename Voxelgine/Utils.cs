@@ -579,5 +579,15 @@ namespace Voxelgine {
 		public static Vector4 ColorVec(Color C) {
 			return new Vector4(C.R / 255.0f, C.G / 255.0f, C.B / 255.0f, C.A / 255.0f);
 		}
+
+		public static IEnumerable<Vector2> ToVec2(float[] F) {
+			for (int i = 0; i < F.Length; i += 2) {
+				yield return new Vector2(F[i + 0], F[i + 1]);
+			}
+		}
+
+		public static Vector3 ToVec3(float[] F) {
+			return new Vector3(F[0], F[1], F[2]);
+		}
 	}
 }

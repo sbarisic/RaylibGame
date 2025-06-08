@@ -17,6 +17,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RaylibGame.States;
+using Windows.UI.Input.Spatial;
 
 namespace Voxelgine.Graphics {
 	struct GlobalPlacedBlock {
@@ -890,11 +891,84 @@ namespace Voxelgine.Graphics {
 			return GetPlacedBlock(X, Y, Z, out Chunk Chk).Type;
 		}
 
+		public BlockType GetBlock(Vector3 Pos, Vector3 ProbeDir, out Vector3 Normal) {
+			PlacedBlock PB = GetPlacedBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z, out Chunk Chk);
+			Normal = Vector3.Zero;
+
+			if (PB.Type != BlockType.None) {
+				Vector3 Min = new Vector3((int)Pos.X, (int)Pos.Y, (int)Pos.Z);
+				Vector3 Diff = (Pos - Min - new Vector3(0.5f, 0.5f, 0.5f)) * 2;
+
+				Vector3 BlockCenter = Min + Diff;
+
+				//float AX = MathF.Abs(Diff.X);
+				//float AY = MathF.Abs(Diff.Y);
+				//float AZ = MathF.Abs(Diff.Z);
+
+				float AX = MathF.Abs(ProbeDir.X);
+				float AY = MathF.Abs(ProbeDir.Y);
+				float AZ = MathF.Abs(ProbeDir.Z);
+
+				bool KeepX = AX > AY && AX > AZ;
+				bool KeepY = AY > AX && AY > AZ;
+				bool KeepZ = AZ > AX && AZ > AY;
+
+				Diff.X = (int)MathF.Round(Diff.X);
+				Diff.Y = (int)MathF.Round(Diff.Y);
+				Diff.Z = (int)MathF.Round(Diff.Z);
+
+				if (!KeepX)
+					Diff.X = 0;
+				if (!KeepY)
+					Diff.Y = 0;
+				if (!KeepZ)
+					Diff.Z = 0;
+
+				// > 0 , the angle between the two vectors is less than 90 degrees.
+				// < 0 , the angle between the two vectors is more than 90 degrees.
+				// Block normal doesn't point to probe dir
+				if (Vector3.Dot(ProbeDir, Diff) > 0) {
+					Normal = Vector3.Zero;
+					return BlockType.None;
+				}
+
+				if (GetBlock((int)Pos.X + (int)Diff.X, (int)Pos.Y + (int)Diff.Y, (int)Pos.Z + (int)Diff.Z) != BlockType.None) {
+					Normal = Vector3.Zero;
+					return BlockType.None;
+				}
+
+				//Diff = Vector3.Normalize(Diff);
+
+
+
+
+
+				/*if (Diff.X < 0)
+					Diff.X = -1;
+				else if (Diff.X >= 0)
+					Diff.X = 1;
+
+				if (Diff.Y < 0)
+					Diff.Y = -1;
+				else if (Diff.Y >= 0)
+					Diff.Y = 1;
+
+				if (Diff.Z < 0)
+					Diff.Z = -1;
+				else if (Diff.Z >= 0)
+					Diff.Z = 1;*/
+
+				Normal = Diff;
+			}
+
+			return PB.Type;
+		}
+
 		public BlockType GetBlock(Vector3 Pos) {
 			return GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z);
 		}
 
-		public RayCollision Collide(Ray R) {
+		public RayCollision Collide(Ray R, float Dist = 0) {
 			// TODO: Do it in a more efficient way
 			List<RayCollision> Hits = new List<RayCollision>();
 
@@ -904,6 +978,9 @@ namespace Voxelgine.Graphics {
 					continue;
 
 				RayCollision Hit = KV.Value.Collide(R);
+
+				if (Dist > 0 && Hit.Hit && Hit.Distance > Dist)
+					continue;
 
 				if (Hit.Hit)
 					Hits.Add(Hit);
@@ -919,6 +996,21 @@ namespace Voxelgine.Graphics {
 			if (GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z) != BlockType.None)
 				return true;
 
+			return false;
+		}
+
+		public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal) {
+			PickNormal = Vector3.Zero;
+
+			if (GetBlock(Pos, ProbeDir, out Vector3 HitNorm) != BlockType.None) {
+				PickNormal = HitNorm;
+
+				Utils.AddRaycastRecord(Pos, Pos, Color.Red);
+				Utils.AddRaycastRecord(Pos, Pos + HitNorm * 0.2f, Color.Green);
+				return true;
+			}
+
+			Utils.AddRaycastRecord(Pos, Pos, Color.Blue);
 			return false;
 		}
 

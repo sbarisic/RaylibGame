@@ -396,12 +396,23 @@ namespace Voxelgine {
 
 		public static void DrawRaycastRecord() {
 			foreach (var Tupl in RaycastDrawList) {
-				Raylib.DrawLine3D(Tupl.Item1, Tupl.Item2, Tupl.Item3);
+				if (Tupl.Item1 == Tupl.Item2) {
+					Raylib.DrawSphereEx(Tupl.Item1, 0.05f, 10, 10, Tupl.Item3);
+				} else {
+					Raylib.DrawLine3D(Tupl.Item1, Tupl.Item2, Tupl.Item3);
+				}
 			}
 		}
 
 		public static bool HasRecord() {
 			return RaycastDrawList.Count > 0;
+		}
+
+		public static void AddRaycastRecord(Vector3 Start, Vector3 End, Color Clr) {
+			if (!IsRecording)
+				return;
+
+			RaycastDrawList.Add(new Tuple<Vector3, Vector3, Color>(Start, End, Clr));
 		}
 
 		public static bool Raycast2(Vector3 Origin, Vector3 Direction, float Length, float CastScale, Raycast2CallbackFunc Callback) {

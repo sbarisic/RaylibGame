@@ -37,16 +37,27 @@ namespace Voxelgine.Engine {
 			Mesh = M;
 			Material = new CustomMaterial();
 			Matrix = Matrix4x4.Identity;
+
+
 		}
 
 		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
 			Matrix4x4 MeshMat = Matrix4x4.Identity;
 
+			//Vector3 RotOr = RotationOrigin + new Vector3(-1, 0, -0.5f);
+			//RotOr.Y = 0;
+
+			Vector3 RotOr = RotationOrigin;
+			RotOr.X = 1 - RotOr.X;
+			RotOr.Z  = 0;
+
 			//if (Name != "body") {
-			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotationOrigin);
+			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotOr);
 			MeshMat = MeshMat * Matrix;
-			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotationOrigin);
+			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotOr);
 			//}
+
+
 
 			MeshMat = MeshMat * Model;
 			return MeshMat;

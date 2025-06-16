@@ -154,9 +154,14 @@ namespace Voxelgine.Engine {
 			BoneInformation BBB = BoneInformation.FindBoneByName(PlayerEntity.GetBones(), "Head");
 			BBB.LocalTransform = Matrix4x4.CreateFromYawPitchRoll(0, 0, 90);
 			BBB.RecalcTransforms();
+
+			ToggleMouse(false);
 		}
 
-		void ToggleMouse() {
+		public void ToggleMouse(bool? Enable = null) {
+			if (Enable != null)
+				CursorDisabled = !Enable.Value;
+
 			if (CursorDisabled)
 				Raylib.EnableCursor();
 			else

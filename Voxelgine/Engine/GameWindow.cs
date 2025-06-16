@@ -16,6 +16,10 @@ namespace Voxelgine.Engine {
 		public GameWindow(int W, int H, string Title) {
 			Open = true;
 
+			Raylib.SetWindowState(ConfigFlags.HighDpiWindow);
+			Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
+			//Raylib.SetWindowState(ConfigFlags.)
+
 			Raylib.InitWindow(Width = W, Height = H, Title);
 			Raylib.SetTargetFPS(60);
 			Raylib.SetExitKey(0);

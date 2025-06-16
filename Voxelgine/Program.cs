@@ -2,6 +2,9 @@
 
 using RaylibGame.States;
 
+using System.Security.Cryptography;
+using System.Text;
+
 using TextCopy;
 
 using Voxelgine.Engine;

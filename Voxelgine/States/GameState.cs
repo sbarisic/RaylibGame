@@ -49,6 +49,7 @@ namespace RaylibGame.States {
 				C.Fill((BlockType)Utils.Random(1, 11));*/
 
 			Ply = new Player("snoutx10k", true, Snd);
+			
 
 			Stopwatch SWatch = Stopwatch.StartNew();
 
@@ -108,7 +109,7 @@ namespace RaylibGame.States {
 
 			Ply.SetPosition(32, 73, 19);
 
-			VoxCollision.Raycast(Ply.Position, Vector3.Normalize(new Vector3(0.5f, -0.8f, 0.2f)), 20,
+			/*VoxCollision.Raycast(Ply.Position, Vector3.Normalize(new Vector3(0.5f, -0.8f, 0.2f)), 20,
 				GetBlockImpl,
 				(X, Y, Z, PBlock, Norm) => {
 					Map.SetBlock((int)X, (int)Y, (int)Z, BlockType.Bricks);
@@ -118,7 +119,7 @@ namespace RaylibGame.States {
 
 
 					return true;
-				});
+				});*/
 		}
 
 		bool GetBlockImpl(float X, float Y, float Z, int Counter, out PlacedBlock B) {

@@ -520,13 +520,15 @@ namespace Voxelgine.Graphics {
 			Dirty = false;
 
 			if (ModelValid) {
-				CachedModelOpaque.Materials[0].Maps[0].Texture.Id = 1;
+				// Set texture ID to 1 to disable texture unloading? Does that even do anything?
+				CachedModelOpaque.Materials[0].Maps[0].Texture.Id = 0;
 				Raylib.UnloadModel(CachedModelOpaque);
 			}
 
 			CachedMeshOpaque = GenMesh();
 			CachedModelOpaque = Raylib.LoadModelFromMesh(CachedMeshOpaque);
 			CachedModelOpaque.Materials[0].Maps[0].Texture = ResMgr.AtlasTexture;
+			CachedModelOpaque.Materials[0].Shader = ResMgr.GetShader("default");
 
 			//ComputeLighting();
 

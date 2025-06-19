@@ -123,7 +123,7 @@ namespace RaylibGame.States {
 			GUI.Update(Dt);
 		}
 
-		public override void Draw() {
+		public override void Draw2D() {
 			const int BtnWidth = 400;
 			const int BtnHeight = 40;
 			const int BtnPadding = 10;

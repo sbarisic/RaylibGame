@@ -22,5 +22,8 @@ namespace Voxelgine.Engine {
 		public virtual void Draw() {
 			Raylib.ClearBackground(new Color(200, 150, 100));
 		}
+
+		public virtual void Draw2D() {
+		}
 	}
 }

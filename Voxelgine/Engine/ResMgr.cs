@@ -30,7 +30,12 @@ namespace Voxelgine.Engine {
 
 			Image Img = Raylib.LoadImage(FilePath);
 			Texture2D Tex = Raylib.LoadTextureFromImage(Img);
+
+
+			Tex.Mipmaps = 4;
 			Raylib.SetTextureFilter(Tex, TextureFilter.Anisotropic16X);
+			Raylib.SetTextureWrap(Tex, TextureWrap.Clamp);
+			Raylib.GenTextureMipmaps(ref Tex);
 
 			Textures.Add(FilePath, Tex);
 			return GetTexture(FilePath);
@@ -51,17 +56,19 @@ namespace Voxelgine.Engine {
 			return mdl;
 		}
 
-		public static Shader GetShader(string FilePath) {
-			FilePath = Path.GetFullPath(Path.Combine("data/shaders", FilePath)).Replace("\\", "/");
+		public static Shader GetShader(string ShaderName) {
+			string ShaderPath = Path.GetFullPath(Path.Combine("data/shaders", ShaderName)).Replace("\\", "/");
+			string FragShaderPath = ShaderPath + "/" + ShaderName + ".frag";
+			string VertShaderPath = ShaderPath + "/" + ShaderName + ".vert";
 
-			if (Shaders.ContainsKey(FilePath))
-				return Shaders[FilePath];
+			if (Shaders.ContainsKey(ShaderName))
+				return Shaders[ShaderName];
 
-			if (!File.Exists(FilePath + ".vert") || !File.Exists(FilePath + ".frag"))
-				throw new Exception("File not found " + FilePath + " (.vert and .frag)");
+			if (!File.Exists(VertShaderPath) || !File.Exists(FragShaderPath))
+				throw new Exception("File not found " + ShaderName + " (.vert and .frag)");
 
-			Shader s = Raylib.LoadShader(FilePath + ".vert", FilePath + ".frag");
-			Shaders.Add(FilePath, s);
+			Shader s = Raylib.LoadShader(VertShaderPath, FragShaderPath);
+			Shaders.Add(ShaderName, s);
 
 			return s;
 		}

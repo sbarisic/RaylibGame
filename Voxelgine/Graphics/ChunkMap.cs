@@ -8,11 +8,8 @@ using Voxelgine.Engine;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,7 +37,6 @@ namespace Voxelgine.Graphics {
 
 		public ChunkMap(GameState GS) {
 			Chunks = new Dictionary<Vector3, Chunk>();
-
 
 			GameEntity Ent = new GameEntity(GS, new Vector3(30.5f, 64, 22.5f));
 			Entities.Add(Ent);

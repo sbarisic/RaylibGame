@@ -49,7 +49,7 @@ namespace RaylibGame.States {
 				C.Fill((BlockType)Utils.Random(1, 11));*/
 
 			Ply = new Player("snoutx10k", true, Snd);
-			
+
 
 			Stopwatch SWatch = Stopwatch.StartNew();
 
@@ -471,6 +471,7 @@ namespace RaylibGame.States {
 			float MaxPlayerControllableVelocity = 5.0f;
 			float MaxPlayerFallVelocity = 10.0f;
 			float PlayerJumpVelocity = 4.8f;
+
 			const float PlyMoveSen = 2.2f;
 
 			if (PlyVelocity != Vector3.Zero) {
@@ -503,7 +504,7 @@ namespace RaylibGame.States {
 					}
 				}
 
-				float Factor = (float)Math.Pow(0.1f, Dt);
+				float Factor = (float)Math.Pow(0.01f, Dt);
 				PlyVelocity.X = PlyVelocity.X * Factor;
 				PlyVelocity.Y = PlyVelocity.Y * Factor;
 				PlyVelocity.Z = PlyVelocity.Z * Factor;
@@ -677,21 +678,14 @@ namespace RaylibGame.States {
 		}
 
 		public override void Draw() {
-			Raylib.EndBlendMode();
+			//Raylib.EndBlendMode();
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
+
 			Draw3D();
+
 			Raylib.EndMode3D();
-
-			//Camera2D GUICam = new Camera2D();
-			//Raylib.BeginMode2D(GUICam);
-			GUI.Draw();
-
-			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
-
-			//Raylib.EndMode2D();
-			Raylib.DrawFPS(10, 10);
 		}
 
 		void Draw3D() {
@@ -710,12 +704,19 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
 
 			Utils.DrawRaycastRecord();
-
-
-
 			//Raylib.DrawLine3D(Start, End, Color.White);
 
 		}
-	}
 
+		public override void Draw2D() {
+			//Camera2D GUICam = new Camera2D();
+			//Raylib.BeginMode2D(GUICam);
+			GUI.Draw();
+
+			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
+
+			//Raylib.EndMode2D();
+			Raylib.DrawFPS(10, 10);
+		}
+	}
 }

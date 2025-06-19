@@ -17,9 +17,9 @@ namespace Voxelgine.Engine {
 		static Dictionary<string, Model> Models = new Dictionary<string, Model>();
 		static Dictionary<string, Shader> Shaders = new Dictionary<string, Shader>();
 
-		public static Texture2D AtlasTexture = GetTexture("atlas.png");
+		public static Texture2D AtlasTexture = GetTexture("atlas.png", TextureFilter.Point);
 
-		public static Texture2D GetTexture(string FilePath) {
+		public static Texture2D GetTexture(string FilePath, TextureFilter TexFilt = TextureFilter.Anisotropic16X) {
 			FilePath = Path.GetFullPath(Path.Combine("data/textures", FilePath)).Replace("\\", "/");
 
 			if (Textures.ContainsKey(FilePath))
@@ -33,7 +33,7 @@ namespace Voxelgine.Engine {
 
 
 			Tex.Mipmaps = 4;
-			Raylib.SetTextureFilter(Tex, TextureFilter.Anisotropic16X);
+			Raylib.SetTextureFilter(Tex, TexFilt);
 			Raylib.SetTextureWrap(Tex, TextureWrap.Clamp);
 			Raylib.GenTextureMipmaps(ref Tex);
 

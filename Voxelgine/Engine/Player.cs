@@ -224,7 +224,7 @@ namespace Voxelgine.Engine {
 			SetPosition(NewPos);
 		}
 
-		public void Update() {
+		public void Tick() {
 			string AnimName = "idle";
 
 			if (MoveFd = Raylib.IsKeyDown(KeyboardKey.W))

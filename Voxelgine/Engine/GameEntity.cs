@@ -43,8 +43,11 @@ namespace Voxelgine.Engine {
 			}*/
 		}
 
-		public virtual void Update(float Dt) {
+		public virtual void Tick() {
 			//Model.LookDirection = Vector3.Normalize(State.Ply.Position - Model.Position);
+		}
+
+		public virtual void UpdateLockstep(float TotalTime, float Dt) {
 		}
 
 		public virtual void Draw() {

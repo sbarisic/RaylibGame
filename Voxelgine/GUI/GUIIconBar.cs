@@ -68,10 +68,6 @@ namespace Voxelgine.GUI {
 			Texs.Add(Tex);
 		}
 
-		public override void Update(float Dt) {
-			base.Update(Dt);
-		}
-
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			Rectangle IcnLoc = new Rectangle(Pos, Size);
 			Vector2 IcnPos = Pos;

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
 	static class FPSCamera {
-		const bool UseCameraMove = false;
+		//const bool UseCameraMove = false;
 
 		const float MouseMoveSen = 0.5f;
 		const float PlyMoveSen = 0.2f;
@@ -54,7 +54,8 @@ namespace Voxelgine.Engine {
 				CamAngle.Y = -89.9f;
 
 			Vector3 Forward = GetForward();
-			if (UseCameraMove) {
+			
+			/*if (UseCameraMove) {
 				Vector3 Left = GetLeft();
 				Vector3 Up = GetUp();
 
@@ -72,7 +73,7 @@ namespace Voxelgine.Engine {
 					Position += Up * PlyMoveSen;
 				if (Raylib.IsKeyDown(KeyboardKey.C))
 					Position -= Up * PlyMoveSen;
-			}
+			}*/
 
 			Cam.Position = Position;
 			Cam.Target = Position + (Forward * FocusDist);

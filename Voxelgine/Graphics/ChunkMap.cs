@@ -1010,9 +1010,15 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public void Update(float Dt) {
+		public void UpdateLockstep(float TotalTime, float Dt) {
 			foreach (var E in Entities) {
-				E.Update(Dt);
+				E.UpdateLockstep(TotalTime, Dt);
+			}
+		}
+
+		public void Tick() {
+			foreach (var E in Entities) {
+				E.Tick();
 			}
 
 			foreach (var KV in Chunks) {

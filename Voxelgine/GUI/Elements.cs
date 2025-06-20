@@ -45,7 +45,7 @@ namespace Voxelgine.GUI {
 
 		bool ButtonHeldDown = false;
 
-		public virtual void Update(float Dt) {
+		public virtual void Update() {
 			if (IsInside(MousePos)) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
 					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {

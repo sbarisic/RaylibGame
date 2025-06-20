@@ -16,7 +16,12 @@ namespace Voxelgine.Engine {
 		public virtual void SwapTo() {
 		}
 
-		public virtual void Update(float Dt) {
+		public virtual void Tick() {
+			// Once per frame
+		}
+
+		public virtual void UpdateLockstep(float TotalTime, float Dt) {
+			// Multiple times per frame, fixed delta
 		}
 
 		public virtual void Draw() {

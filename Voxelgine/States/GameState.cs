@@ -569,14 +569,14 @@ namespace RaylibGame.States {
 			Utils.EndRaycastRecord();
 		}
 
-		public override void Update(float Dt) {
+		public override void Tick() {
 			if (Raylib.IsKeyPressed(KeyboardKey.Escape)) {
 				Window.SetState(Program.MainMenuState);
 				return;
 			}
 
-			Map.Update(Dt);
-			Ply.Update();
+			Map.Tick();
+			Ply.Tick();
 
 			if (Raylib.IsKeyPressed(KeyboardKey.F5)) {
 				Console.WriteLine("Saving map!");
@@ -668,13 +668,18 @@ namespace RaylibGame.States {
 				}
 			}
 
-			UpdatePhysics(Dt);
+			// Update physics goes here
 
 			if (!Ply.CursorDisabled) {
-				GUI.Update(Dt);
+				GUI.Tick();
 			}
 
 			UpdateGUI();
+		}
+
+		public override void UpdateLockstep(float TotalTime, float Dt) {
+			Map.UpdateLockstep(TotalTime, Dt);
+			UpdatePhysics(Dt);
 		}
 
 		public override void Draw() {

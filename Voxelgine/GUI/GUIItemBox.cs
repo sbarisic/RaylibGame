@@ -50,9 +50,6 @@ namespace Voxelgine.GUI {
 			}
 		}
 
-		public override void Update(float Dt) {
-			base.Update(Dt);
-		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			Rectangle BtnLoc = new Rectangle(Pos, Size);

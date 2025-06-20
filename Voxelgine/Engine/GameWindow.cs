@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
 	class GameWindow {
-		GameStateImpl State;
+		public InputMgr InMgr;
 
 		public int Width {
 			get; private set;
@@ -19,8 +19,9 @@ namespace Voxelgine.Engine {
 			get; private set;
 		}
 
-		bool Open;
+		GameStateImpl State;
 
+		bool Open;
 		bool HasWindowRT;
 		RenderTexture2D WindowRT;
 
@@ -38,6 +39,8 @@ namespace Voxelgine.Engine {
 			Raylib.InitWindow(Width = W, Height = H, Title);
 			Raylib.SetTargetFPS(240);
 			Raylib.SetExitKey(0);
+
+			InMgr = new InputMgr();
 
 			HasWindowRT = false;
 			ReloadRT();
@@ -74,8 +77,13 @@ namespace Voxelgine.Engine {
 			Open = false;
 		}
 
-		public void Update(float Dt) {
-			State.Update(Dt);
+		public void Tick() {
+			InMgr.Tick();
+			State.Tick();
+		}
+
+		public void UpdateLockstep(float TotalTime, float Dt) {
+			State.UpdateLockstep(TotalTime, Dt);
 		}
 
 		public void Draw() {

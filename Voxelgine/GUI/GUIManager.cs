@@ -41,19 +41,19 @@ namespace Voxelgine.GUI {
 			Elements.Add(E);
 		}
 
-		public void Update(float Dt) {
-			MousePos = Raylib.GetMousePosition();
+		public void Tick() {
+			MousePos = Window.InMgr.GetMousePos();
 
 			foreach (GUIElement E in Elements) {
 				E.MousePos = MousePos;
-				E.Update(Dt);
+				E.Update();
 			}
 		}
 
 		public void Draw() {
-			bool Hovered = false;
-			bool MouseClicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
-			bool MouseDown = Raylib.IsMouseButtonDown(MouseButton.Left);
+			bool Hovered = false; 
+			bool MouseClicked = Window.InMgr.IsInputPressed(InputKey.Click_Left);
+			bool MouseDown = Window.InMgr.IsInputDown(InputKey.Click_Left);
 
 			foreach (GUIElement E in Elements) {
 				Hovered = E.IsInside(MousePos);

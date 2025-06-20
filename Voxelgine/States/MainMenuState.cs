@@ -118,9 +118,9 @@ namespace RaylibGame.States {
 			Cam.Zoom = 1;
 		}
 
-		public override void Update(float Dt) {
-			MousePos = Raylib.GetMousePosition();
-			GUI.Update(Dt);
+		public override void Tick() {
+			MousePos = Window.InMgr.GetMousePos();
+			GUI.Tick();
 		}
 
 		public override void Draw2D() {

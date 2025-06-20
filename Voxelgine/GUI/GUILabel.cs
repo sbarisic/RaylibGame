@@ -285,7 +285,7 @@ namespace Voxelgine.GUI {
 			Raylib.EndScissorMode();
 		}
 
-		public override void Update(float Dt) {
+		public override void Update() {
 			int KeyPressed = 0;
 
 			if (IsReading) {
@@ -373,7 +373,7 @@ namespace Voxelgine.GUI {
 				Scroll = Scroll - 16;
 			}
 
-			base.Update(Dt);
+			base.Update();
 		}
 	}
 }

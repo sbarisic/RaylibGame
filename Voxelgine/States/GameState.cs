@@ -682,18 +682,18 @@ namespace RaylibGame.States {
 			UpdatePhysics(Dt);
 		}
 
-		public override void Draw() {
+		public override void Draw(float TimeAlpha) {
 			//Raylib.EndBlendMode();
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
 
-			Draw3D();
+			Draw3D(TimeAlpha);
 
 			Raylib.EndMode3D();
 		}
 
-		void Draw3D() {
+		void Draw3D(float TimeAlpha) {
 			//Raylib.DrawGrid(100, 1);
 			Map.Draw();
 			Map.DrawTransparent();
@@ -707,6 +707,11 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(100, 0, 0), Color.Red);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 100, 0), Color.Green);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
+
+			// Raylib.DrawTexture(ResMgr.AtlasTexture, 0, 0, Color.White);
+			Raylib.DrawTextureEx(ResMgr.AtlasTexture, Vector2.Zero, 0, 0.01f, Color.White);
+
+			//Raylib.DrawCircle3D(new Vector3(0, 0, 0), 1, new Vector3(0, 1, 0), 0, Color.Pink);
 
 			Utils.DrawRaycastRecord();
 			//Raylib.DrawLine3D(Start, End, Color.White);

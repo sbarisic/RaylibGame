@@ -75,7 +75,7 @@ namespace Voxelgine {
 
 				// TODO: Interpolation for rendering?
 				// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
-				Window.Draw();
+				Window.Draw(TimeAlpha);
 			}
 		}
 	}

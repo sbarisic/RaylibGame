@@ -86,7 +86,7 @@ namespace Voxelgine.Engine {
 			State.UpdateLockstep(TotalTime, Dt);
 		}
 
-		public void Draw() {
+		public void Draw(float TimeAlpha) {
 			if (Raylib.IsWindowResized()) {
 				Width = Raylib.GetRenderWidth();
 				Height = Raylib.GetRenderHeight();
@@ -98,7 +98,7 @@ namespace Voxelgine.Engine {
 				Raylib.BeginTextureMode(WindowRT);
 			}
 
-			State.Draw();
+			State.Draw(TimeAlpha);
 
 			if (HasWindowRT) {
 				Raylib.EndTextureMode();

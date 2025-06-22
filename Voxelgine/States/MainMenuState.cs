@@ -15,9 +15,9 @@ namespace RaylibGame.States {
 		Camera2D Cam = new Camera2D();
 		GUIManager GUI;
 
-		GUILabel Lbl;
+		/*GUILabel Lbl;
 		GUILabel OutLbl;
-		Vector2 MousePos;
+		Vector2 MousePos;*/
 
 		Rectangle DbgRect = new Rectangle();
 
@@ -116,37 +116,21 @@ namespace RaylibGame.States {
 
 		public override void SwapTo() {
 			Cam.Zoom = 1;
+			Cam.Rotation = 0;
+			Cam.Offset = Vector2.Zero;
+			Cam.Target = Vector2.Zero;
 		}
 
 		public override void Tick() {
-			MousePos = Window.InMgr.GetMousePos();
 			GUI.Tick();
 		}
 
 		public override void Draw2D() {
-			const int BtnWidth = 400;
-			const int BtnHeight = 40;
-			const int BtnPadding = 10;
-			int BtnX = (Program.Window.Width / 2) - (BtnWidth / 2);
-
-			//RL.ClearBackground(new Color(160, 180, 190, 255));
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode2D(Cam);
 
 			GUI.DrawWindowBorder(DbgRect.Position, DbgRect.Size);
-
 			GUI.Draw();
-
-			/*if (Raygui.GuiButton(new Rectangle(BtnX, 100 + (BtnHeight + BtnPadding) * 0, BtnWidth, BtnHeight), "New Game"))
-				Program.Window.SetState(Program.GameState);
-
-			if (Raygui.GuiButton(new Rectangle(BtnX, 100 + (BtnHeight + BtnPadding) * 1, BtnWidth, BtnHeight), "Options"))
-				Program.Window.SetState(Program.OptionsState);
-
-			if (Raygui.GuiButton(new Rectangle(BtnX, 100 + (BtnHeight + BtnPadding) * 2, BtnWidth, BtnHeight), "Quit"))
-				Program.Window.Close();
-			*/
-
 
 			Raylib.EndMode2D();
 		}

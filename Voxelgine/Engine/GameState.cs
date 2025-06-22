@@ -24,7 +24,7 @@ namespace Voxelgine.Engine {
 			// Multiple times per frame, fixed delta
 		}
 
-		public virtual void Draw() {
+		public virtual void Draw(float TimeAlpha) {
 			Raylib.ClearBackground(new Color(200, 150, 100));
 		}
 

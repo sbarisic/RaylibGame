@@ -22,7 +22,11 @@ namespace Voxelgine.Engine {
 
 		static Script CreateContext() {
 			Script S = new Script();
+
 			S.Globals[nameof(AnimatedEntity)] = (Func<AnimatedEntity>)AnimatedEntity.Create;
+
+
+
 			return S;
 		}
 	}

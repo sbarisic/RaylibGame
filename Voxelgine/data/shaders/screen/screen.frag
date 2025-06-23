@@ -63,9 +63,17 @@ vec4 calc_fxaa(vec2 fragTexCoord2) {
     return fxaaColor;
 }
  
+vec3 color_palette(vec3 clr) {
+    clr = clr * 255;
+    //clr = floor(clr / 8) * 8;
+    return clr / 255;
+}
+
 void main()
 {
-    finalColor = calc_fxaa(fragTexCoord);
+    vec4 out_clr = calc_fxaa(fragTexCoord);
+
+    finalColor = vec4(color_palette(out_clr.rgb), out_clr.a);
 
     
     // Pixelate filter

@@ -27,6 +27,12 @@ vec2 v2_clamp(vec2 v, float amt) {
     return floor(v * amt) / amt;
 }
 
+vec3 color_palette(vec3 clr) {
+    clr = clr * 255;
+    //clr = floor(clr / 8) * 8;
+    return clr / 255;
+}
+
 void main()
 {
 
@@ -44,7 +50,7 @@ void main()
 
     float RX = (random(v2_clamp( fragTexCoord * vec2(1, aspect), 200 )) - 0.5) / 23;
 
-    finalColor = vec4(rt_color.xyz + vec3(RX), rt_color.a);
+    finalColor = vec4(color_palette(rt_color.xyz) + vec3(RX), rt_color.a);
 
     //bullshit
 }

@@ -27,7 +27,7 @@ namespace Voxelgine {
 			Clipb = new Clipboard();
 
 
-			Window = new GameWindow(1920, 1080, nameof(Voxelgine));
+			Window = new GameWindow(1920, 1080, "Aurora Falls");
 			ResMgr.InitResources();
 			ResMgr.InitHotReload();
 

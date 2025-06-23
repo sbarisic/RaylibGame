@@ -1,6 +1,7 @@
 ﻿using Raylib_cs;
 using Voxelgine.Engine;
 using Voxelgine;
+using Voxelgine.GUI;
 
 using System;
 using System.Numerics;
@@ -8,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Voxelgine.GUI;
 
 namespace RaylibGame.States {
 	class MainMenuState : GameStateImpl {
@@ -27,6 +27,10 @@ namespace RaylibGame.States {
 
 			Vector2 BtnSize = GUI.WindowScale(new Vector2(0.2f, 0.07f));
 			Vector2 Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
+
+			GUIImage TitleImage = new GUIImage(GUI, "title.png", 10);
+			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
+			GUI.AddElement(TitleImage);
 
 			GUIButton Btn_NewGame = new GUIButton(GUI);
 			Btn_NewGame.Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
@@ -69,7 +73,12 @@ namespace RaylibGame.States {
 
 			Vector2 CenterSize = new Vector2(400, 500);
 
-			DbgRect = new Rectangle(new Vector2(Window.Width, Window.Height) / 2 - CenterSize / 2, CenterSize);
+			DbgRect = new Rectangle(
+				new Vector2(
+					(Window.Width / 2) - (CenterSize.X / 2),
+					(Window.Height / 1.65f) - (CenterSize.Y / 2)
+				), CenterSize);
+
 			GUI.CenterVertical(DbgRect.Position, DbgRect.Size, new Vector2(15, 10), 5, IB.ToArray());
 
 			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
@@ -126,10 +135,13 @@ namespace RaylibGame.States {
 		}
 
 		public override void Draw2D() {
-			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode2D(Cam);
+			Raylib.ClearBackground(new Color(150, 150, 150, 255));
 
+			//Raylib.BeginBlendMode(BlendMode.Alpha);
 			GUI.DrawWindowBorder(DbgRect.Position, DbgRect.Size);
+			//Raylib.EndBlendMode();
+
 			GUI.Draw();
 
 			Raylib.EndMode2D();

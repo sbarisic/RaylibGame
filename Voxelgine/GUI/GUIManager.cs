@@ -65,7 +65,7 @@ namespace Voxelgine.GUI {
 			Rectangle Rect = new Rectangle(Pos, Size);
 
 			Raylib.DrawRectanglePro(Rect, Vector2.Zero, 0, new Color(0, 0, 0, 128));
-			Raylib.DrawRectangleLinesEx(Rect, 1, new Color(200, 200, 200, 255));
+			Raylib.DrawRectangleLinesEx(Rect, 1, new Color(0, 0, 0, 180));
 		}
 
 		public void DrawText(string Txt, Vector2 Pos, Color Clr) {

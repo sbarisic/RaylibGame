@@ -25,7 +25,6 @@ namespace Voxelgine.Engine {
 		}
 
 		public virtual void Draw(float TimeAlpha) {
-			Raylib.ClearBackground(new Color(200, 150, 100));
 		}
 
 		public virtual void Draw2D() {

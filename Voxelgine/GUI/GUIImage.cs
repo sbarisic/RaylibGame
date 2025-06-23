@@ -27,7 +27,10 @@ namespace Voxelgine.GUI {
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			Rectangle IcnLoc = new Rectangle(Pos, Size);
+
+			//Raylib.BeginBlendMode(BlendMode.Multiplied);
 			Mgr.DrawTexture(Img, Pos, 0, ImgScale);
+			//Raylib.EndBlendMode();
 		}
 	}
 }

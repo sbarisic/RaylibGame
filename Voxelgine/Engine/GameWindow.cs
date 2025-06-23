@@ -1,5 +1,7 @@
 ﻿using Raylib_cs;
 
+using RaylibGame.States;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -86,6 +88,41 @@ namespace Voxelgine.Engine {
 			State.UpdateLockstep(TotalTime, Dt);
 		}
 
+		void BeginScreenShader() {
+			if (!HasWindowRT)
+				return;
+
+			Raylib.BeginTextureMode(WindowRT);
+			Raylib.ClearBackground(new Color(0, 0, 0, 0));
+		}
+
+		void EndScreenShader(string ShaderName) {
+			if (!HasWindowRT)
+				return;
+
+			Raylib.EndTextureMode();
+
+			Rectangle Src = new Rectangle(0, 0, WindowRT.Texture.Width, -WindowRT.Texture.Height);
+			Rectangle Dst = new Rectangle(0, 0, Width, Height);
+
+			Shader ScreenShader = ResMgr.GetShader(ShaderName);
+			Raylib.BeginShaderMode(ScreenShader);
+
+			int Loc_Resolution = Raylib.GetShaderLocation(ScreenShader, "resolution");
+			if (Loc_Resolution >= 0) {
+				Raylib.SetShaderValue(ScreenShader, Loc_Resolution, new Vector2(Width, Height), ShaderUniformDataType.Vec2);
+			}
+
+			int Loc_Time = Raylib.GetShaderLocation(ScreenShader, "time");
+			if (Loc_Time >= 0) {
+				Raylib.SetShaderValue(ScreenShader, Loc_Time, Program.TotalTime, ShaderUniformDataType.Float);
+			}
+
+			Raylib.DrawTexturePro(WindowRT.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
+
+			Raylib.EndShaderMode();
+		}
+
 		public void Draw(float TimeAlpha) {
 			if (Raylib.IsWindowResized()) {
 				Width = Raylib.GetRenderWidth();
@@ -94,28 +131,16 @@ namespace Voxelgine.Engine {
 			}
 
 			Raylib.BeginDrawing();
-			if (HasWindowRT) {
-				Raylib.BeginTextureMode(WindowRT);
-			}
+			Raylib.ClearBackground(new Color(200, 150, 100, 255));
 
+			BeginScreenShader();
 			State.Draw(TimeAlpha);
+			EndScreenShader("screen");
 
-			if (HasWindowRT) {
-				Raylib.EndTextureMode();
-
-				Rectangle Src = new Rectangle(0, 0, WindowRT.Texture.Width, -WindowRT.Texture.Height);
-				Rectangle Dst = new Rectangle(0, 0, Width, Height);
-
-				Shader ScreenShader = ResMgr.GetShader("screen");
-				Raylib.BeginShaderMode(ScreenShader);
-				Raylib.SetShaderValue(ScreenShader, Raylib.GetShaderLocation(ScreenShader, "resolution"), new Vector2(Width, Height), ShaderUniformDataType.Vec2);
-
-				Raylib.DrawTexturePro(WindowRT.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
-
-				Raylib.EndShaderMode();
-			}
-
+			BeginScreenShader();
 			State.Draw2D();
+			EndScreenShader("screen_gui");
+
 			Raylib.EndDrawing();
 		}
 	}

@@ -21,10 +21,16 @@ namespace Voxelgine {
 
 		public static Clipboard Clipb;
 
+		public static float TotalTime;
+
 		static void Main(string[] args) {
 			Clipb = new Clipboard();
 
+
 			Window = new GameWindow(1920, 1080, nameof(Voxelgine));
+			ResMgr.InitResources();
+			ResMgr.InitHotReload();
+
 			GraphicsUtils.Init();
 			Scripting.Init();
 
@@ -42,12 +48,15 @@ namespace Voxelgine {
 
 			//float DeltaTime = 0.015f; // 66.6 update ticks per second
 			float DeltaTime = 0.04f; // 25 updates per second
-			//float DeltaTime = 0.2f; // 5 updates per second
+									 //float DeltaTime = 0.2f; // 5 updates per second
 
 			float Accumulator = 0;
 			float CurrentTime = 0;
 
 			while (Window.IsOpen()) {
+				TotalTime = (float)Raylib.GetTime();
+				ResMgr.HandleHotReload();
+
 				float NewTime = (float)SWatch.Elapsed.TotalSeconds;
 				float FrameTime = NewTime - CurrentTime;
 				if (FrameTime > MaxFrameTime) {

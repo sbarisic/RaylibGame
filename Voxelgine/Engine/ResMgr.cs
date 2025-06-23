@@ -12,12 +12,101 @@ using Newtonsoft.Json.Linq;
 using System.Numerics;
 
 namespace Voxelgine.Engine {
+	class EngineResourceBase {
+		public string Name;
+		public string FileName;
+		public DateTime LastUpdate;
+	}
+
+	class EngineResource<T> : EngineResourceBase {
+		public T Value;
+
+		public EngineResource(string Name, string FileName, T Value) {
+			this.Value = Value;
+			this.Name = Name;
+			this.FileName = FileName;
+			LastUpdate = DateTime.Now;
+		}
+	}
+
 	unsafe static class ResMgr {
+		static FileSystemWatcher FSW;
+
 		static Dictionary<string, Texture2D> Textures = new Dictionary<string, Texture2D>();
 		static Dictionary<string, Model> Models = new Dictionary<string, Model>();
-		static Dictionary<string, Shader> Shaders = new Dictionary<string, Shader>();
 
-		public static Texture2D AtlasTexture = GetTexture("atlas.png", TextureFilter.Point);
+		//static Dictionary<string, Shader> Shaders = new Dictionary<string, Shader>();
+		static List<EngineResourceBase> ResourceList = new List<EngineResourceBase>();
+
+		public static Texture2D AtlasTexture;
+
+		static List<string> ReloadList = new List<string>();
+
+		public static void InitHotReload() {
+			FSW = new FileSystemWatcher();
+			FSW.Path = Path.GetFullPath("data");
+			FSW.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite;
+
+			FSW.Changed += (S, Args) => {
+				ReloadList.Add(Args.FullPath);
+			};
+
+			FSW.IncludeSubdirectories = true;
+			FSW.EnableRaisingEvents = true;
+		}
+
+		public static void HandleHotReload() {
+			for (int i = 0; i < ReloadList.Count; i++) {
+				string FullPath = ReloadList[i];
+				string FName = Path.GetFileNameWithoutExtension(FullPath);
+
+				if (FullPath.EndsWith(".frag") || FullPath.EndsWith(".vert")) {
+					if (TryGetResource(FName, out EngineResource<Shader> R)) {
+						if ((DateTime.Now - R.LastUpdate).TotalSeconds > 1) {
+
+							try {
+								Console.WriteLine("Reloading shader '{0}'", FName);
+								GetShader(FName, true);
+							} catch (Exception E) {
+								Console.WriteLine("Failed to reload shader: {0}", E.Message);
+							}
+						}
+					}
+				}
+			}
+
+			ReloadList.Clear();
+		}
+
+		public static void InitResources() {
+			AtlasTexture = GetTexture("atlas.png", TextureFilter.Point);
+		}
+
+		static bool TryGetResource<T>(string Name, out EngineResource<T> OutRes) {
+			for (int i = 0; i < ResourceList.Count; i++) {
+				if (ResourceList[i] is EngineResource<T> R && R.Name == Name) {
+					OutRes = R;
+					return true;
+				}
+			}
+
+			OutRes = null;
+			return false;
+		}
+
+		static void RemoveResource(EngineResourceBase Res) {
+			if (ResourceList.Contains(Res))
+				ResourceList.Remove(Res);
+		}
+
+		static void AddResource<T>(string Name, EngineResource<T> Res) {
+			if (TryGetResource<T>(Name, out EngineResource<T> OutR))
+				return;
+
+			Res.LastUpdate = DateTime.Now;
+			Res.Name = Name;
+			ResourceList.Add(Res);
+		}
 
 		public static Texture2D GetTexture(string FilePath, TextureFilter TexFilt = TextureFilter.Anisotropic16X) {
 			FilePath = Path.GetFullPath(Path.Combine("data/textures", FilePath)).Replace("\\", "/");
@@ -56,21 +145,37 @@ namespace Voxelgine.Engine {
 			return mdl;
 		}
 
-		public static Shader GetShader(string ShaderName) {
+		public static Shader GetShader(string ShaderName, bool Reload = false) {
 			string ShaderPath = Path.GetFullPath(Path.Combine("data/shaders", ShaderName)).Replace("\\", "/");
 			string FragShaderPath = ShaderPath + "/" + ShaderName + ".frag";
 			string VertShaderPath = ShaderPath + "/" + ShaderName + ".vert";
 
-			if (Shaders.ContainsKey(ShaderName))
-				return Shaders[ShaderName];
+			EngineResource<Shader> UnloadShader = null;
+
+			if (TryGetResource(ShaderName, out EngineResource<Shader> Shd)) {
+				if (Reload) {
+					UnloadShader = Shd;
+				} else {
+					return Shd.Value;
+				}
+			}
 
 			if (!File.Exists(VertShaderPath) || !File.Exists(FragShaderPath))
 				throw new Exception("File not found " + ShaderName + " (.vert and .frag)");
 
-			Shader s = Raylib.LoadShader(VertShaderPath, FragShaderPath);
-			Shaders.Add(ShaderName, s);
+			Shader S = Raylib.LoadShader(VertShaderPath, FragShaderPath);
+			if (S.Id == 0 && S.Locs == null) {
+				throw new Exception("Shader failed to compile " + ShaderName);
+			}
 
-			return s;
+
+			if (UnloadShader != null) {
+				Raylib.UnloadShader(UnloadShader.Value);
+				RemoveResource(UnloadShader);
+			}
+
+			AddResource(ShaderName, new EngineResource<Shader>(ShaderName, VertShaderPath + ";" + FragShaderPath, S));
+			return S;
 		}
 
 		public static MinecraftModel GetJsonModel(string FilePath) {

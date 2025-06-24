@@ -23,6 +23,28 @@ float random(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * (43758.5453123));
 }
 
+float sdSquare(vec2 point, float width) {
+	vec2 d = abs(point) - width;
+	return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+float vignette(vec2 uv, vec2 size, float roundness, float smoothness) {
+	// Center UVs
+	uv -= 0.5;
+
+	// Shift UVs based on the larger of width or height
+	float minWidth = min(size.x, size.y);
+	uv.x = sign(uv.x) * clamp(abs(uv.x) - abs(minWidth - size.x), 0.0, 1.0);
+	uv.y = sign(uv.y) * clamp(abs(uv.y) - abs(minWidth - size.y), 0.0, 1.0);
+
+	// Signed distance calculation
+	float boxSize = minWidth * (1.0 - roundness);
+	float dist = sdSquare(uv, boxSize) - (minWidth * roundness);
+
+	return 1.0 - smoothstep(0.0, smoothness, dist);
+}
+
+
 vec2 v2_clamp(vec2 v, float amt) {
     return floor(v * amt) / amt;
 }
@@ -49,8 +71,11 @@ void main()
     vec4 rt_color = texture2D(texture0, fragTexCoord);
 
     float RX = (random(v2_clamp( fragTexCoord * vec2(1, aspect), 200 )) - 0.5) / 23;
+    float vign = vignette(fragTexCoord, vec2(0.4, 0.4), 1.5, 1);
 
-    finalColor = vec4(color_palette(rt_color.xyz) + vec3(RX), rt_color.a);
+    //float RX = vignette(fragTexCoord, vec2(1, 1), 1, 1);
+
+    finalColor = vec4((color_palette(rt_color.xyz) + vec3(RX)) * vign, rt_color.a);
 
     //bullshit
 }

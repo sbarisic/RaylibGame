@@ -30,10 +30,10 @@ namespace Voxelgine.Graphics {
 		public Vector3 GlobalChunkIndex;
 		ChunkMap WorldMap;
 
-		List<Vector3> SunRayOrigins = new List<Vector3>();
-		Vector3 SunDir = -Vector3.UnitY;
+		//List<Vector3> SunRayOrigins = new List<Vector3>();
+		//Vector3 SunDir = -Vector3.UnitY;
 
-		public Vector3 Position;
+		//public Vector3 Position;
 
 		public Chunk(Vector3 GlobalChunkIndex, ChunkMap WorldMap) {
 			this.GlobalChunkIndex = GlobalChunkIndex;
@@ -49,9 +49,9 @@ namespace Voxelgine.Graphics {
 			//int TileTexSize = AtlasTex.width / 16;
 		}
 
-		public void SetPosition(Vector3 Pos) {
+		/*public void SetPosition(Vector3 Pos) {
 			Position = Pos;
-		}
+		}*/
 
 		public void Write(BinaryWriter Writer) {
 			for (int i = 0; i < Blocks.Length;) {
@@ -171,7 +171,7 @@ namespace Voxelgine.Graphics {
 			Vector3 Up = Vector3.Transform(Vector3.UnitY, LookAtRot);
 			Vector3 Fwd = Vector3.Transform(Vector3.UnitZ, LookAtRot);
 
-			SunDir = Fwd;
+			/*SunDir = Fwd;
 			SunRayOrigins.Clear();
 
 			for (int yy = 0; yy < 20; yy++) {
@@ -190,7 +190,7 @@ namespace Voxelgine.Graphics {
 
 					}
 				}
-			}
+			}*/
 
 			for (int i = 0; i < Blocks.Length; i++) {
 				if (Blocks[i].Type == BlockType.None)
@@ -536,13 +536,13 @@ namespace Voxelgine.Graphics {
 			return CachedModelOpaque;
 		}
 
-		public RayCollision Collide(Ray R) {
-			Matrix4x4 Transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation(Position));
+		public RayCollision Collide(Vector3 ChunkPosition, Ray R) {
+			Matrix4x4 Transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation(ChunkPosition));
 			return Raylib.GetRayCollisionMesh(R, CachedMeshOpaque, Transform);
 		}
 
-		public void Draw() {
-			Raylib.DrawModel(GetModel(), Position, BlockSize, ChunkColor);
+		public void Draw(Vector3 ChunkPosition) {
+			Raylib.DrawModel(GetModel(), ChunkPosition, BlockSize, ChunkColor);
 		}
 
 		public void DrawTransparent() {

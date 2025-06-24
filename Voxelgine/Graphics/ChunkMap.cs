@@ -30,7 +30,7 @@ namespace Voxelgine.Graphics {
 	}
 
 	unsafe class ChunkMap {
-		List<GameEntity> Entities = new List<GameEntity>();
+		///List<GameEntity> Entities = new List<GameEntity>();
 
 		Dictionary<Vector3, Chunk> Chunks;
 		Random Rnd = new Random();
@@ -38,8 +38,8 @@ namespace Voxelgine.Graphics {
 		public ChunkMap(GameState GS) {
 			Chunks = new Dictionary<Vector3, Chunk>();
 
-			GameEntity Ent = new GameEntity(GS, new Vector3(30.5f, 64, 22.5f));
-			Entities.Add(Ent);
+			//GameEntity Ent = new GameEntity(GS, new Vector3(30.5f, 64, 22.5f));
+			//Entities.Add(Ent);
 		}
 
 		/*public void LoadFromChunk(string FileName) {
@@ -183,7 +183,7 @@ namespace Voxelgine.Graphics {
 			ComputeLighting();
 		}
 
-		public RayCollision RaycastEnt(Ray Ray) {
+		/*public RayCollision RaycastEnt(Ray Ray) {
 			foreach (GameEntity E in Entities) {
 				RayCollision Col = E.Model.Collide(Ray, out CustomMesh HitMesh);
 
@@ -192,7 +192,7 @@ namespace Voxelgine.Graphics {
 			}
 
 			return new RayCollision() { Hit = false };
-		}
+		}*/
 
 		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos) {
 			ChunkIndex = (int)Math.Floor((float)S / Chunk.ChunkSize);
@@ -324,99 +324,6 @@ namespace Voxelgine.Graphics {
 			//ComputeLighting();
 		}
 
-		IEnumerable<GlobalPlacedBlock> GetAllExistingBlocks() {
-			foreach (var C in Chunks) {
-				for (int X = 0; X < Chunk.ChunkSize; X++) {
-					for (int Y = 0; Y < Chunk.ChunkSize; Y++) {
-						for (int Z = 0; Z < Chunk.ChunkSize; Z++) {
-							PlacedBlock CurBlock = C.Value.GetBlock(X, Y, Z);
-							if (CurBlock.Type == BlockType.None)
-								continue;
-
-							GetWorldPos(X, Y, Z, C.Key, out Vector3 GlobalPos);
-							yield return new GlobalPlacedBlock(GlobalPos, CurBlock, C.Value);
-						}
-					}
-				}
-			}
-		}
-
-		public int CountHits(int X, int Y, int Z, int Distance, Vector3 Dir, out int MaxHits) {
-			int Hits = Utils.RaycastHalfSphere(new Vector3(X, Y, Z), Dir, Distance, (Orig, Face) => {
-				if (GetBlock(Orig) != BlockType.None)
-					return true;
-
-				return false;
-			}, out MaxHits, 12);
-
-			return Hits;
-		}
-
-		public int CountSphereHits(int X, int Y, int Z, int Distance, int Slices = 16) {
-			int Hits = Utils.RaycastSphere(new Vector3(X, Y, Z), Distance, (Orig, Face) => {
-				if (GetBlock(Orig) != BlockType.None)
-					return true;
-
-				return false;
-			}, Slices);
-
-			return Hits;
-		}
-
-		public int CountSphereHits(Vector3 Origin, int Distance, int Slices = 16) {
-			return CountSphereHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Slices);
-		}
-
-		public int CountHits(Vector3 Origin, int Distance, Vector3 Dir, out int MaxHits) {
-			return CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, Distance, Dir, out MaxHits);
-		}
-
-		bool Chk(int X, int Y, int Z) {
-			return GetBlock(X, Y, Z) != BlockType.None;
-		}
-
-		IEnumerable<Vector3> GetPlaneNeighbours(int X, int Y, int Z, Vector3 faceNormal) {
-			//Vector3 BlockPos = new Vector3(X, Y, Z) + new Vector3(0.5f);
-
-			int Range = 1;
-
-			for (int yy = -Range; yy < Range + 1; yy++) {
-				for (int xx = -Range; xx < Range + 1; xx++) {
-					if (faceNormal.Y == 1 || faceNormal.Y == -1) {
-						bool C1 = Chk(X + xx, Y, Z + yy);
-						bool C2 = Chk(X + xx, (int)(Y + faceNormal.Y), Z + yy);
-
-						if (C1 && !C2)
-							yield return new Vector3(X + xx, Y, Z + yy);
-						/*else if (C1 && C2)
-							yield break;*/
-
-					} else if (faceNormal.X == 1 || faceNormal.X == -1) {
-						bool C1 = Chk(X, Y + xx, Z + yy);
-						bool C2 = Chk((int)(X + faceNormal.X), Y + xx, Z + yy);
-
-						if (C1 && !C2)
-							yield return new Vector3(X, Y + xx, Z + yy);
-						/*else if (C1 && C2)
-							yield break;*/
-
-					} else if (faceNormal.Z == 1 || faceNormal.Z == -1) {
-						bool C1 = Chk(X + xx, Y + yy, Z);
-						bool C2 = Chk(X + xx, Y + yy, (int)(Z + faceNormal.Z));
-
-						if (C1 && !C2)
-							yield return new Vector3(X + xx, Y + yy, Z);
-						/*else if (C1 && C2)
-							yield break;*/
-
-					}
-				}
-
-
-
-			}
-		}
-
 		public int RayTest(Vector3 Start, Vector3 End, Vector3[] IgnorePos = null, BlockType[] IgnoreBlocks = null) {
 			//Start = new Vector3((int)Start.X, (int)Start.Y, (int)Start.Z);
 			//End = new Vector3((int)End.X, (int)End.Y, (int)End.Z);
@@ -431,17 +338,18 @@ namespace Voxelgine.Graphics {
 			int Count = 0;
 
 			Vector3 Dir = Vector3.Normalize(End - Start);
-			Utils.Raycast2(Start, Dir, Dist, 10, (HitPos, Face) => {
+
+			Utils.Raycast(Start, Dir, Dist, (HitPosX, HitPosY, HitPosZ, Face) => {
 				BlockType BT = BlockType.None;
 
 				if (IgnorePos != null) {
 					foreach (var Ign in IgnorePos) {
-						if ((int)Ign.X == (int)HitPos.X && (int)Ign.Y == (int)HitPos.Y && (int)Ign.Z == (int)HitPos.Z)
+						if ((int)Ign.X == (int)HitPosX && (int)Ign.Y == (int)HitPosY && (int)Ign.Z == (int)HitPosZ)
 							return false;
 					}
 				}
 
-				if ((BT = GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z)) != BlockType.None) {
+				if ((BT = GetBlock((int)HitPosX, (int)HitPosY, (int)HitPosZ)) != BlockType.None) {
 					if (!BlockInfo.IsOpaque(BT))
 						return false;
 
@@ -460,15 +368,15 @@ namespace Voxelgine.Graphics {
 		}
 
 		public bool Raycast(int X, int Y, int Z, float Distance, Vector3 Dir) {
-			/*return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
+			return Utils.Raycast(new Vector3(X, Y, Z), Dir, Distance, (XX, YY, ZZ, Face) => {
 				if (GetBlock(XX, YY, ZZ) != BlockType.None)
 					return true;
 
 				return false;
-			});*/
+			});
 
 
-			if (Utils.Raycast2(new Vector3(X, Y, Z), Dir, Distance, 10, (HitPos, Face) => {
+			/*if (Utils.Raycast2(new Vector3(X, Y, Z), Dir, Distance, 10, (HitPos, Face) => {
 				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
 					return true;
 				}
@@ -478,7 +386,7 @@ namespace Voxelgine.Graphics {
 				return true;
 			}
 
-			return false;
+			return false;*/
 		}
 
 		public bool Raycast(Vector3 Origin, float Distance, Vector3 Dir) {
@@ -497,7 +405,7 @@ namespace Voxelgine.Graphics {
 				return Col.Point;
 			}
 
-			foreach (var E in Entities) {
+			/*foreach (var E in Entities) {
 				if (!E.HasCollision)
 					continue;
 
@@ -507,7 +415,7 @@ namespace Voxelgine.Graphics {
 					FaceDir = Col.Normal;
 					return Col.Point;
 				}
-			}
+			}*/
 
 			return Vector3.Zero;
 
@@ -559,12 +467,12 @@ namespace Voxelgine.Graphics {
 			Vector3 OutFaceDir = Vector3.Zero;
 			Vector3 Blk = Vector3.Zero;
 
-			if (Utils.Raycast2(Origin, Dir, Distance, 20, (HitPos, Face) => {
+			if (Utils.Raycast(Origin, Dir, Distance, (HitPosX, HitPosY, HitPosZ, Face) => {
 
-				if (GetBlock((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z) != BlockType.None) {
-					RetPos = HitPos;
+				if (GetBlock((int)HitPosX, (int)HitPosY, (int)HitPosZ) != BlockType.None) {
+					RetPos = new Vector3(HitPosX, HitPosY, HitPosZ);
 					OutFaceDir = Face;
-					Blk = new Vector3((int)HitPos.X, (int)HitPos.Y, (int)HitPos.Z);
+					Blk = new Vector3((int)HitPosX, (int)HitPosY, (int)HitPosZ);
 					return true;
 				}
 
@@ -578,7 +486,7 @@ namespace Voxelgine.Graphics {
 			return RetPos;
 		}
 
-		public int RaycastSphere(Vector3 Origin, float Distance, Raycast2CallbackFunc OnHit, BlockType[] SkipArray = null, int Slices = 26) {
+		/*public int RaycastSphere(Vector3 Origin, float Distance, Raycast2CallbackFunc OnHit, BlockType[] SkipArray = null, int Slices = 26) {
 			return Utils.RaycastSphere(Origin, Distance, (Orig, Face) => {
 				BlockType BT = BlockType.None;
 
@@ -610,7 +518,7 @@ namespace Voxelgine.Graphics {
 			}
 
 			return Hits;
-		}
+		}*/
 
 		public bool IsCovered(int X, int Y, int Z) {
 			for (int i = 0; i < Utils.MainDirs.Length; i++) {
@@ -628,49 +536,10 @@ namespace Voxelgine.Graphics {
 		List<Vector3> SunRayOrigins = new List<Vector3>();
 		Vector3 SunDir = -Vector3.UnitY;
 
-		void PerformLightBounce2(Vector3 Origin, float Distance) {
-			Vector3 SphereCenter = Origin;
-			float SphereRadius = Distance;
-
-			IEnumerable<Tuple<PlacedBlock, Vector3>> BlocksAround = GetBlocksInRange(SphereCenter, SphereRadius, new[] { BlockType.None });
-			foreach (var BA in BlocksAround) {
-				if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
-					continue;
-
-				float Dist = Vector3.Distance(SphereCenter, BA.Item2);
-
-				if (Dist > SphereRadius)
-					continue;
-
-				foreach (var Face in GetVisibleFaces(BA.Item2, SphereCenter)) {
-					if (IsCovered((int)BA.Item2.X, (int)BA.Item2.Y, (int)BA.Item2.Z))
-						continue;
-
-					if (GetBlock(BA.Item2 + Face) != BlockType.None)
-						continue;
-
-					int RT = RayTest(SphereCenter, BA.Item2 + new Vector3(0.5f, 0.5f, 0.5f) + Face * 0.6f, null, new[] { BlockType.None, BlockType.Glowstone });
-					if (RT > 0)
-						continue;
-
-					//byte TargetLight = Math.Max((byte)(SphereRadius - Dist), (byte)0);
-					//float TgtLightPerc = 1 - (float)(Dist / SphereRadius);
-					byte AdditiveLightLevel = (byte)1;
-
-					// byte TargetLight = (byte)(TgtLightPerc * 28);
-					byte TargetLight = (byte)(BA.Item1.Lights[Utils.DirToByte(Face)].R + AdditiveLightLevel);
-
-					if (TargetLight > 28)
-						TargetLight = 28;
-
-					BA.Item1.Lights[Utils.DirToByte(Face)] = new BlockLight(TargetLight);
-				}
-			}
-		}
-
 		// HitPos + FaceNormal * 0.1f
 		// 4
-		void PerformLightBounce(Vector3 Origin, float Distance) {
+
+		/*void PerformLightBounce(Vector3 Origin, float Distance) {
 			RaycastSphere(Origin, Distance, (Orig, Norm) => {
 				PlacedBlock PB = GetPlacedBlock((int)Orig.X, (int)Orig.Y, (int)Orig.Z, out Chunk Chk2);
 
@@ -684,7 +553,7 @@ namespace Voxelgine.Graphics {
 
 				return false;
 			});
-		}
+		}*/
 
 		IEnumerable<Tuple<PlacedBlock, Vector3>> GetBlocksInRange(Vector3 Pos, float Range, BlockType[] IgnoreBlocks = null) {
 			int Rang = (int)Range;//(int)Math.Ceiling(Range / 2) + 1;
@@ -969,11 +838,13 @@ namespace Voxelgine.Graphics {
 			List<RayCollision> Hits = new List<RayCollision>();
 
 			foreach (var KV in Chunks) {
-				Vector3 ChunkPos = KV.Value.Position;
+				//Vector3 ChunkPos = KV.Value.Position;
+				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+
 				if (Vector3.Distance(ChunkPos, R.Position) > 32)
 					continue;
 
-				RayCollision Hit = KV.Value.Collide(R);
+				RayCollision Hit = KV.Value.Collide(ChunkPos, R);
 
 				if (Dist > 0 && Hit.Hit && Hit.Distance > Dist)
 					continue;
@@ -1010,30 +881,32 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public void UpdateLockstep(float TotalTime, float Dt) {
-			foreach (var E in Entities) {
+		/*public void UpdateLockstep(float TotalTime, float Dt) {
+		foreach (var E in Entities) {
 				E.UpdateLockstep(TotalTime, Dt);
 			}
-		}
+		}*/
 
 		public void Tick() {
-			foreach (var E in Entities) {
+			/*foreach (var E in Entities) {
 				E.Tick();
-			}
+			}*/
 
-			foreach (var KV in Chunks) {
+			/*foreach (var KV in Chunks) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 				KV.Value.SetPosition(ChunkPos);
-			}
+			}*/
 		}
 
 		public void Draw() {
-			foreach (var KV in Chunks)
-				KV.Value.Draw();
-
-			foreach (var E in Entities) {
-				E.Draw();
+			foreach (var KV in Chunks) {
+				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+				KV.Value.Draw(ChunkPos);
 			}
+
+			/*foreach (var E in Entities) {
+				E.Draw();
+			}*/
 
 			/*foreach (Vector3 Orig in SunRayOrigins) {
 				Vector3 Dst = Orig + SunDir * 64;

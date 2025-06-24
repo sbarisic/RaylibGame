@@ -26,7 +26,6 @@ namespace Voxelgine {
 		static void Main(string[] args) {
 			Clipb = new Clipboard();
 
-
 			Window = new GameWindow(1920, 1080, "Aurora Falls");
 			ResMgr.InitResources();
 			ResMgr.InitHotReload();
@@ -46,9 +45,9 @@ namespace Voxelgine {
 
 			float Time = 0;
 
-			//float DeltaTime = 0.015f; // 66.6 update ticks per second
-			float DeltaTime = 0.04f; // 25 updates per second
-									 //float DeltaTime = 0.2f; // 5 updates per second
+			float DeltaTime = 0.015f; // 66.6 update ticks per second
+									  //float DeltaTime = 0.04f; // 25 updates per second
+									  //float DeltaTime = 0.2f; // 5 updates per second
 
 			float Accumulator = 0;
 			float CurrentTime = 0;

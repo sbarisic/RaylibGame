@@ -78,7 +78,7 @@ namespace RaylibGame.States {
 				Vector3 Start = Ply.Position;
 				//Vector3 End = Map.RaycastPos(Start, 10, FPSCamera.GetForward(), out Vector3 Face);
 
-				Ray R = new Ray();
+				/*Ray R = new Ray();
 				R.Position = Start;
 				R.Direction = FPSCamera.GetForward();
 				RayCollision Col = Map.RaycastEnt(R);
@@ -90,7 +90,7 @@ namespace RaylibGame.States {
 
 				if (End != Vector3.Zero) {
 					MarkerList.Add(new Tuple<Vector3, Vector3>(Start, End));
-				}
+				}*/
 			});
 
 			Ply.AddOnKeyPressed(KeyboardKey.E, () => {
@@ -147,7 +147,7 @@ namespace RaylibGame.States {
 
 		GUIItemBox Box_Health;
 		GUILabel InfoLbl;
-
+		BlockType PlayerSelectedBlockType;
 		void InitGUI() {
 			/*GUIIconBar Bar_Health = new GUIIconBar(GUI, IconBarStyle.Hearts, 10, 2.0f);
 			Bar_Health.Pos = new Vector2(100, Window.Height - 80);
@@ -170,10 +170,15 @@ namespace RaylibGame.States {
 
 			List<GUIElement> Els = new List<GUIElement>();
 
-			Els.Add(AddButton("Func 1", (E) => { }));
-			Els.Add(AddButton("Func 2", (E) => { }));
-			Els.Add(AddButton("Func 3", (E) => { }));
-			Els.Add(AddButton("Func 4", (E) => { }));
+			PlayerSelectedBlockType = BlockType.Dirt;
+			Els.Add(AddButton("Stone", (E) => { PlayerSelectedBlockType = BlockType.Stone; }));
+			Els.Add(AddButton("Dirt", (E) => { PlayerSelectedBlockType = BlockType.Dirt; }));
+			Els.Add(AddButton("Stone Brick", (E) => { PlayerSelectedBlockType = BlockType.StoneBrick; }));
+			Els.Add(AddButton("Bricks", (E) => { PlayerSelectedBlockType = BlockType.Bricks; }));
+			Els.Add(AddButton("Plank", (E) => { PlayerSelectedBlockType = BlockType.Plank; }));
+			Els.Add(AddButton("Water", (E) => { PlayerSelectedBlockType = BlockType.Water; }));
+			Els.Add(AddButton("Glass", (E) => { PlayerSelectedBlockType = BlockType.Glass; }));
+			Els.Add(AddButton("Craft Tbl", (E) => { PlayerSelectedBlockType = BlockType.CraftingTable; }));
 
 			GUI.CenterVertical(new Vector2(Window.Width - 180, 10), new Vector2(180, 400), new Vector2(10, 0), 1, Els.ToArray());
 		}
@@ -570,7 +575,7 @@ namespace RaylibGame.States {
 		}
 
 		public override void Tick() {
-			if (Raylib.IsKeyPressed(KeyboardKey.Escape)) {
+			if (Window.InMgr.IsInputPressed(InputKey.Esc)) {
 				Window.SetState(Program.MainMenuState);
 				return;
 			}
@@ -578,7 +583,7 @@ namespace RaylibGame.States {
 			Map.Tick();
 			Ply.Tick();
 
-			if (Raylib.IsKeyPressed(KeyboardKey.F5)) {
+			if (Window.InMgr.IsInputPressed(InputKey.F5)) {
 				Console.WriteLine("Saving map!");
 
 				using (MemoryStream MS = new MemoryStream()) {
@@ -589,9 +594,9 @@ namespace RaylibGame.States {
 				Console.WriteLine("Done!");
 			}
 
-			bool Left = Raylib.IsMouseButtonPressed(MouseButton.Left);
-			bool Right = Raylib.IsMouseButtonPressed(MouseButton.Right);
-			bool Middle = Raylib.IsMouseButtonPressed(MouseButton.Middle);
+			bool Left = Window.InMgr.IsInputPressed(InputKey.Click_Left);
+			bool Right = Window.InMgr.IsInputPressed(InputKey.Click_Right);
+			bool Middle = Window.InMgr.IsInputPressed(InputKey.Click_Middle);
 			const float MaxLen = 20;
 
 			if ((Left || Right || Middle) && Ply.CursorDisabled) {
@@ -636,7 +641,7 @@ namespace RaylibGame.States {
 							Z += (int)Face.Z;
 
 							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, BlockType.Dirt);
+							Map.SetBlock(X, Y, Z, PlayerSelectedBlockType);
 							return true;
 						}
 
@@ -678,7 +683,7 @@ namespace RaylibGame.States {
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt) {
-			Map.UpdateLockstep(TotalTime, Dt);
+			//Map.UpdateLockstep(TotalTime, Dt);
 			UpdatePhysics(Dt);
 		}
 
@@ -709,7 +714,7 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
 
 			// Raylib.DrawTexture(ResMgr.AtlasTexture, 0, 0, Color.White);
-			Raylib.DrawTextureEx(ResMgr.AtlasTexture, Vector2.Zero, 0, 0.01f, Color.White);
+			//Raylib.DrawTextureEx(ResMgr.AtlasTexture, Vector2.Zero, 0, 0.01f, Color.White);
 
 			//Raylib.DrawCircle3D(new Vector3(0, 0, 0), 1, new Vector3(0, 1, 0), 0, Color.Pink);
 

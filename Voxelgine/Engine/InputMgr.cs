@@ -13,6 +13,7 @@ namespace Voxelgine.Engine {
 
 		Click_Left,
 		Click_Right,
+		Click_Middle,
 
 		W,
 		A,
@@ -32,6 +33,7 @@ namespace Voxelgine.Engine {
 		F2,
 		F3,
 		F4,
+		F5,
 
 		Esc,
 		Ctrl,
@@ -58,6 +60,7 @@ namespace Voxelgine.Engine {
 			InputState_Cur.MousePos = Raylib.GetMousePosition();
 			InputState_Cur.KeysDown[(int)InputKey.Click_Left] = Raylib.IsMouseButtonDown(MouseButton.Left);
 			InputState_Cur.KeysDown[(int)InputKey.Click_Right] = Raylib.IsMouseButtonDown(MouseButton.Right);
+			InputState_Cur.KeysDown[(int)InputKey.Click_Middle] = Raylib.IsMouseButtonDown(MouseButton.Middle);
 
 			InputState_Cur.KeysDown[(int)InputKey.W] = Raylib.IsKeyDown(KeyboardKey.W);
 			InputState_Cur.KeysDown[(int)InputKey.A] = Raylib.IsKeyDown(KeyboardKey.A);
@@ -77,6 +80,7 @@ namespace Voxelgine.Engine {
 			InputState_Cur.KeysDown[(int)InputKey.F2] = Raylib.IsKeyDown(KeyboardKey.F2);
 			InputState_Cur.KeysDown[(int)InputKey.F3] = Raylib.IsKeyDown(KeyboardKey.F3);
 			InputState_Cur.KeysDown[(int)InputKey.F4] = Raylib.IsKeyDown(KeyboardKey.F4);
+			InputState_Cur.KeysDown[(int)InputKey.F5] = Raylib.IsKeyDown(KeyboardKey.F5);
 
 			InputState_Cur.KeysDown[(int)InputKey.Esc] = Raylib.IsKeyDown(KeyboardKey.Escape);
 			InputState_Cur.KeysDown[(int)InputKey.Ctrl] = Raylib.IsKeyDown(KeyboardKey.LeftControl) || Raylib.IsKeyDown(KeyboardKey.RightControl);

@@ -227,6 +227,8 @@ namespace Voxelgine.Engine {
 		public void Tick() {
 			string AnimName = "idle";
 
+			
+
 			if (MoveFd = Raylib.IsKeyDown(KeyboardKey.W))
 				AnimName = "forward";
 			else if (MoveLt = Raylib.IsKeyDown(KeyboardKey.A))

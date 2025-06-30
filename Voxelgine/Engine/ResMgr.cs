@@ -163,7 +163,12 @@ namespace Voxelgine.Engine {
 			if (!File.Exists(VertShaderPath) || !File.Exists(FragShaderPath))
 				throw new Exception("File not found " + ShaderName + " (.vert and .frag)");
 
-			Shader S = Raylib.LoadShader(VertShaderPath, FragShaderPath);
+			string VertexSrc = File.ReadAllText(VertShaderPath);
+			string FragmentSrc = File.ReadAllText(FragShaderPath);
+
+			//Shader S = Raylib.LoadShader(VertShaderPath, FragShaderPath);
+			Shader S = Raylib.LoadShaderFromMemory(VertexSrc, FragmentSrc);
+
 			if (S.Id == 0 && S.Locs == null) {
 				throw new Exception("Shader failed to compile " + ShaderName);
 			}

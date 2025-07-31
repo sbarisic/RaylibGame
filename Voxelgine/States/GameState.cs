@@ -422,12 +422,10 @@ namespace RaylibGame.States {
 			// Velocity processing and constraints  
 			ProcessVelocityConstraints(physicsConfig, HasHitFloor, HitFloor, IsBraking, Dt);
 
-			// PERFORMANCE FIX: Replace 24-raycast collision with cylindrical collision  
 			if (PlyVelocity != Vector3.Zero) {
 				Vector3 NewPlyPos = Ply.Position + (PlyVelocity * Dt);
 				Vector3 MoveDir = Vector3.Normalize(PlyVelocity);
-
-				// Use the efficient cylindrical collision system instead of multiple raycasts  
+ 
 				if (Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm)) {
 					// Project velocity onto collision surface  
 					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, HitNorm);
@@ -439,6 +437,12 @@ namespace RaylibGame.States {
 					} else {
 						// If still colliding, stop movement  
 						PlyVelocity = Vector3.Zero;
+
+						if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
+							Ply.SetPosition(Ply.GetPreviousPosition());
+						} else {
+							Ply.SetPosition(Ply.Position);
+						}
 					}
 				} else {
 					// No collision, move normally  
@@ -446,11 +450,17 @@ namespace RaylibGame.States {
 						Ply.SetPosition(NewPlyPos);
 					} else {
 						PlyVelocity = Vector3.Zero;
+
+						if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
+							Ply.SetPosition(Ply.GetPreviousPosition());
+						} else {
+							Ply.SetPosition(Ply.Position);
+						}
 					}
 				}
 			}
 
-			// Parkour system - simplified  
+			/*// Parkour system - simplified  
 			if (PlyVelocity.Y == 0 && !HasHitFloor) {
 				// Check for parkour opportunities using single collision test  
 				Vector3 ParkourPos = Ply.Position + Vector3.Normalize(new Vector3(PlyVelocity.X, 0, PlyVelocity.Z)) * 0.4f;
@@ -459,7 +469,7 @@ namespace RaylibGame.States {
 					PlyVelocity = PlyVelocity * 0.5f;
 					Ply.Parkour(ParkourPos + new Vector3(0, physicsConfig.PlayerHeight, 0));
 				}
-			}
+			}*/
 
 			Utils.EndRaycastRecord();
 		}

@@ -100,9 +100,8 @@ namespace Voxelgine.Engine {
 			return Vector3.Transform(UpNormal, GetRotationMatrix());
 		}
 
-		// TODO
-		/*public static void LookAt(Vector3 Target) {
+		public static void LookAt(Vector3 Target) {
 			CamAngle = Utils.EulerBetweenVectors(Position, Target);
-		}*/
+		}
 	}
 }

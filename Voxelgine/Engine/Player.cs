@@ -118,6 +118,7 @@ namespace Voxelgine.Engine {
 		bool MoveLt;
 		bool MoveRt;
 
+		Vector3 PreviousPosition;
 		public Vector3 Position;
 		public Matrix4x4 Rotation;
 		public Matrix4x4 UpperBodyRotation;
@@ -175,7 +176,12 @@ namespace Voxelgine.Engine {
 		}
 
 		public void SetPosition(Vector3 Pos) {
+			PreviousPosition = Position;
 			Position = FPSCamera.Position = Pos;
+		}
+
+		public Vector3 GetPreviousPosition() {
+			return PreviousPosition;
 		}
 
 		public void UpdatePhysics(float Dt) {
@@ -227,7 +233,7 @@ namespace Voxelgine.Engine {
 		public void Tick() {
 			string AnimName = "idle";
 
-			
+
 
 			if (MoveFd = Raylib.IsKeyDown(KeyboardKey.W))
 				AnimName = "forward";

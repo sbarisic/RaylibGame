@@ -176,6 +176,9 @@ namespace Voxelgine.Engine {
 		}
 
 		public void SetPosition(Vector3 Pos) {
+			if (float.IsNaN(Pos.X) || float.IsNaN(Pos.Y) || float.IsNaN(Pos.Z))
+				return;
+
 			PreviousPosition = Position;
 			Position = FPSCamera.Position = Pos;
 		}

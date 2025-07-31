@@ -111,7 +111,10 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void SetBlock(int X, int Y, int Z, PlacedBlock Block) {
-			Blocks[X + ChunkSize * (Y + ChunkSize * Z)] = Block;
+			PlacedBlock PB = Blocks[X + ChunkSize * (Y + ChunkSize * Z)];
+			PB.Lights = Block.Lights;
+			PB.Type = Block.Type;
+
 			Dirty = true;
 		}
 
@@ -155,6 +158,120 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void ComputeLighting() {
+			// Initialize all blocks to darkness  
+			for (int i = 0; i < Blocks.Length; i++) {
+				if (Blocks[i].Type != BlockType.None)
+					Blocks[i].SetBlockLight(new BlockLight(0));
+			}
+
+			// Queue for light propagation  
+			Queue<Vector3> lightQueue = new Queue<Vector3>();
+
+			// Add sky-exposed blocks as light sources  
+			for (int x = 0; x < ChunkSize; x++) {
+				for (int z = 0; z < ChunkSize; z++) {
+					for (int y = ChunkSize - 1; y >= 0; y--) {
+						PlacedBlock CurBlock = GetBlock(x, y, z);
+
+						if (CurBlock.Type != BlockType.None) {
+							if (!WorldMap.Raycast(new Vector3(x, y, z), 128, Vector3.UnitY)) {
+								SetLightLevel(x, y, z, 15);
+								lightQueue.Enqueue(new Vector3(x, y, z));
+							}
+
+
+							if (CurBlock.Type == BlockType.Glowstone || CurBlock.Type == BlockType.Campfire || CurBlock.Type == BlockType.CraftingTable) {
+								SetLightLevel(x, y, z, 15);
+								lightQueue.Enqueue(new Vector3(x, y, z));
+							}
+							break;
+						}
+					}
+				}
+			}
+
+			while (lightQueue.Count > 0) {
+				// Propagate light  
+				PropagateLight(lightQueue);
+			}
+		}
+
+		void SetLightLevel(int x, int y, int z, byte lightLevel) {
+			if (x < 0 || x >= ChunkSize || y < 0 || y >= ChunkSize || z < 0 || z >= ChunkSize)
+				return;
+
+			PlacedBlock block = GetBlock(x, y, z);
+			if (block.Type == BlockType.None)
+				return;
+
+			// Set light for all faces  
+			for (int i = 0; i < 6; i++) {
+				block.Lights[i] = new BlockLight(lightLevel);
+			}
+
+			SetBlock(x, y, z, block);
+		}
+
+		void PropagateLight(Queue<Vector3> lightQueue) {
+			Vector3[] directions = {
+				new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
+				new Vector3(0, 1, 0), new Vector3(0, -1, 0),
+				new Vector3(0, 0, 1), new Vector3(0, 0, -1)
+			};
+
+			while (lightQueue.Count > 0) {
+				Vector3 pos = lightQueue.Dequeue();
+				PlacedBlock currentBlock = GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+
+				if (currentBlock.Type == BlockType.None)
+					continue;
+
+				byte currentLight = currentBlock.Lights[0].R; // Use first face as reference  
+
+				// Propagate to neighboring blocks  
+				foreach (Vector3 dir in directions) {
+					Vector3 neighborPos = pos + dir;
+					int nx = (int)neighborPos.X;
+					int ny = (int)neighborPos.Y;
+					int nz = (int)neighborPos.Z;
+
+					// Check bounds - handle cross-chunk propagation  
+					PlacedBlock neighborBlock;
+					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize) {
+						// Cross-chunk boundary - use WorldMap for neighbor access  
+						WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
+						neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
+					} else {
+						neighborBlock = GetBlock(nx, ny, nz);
+					}
+
+					if (neighborBlock.Type == BlockType.None)
+						continue;
+
+					// Calculate light falloff  
+					byte newLight = (byte)Math.Max(0, currentLight - 1);
+					byte existingLight = neighborBlock.Lights[Utils.DirToByte(-dir)].R;
+
+					// Only propagate if new light is brighter  
+					if (newLight > existingLight) {
+						int faceIndex = Utils.DirToByte(-dir);
+						neighborBlock.Lights[faceIndex] = new BlockLight(newLight);
+
+						// Update the block in the appropriate chunk  
+						if (nx >= 0 && nx < ChunkSize && ny >= 0 && ny < ChunkSize && nz >= 0 && nz < ChunkSize) {
+							SetBlock(nx, ny, nz, neighborBlock);
+
+							// Add to queue for further propagation if light is still significant  
+							if (newLight > 0) {
+								lightQueue.Enqueue(neighborPos);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		public void ComputeLighting2() {
 			for (int i = 0; i < Blocks.Length; i++) {
 				if (Blocks[i].Type == BlockType.None)
 					continue;

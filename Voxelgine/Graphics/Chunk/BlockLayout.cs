@@ -29,7 +29,7 @@ namespace Voxelgine.Graphics {
 		[FieldOffset(0)]
 		public int LightInteger;
 
-		const int LightLevels = 8;
+		const int LightLevels = 16;
 
 		public BlockLight(byte R, byte G, byte B) {
 			LightInteger = Unused = 0;

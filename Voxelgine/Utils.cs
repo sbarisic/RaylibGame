@@ -458,10 +458,19 @@ namespace Voxelgine {
 			return new Vector3(F[0], F[1], F[2]);
 		}
 
-		public static Vector3 ProjectOnPlane(Vector3 Vec, Vector3 Normal) {
+		public static Vector3 ProjectOnPlane(Vector3 Vec, Vector3 Normal, float Eps) {
+			if (Vec.X == 0 && Vec.Y == 0 && Normal.X == 0 && Normal.Y == 0)
+				return Vec;
+
+			if (Vec.X == 0 && Vec.Z == 0 && Normal.X == 0 && Normal.Z == 0)
+				return Vec;
+
+			if (Vec.Z == 0 && Vec.Y == 0 && Normal.Z == 0 && Normal.Y == 0)
+				return Vec;
+
 			float SqrMag = Vector3.Dot(Normal, Normal);
 
-			if (SqrMag < float.Epsilon) {
+			if (SqrMag < Eps) {
 				return Vec;
 			} else {
 				float Dot = Vector3.Dot(Vec, Normal);

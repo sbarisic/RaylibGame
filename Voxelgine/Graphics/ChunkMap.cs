@@ -612,13 +612,17 @@ namespace Voxelgine.Graphics {
 
 		public void ComputeLighting() {
 			foreach (Chunk C in GetAllChunks()) {
-				foreach (PlacedBlock B in C.Blocks) {
+				/*foreach (PlacedBlock B in C.Blocks) {
 					if (B.Type == BlockType.None)
 						continue;
 
 					B.SetBlockLight(new BlockLight(8));
-				}
+				}*/
+
+				C.ComputeLighting();
 			}
+
+			return;
 
 			/*if (!Utils.HasRecord()) {
 				Console.WriteLine("Begin recording!");
@@ -859,8 +863,12 @@ namespace Voxelgine.Graphics {
 			return Hits.OrderBy((RC) => RC.Distance).First();
 		}
 
-		public bool Collide(Vector3 Pos) {
-			if (GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z) != BlockType.None)
+		public bool Collide(Vector3 Pos, out int XX, out int YY, out int ZZ) {
+			XX = (int)(Pos.X);
+			YY = (int)(Pos.Y);
+			ZZ = (int)(Pos.Z);
+
+			if (GetBlock(XX, YY, ZZ) != BlockType.None)
 				return true;
 
 			return false;

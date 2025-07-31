@@ -15,6 +15,8 @@ namespace RaylibGame.States {
 		Camera2D Cam = new Camera2D();
 		GUIManager GUI;
 
+		GUIInventory Inv;
+
 		/*GUILabel Lbl;
 		GUILabel OutLbl;
 		Vector2 MousePos;*/
@@ -58,6 +60,9 @@ namespace RaylibGame.States {
 			Btn_Wat.Text = "Wat";
 			Btn_Wat.OnClickedFunc = (E) => {
 				Console.WriteLine("Wat");
+
+				GUIItemBox ItmBx1 = Inv.GetSelectedItem();
+				ItmBx1.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
 			};
 			GUI.AddElement(Btn_Wat);
 
@@ -80,6 +85,10 @@ namespace RaylibGame.States {
 				), CenterSize);
 
 			GUI.CenterVertical(DbgRect.Position, DbgRect.Size, new Vector2(15, 10), 5, IB.ToArray());
+
+			Inv = new GUIInventory(GUI);
+			Inv.Pos = new Vector2(100, 100);
+			GUI.AddElement(Inv);
 
 			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
 			IcnBar.Pos = new Vector2(800, 200);

@@ -12,6 +12,7 @@ using Voxelgine.Engine;
 namespace Voxelgine.GUI {
 	class GUIItemBox : GUIElement {
 		public bool IsSelected = false;
+		public GUIInventory Parent;
 
 		public string Text;
 

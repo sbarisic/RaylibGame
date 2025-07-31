@@ -73,82 +73,15 @@ namespace RaylibGame.States {
 				Utils.ClearRaycastRecord();
 			});
 
-			Ply.AddOnKeyPressed(KeyboardKey.F, () => {
-				Console.WriteLine("Pew pew!");
-
-				Vector3 Start = Ply.Position;
-				//Vector3 End = Map.RaycastPos(Start, 10, FPSCamera.GetForward(), out Vector3 Face);
-
-				/*Ray R = new Ray();
-				R.Position = Start;
-				R.Direction = FPSCamera.GetForward();
-				RayCollision Col = Map.RaycastEnt(R);
-
-				Vector3 End = Vector3.Zero;
-
-				if (Col.Hit)
-					End = Col.Point;
-
-				if (End != Vector3.Zero) {
-					MarkerList.Add(new Tuple<Vector3, Vector3>(Start, End));
-				}*/
-			});
-
 			Ply.AddOnKeyPressed(KeyboardKey.B, () => {
 				if (Debugger.IsAttached)
 					Debugger.Break();
 			});
 
-			/*Ply.AddOnKeyPressed(KeyboardKey.E, () => {
-				Vector3 Start = Ply.Position;
-				Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
-
-				if (Face.Y == 1)
-					End.Y -= 0.001f;
-
-				PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
-
-				float XU = (float)(End.X - Math.Floor(End.X));
-				float YV = (float)(End.Z - Math.Floor(End.Z));
-
-				//Blk.OnBlockActivate?.Invoke(Blk, End, new Vector2(XU, YV));
-
-				if (Blk.Type == BlockType.CraftingTable) {
-					Console.WriteLine("Craft! {0}, ({1}, {2})", Face, XU, YV);
-					return;
-				}
-
-				//Inventory.SelectNext();
-			});*/
-
-
 			Ply.SetPosition(32, 73, 19);
-
-			/*VoxCollision.Raycast(Ply.Position, Vector3.Normalize(new Vector3(0.5f, -0.8f, 0.2f)), 20,
-				GetBlockImpl,
-				(X, Y, Z, PBlock, Norm) => {
-					Map.SetBlock((int)X, (int)Y, (int)Z, BlockType.Bricks);
-
-					if (PBlock.Type == BlockType.None)
-						return false;
-
-
-					return true;
-				});*/
-		}
-
-		bool GetBlockImpl(float X, float Y, float Z, int Counter, out PlacedBlock B) {
-			if (Counter > 32) {
-				B = null;
-				return false;
-			}
-
-			B = Map.GetPlacedBlock((int)X, (int)Y, (int)Z, out Chunk Chk);
-			return true;
 		}
 
 		GUIElement AddButton(string Txt, OnMouseClickedFunc OnClick) {
-
 			GUIButton Btn = new GUIButton(GUI);
 			Btn.Pos = GUI.WindowScale(new Vector2(0.1f, 0.1f));
 			Btn.Size = new Vector2(180, 45);
@@ -157,7 +90,6 @@ namespace RaylibGame.States {
 			GUI.AddElement(Btn);
 
 			return Btn;
-
 		}
 
 		GUIItemBox Box_Health;
@@ -247,46 +179,6 @@ namespace RaylibGame.States {
 			return Num;
 		}
 
-		IEnumerable<Vector3> Phys_RingPoints(Vector3 RingPos, float Radius = 0.4f) {
-			for (int i = 0; i < 360; i += 20) {
-				float X = MathF.Sin(Utils.ToRad(i)) * Radius;
-				float Y = MathF.Cos(Utils.ToRad(i)) * Radius;
-				Vector3 Offset = new Vector3(X, 0, Y);
-
-				yield return RingPos + Offset;
-			}
-		}
-
-		Mesh PlayerColMesh;
-		bool HasPlayerColMesh;
-
-		IEnumerable<Vector3> Phys_PlayerCollisionPoints(Vector3 Pos, float Radius = 0.4f, float Height = 1.8f) {
-			int Divs = 6;
-
-			if (!HasPlayerColMesh) {
-				PlayerColMesh = Raylib.GenMeshCylinder(Radius, Height + 0.1f, Divs);
-				HasPlayerColMesh = true;
-			}
-
-			if (HasPlayerColMesh) {
-				//yield return Pos - new Vector3(0, Height, 0);
-
-				for (int i = 0; i < PlayerColMesh.VertexCount; i++) {
-					yield return PlayerColMesh.VerticesAs<Vector3>()[i] + Pos - new Vector3(0, Height - 0.1f, 0);
-				}
-			}
-		}
-
-		/*bool Phys_CollideFeet(Vector3 FeetPos, out Vector3 HitNorm, float Radius = 0.5f) {
-			HitNorm = Vector3.Zero;
-
-			foreach (Vector3 P in Phys_RingPoints(FeetPos, Radius)) {
-				if (Map.Collide(P, out HitNorm))
-					return true;
-			}
-
-			return false;
-		}*/
 
 		bool Phys_CollidePlayer(Vector3 Pos, Vector3 ProbeDir, out Vector3 HitNorm) {
 			bool Res = Phys_CollidePlayerAdvanced(Pos, ProbeDir, out HitNorm, out Vector3 _, out float _);
@@ -389,51 +281,6 @@ namespace RaylibGame.States {
 			yield return Pos + new Vector3(0, -Height, 0);     // Bottom center  
 		}
 
-		// Optional: Optimized version that uses spatial partitioning  
-		bool Phys_CollidePlayerOptimized(Vector3 Pos, Vector3 ProbeDir, out Vector3 HitNorm, float Radius = 0.4f, float Height = 1.8f) {
-			HitNorm = Vector3.Zero;
-
-			// Quick AABB check first  
-			Vector3 minBounds = Pos + new Vector3(-Radius, -Height, -Radius);
-			Vector3 maxBounds = Pos + new Vector3(Radius, 0, Radius);
-
-			// Early exit if no blocks in the general area  
-			if (!HasBlocksInBounds(minBounds, maxBounds)) {
-				return false;
-			}
-
-			// Use adaptive sampling - fewer points if no collision detected initially  
-			int initialSamples = 8;
-			Vector3[] initialPoints = Phys_PlayerCollisionPointsSparse(Pos, Radius, Height, initialSamples).ToArray();
-
-			bool hasInitialCollision = false;
-			foreach (var P in initialPoints) {
-				if (Map.Collide(P, ProbeDir, out HitNorm)) {
-					hasInitialCollision = true;
-					break;
-				}
-			}
-
-			// If initial sparse check finds collision, do detailed check  
-			if (hasInitialCollision) {
-				return Phys_CollidePlayerAdvanced(Pos, ProbeDir, out HitNorm, out Vector3 _, out float _);
-			}
-
-			return false;
-		}
-
-		IEnumerable<Vector3> Phys_PlayerCollisionPointsSparse(Vector3 Pos, float Radius, float Height, int samples) {
-			for (int i = 0; i < samples; i++) {
-				float angle = (float)i / samples * 2.0f * MathF.PI;
-				float x = MathF.Cos(angle) * Radius;
-				float z = MathF.Sin(angle) * Radius;
-
-				// Sample at multiple heights  
-				yield return Pos + new Vector3(x, 0, z);           // Top  
-				yield return Pos + new Vector3(x, -Height / 2, z);   // Middle  
-				yield return Pos + new Vector3(x, -Height, z);     // Bottom  
-			}
-		}
 
 		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
 			// Quick check if there are any non-air blocks in the bounding box  
@@ -502,23 +349,6 @@ namespace RaylibGame.States {
 
 			}
 
-			//Console.WriteLine("HasHitFloor: {0}", HasHitFloor);
-
-			/*Vector3 HitFloor = Vector3.Zero;
-			Vector3 Face1 = Vector3.Zero;
-
-			if (Phys_CollidePlayerSingle(Ply.Position - (PlyVelocity * Dt), out Face1, out Vector3 PHitPoint, out float PHitDist, true)) {
-				HitFloor = Ply.Position;
-			}
-
-			bool HasHitFloor = HitFloor != Vector3.Zero && (Face1.Y == -1 || Face1.Y == 1);
-			//*/
-
-
-
-			//if (!HasHitFloor && PlyVelocity.Length() == 0 && HitFloor != Vector3.Zero) {
-			//	HasHitFloor = true;
-			//}
 
 			// Floor hit events  
 			if (HasHitFloor) {
@@ -845,7 +675,24 @@ namespace RaylibGame.States {
 				}
 
 				if (Window.InMgr.IsInputPressed(InputKey.F)) {
-				
+					Console.WriteLine("Pew pew!");
+
+					Vector3 Start = Ply.Position;
+					//Vector3 End = Map.RaycastPos(Start, 10, FPSCamera.GetForward(), out Vector3 Face);
+
+					/*Ray R = new Ray();
+					R.Position = Start;
+					R.Direction = FPSCamera.GetForward();
+					RayCollision Col = Map.RaycastEnt(R);
+
+					Vector3 End = Vector3.Zero;
+
+					if (Col.Hit)
+						End = Col.Point;
+
+					if (End != Vector3.Zero) {
+						MarkerList.Add(new Tuple<Vector3, Vector3>(Start, End));
+					}*/
 
 				}
 

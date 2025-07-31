@@ -99,7 +99,7 @@ namespace RaylibGame.States {
 					Debugger.Break();
 			});
 
-			Ply.AddOnKeyPressed(KeyboardKey.E, () => {
+			/*Ply.AddOnKeyPressed(KeyboardKey.E, () => {
 				Vector3 Start = Ply.Position;
 				Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
 
@@ -119,12 +119,8 @@ namespace RaylibGame.States {
 				}
 
 				//Inventory.SelectNext();
-			});
+			});*/
 
-
-			Ply.AddOnKeyPressed(KeyboardKey.Q, () => {
-				//Inventory.SelectPrevious();
-			});
 
 			Ply.SetPosition(32, 73, 19);
 
@@ -822,6 +818,37 @@ namespace RaylibGame.States {
 			if (!Ply.CursorDisabled) {
 				GUI.Tick();
 			} else {
+				if (Window.InMgr.IsInputPressed(InputKey.Q)) {
+					Inventory.SelectPrevious();
+				}
+
+				if (Window.InMgr.IsInputPressed(InputKey.E)) {
+					Vector3 Start = Ply.Position;
+					Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
+
+					if (Face.Y == 1)
+						End.Y -= 0.001f;
+
+					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
+
+					float XU = (float)(End.X - Math.Floor(End.X));
+					float YV = (float)(End.Z - Math.Floor(End.Z));
+
+					//Blk.OnBlockActivate?.Invoke(Blk, End, new Vector2(XU, YV));
+
+					if (Blk.Type == BlockType.CraftingTable) {
+						Console.WriteLine("Craft! {0}, ({1}, {2})", Face, XU, YV);
+						return;
+					}
+
+					Inventory.SelectNext();
+				}
+
+				if (Window.InMgr.IsInputPressed(InputKey.F)) {
+				
+
+				}
+
 				Inventory.Update();
 			}
 

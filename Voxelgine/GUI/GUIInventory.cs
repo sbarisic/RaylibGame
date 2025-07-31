@@ -61,7 +61,7 @@ namespace Voxelgine.GUI {
 			base.Update();
 
 			// Handle scrolling input (using A/D keys since mouse wheel isn't in InputMgr)  
-			bool currentScrollLeft = Raylib.IsKeyDown(KeyboardKey.A) || Raylib.IsKeyDown(KeyboardKey.Left);
+			/*bool currentScrollLeft = Raylib.IsKeyDown(KeyboardKey.A) || Raylib.IsKeyDown(KeyboardKey.Left);
 			bool currentScrollRight = Raylib.IsKeyDown(KeyboardKey.D) || Raylib.IsKeyDown(KeyboardKey.Right);
 			bool currentSelectNext = Raylib.IsKeyDown(KeyboardKey.E);
 			bool currentSelectPrev = Raylib.IsKeyDown(KeyboardKey.Q);
@@ -88,7 +88,7 @@ namespace Voxelgine.GUI {
 			if (currentSelectPrev && !SelectPrevPressed) {
 				SelectPrevious();
 			}
-			SelectPrevPressed = currentSelectPrev;
+			SelectPrevPressed = currentSelectPrev;*/
 
 			// Update positions of visible item boxes  
 			UpdateItemPositions();
@@ -132,7 +132,7 @@ namespace Voxelgine.GUI {
 			ItemBoxes[Idx].IsSelected = true;
 		}
 
-		private void SelectNext() {
+		public void SelectNext() {
 			if (SelectedIndex < MaxItems - 1) {
 				SelectedIndex++;
 				SelectIdx(SelectedIndex);
@@ -144,9 +144,11 @@ namespace Voxelgine.GUI {
 					ScrollOffset = SelectedIndex;
 				}
 			}
+
+			GetSelectedItem().OnMouseClick();
 		}
 
-		private void SelectPrevious() {
+		public void SelectPrevious() {
 			if (SelectedIndex > 0) {
 				SelectedIndex--;
 				SelectIdx(SelectedIndex);
@@ -158,6 +160,8 @@ namespace Voxelgine.GUI {
 					ScrollOffset = SelectedIndex - VisibleItems + 1;
 				}
 			}
+
+			GetSelectedItem().OnMouseClick();
 		}
 
 		public void SetItemIcon(int index, Texture2D? icon, float scale = 2.0f) {

@@ -24,6 +24,7 @@ namespace RaylibGame.States {
 		List<Tuple<Vector3, Vector3>> MarkerList = new List<Tuple<Vector3, Vector3>>();
 
 		GUIManager GUI;
+		GUIInventory Inventory;
 
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
@@ -101,6 +102,10 @@ namespace RaylibGame.States {
 			Ply.AddOnKeyPressed(KeyboardKey.E, () => {
 				Vector3 Start = Ply.Position;
 				Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
+
+				if (Face.Y == 1)
+					End.Y -= 0.001f;
+
 				PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
 
 				float XU = (float)(End.X - Math.Floor(End.X));
@@ -108,8 +113,17 @@ namespace RaylibGame.States {
 
 				//Blk.OnBlockActivate?.Invoke(Blk, End, new Vector2(XU, YV));
 
-				if (Blk.Type == BlockType.CraftingTable)
+				if (Blk.Type == BlockType.CraftingTable) {
 					Console.WriteLine("Craft! {0}, ({1}, {2})", Face, XU, YV);
+					return;
+				}
+
+				//Inventory.SelectNext();
+			});
+
+
+			Ply.AddOnKeyPressed(KeyboardKey.Q, () => {
+				//Inventory.SelectPrevious();
 			});
 
 			Ply.SetPosition(32, 73, 19);
@@ -173,21 +187,8 @@ namespace RaylibGame.States {
 			InfoLbl.WriteLine("Hello World!");
 			GUI.AddElement(InfoLbl);
 
-			/*List<GUIElement> Els = new List<GUIElement>();
 
-			PlayerSelectedBlockType = BlockType.Dirt;
-			Els.Add(AddButton("Stone", (E) => { PlayerSelectedBlockType = BlockType.Stone; }));
-			Els.Add(AddButton("Dirt", (E) => { PlayerSelectedBlockType = BlockType.Dirt; }));
-			Els.Add(AddButton("Stone Brick", (E) => { PlayerSelectedBlockType = BlockType.StoneBrick; }));
-			Els.Add(AddButton("Bricks", (E) => { PlayerSelectedBlockType = BlockType.Bricks; }));
-			Els.Add(AddButton("Plank", (E) => { PlayerSelectedBlockType = BlockType.Plank; }));
-			Els.Add(AddButton("Water", (E) => { PlayerSelectedBlockType = BlockType.Water; }));
-			Els.Add(AddButton("Glass", (E) => { PlayerSelectedBlockType = BlockType.Glass; }));
-			Els.Add(AddButton("Craft Tbl", (E) => { PlayerSelectedBlockType = BlockType.CraftingTable; }));
-			GUI.CenterVertical(new Vector2(Window.Width - 180, 10), new Vector2(180, 400), new Vector2(10, 0), 1, Els.ToArray());*/
-
-
-			GUIInventory Inventory = new GUIInventory(GUI);
+			Inventory = new GUIInventory(GUI);
 			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f));
 			Inventory.Pos -= new Vector2(Inventory.Size.X / 2, 0);
 			GUI.AddElement(Inventory);
@@ -734,6 +735,14 @@ namespace RaylibGame.States {
 			bool Middle = Window.InMgr.IsInputPressed(InputKey.Click_Middle);
 			const float MaxLen = 20;
 
+			float Wheel = Window.InMgr.GetMouseWheel();
+
+			if (Wheel >= 1) {
+				Inventory.SelectNext();
+			} else if (Wheel <= -1) {
+				Inventory.SelectPrevious();
+			}
+
 			if ((Left || Right || Middle) && Ply.CursorDisabled) {
 				Vector3 Dir = FPSCamera.GetForward();
 				Vector3 Start = FPSCamera.Position;
@@ -812,6 +821,8 @@ namespace RaylibGame.States {
 
 			if (!Ply.CursorDisabled) {
 				GUI.Tick();
+			} else {
+				Inventory.Update();
 			}
 
 			UpdateGUI();

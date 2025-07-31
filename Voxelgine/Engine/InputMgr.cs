@@ -45,6 +45,7 @@ namespace Voxelgine.Engine {
 	public unsafe struct InputState {
 		public fixed bool KeysDown[(int)InputKey.InputKeyCount];
 		public Vector2 MousePos;
+		public float MouseWheel;
 	}
 
 	unsafe class InputMgr {
@@ -58,6 +59,8 @@ namespace Voxelgine.Engine {
 			// TODO: Input mapping
 
 			InputState_Cur.MousePos = Raylib.GetMousePosition();
+			InputState_Cur.MouseWheel = Raylib.GetMouseWheelMove();
+
 			InputState_Cur.KeysDown[(int)InputKey.Click_Left] = Raylib.IsMouseButtonDown(MouseButton.Left);
 			InputState_Cur.KeysDown[(int)InputKey.Click_Right] = Raylib.IsMouseButtonDown(MouseButton.Right);
 			InputState_Cur.KeysDown[(int)InputKey.Click_Middle] = Raylib.IsMouseButtonDown(MouseButton.Middle);
@@ -107,6 +110,10 @@ namespace Voxelgine.Engine {
 
 		public Vector2 GetMousePos() {
 			return InputState_Cur.MousePos;
+		}
+
+		public float GetMouseWheel() {
+			return InputState_Cur.MouseWheel;
 		}
 	}
 }

@@ -25,6 +25,10 @@ namespace Voxelgine.Engine {
 		static Vector3 LeftNormal = Vector3.UnitX;
 		static Vector3 ForwardNormal = Vector3.UnitZ;
 
+		public static Vector2 GetPreviousMousePos() {
+			return MousePrev;
+		}
+
 		public static void Update(bool HandleRotation, ref Camera3D Cam) {
 			Vector2 MousePos = new Vector2(Raylib.GetMouseX(), Raylib.GetMouseY());
 
@@ -54,7 +58,7 @@ namespace Voxelgine.Engine {
 				CamAngle.Y = -89.9f;
 
 			Vector3 Forward = GetForward();
-			
+
 			/*if (UseCameraMove) {
 				Vector3 Left = GetLeft();
 				Vector3 Up = GetUp();

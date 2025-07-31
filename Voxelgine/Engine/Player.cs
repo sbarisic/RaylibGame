@@ -165,8 +165,12 @@ namespace Voxelgine.Engine {
 
 			if (CursorDisabled)
 				Raylib.EnableCursor();
-			else
+			else {
 				Raylib.DisableCursor();
+
+				Vector2 MPos = FPSCamera.GetPreviousMousePos();
+				Raylib.SetMousePosition((int)MPos.X, (int)MPos.Y);
+			}
 
 			CursorDisabled = !CursorDisabled;
 		}

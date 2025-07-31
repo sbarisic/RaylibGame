@@ -173,7 +173,7 @@ namespace RaylibGame.States {
 			InfoLbl.WriteLine("Hello World!");
 			GUI.AddElement(InfoLbl);
 
-			List<GUIElement> Els = new List<GUIElement>();
+			/*List<GUIElement> Els = new List<GUIElement>();
 
 			PlayerSelectedBlockType = BlockType.Dirt;
 			Els.Add(AddButton("Stone", (E) => { PlayerSelectedBlockType = BlockType.Stone; }));
@@ -184,8 +184,50 @@ namespace RaylibGame.States {
 			Els.Add(AddButton("Water", (E) => { PlayerSelectedBlockType = BlockType.Water; }));
 			Els.Add(AddButton("Glass", (E) => { PlayerSelectedBlockType = BlockType.Glass; }));
 			Els.Add(AddButton("Craft Tbl", (E) => { PlayerSelectedBlockType = BlockType.CraftingTable; }));
+			GUI.CenterVertical(new Vector2(Window.Width - 180, 10), new Vector2(180, 400), new Vector2(10, 0), 1, Els.ToArray());*/
 
-			GUI.CenterVertical(new Vector2(Window.Width - 180, 10), new Vector2(180, 400), new Vector2(10, 0), 1, Els.ToArray());
+
+			GUIInventory Inventory = new GUIInventory(GUI);
+			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f));
+			Inventory.Pos -= new Vector2(Inventory.Size.X / 2, 0);
+			GUI.AddElement(Inventory);
+
+			SetInvItem(Inventory, 0, BlockType.Dirt, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.Dirt;
+			});
+
+			SetInvItem(Inventory, 1, BlockType.Stone, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.Stone;
+			});
+
+			SetInvItem(Inventory, 2, BlockType.StoneBrick, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.StoneBrick;
+			});
+
+			SetInvItem(Inventory, 3, BlockType.Bricks, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.Bricks;
+			});
+
+			SetInvItem(Inventory, 4, BlockType.Plank, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.Plank;
+			});
+
+			SetInvItem(Inventory, 5, BlockType.CraftingTable, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.CraftingTable;
+			});
+
+		}
+
+		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
+			GUIItemBox Itm = Inventory.GetItem(Idx);
+
+			BlockInfo.GetBlockTexCoords(BType, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
+			Itm.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
+
+			Itm.OnClickedFunc = (E) => {
+				Inventory.SetSelectedIndex(Idx);
+				OnClick(E as GUIItemBox, Idx);
+			};
 		}
 
 		void UpdateGUI() {
@@ -462,7 +504,7 @@ namespace RaylibGame.States {
 				}
 
 			}
-			
+
 			//Console.WriteLine("HasHitFloor: {0}", HasHitFloor);
 
 			/*Vector3 HitFloor = Vector3.Zero;
@@ -499,7 +541,7 @@ namespace RaylibGame.States {
 
 			// Apply movement based on ground state  
 			if (HasHitFloor) {
-				if (Math.Abs( PlyVelocity.X )> MovementInput.X)
+				if (Math.Abs(PlyVelocity.X) > MovementInput.X)
 					PlyVelocity.X += MovementInput.X;
 				else
 					PlyVelocity.X = MovementInput.X;

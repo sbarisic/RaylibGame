@@ -441,8 +441,7 @@ namespace Voxelgine.Graphics {
 			int BlockX = BlockID % AtlasSize;
 			int BlockY = BlockID / AtlasSize;
 
-			Vector2 UVSize = new Vector2(1.0f / AtlasSize, 1.0f / AtlasSize);
-			Vector2 UVPos = UVSize * new Vector2(BlockX, BlockY);
+			BlockInfo.GetBlockTexCoords(BlockType, FaceNormal, out Vector2 UVSize, out Vector2 UVPos);
 			Verts.SetUVOffsetSize(UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1));
 		}
 

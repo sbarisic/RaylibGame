@@ -24,6 +24,9 @@ namespace Voxelgine.GUI {
 		bool HasIcon = false;
 		float IconScale = 2.0f;
 
+		Vector2 TextureCoords;
+		Vector2 TextureSize;
+
 		GUIManager Mgr;
 
 		public GUIItemBox(GUIManager Mgr) {
@@ -38,8 +41,11 @@ namespace Voxelgine.GUI {
 			Raylib.SetTextureFilter(TexSel, TextureFilter.Point);
 		}
 
-		public void SetIcon(Texture2D? Icon, float Scale) {
+		public void SetIcon(Texture2D? Icon, float Scale, Vector2 Coords, Vector2 Size) {
 			if (Icon.HasValue) {
+				TextureCoords = Coords;
+				TextureSize = Size;
+
 				HasIcon = true;
 				this.Icon = Icon.Value;
 				this.IconScale = Scale;
@@ -51,6 +57,9 @@ namespace Voxelgine.GUI {
 			}
 		}
 
+		public void SetIcon(Texture2D? Icon, float Scale) {
+			SetIcon(Icon, Scale, Vector2.Zero, Vector2.One);
+		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			Rectangle BtnLoc = new Rectangle(Pos, Size);
@@ -70,7 +79,7 @@ namespace Voxelgine.GUI {
 			}
 
 			if (HasIcon) {
-				Mgr.DrawTexture(Icon, Pos + Size / 2 + DrawOffset, 0, IconScale, new Color(Clr, Clr, Clr));
+				Mgr.DrawTexture(Icon, Pos + Size / 2 + DrawOffset, 0, IconScale, new Color(Clr, Clr, Clr), TextureCoords, TextureSize);
 			}
 
 			if (!string.IsNullOrEmpty(Text)) {

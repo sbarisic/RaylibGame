@@ -88,6 +88,8 @@ namespace RaylibGame.States {
 
 			Inv = new GUIInventory(GUI);
 			Inv.Pos = new Vector2(100, 100);
+			Inv.SetSelectedIndex(0);
+			Inv.GetSelectedItem().SetIcon(ResMgr.GetTexture("items/heart_empty.png"), 3);
 			GUI.AddElement(Inv);
 
 			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);

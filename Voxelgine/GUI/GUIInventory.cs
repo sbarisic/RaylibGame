@@ -14,8 +14,8 @@ namespace Voxelgine.GUI {
 		private List<GUIItemBox> ItemBoxes;
 		private int SelectedIndex = 0;
 		private int ScrollOffset = 0;
-		private int VisibleItems = 5; // Number of items visible at once  
-		private int MaxItems = 5; // Total inventory slots  
+		private int VisibleItems = 6; // Number of items visible at once  
+		private int MaxItems = 6; // Total inventory slots  
 		private float ItemSpacing = 4f;
 		private float ItemBoxSize = 64f;
 
@@ -25,7 +25,7 @@ namespace Voxelgine.GUI {
 		private bool SelectNextPressed = false;
 		private bool SelectPrevPressed = false;
 
-		public GUIInventory(GUIManager Mgr, int maxItems = 5, int visibleItems = 5) {
+		public GUIInventory(GUIManager Mgr, int maxItems = 10, int visibleItems = 10) {
 			this.Mgr = Mgr;
 			this.MaxItems = maxItems;
 			this.VisibleItems = visibleItems;
@@ -39,14 +39,15 @@ namespace Voxelgine.GUI {
 			// Initialize item boxes  
 			ItemBoxes = new List<GUIItemBox>();
 			for (int i = 0; i < MaxItems; i++) {
-				var itemBox = new GUIItemBox(Mgr);
+				GUIItemBox itemBox = new GUIItemBox(Mgr);
 				itemBox.Parent = this;
 				itemBox.Size = new Vector2(ItemBoxSize, ItemBoxSize);
+
 				itemBox.OnClickedFunc = (E) => {
 					GUIItemBox ths = E as GUIItemBox;
 					ths.Parent.SetSelectedIndexObject(ths);
-
 				};
+
 				ItemBoxes.Add(itemBox);
 			}
 
@@ -193,6 +194,11 @@ namespace Voxelgine.GUI {
 
 		public GUIItemBox GetSelectedItem() {
 			return ItemBoxes[SelectedIndex];
+		}
+
+		public GUIItemBox GetItem(int Idx) {
+			SetSelectedIndex(Idx);
+			return GetSelectedItem();
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {

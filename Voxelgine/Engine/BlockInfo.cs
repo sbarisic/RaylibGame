@@ -1,10 +1,13 @@
 ﻿using Raylib_cs;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+
+using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	enum BlockType : ushort {
@@ -23,7 +26,7 @@ namespace Voxelgine.Engine {
 		Glass,
 		Glowstone,
 		Test2,
-		
+
 		// Blocks with different sides go here
 		Grass,
 		Wood,
@@ -59,6 +62,15 @@ namespace Voxelgine.Engine {
 				default:
 					return false;
 			}
+		}
+
+		public static void GetBlockTexCoords(BlockType BlockType,Vector3 FaceNormal, out Vector2 UVSize, out Vector2 UVPos) {
+			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
+			int BlockX = BlockID % Chunk.AtlasSize;
+			int BlockY = BlockID / Chunk.AtlasSize;
+
+			UVSize = new Vector2(1.0f / Chunk.AtlasSize, 1.0f / Chunk.AtlasSize);
+			UVPos = UVSize * new Vector2(BlockX, BlockY);
 		}
 
 		public static int GetBlockID(BlockType BType, Vector3 Face) {

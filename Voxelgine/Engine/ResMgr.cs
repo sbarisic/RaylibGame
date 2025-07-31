@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Numerics;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	class EngineResourceBase {
@@ -222,6 +223,12 @@ namespace Voxelgine.Engine {
 
 			return JMdl;
 		}
+
+		/*internal static Texture2D GetBlockTexture(BlockType BType) {
+			BlockInfo.GetBlockTexCoords(BType, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
+			
+			Raylib.texture
+		}*/
 	}
 
 	class MinecraftModel {

@@ -411,6 +411,13 @@ namespace RaylibGame.States {
 		}
 
 		void ClampToZero(ref Vector3 Vec, float ClampHyst) {
+			if (float.IsNaN(Vec.X))
+				Vec.X = 0;
+			if (float.IsNaN(Vec.Y))
+				Vec.Y = 0;
+			if (float.IsNaN(Vec.Z))
+				Vec.Z = 0;
+
 			Vec.X = ClampToZero(Vec.X, ClampHyst);
 			Vec.Y = ClampToZero(Vec.Y, ClampHyst);
 			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
@@ -455,7 +462,8 @@ namespace RaylibGame.States {
 				}
 
 			}
-			Console.WriteLine("HasHitFloor: {0}", HasHitFloor);
+			
+			//Console.WriteLine("HasHitFloor: {0}", HasHitFloor);
 
 			/*Vector3 HitFloor = Vector3.Zero;
 			Vector3 Face1 = Vector3.Zero;
@@ -491,17 +499,33 @@ namespace RaylibGame.States {
 
 			// Apply movement based on ground state  
 			if (HasHitFloor) {
-				PlyVelocity.X += MovementInput.X;
-				PlyVelocity.Z += MovementInput.Z;
+				if (Math.Abs( PlyVelocity.X )> MovementInput.X)
+					PlyVelocity.X += MovementInput.X;
+				else
+					PlyVelocity.X = MovementInput.X;
+
+				if (Math.Abs(PlyVelocity.Z) > MovementInput.Z)
+					PlyVelocity.Z += MovementInput.Z;
+				else
+					PlyVelocity.Z = MovementInput.Z;
 
 				if (MovementInput.Y > physicsConfig.ClampHyst) {
-					PlyVelocity.Y += MovementInput.Y;
+					if (PlyVelocity.Y < 0)
+						PlyVelocity.Y = MovementInput.Y;
+					else
+						PlyVelocity.Y += MovementInput.Y;
 					//HasHitFloor = false;
 				}
 			} else {
-				if (PlyVelocity.Length() <= physicsConfig.MaxPlayerControllableVelocity) {
+				PlyVelocity += new Vector3(MovementInput.X, 0, MovementInput.Z) * 0.1f;
+
+				float MaxVel = physicsConfig.MaxPlayerControllableVelocity;
+				PlyVelocity.X = Utils.Clamp(PlyVelocity.X, -MaxVel, MaxVel);
+				PlyVelocity.Z = Utils.Clamp(PlyVelocity.Z, -MaxVel, MaxVel);
+
+				/*if (PlyVelocity.Length() <= physicsConfig.MaxPlayerControllableVelocity) {
 					PlyVelocity += new Vector3(MovementInput.X, 0, MovementInput.Z) * 0.1f;
-				}
+				}*/
 			}
 
 			// Velocity processing and constraints  
@@ -531,6 +555,7 @@ namespace RaylibGame.States {
 					// Try to move with projected velocity  
 					NewPlyPos = Ply.Position + (NewPlyVelocity * Dt);
 					if (!Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm2)) {
+						PlyVelocity = NewPlyVelocity;
 						Ply.SetPosition(NewPlyPos);
 					} else {
 						// If still colliding, stop movement  
@@ -549,9 +574,9 @@ namespace RaylibGame.States {
 					if (Map.GetBlock(NewPlyPos) == BlockType.None) {
 						Ply.SetPosition(NewPlyPos);
 					} else {
-						PlyVelocity = Vector3.Zero;
 
 						if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
+							PlyVelocity = Vector3.Zero;
 							Ply.SetPosition(Ply.GetPreviousPosition());
 						} else {
 							Ply.SetPosition(Ply.Position);
@@ -562,6 +587,9 @@ namespace RaylibGame.States {
 
 			Utils.EndRaycastRecord();
 		}
+
+		// TODO: Move out into a scalable in-game timer event or something
+		Stopwatch JumpCounter = Stopwatch.StartNew();
 
 		// Helper method for movement input  
 		private Vector3 HandleMovementInput(float moveSensitivity, float jumpVelocity, ref bool hasHitFloor, Vector3 hitFloor) {
@@ -583,7 +611,9 @@ namespace RaylibGame.States {
 			if (Raylib.IsKeyDown(KeyboardKey.D))
 				DesiredPos -= Left * moveSensitivity;
 
-			if (Raylib.IsKeyDown(KeyboardKey.Space) && hasHitFloor) {
+			if (Raylib.IsKeyDown(KeyboardKey.Space) && hasHitFloor && JumpCounter.ElapsedMilliseconds > 500) {
+				JumpCounter.Restart();
+
 				//PlyVelocity += new Vector3(0, jumpVelocity, 0);
 				DesiredPos += new Vector3(0, jumpVelocity, 0);
 				Ply.PhysicsHit(hitFloor, PlyVelocity.Length(), false, false, false, true);

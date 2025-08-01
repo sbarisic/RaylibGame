@@ -155,43 +155,24 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void ComputeLighting() {
-			// Initialize ALL blocks (including air) to darkness  
+			// Initialize ALL blocks to black (0) light
 			for (int i = 0; i < Blocks.Length; i++) {
-				Blocks[i].SetBlockLight(new BlockLight(3));
+				Blocks[i].SetBlockLight(new BlockLight(0));
 			}
 
 			// Queue for light propagation using BFS  
 			Queue<Vector3> lightQueue = new Queue<Vector3>();
 
-			// Add sky-lit blocks and light sources  
+			// For each column, propagate sunlight down through air blocks until a solid block is hit
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int z = 0; z < ChunkSize; z++) {
-					// Check for sky lighting from top  
 					for (int y = ChunkSize - 1; y >= 0; y--) {
-						PlacedBlock currentBlock = GetBlock(x, y, z);
-
-						// If we hit a solid block, light the air block above it  
-						if (currentBlock.Type != BlockType.None) {
-							if (y + 1 < ChunkSize) {
-								PlacedBlock aboveBlock = GetBlock(x, y + 1, z);
-								if (aboveBlock.Type == BlockType.None) {
-									// Check if this air block can see the sky  
-									if (!WorldMap.Raycast(new Vector3(x, y + 1, z), 128, Vector3.UnitY)) {
-										SetLightLevel(x, y + 1, z, 15);
-										lightQueue.Enqueue(new Vector3(x, y + 1, z));
-									}
-								}
-							}
-							break; // Stop going down once we hit solid ground  
-						}
-					}
-
-					// Also check if the top air block can see sky  
-					PlacedBlock topBlock = GetBlock(x, ChunkSize - 1, z);
-					if (topBlock.Type == BlockType.None) {
-						if (!WorldMap.Raycast(new Vector3(x, ChunkSize - 1, z), 128, Vector3.UnitY)) {
-							SetLightLevel(x, ChunkSize - 1, z, 15);
-							lightQueue.Enqueue(new Vector3(x, ChunkSize - 1, z));
+						PlacedBlock block = GetBlock(x, y, z);
+						if (block.Type == BlockType.None) {
+							SetLightLevel(x, y, z, 15);
+							lightQueue.Enqueue(new Vector3(x, y, z));
+						} else {
+							break; // Stop at first solid block
 						}
 					}
 				}
@@ -213,6 +194,16 @@ namespace Voxelgine.Graphics {
 
 			// Propagate light using BFS  
 			PropagateLight(lightQueue);
+
+			// DEBUG: Print light value of top air block in each column
+			for (int x = 0; x < ChunkSize; x++) {
+				for (int z = 0; z < ChunkSize; z++) {
+					PlacedBlock block = GetBlock(x, ChunkSize - 1, z);
+					if (block.Type == BlockType.None) {
+						Console.WriteLine($"Light at ({x},{ChunkSize - 1},{z}): {block.Lights[0].R}");
+					}
+				}
+			}
 		}
 
 		void SetLightLevel(int x, int y, int z, byte lightLevel) {

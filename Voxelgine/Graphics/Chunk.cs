@@ -232,6 +232,8 @@ namespace Voxelgine.Graphics {
 					if (currentBlock.Lights[i].R > currentLight)
 						currentLight = currentBlock.Lights[i].R;
 
+				bool isLightSource = (currentBlock.Type == BlockType.Glowstone || currentBlock.Type == BlockType.Campfire);
+
 				foreach (Vector3 dir in directions) {
 					Vector3 neighborPos = pos + dir;
 					int nx = (int)neighborPos.X;
@@ -248,8 +250,8 @@ namespace Voxelgine.Graphics {
 						neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
 					}
 
-					// Only propagate if not opaque
-					if (neighborBlock.Type != BlockType.None && BlockInfo.IsOpaque(neighborBlock.Type)) {
+					// Only propagate if neighbor is NOT opaque, or if the current block is a light source
+					if (!isLightSource && BlockInfo.IsOpaque(neighborBlock.Type)) {
 						continue;
 					}
 
@@ -269,6 +271,7 @@ namespace Voxelgine.Graphics {
 
 						if (isWithinChunk) {
 							SetBlock(nx, ny, nz, neighborBlock);
+							MarkDirty();
 						} else {
 							WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
 							WorldMap.SetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, neighborBlock);

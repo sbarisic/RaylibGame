@@ -177,6 +177,7 @@ namespace RaylibGame.States {
 				InfoLbl.Clear();
 				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(PlyVelocity.Length(), 3));
+				InfoLbl.WriteLine("No-clip: {0}", NoClip ? "ON" : "OFF");
 			}
 		}
 
@@ -327,9 +328,22 @@ namespace RaylibGame.States {
 		void UpdatePhysics(float Dt) {
 			Ply.UpdatePhysics(Dt);
 
+			// Physics constants - consolidated for better organization  
+			var physicsConfig = new {
+				ClampHyst = 0.02f,
+				Gravity = 10.5f,
+				MaxPlayerVelocity = 3.6f,
+				MaxPlayerControllableVelocity = 4.0f,
+				MaxPlayerFallVelocity = 10.0f,
+				PlayerJumpVelocity = 5.2f,
+				PlyMoveSen = 3.2f,
+				PlayerHeight = 1.8f,
+				NoClipMoveSpeed = 10.0f
+			};
+
 			if (NoClip) {
 				// No-clip movement: ignore collisions and physics, move freely
-				float moveSpeed = 10.0f;
+				float moveSpeed = physicsConfig.NoClipMoveSpeed;
 				Vector3 move = Vector3.Zero;
 				Vector3 forward = FPSCamera.GetForward();
 				Vector3 left = FPSCamera.GetLeft();
@@ -350,18 +364,6 @@ namespace RaylibGame.States {
 
 			if (!Utils.HasRecord())
 				Utils.BeginRaycastRecord();
-
-			// Physics constants - consolidated for better organization  
-			var physicsConfig = new {
-				ClampHyst = 0.02f,
-				Gravity = 10.5f,
-				MaxPlayerVelocity = 3.6f,
-				MaxPlayerControllableVelocity = 4.0f,
-				MaxPlayerFallVelocity = 10.0f,
-				PlayerJumpVelocity = 5.2f,
-				PlyMoveSen = 3.2f,
-				PlayerHeight = 1.8f
-			};
 
 			// Velocity clamping  
 			ClampToZero(ref PlyVelocity, physicsConfig.ClampHyst);

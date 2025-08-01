@@ -26,7 +26,7 @@ namespace Voxelgine.Graphics {
 			this.Type = Type;
 		}
 
-		public PlacedBlock(BlockType Type) : this(Type, BlockLight.FullBright) {
+		public PlacedBlock(BlockType Type) : this(Type, BlockLight.Black) {
 		}
 
 		public PlacedBlock(PlacedBlock Copy) : this(Copy.Type) {

@@ -154,6 +154,21 @@ namespace Voxelgine.Graphics {
 			return true;
 		}
 
+		void SetLightLevel(int x, int y, int z, byte lightLevel) {
+			if (x < 0 || x >= ChunkSize || y < 0 || y >= ChunkSize || z < 0 || z >= ChunkSize)
+				return;
+
+			PlacedBlock block = GetBlock(x, y, z);
+
+			// Set light for all faces - both air blocks and solid blocks need lighting  
+			BlockLight newLight = new BlockLight(lightLevel);
+			for (int i = 0; i < 6; i++) {
+				block.Lights[i] = newLight;
+			}
+
+			SetBlock(x, y, z, block);
+		}
+
 		public void ComputeLighting() {
 			// Initialize ALL blocks to black (0) light
 			for (int i = 0; i < Blocks.Length; i++) {
@@ -166,13 +181,22 @@ namespace Voxelgine.Graphics {
 			// For each column, propagate sunlight down through air blocks until a solid block is hit
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int z = 0; z < ChunkSize; z++) {
+					// Start from top of chunk
+					bool foundFirstSolid = false;
 					for (int y = ChunkSize - 1; y >= 0; y--) {
 						PlacedBlock block = GetBlock(x, y, z);
-						if (block.Type == BlockType.None) {
-							SetLightLevel(x, y, z, 15);
-							lightQueue.Enqueue(new Vector3(x, y, z));
-						} else {
-							break; // Stop at first solid block
+						if (!foundFirstSolid) {
+							if (block.Type == BlockType.None || !BlockInfo.IsOpaque(block.Type)) {
+								// Full sunlight for air blocks and transparent blocks
+								SetLightLevel(x, y, z, 15);
+								lightQueue.Enqueue(new Vector3(x, y, z));
+							} else {
+								// Found first solid block
+								foundFirstSolid = true;
+								// Give it some light but not full
+								SetLightLevel(x, y, z, 13);
+								lightQueue.Enqueue(new Vector3(x, y, z));
+							}
 						}
 					}
 				}
@@ -204,20 +228,6 @@ namespace Voxelgine.Graphics {
 					}
 				}
 			}
-		}
-
-		void SetLightLevel(int x, int y, int z, byte lightLevel) {
-			if (x < 0 || x >= ChunkSize || y < 0 || y >= ChunkSize || z < 0 || z >= ChunkSize)
-				return;
-
-			PlacedBlock block = GetBlock(x, y, z);
-
-			// Set light for all faces - both air blocks and solid blocks need lighting  
-			for (int i = 0; i < 6; i++) {
-				block.Lights[i] = new BlockLight(lightLevel);
-			}
-
-			SetBlock(x, y, z, block);
 		}
 
 		void PropagateLight(Queue<Vector3> lightQueue) {

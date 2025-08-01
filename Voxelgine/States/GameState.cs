@@ -165,8 +165,8 @@ namespace RaylibGame.States {
 			if (Program.DebugMode) {
 				InfoLbl.Enabled = true;
 				InfoLbl.Clear();
-				InfoLbl.WriteLine("Pos: {0}, {1}, {2}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
-				InfoLbl.WriteLine("Vel: {0}", MathF.Round(PlyVelocity.Length(), 3));
+				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
+				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(PlyVelocity.Length(), 3));
 			}
 		}
 

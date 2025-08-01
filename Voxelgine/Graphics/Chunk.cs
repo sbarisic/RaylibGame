@@ -111,10 +111,7 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void SetBlock(int X, int Y, int Z, PlacedBlock Block) {
-			PlacedBlock PB = Blocks[X + ChunkSize * (Y + ChunkSize * Z)];
-			PB.Lights = Block.Lights;
-			PB.Type = Block.Type;
-
+			Blocks[X + ChunkSize * (Y + ChunkSize * Z)] = Block;
 			Dirty = true;
 		}
 
@@ -158,42 +155,64 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void ComputeLighting() {
-			// Initialize all blocks to darkness  
+			// Initialize ALL blocks (including air) to darkness  
 			for (int i = 0; i < Blocks.Length; i++) {
-				if (Blocks[i].Type != BlockType.None)
-					Blocks[i].SetBlockLight(new BlockLight(0));
+				Blocks[i].SetBlockLight(new BlockLight(3));
 			}
 
-			// Queue for light propagation  
+			// Queue for light propagation using BFS  
 			Queue<Vector3> lightQueue = new Queue<Vector3>();
 
-			// Add sky-exposed blocks as light sources  
+			// Add sky-lit blocks and light sources  
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int z = 0; z < ChunkSize; z++) {
+					// Check for sky lighting from top  
 					for (int y = ChunkSize - 1; y >= 0; y--) {
-						PlacedBlock CurBlock = GetBlock(x, y, z);
+						PlacedBlock currentBlock = GetBlock(x, y, z);
 
-						if (CurBlock.Type != BlockType.None) {
-							if (!WorldMap.Raycast(new Vector3(x, y, z), 128, Vector3.UnitY)) {
-								SetLightLevel(x, y, z, 15);
-								lightQueue.Enqueue(new Vector3(x, y, z));
+						// If we hit a solid block, light the air block above it  
+						if (currentBlock.Type != BlockType.None) {
+							if (y + 1 < ChunkSize) {
+								PlacedBlock aboveBlock = GetBlock(x, y + 1, z);
+								if (aboveBlock.Type == BlockType.None) {
+									// Check if this air block can see the sky  
+									if (!WorldMap.Raycast(new Vector3(x, y + 1, z), 128, Vector3.UnitY)) {
+										SetLightLevel(x, y + 1, z, 15);
+										lightQueue.Enqueue(new Vector3(x, y + 1, z));
+									}
+								}
 							}
+							break; // Stop going down once we hit solid ground  
+						}
+					}
 
-
-							if (CurBlock.Type == BlockType.Glowstone || CurBlock.Type == BlockType.Campfire || CurBlock.Type == BlockType.CraftingTable) {
-								SetLightLevel(x, y, z, 15);
-								lightQueue.Enqueue(new Vector3(x, y, z));
-							}
-							break;
+					// Also check if the top air block can see sky  
+					PlacedBlock topBlock = GetBlock(x, ChunkSize - 1, z);
+					if (topBlock.Type == BlockType.None) {
+						if (!WorldMap.Raycast(new Vector3(x, ChunkSize - 1, z), 128, Vector3.UnitY)) {
+							SetLightLevel(x, ChunkSize - 1, z, 15);
+							lightQueue.Enqueue(new Vector3(x, ChunkSize - 1, z));
 						}
 					}
 				}
 			}
 
-			while (lightQueue.Count > 0) {
-				// Propagate light  
-				PropagateLight(lightQueue);
+			// Add artificial light sources  
+			for (int x = 0; x < ChunkSize; x++) {
+				for (int y = 0; y < ChunkSize; y++) {
+					for (int z = 0; z < ChunkSize; z++) {
+						PlacedBlock block = GetBlock(x, y, z);
+
+						if (block.Type == BlockType.Glowstone || block.Type == BlockType.Campfire) {
+							SetLightLevel(x, y, z, 15);
+							lightQueue.Enqueue(new Vector3(x, y, z));
+						}
+					}
+				}
 			}
+
+			// Propagate light using BFS  
+			PropagateLight(lightQueue);
 		}
 
 		void SetLightLevel(int x, int y, int z, byte lightLevel) {
@@ -201,10 +220,8 @@ namespace Voxelgine.Graphics {
 				return;
 
 			PlacedBlock block = GetBlock(x, y, z);
-			if (block.Type == BlockType.None)
-				return;
 
-			// Set light for all faces  
+			// Set light for all faces - both air blocks and solid blocks need lighting  
 			for (int i = 0; i < 6; i++) {
 				block.Lights[i] = new BlockLight(lightLevel);
 			}
@@ -223,9 +240,7 @@ namespace Voxelgine.Graphics {
 				Vector3 pos = lightQueue.Dequeue();
 				PlacedBlock currentBlock = GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
 
-				if (currentBlock.Type == BlockType.None)
-					continue;
-
+				// TODO: Implement better currentLight functionality, maybe fetch a different per-face?
 				byte currentLight = currentBlock.Lights[0].R; // Use first face as reference  
 
 				// Propagate to neighboring blocks  
@@ -235,184 +250,57 @@ namespace Voxelgine.Graphics {
 					int ny = (int)neighborPos.Y;
 					int nz = (int)neighborPos.Z;
 
-					// Check bounds - handle cross-chunk propagation  
 					PlacedBlock neighborBlock;
-					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize) {
-						// Cross-chunk boundary - use WorldMap for neighbor access  
+					bool isWithinChunk = (nx >= 0 && nx < ChunkSize && ny >= 0 && ny < ChunkSize && nz >= 0 && nz < ChunkSize);
+
+					if (isWithinChunk) {
+						neighborBlock = GetBlock(nx, ny, nz);
+					} else {
+						// Handle cross-chunk boundaries  
 						WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
 						neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
-					} else {
-						neighborBlock = GetBlock(nx, ny, nz);
 					}
 
-					if (neighborBlock.Type == BlockType.None)
+					// Calculate light falloff  
+					byte newLight;
+					if (neighborBlock.Type != BlockType.None && BlockInfo.IsOpaque(neighborBlock.Type)) {
+						// Light doesn't pass through opaque blocks  
+						continue;
+					} else if (neighborBlock.Type != BlockType.None) {
+						// Light passes through but with more falloff for non-air blocks  
+						newLight = (byte)Math.Max(0, currentLight - 2);
+					} else {
+						// Air block - normal falloff  
+						newLight = (byte)Math.Max(0, currentLight - 1);
+					}
+
+					if (newLight <= 0)
 						continue;
 
-					// Calculate light falloff  
-					byte newLight = (byte)Math.Max(0, currentLight - 1);
-					byte existingLight = neighborBlock.Lights[Utils.DirToByte(-dir)].R;
+					byte existingLight = neighborBlock.Lights[0].R; // Check existing light level  
 
 					// Only propagate if new light is brighter  
 					if (newLight > existingLight) {
-						int faceIndex = Utils.DirToByte(-dir);
-						neighborBlock.Lights[faceIndex] = new BlockLight(newLight);
+						// Set light for all faces  
+						for (int i = 0; i < 6; i++) {
+							neighborBlock.Lights[i] = new BlockLight(newLight);
+						}
 
 						// Update the block in the appropriate chunk  
-						if (nx >= 0 && nx < ChunkSize && ny >= 0 && ny < ChunkSize && nz >= 0 && nz < ChunkSize) {
+						if (isWithinChunk) {
 							SetBlock(nx, ny, nz, neighborBlock);
+						} else {
+							// Update in neighboring chunk  
+							WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
+							WorldMap.SetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, neighborBlock);
+						}
 
-							// Add to queue for further propagation if light is still significant  
-							if (newLight > 0) {
-								lightQueue.Enqueue(neighborPos);
-							}
+						// Add to queue for further propagation if light is still significant  
+						if (newLight > 1) {
+							lightQueue.Enqueue(neighborPos);
 						}
 					}
 				}
-			}
-		}
-
-		public void ComputeLighting2() {
-			for (int i = 0; i < Blocks.Length; i++) {
-				if (Blocks[i].Type == BlockType.None)
-					continue;
-
-				Blocks[i].SetBlockLight(new BlockLight(2));
-			}
-
-			Vector3 SunPos = new Vector3(29.63366f, 100.57468f, 23.19503f);
-			Vector3 SunTgt = new Vector3(31.13366f, 63.97468f, 24.74503f);
-			//Vector3  SunDir = Vector3.Normalize(SunTgt - SunPos);
-
-			Matrix4x4 LookAtRot = Matrix4x4.CreateLookAt(SunPos, SunTgt, Vector3.UnitY);
-			Vector3 Left = Vector3.Transform(Vector3.UnitX, LookAtRot);
-			Vector3 Up = Vector3.Transform(Vector3.UnitY, LookAtRot);
-			Vector3 Fwd = Vector3.Transform(Vector3.UnitZ, LookAtRot);
-
-			/*SunDir = Fwd;
-			SunRayOrigins.Clear();
-
-			for (int yy = 0; yy < 20; yy++) {
-				for (int xx = 0; xx < 20; xx++) {
-					Vector3 PosOffset = (Left * (xx - 10)) + (Up * (yy - 10));
-
-					SunRayOrigins.Add(SunPos + PosOffset);
-
-					Vector3 HitPos = WorldMap.RaycastPos(SunPos + PosOffset, 64, Fwd, out Vector3 FaceNormal);
-					if (HitPos != Vector3.Zero) {
-
-						Vector3 BlokPos = HitPos - (FaceNormal * 0.5f);
-						PlacedBlock Blk = WorldMap.GetPlacedBlock((int)BlokPos.X, (int)BlokPos.Y, (int)BlokPos.Z, out Chunk Chk);
-
-						Blk.Lights[Utils.DirToByte(FaceNormal)] = new BlockLight(28);
-
-					}
-				}
-			}*/
-
-			for (int i = 0; i < Blocks.Length; i++) {
-				if (Blocks[i].Type == BlockType.None)
-					continue;
-
-				PlacedBlock Block = Blocks[i];
-
-				To3D(i, out int LocalX, out int LocalY, out int LocalZ);
-				if (IsCovered(LocalX, LocalY, LocalZ))
-					continue;
-
-				WorldMap.GetWorldPos(LocalX, LocalY, LocalZ, GlobalChunkIndex, out Vector3 GlobalPos);
-
-				int X = (int)GlobalPos.X;
-				int Y = (int)GlobalPos.Y;
-				int Z = (int)GlobalPos.Z;
-
-				if (WorldMap.IsCovered(X, Y, Z))
-					continue;
-
-
-
-				// Ambient occlusion
-				for (int j = 0; j < /*Utils.MainDirs.Length*/ -1; j++) {
-					Vector3 Origin = new Vector3(X, Y, Z) + Utils.MainDirs[j];
-
-					if (WorldMap.GetBlock(Origin) != BlockType.None)
-						continue; // Side covered
-
-
-					int AmbientLight = 5;
-					if (!WorldMap.Raycast(Origin, 128, new Vector3(0, 1, 0))) {
-						AmbientLight = 28;
-
-						/*WorldMap.RaycastSphere(Origin + new Vector3(0, 0.5f, 0), 6, (Orig, Norm) => {
-							PlacedBlock PB = GetBlock(Orig);
-							PB.Lights[Utils.DirToByte(Norm)] = PB.Lights[Utils.DirToByte(Norm)] + 2;
-
-							return false;
-						});*/
-					}
-
-					//if (Utils.MainDirs[j] == new Vector3(0, 1, 0)) {
-					const int AddLight = 2;
-
-					//int SkyHits = WorldMap.CountHits(Origin, 128, new Vector3(0, 1, 0), out int MaxSkyHits);
-					//float SkyPerc = (float)SkyHits / MaxSkyHits;
-
-					//int MaxSkyHits = 12;
-					//int SkyHits = WorldMap.CountSphereHits(Origin, 128, MaxSkyHits);
-					//float SkyPerc = (float)(MaxSkyHits - SkyHits) / MaxSkyHits;
-
-					//AmbientLight += (int)(SkyPerc * 16);
-
-					/*if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 0))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 0))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, 1))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(0, 1, -1))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, 1))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, 1))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(1, 1, -1))))
-						AmbientLight += AddLight;
-
-					if (AmbientLight < 28 && !WorldMap.Raycast(Origin, 128, Vector3.Normalize(new Vector3(-1, 1, -1))))
-						AmbientLight += AddLight;*/
-
-
-					//}
-
-					if (AmbientLight > 28)
-						AmbientLight = 28;
-
-					// float AmbientHitRatio = (float)WorldMap.CountHits((int)Origin.X, (int)Origin.Y, (int)Origin.Z, 3, Utils.MainDirs[j], out int MaxHits) / MaxHits;
-
-					// float AmbientHitRatio = ((float)WorldMap.CountAmbientHits(Origin) - 1) / 5;
-
-					int Light = AmbientLight;//- (int)(AmbientHitRatio * (AmbientLight - 4));
-
-					//int Light = (int)(AmbientLight * 32) - (24 - (int)(AmbientHitRatio * 24));
-
-					if (Light < 0)
-						Light = 0;
-					if (Light > 32)
-						Light = 32;
-
-					if (Light > 0)
-						Block.Lights[Utils.DirToByte(Utils.MainDirs[j])] += (byte)Light;
-				}
-
-				// TODO: Actual lights
-
-				// Set block back into world
-				// SetPlacedBlock(X, Y, Z, Block, false);
 			}
 		}
 

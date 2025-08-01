@@ -193,74 +193,54 @@ namespace Voxelgine.Graphics {
 			int XX = (int)BlockPos.X;
 			int YY = (int)BlockPos.Y;
 			int ZZ = (int)BlockPos.Z;
-			int CX = (int)ChunkIndex.X;
-			int CY = (int)ChunkIndex.Y;
-			int CZ = (int)ChunkIndex.Z;
 
 			const int MaxBlock = Chunk.ChunkSize - 1;
 
-			// Edge cases, literally
+			// Calculate which neighbor chunks need to be marked dirty  
+			HashSet<Vector3> affectedChunks = new HashSet<Vector3> { ChunkIndex };
+
+			// Generate all possible chunk offsets based on boundary conditions  
+			int[] xOffsets = { 0 };
+			int[] yOffsets = { 0 };
+			int[] zOffsets = { 0 };
+
 			if (XX == 0)
-				MarkDirty(CX - 1, CY, CZ);
-			if (YY == 0)
-				MarkDirty(CX, CY - 1, CZ);
-			if (ZZ == 0)
-				MarkDirty(CX, CY, CZ - 1);
+				xOffsets = xOffsets.Concat(new[] { -1 }).ToArray();
 			if (XX == MaxBlock)
-				MarkDirty(CX + 1, CY, CZ);
+				xOffsets = xOffsets.Concat(new[] { 1 }).ToArray();
+			if (YY == 0)
+				yOffsets = yOffsets.Concat(new[] { -1 }).ToArray();
 			if (YY == MaxBlock)
-				MarkDirty(CX, CY + 1, CZ);
+				yOffsets = yOffsets.Concat(new[] { 1 }).ToArray();
+			if (ZZ == 0)
+				zOffsets = zOffsets.Concat(new[] { -1 }).ToArray();
 			if (ZZ == MaxBlock)
-				MarkDirty(CX, CY, CZ + 1);
+				zOffsets = zOffsets.Concat(new[] { 1 }).ToArray();
 
-			// Corners
-			if (XX == 0 && YY == 0 && ZZ == 0)
-				MarkDirty(CX - 1, CY - 1, CZ - 1);
-			if (XX == 0 && YY == 0 && ZZ == MaxBlock)
-				MarkDirty(CX - 1, CY - 1, CZ + 1);
-			if (XX == 0 && YY == MaxBlock && ZZ == 0)
-				MarkDirty(CX - 1, CY + 1, CZ - 1);
-			if (XX == 0 && YY == MaxBlock && ZZ == MaxBlock)
-				MarkDirty(CX - 1, CY + 1, CZ + 1);
-			if (XX == MaxBlock && YY == 0 && ZZ == 0)
-				MarkDirty(CX + 1, CY - 1, CZ - 1);
-			if (XX == MaxBlock && YY == 0 && ZZ == MaxBlock)
-				MarkDirty(CX + 1, CY - 1, CZ + 1);
-			if (XX == MaxBlock && YY == MaxBlock && ZZ == 0)
-				MarkDirty(CX + 1, CY + 1, CZ - 1);
-			if (XX == MaxBlock && YY == MaxBlock && ZZ == MaxBlock)
-				MarkDirty(CX + 1, CY + 1, CZ + 1);
+			// Generate all combinations of offsets  
+			foreach (int xOffset in xOffsets) {
+				foreach (int yOffset in yOffsets) {
+					foreach (int zOffset in zOffsets) {
+						Vector3 neighborChunk = ChunkIndex + new Vector3(xOffset, yOffset, zOffset);
+						affectedChunks.Add(neighborChunk);
+					}
+				}
+			}
 
-			// Diagonals
-			if (XX == 0 && YY == 0)
-				MarkDirty(CX - 1, CY - 1, CZ);
-			if (XX == MaxBlock && YY == MaxBlock)
-				MarkDirty(CX + 1, CY + 1, CZ);
-			if (XX == 0 && YY == MaxBlock)
-				MarkDirty(CX - 1, CY + 1, CZ);
-			if (XX == MaxBlock && YY == 0)
-				MarkDirty(CX + 1, CY - 1, CZ);
-			if (YY == 0 && ZZ == 0)
-				MarkDirty(CX, CY - 1, CZ - 1);
-			if (YY == MaxBlock && ZZ == MaxBlock)
-				MarkDirty(CX, CY + 1, CZ + 1);
-			if (YY == 0 && ZZ == MaxBlock)
-				MarkDirty(CX, CY - 1, CZ + 1);
-			if (YY == MaxBlock && ZZ == 0)
-				MarkDirty(CX, CY + 1, CZ - 1);
+			// Mark all affected chunks as dirty  
+			foreach (var chunkPos in affectedChunks) {
+				if (Chunks.ContainsKey(chunkPos)) {
+					Chunks[chunkPos].MarkDirty();
+				}
+			}
 
-
-
-			/*for (int x = -1; x < 2; x++)
-				for (int y = -1; y < 2; y++)
-					for (int z = -1; z < 2; z++)
-						MarkDirty(ChunkIndex + new Vector3(x, y, z));*/
-
+			// Create chunk if it doesn't exist  
 			if (!Chunks.ContainsKey(ChunkIndex)) {
 				Chunk Chk = new Chunk(ChunkIndex, this);
 				Chunks.Add(ChunkIndex, Chk);
 			}
 
+			// Set the block  
 			Chunks[ChunkIndex].SetBlock(XX, YY, ZZ, Block);
 		}
 

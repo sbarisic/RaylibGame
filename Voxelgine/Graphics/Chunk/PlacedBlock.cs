@@ -66,6 +66,11 @@ namespace Voxelgine.Graphics {
 			/*for (int i = 0; i < Lights.Length; i++)
 				Lights[i].LightInteger = Reader.ReadInt32();*/
 		}
+
+		public override string ToString() {
+			BlockLight BL = GetBlockLight(new Vector3(0, 1, 0));
+			return string.Format("{0} - R {1}, Light {2}", Type, BL.R, BL.LightInteger);
+		}
 	}
 
 }

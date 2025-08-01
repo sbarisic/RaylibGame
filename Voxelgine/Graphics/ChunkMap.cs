@@ -42,26 +42,6 @@ namespace Voxelgine.Graphics {
 			//Entities.Add(Ent);
 		}
 
-		/*public void LoadFromChunk(string FileName) {
-			string[] Lines = File.ReadAllText(FileName).Replace("\r", "").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			ChunkPalette Palette = new ChunkPalette();
-
-			foreach (var L in Lines) {
-				string Line = L.Trim();
-				if (Line.StartsWith("#"))
-					continue;
-
-				string[] XYZT = Line.Split(new[] { ' ' });
-
-				// Swapped for reasons
-				int Z = int.Parse(XYZT[0]);
-				int X = int.Parse(XYZT[1]);
-				int Y = int.Parse(XYZT[2]);
-
-				SetBlock(X, Y, Z, Palette.GetBlock(XYZT[3]));
-			}
-		}*/
-
 		public void Write(Stream Output) {
 			using (GZipStream ZipStream = new GZipStream(Output, CompressionMode.Compress, true)) {
 				using (BinaryWriter Writer = new BinaryWriter(ZipStream)) {
@@ -182,17 +162,6 @@ namespace Voxelgine.Graphics {
 
 			ComputeLighting();
 		}
-
-		/*public RayCollision RaycastEnt(Ray Ray) {
-			foreach (GameEntity E in Entities) {
-				RayCollision Col = E.Model.Collide(Ray, out CustomMesh HitMesh);
-
-				if (Col.Hit)
-					return Col;
-			}
-
-			return new RayCollision() { Hit = false };
-		}*/
 
 		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos) {
 			ChunkIndex = (int)Math.Floor((float)S / Chunk.ChunkSize);

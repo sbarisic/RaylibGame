@@ -145,6 +145,9 @@ namespace RaylibGame.States {
 				PlayerSelectedBlockType = BlockType.CraftingTable;
 			});
 
+			SetInvItem(Inventory, 5, BlockType.Glowstone, (ItmBox, Idx) => {
+				PlayerSelectedBlockType = BlockType.Glowstone;
+			});
 		}
 
 		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {

@@ -12,7 +12,7 @@ namespace Voxelgine.Graphics {
 	public struct BlockLight {
 		public static readonly BlockLight Black = new BlockLight(0, 0, 0);
 		public static readonly BlockLight Ambient = new BlockLight(LightLevels);
-		public static readonly BlockLight FullBright = new BlockLight(256 / LightLevels);
+		public static readonly BlockLight FullBright = new BlockLight(15); // Set to max light level
 
 		[FieldOffset(0)]
 		public byte R;
@@ -42,59 +42,39 @@ namespace Voxelgine.Graphics {
 		public BlockLight(byte Amt) {
 			LightInteger = Unused = 0;
 
-			R = G = B = Amt;
+			byte clampedAmt = (byte)(Amt > 15 ? 15 : Amt);
+			R = G = B = clampedAmt;
 		}
 
 		public void Increase(byte Amt) {
-			if (R + Amt > 255)
-				R = 255;
-			else
-				R += Amt;
-
-			if (G + Amt > 255)
-				G = 255;
-			else
-				G += Amt;
-
-			if (B + Amt > 255)
-				B = 255;
-			else
-				B += Amt;
+			R = (byte)(R + Amt > 15 ? 15 : R + Amt);
+			G = (byte)(G + Amt > 15 ? 15 : G + Amt);
+			B = (byte)(B + Amt > 15 ? 15 : B + Amt);
 		}
 
 		public void SetMin(byte Amt) {
-			if (R < Amt)
-				R = Amt;
-
-			if (G < Amt)
-				G = Amt;
-
-			if (B < Amt)
-				B = Amt;
+			byte clampedAmt = (byte)(Amt > 15 ? 15 : Amt);
+			if (R < clampedAmt) R = clampedAmt;
+			if (G < clampedAmt) G = clampedAmt;
+			if (B < clampedAmt) B = clampedAmt;
 		}
 
 		public void Set(byte Amt) {
-			R = Amt;
-			G = Amt;
-			B = Amt;
+			byte clampedAmt = (byte)(Amt > 15 ? 15 : Amt);
+			R = G = B = clampedAmt;
 		}
 
 		public Color ToColor() {
-			byte RR = (byte)Utils.Clamp(R * LightLevels, 0, 255);
-			byte GG = (byte)Utils.Clamp(G * LightLevels, 0, 255);
-			byte BB = (byte)Utils.Clamp(B * LightLevels, 0, 255);
+			// Scale from 0-15 to 0-255
+			byte RR = (byte)Utils.Clamp(R * 17, 0, 255); // 17 = ~255/15
+			byte GG = (byte)Utils.Clamp(G * 17, 0, 255);
+			byte BB = (byte)Utils.Clamp(B * 17, 0, 255);
 			return new Color(RR, GG, BB);
 		}
 
 		public static BlockLight operator +(BlockLight BL, byte Amt) {
-			byte Res = BL.R;
-
-			if (Res + Amt > 255)
-				Res = 255;
-			else
-				Res = (byte)(Res + Amt);
-
-			return new BlockLight(Res);
+			byte newR = (byte)(BL.R + Amt > 15 ? 15 : BL.R + Amt);
+			return new BlockLight(newR);
 		}
 	}
 

@@ -387,11 +387,9 @@ namespace Voxelgine.Graphics {
 								// X++
 								if (!XPosSkipFace) {
 									Vector3 CurDir = new Vector3(1, 0, 0);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
-
+									Color FaceClr = Utils.ColorMul(CurBlock.GetBlockLight(CurDir).ToColor(), ChunkColor);
 									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
-
+									
 									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0))));
 									Vertices.Add(new Vector3(1, 1, 1), new Vector2(0, 1), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(1, 0, 1))));
 									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1))));

@@ -177,20 +177,28 @@ namespace Voxelgine.Graphics {
 
 			Queue<Vector3> lightQueue = new Queue<Vector3>();
 
-			// Set all non-air blocks to sunlight (15)
+			// Sunlight: propagate from the top of each column down through air/transparent blocks
 			for (int x = 0; x < ChunkSize; x++) {
-				for (int y = 0; y < ChunkSize; y++) {
-					for (int z = 0; z < ChunkSize; z++) {
+				for (int z = 0; z < ChunkSize; z++) {
+					bool blocked = false;
+					for (int y = ChunkSize - 1; y >= 0; y--) {
 						PlacedBlock block = GetBlock(x, y, z);
-						if (block.Type != BlockType.None) {
+						if (!blocked && (block.Type == BlockType.None || !BlockInfo.IsOpaque(block.Type))) {
 							SetLightLevel(x, y, z, 15);
 							lightQueue.Enqueue(new Vector3(x, y, z));
+						} else if (!blocked && BlockInfo.IsOpaque(block.Type)) {
+							// First opaque block: set sunlight, then stop
+							SetLightLevel(x, y, z, 15);
+							lightQueue.Enqueue(new Vector3(x, y, z));
+							blocked = true;
+						} else {
+							blocked = true;
 						}
 					}
 				}
 			}
 
-			// Set glowing blocks to 15 (redundant, but explicit)
+			// Artificial light sources: propagate in all directions
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int y = 0; y < ChunkSize; y++) {
 					for (int z = 0; z < ChunkSize; z++) {

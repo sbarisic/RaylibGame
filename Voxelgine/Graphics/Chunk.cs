@@ -169,27 +169,33 @@ namespace Voxelgine.Graphics {
 			SetBlock(x, y, z, block);
 		}
 
+		// Helper struct for queue (faster than Vector3 for ints)
+		struct BlockPos {
+			public int X, Y, Z;
+			public BlockPos(int x, int y, int z) { X = x; Y = y; Z = z; }
+		}
+
 		public void ComputeLighting() {
 			// Set all blocks to light level 0 first
 			for (int i = 0; i < Blocks.Length; i++) {
 				Blocks[i].SetBlockLight(new BlockLight(0));
 			}
 
-			Queue<Vector3> lightQueue = new Queue<Vector3>();
+			Queue<BlockPos> lightQueue = new Queue<BlockPos>(ChunkSize * ChunkSize * ChunkSize);
 
 			// Sunlight: propagate from the top of each column down through air/transparent blocks
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int z = 0; z < ChunkSize; z++) {
 					bool blocked = false;
 					for (int y = ChunkSize - 1; y >= 0; y--) {
-						PlacedBlock block = GetBlock(x, y, z);
+						int idx = x + ChunkSize * (y + ChunkSize * z);
+						PlacedBlock block = Blocks[idx];
 						if (!blocked && (block.Type == BlockType.None || !BlockInfo.IsOpaque(block.Type))) {
-							SetLightLevel(x, y, z, 15);
-							lightQueue.Enqueue(new Vector3(x, y, z));
+							Blocks[idx].SetBlockLight(new BlockLight(15));
+							lightQueue.Enqueue(new BlockPos(x, y, z));
 						} else if (!blocked && BlockInfo.IsOpaque(block.Type)) {
-							// First opaque block: set sunlight, then stop
-							SetLightLevel(x, y, z, 15);
-							lightQueue.Enqueue(new Vector3(x, y, z));
+							Blocks[idx].SetBlockLight(new BlockLight(15));
+							lightQueue.Enqueue(new BlockPos(x, y, z));
 							blocked = true;
 						} else {
 							blocked = true;
@@ -202,10 +208,11 @@ namespace Voxelgine.Graphics {
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int y = 0; y < ChunkSize; y++) {
 					for (int z = 0; z < ChunkSize; z++) {
-						PlacedBlock block = GetBlock(x, y, z);
+						int idx = x + ChunkSize * (y + ChunkSize * z);
+						PlacedBlock block = Blocks[idx];
 						if (block.Type == BlockType.Glowstone || block.Type == BlockType.Campfire) {
-							SetLightLevel(x, y, z, 15);
-							lightQueue.Enqueue(new Vector3(x, y, z));
+							Blocks[idx].SetBlockLight(new BlockLight(15));
+							lightQueue.Enqueue(new BlockPos(x, y, z));
 						}
 					}
 				}
@@ -213,73 +220,64 @@ namespace Voxelgine.Graphics {
 
 			// Propagate light globally
 			PropagateLight(lightQueue);
+			Dirty = true; // Mark dirty only once
 		}
 
-		void PropagateLight(Queue<Vector3> lightQueue) {
-			Vector3[] directions = {
-				new Vector3(1, 0, 0), new Vector3(-1, 0, 0),
-				new Vector3(0, 1, 0), new Vector3(0, -1, 0),
-				new Vector3(0, 0, 1), new Vector3(0, 0, -1)
-			};
+		void PropagateLight(Queue<BlockPos> lightQueue) {
+			int[] dx = { 1, -1, 0, 0, 0, 0 };
+			int[] dy = { 0, 0, 1, -1, 0, 0 };
+			int[] dz = { 0, 0, 0, 0, 1, -1 };
 
 			while (lightQueue.Count > 0) {
-				Vector3 pos = lightQueue.Dequeue();
-				PlacedBlock currentBlock = GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+				BlockPos pos = lightQueue.Dequeue();
+				int idx = pos.X + ChunkSize * (pos.Y + ChunkSize * pos.Z);
+				if (pos.X < 0 || pos.X >= ChunkSize || pos.Y < 0 || pos.Y >= ChunkSize || pos.Z < 0 || pos.Z >= ChunkSize)
+					continue;
+				PlacedBlock currentBlock = Blocks[idx];
 
 				// Use the maximum light value from any face for propagation
 				byte currentLight = 0;
 				for (int i = 0; i < 6; i++)
 					if (currentBlock.Lights[i].R > currentLight)
 						currentLight = currentBlock.Lights[i].R;
+				if (currentLight == 0)
+					continue;
 
-				bool isLightSource = (currentBlock.Type == BlockType.Glowstone || currentBlock.Type == BlockType.Campfire);
-
-				foreach (Vector3 dir in directions) {
-					Vector3 neighborPos = pos + dir;
-					int nx = (int)neighborPos.X;
-					int ny = (int)neighborPos.Y;
-					int nz = (int)neighborPos.Z;
-
-					PlacedBlock neighborBlock;
-					bool isWithinChunk = (nx >= 0 && nx < ChunkSize && ny >= 0 && ny < ChunkSize && nz >= 0 && nz < ChunkSize);
-
-					if (isWithinChunk) {
-						neighborBlock = GetBlock(nx, ny, nz);
-					} else {
+				for (int d = 0; d < 6; d++) {
+					int nx = pos.X + dx[d];
+					int ny = pos.Y + dy[d];
+					int nz = pos.Z + dz[d];
+					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize) {
+						// Out of chunk, fallback to old logic for cross-chunk
 						WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
-						neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
-					}
-
-					// Only propagate if neighbor is NOT opaque, or if the current block is a light source
-					if (!isLightSource && BlockInfo.IsOpaque(neighborBlock.Type)) {
-						continue;
-					}
-
-					byte newLight = (byte)Math.Max(0, currentLight - 1);
-					if (newLight <= 0)
-						continue;
-
-					byte existingLight = 0;
-					for (int i = 0; i < 6; i++)
-						if (neighborBlock.Lights[i].R > existingLight)
-							existingLight = neighborBlock.Lights[i].R;
-
-					if (newLight > existingLight) {
-						for (int i = 0; i < 6; i++) {
-							neighborBlock.Lights[i] = new BlockLight(newLight);
-						}
-
-						if (isWithinChunk) {
-							SetBlock(nx, ny, nz, neighborBlock);
-							MarkDirty();
-						} else {
-							WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
+						PlacedBlock neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
+						if (BlockInfo.IsOpaque(neighborBlock.Type)) continue;
+						byte neighborLight = 0;
+						for (int i = 0; i < 6; i++)
+							if (neighborBlock.Lights[i].R > neighborLight)
+								neighborLight = neighborBlock.Lights[i].R;
+						byte newLight = (byte)(currentLight - 1);
+						if (newLight > neighborLight) {
+							for (int i = 0; i < 6; i++)
+								neighborBlock.Lights[i] = new BlockLight(newLight);
 							WorldMap.SetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, neighborBlock);
+							lightQueue.Enqueue(new BlockPos(nx, ny, nz));
 						}
-
-						if (newLight > 1) {
-							lightQueue.Enqueue(neighborPos);
-						}
+						continue;
+					}
+					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
+					PlacedBlock neighborBlockInChunk = Blocks[nidx];
+					if (BlockInfo.IsOpaque(neighborBlockInChunk.Type)) continue;
+					byte neighborLightInChunk = 0;
+					for (int i = 0; i < 6; i++)
+						if (neighborBlockInChunk.Lights[i].R > neighborLightInChunk)
+							neighborLightInChunk = neighborBlockInChunk.Lights[i].R;
+					byte newLightInChunk = (byte)(currentLight - 1);
+					if (newLightInChunk > neighborLightInChunk) {
+						for (int i = 0; i < 6; i++)
+							neighborBlockInChunk.Lights[i] = new BlockLight(newLightInChunk);
+						Blocks[nidx] = neighborBlockInChunk;
+						lightQueue.Enqueue(new BlockPos(nx, ny, nz));
 					}
 				}
 			}

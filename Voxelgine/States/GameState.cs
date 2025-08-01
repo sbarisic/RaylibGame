@@ -26,6 +26,8 @@ namespace RaylibGame.States {
 		GUIManager GUI;
 		GUIInventory Inventory;
 
+		bool NoClip = false;
+
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
 			InitGUI();
@@ -79,6 +81,11 @@ namespace RaylibGame.States {
 			});*/
 
 			Ply.SetPosition(32, 73, 19);
+
+			Ply.AddOnKeyPressed(KeyboardKey.C, () => {
+				NoClip = !NoClip;
+				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
+			});
 		}
 
 		GUIElement AddButton(string Txt, OnMouseClickedFunc OnClick) {
@@ -319,6 +326,27 @@ namespace RaylibGame.States {
 
 		void UpdatePhysics(float Dt) {
 			Ply.UpdatePhysics(Dt);
+
+			if (NoClip) {
+				// No-clip movement: ignore collisions and physics, move freely
+				float moveSpeed = 10.0f;
+				Vector3 move = Vector3.Zero;
+				Vector3 forward = FPSCamera.GetForward();
+				Vector3 left = FPSCamera.GetLeft();
+				Vector3 up = FPSCamera.GetUp();
+				if (Raylib.IsKeyDown(KeyboardKey.W)) move += forward;
+				if (Raylib.IsKeyDown(KeyboardKey.S)) move -= forward;
+				if (Raylib.IsKeyDown(KeyboardKey.A)) move += left;
+				if (Raylib.IsKeyDown(KeyboardKey.D)) move -= left;
+				if (Raylib.IsKeyDown(KeyboardKey.Space)) move += up;
+				if (Raylib.IsKeyDown(KeyboardKey.LeftShift)) move -= up;
+				if (move != Vector3.Zero)
+				{
+					move = Vector3.Normalize(move) * moveSpeed * Dt;
+					Ply.SetPosition(Ply.Position + move);
+				}
+				return;
+			}
 
 			if (!Utils.HasRecord())
 				Utils.BeginRaycastRecord();

@@ -29,14 +29,114 @@ namespace Voxelgine.Graphics {
 		}
 	}
 
+	// Spatial hash grid for chunk storage
+	class SpatialHashGrid<T>
+	{
+		private readonly int bucketSize;
+		private readonly Dictionary<long, List<(Vector3, T)>> buckets = new();
+
+		public SpatialHashGrid(int bucketSize = 64)
+		{
+			this.bucketSize = bucketSize;
+		}
+
+		private long Hash(Vector3 pos)
+		{
+			// Use integer chunk coordinates for hashing
+			int x = (int)pos.X / bucketSize;
+			int y = (int)pos.Y / bucketSize;
+			int z = (int)pos.Z / bucketSize;
+			// Pack into a long for uniqueness
+			return ((long)x & 0x1FFFFF) | (((long)y & 0x1FFFFF) << 21) | (((long)z & 0x1FFFFF) << 42);
+		}
+
+		public void Add(Vector3 pos, T value)
+		{
+			long h = Hash(pos);
+			if (!buckets.TryGetValue(h, out var list))
+			{
+				list = new List<(Vector3, T)>();
+				buckets[h] = list;
+			}
+			list.Add((pos, value));
+		}
+
+		public bool TryGetValue(Vector3 pos, out T value)
+		{
+			long h = Hash(pos);
+			if (buckets.TryGetValue(h, out var list))
+			{
+				foreach (var (p, v) in list)
+				{
+					if (p == pos)
+					{
+						value = v;
+						return true;
+					}
+				}
+			}
+			value = default;
+			return false;
+		}
+
+		public bool ContainsKey(Vector3 pos)
+		{
+			return TryGetValue(pos, out _);
+		}
+
+		public void Remove(Vector3 pos)
+		{
+			long h = Hash(pos);
+			if (buckets.TryGetValue(h, out var list))
+			{
+				for (int i = 0; i < list.Count; i++)
+				{
+					if (list[i].Item1 == pos)
+					{
+						list.RemoveAt(i);
+						if (list.Count == 0)
+							buckets.Remove(h);
+						return;
+					}
+				}
+			}
+		}
+
+		public void Clear()
+		{
+			buckets.Clear();
+		}
+
+		public IEnumerable<T> Values
+		{
+			get
+			{
+				foreach (var list in buckets.Values)
+					foreach (var (_, v) in list)
+						yield return v;
+			}
+		}
+
+		public IEnumerable<KeyValuePair<Vector3, T>> Items
+		{
+			get
+			{
+				foreach (var list in buckets.Values)
+					foreach (var (p, v) in list)
+						yield return new KeyValuePair<Vector3, T>(p, v);
+			}
+		}
+	}
+
 	unsafe class ChunkMap {
 		///List<GameEntity> Entities = new List<GameEntity>();
 
-		Dictionary<Vector3, Chunk> Chunks;
+		// Replace Dictionary<Vector3, Chunk> Chunks;
+		SpatialHashGrid<Chunk> Chunks;
 		Random Rnd = new Random();
 
 		public ChunkMap(GameState GS) {
-			Chunks = new Dictionary<Vector3, Chunk>();
+			Chunks = new SpatialHashGrid<Chunk>(1); // 1 chunk per bucket for precise lookup
 
 			//GameEntity Ent = new GameEntity(GS, new Vector3(30.5f, 64, 22.5f));
 			//Entities.Add(Ent);
@@ -45,7 +145,7 @@ namespace Voxelgine.Graphics {
 		public void Write(Stream Output) {
 			using (GZipStream ZipStream = new GZipStream(Output, CompressionMode.Compress, true)) {
 				using (BinaryWriter Writer = new BinaryWriter(ZipStream)) {
-					KeyValuePair<Vector3, Chunk>[] ChunksArray = Chunks.ToArray();
+					var ChunksArray = Chunks.Items.ToArray();
 					Writer.Write(ChunksArray.Length);
 
 					for (int i = 0; i < ChunksArray.Length; i++) {
@@ -183,9 +283,8 @@ namespace Voxelgine.Graphics {
 
 		void MarkDirty(int ChunkX, int ChunkY, int ChunkZ) {
 			Vector3 ChunkIndex = new Vector3(ChunkX, ChunkY, ChunkZ);
-
-			if (Chunks.ContainsKey(ChunkIndex))
-				Chunks[ChunkIndex].MarkDirty();
+			if (Chunks.TryGetValue(ChunkIndex, out var chunk))
+				chunk.MarkDirty();
 		}
 
 		public void SetPlacedBlock(int X, int Y, int Z, PlacedBlock Block) {
@@ -209,7 +308,7 @@ namespace Voxelgine.Graphics {
 			if (XX == MaxBlock)
 				xOffsets = xOffsets.Concat(new[] { 1 }).ToArray();
 			if (YY == 0)
-				yOffsets = yOffsets.Concat(new[] { -1 }).ToArray();
+			yOffsets = yOffsets.Concat(new[] { -1 }).ToArray();
 			if (YY == MaxBlock)
 				yOffsets = yOffsets.Concat(new[] { 1 }).ToArray();
 			if (ZZ == 0)
@@ -229,8 +328,8 @@ namespace Voxelgine.Graphics {
 
 			// Mark all affected chunks as dirty  
 			foreach (var chunkPos in affectedChunks) {
-				if (Chunks.ContainsKey(chunkPos)) {
-					Chunks[chunkPos].MarkDirty();
+				if (Chunks.TryGetValue(chunkPos, out var chunk)) {
+					chunk.MarkDirty();
 				}
 			}
 
@@ -241,7 +340,8 @@ namespace Voxelgine.Graphics {
 			}
 
 			// Set the block  
-			Chunks[ChunkIndex].SetBlock(XX, YY, ZZ, Block);
+			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+			targetChunk.SetBlock(XX, YY, ZZ, Block);
 		}
 
 		public void SetBlock(int X, int Y, int Z, BlockType T) {
@@ -697,12 +797,11 @@ namespace Voxelgine.Graphics {
 		public PlacedBlock GetPlacedBlock(int X, int Y, int Z, out Chunk Chk) {
 			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
 
-			if (Chunks.ContainsKey(ChunkIndex)) {
-				return (Chk = Chunks[ChunkIndex]).GetBlock((int)BlockPos.X, (int)BlockPos.Y, (int)BlockPos.Z);
+			if (Chunks.TryGetValue(ChunkIndex, out Chk)) {
+				return Chk.GetBlock((int)BlockPos.X, (int)BlockPos.Y, (int)BlockPos.Z);
 			}
-
-			Chk = null;
-			return new PlacedBlock(BlockType.None);
+		 Chk = null;
+		 return new PlacedBlock(BlockType.None);
 		}
 
 		public BlockType GetBlock(int X, int Y, int Z) {
@@ -790,7 +889,7 @@ namespace Voxelgine.Graphics {
 			// TODO: Do it in a more efficient way
 			List<RayCollision> Hits = new List<RayCollision>();
 
-			foreach (var KV in Chunks) {
+			foreach (var KV in Chunks.Items) {
 				//Vector3 ChunkPos = KV.Value.Position;
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 
@@ -856,26 +955,16 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void Draw() {
-			foreach (var KV in Chunks) {
+			foreach (var KV in Chunks.Items) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 				KV.Value.Draw(ChunkPos);
 			}
-
-			/*foreach (var E in Entities) {
-				E.Draw();
-			}*/
-
-			/*foreach (Vector3 Orig in SunRayOrigins) {
-				Vector3 Dst = Orig + SunDir * 64;
-
-				Raylib.DrawLine3D(Orig, Dst, Color.Orange);
-			}*/
 
 			Utils.DrawRaycastRecord();
 		}
 
 		public void DrawTransparent() {
-			foreach (var KV in Chunks)
+			foreach (var KV in Chunks.Items)
 				KV.Value.DrawTransparent();
 		}
 	}

@@ -240,11 +240,11 @@ namespace Voxelgine.Graphics {
 				Vector3 pos = lightQueue.Dequeue();
 				PlacedBlock currentBlock = GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
 
-				// TODO: Implement better currentLight functionality, maybe fetch a different per-face?
-				byte currentLight = currentBlock.Lights[0].R; // Use first face as reference  
-
-				// Propagate to neighboring blocks  
+				// Use the light value from the face in the direction we're propagating from
 				foreach (Vector3 dir in directions) {
+					int faceIndex = Utils.DirToByte(dir);
+					byte currentLight = currentBlock.Lights[faceIndex].R;
+
 					Vector3 neighborPos = pos + dir;
 					int nx = (int)neighborPos.X;
 					int ny = (int)neighborPos.Y;

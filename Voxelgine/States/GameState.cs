@@ -65,7 +65,7 @@ namespace RaylibGame.States {
 			});
 
 			Ply.AddOnKeyPressed(KeyboardKey.F3, () => {
-				Console.WriteLine("Pos: {0}", Ply.Position);
+				Program.DebugMode = !Program.DebugMode;
 			});
 
 			Ply.AddOnKeyPressed(KeyboardKey.F4, () => {
@@ -73,10 +73,10 @@ namespace RaylibGame.States {
 				Utils.ClearRaycastRecord();
 			});
 
-			Ply.AddOnKeyPressed(KeyboardKey.B, () => {
+			/*Ply.AddOnKeyPressed(KeyboardKey.B, () => {
 				if (Debugger.IsAttached)
 					Debugger.Break();
-			});
+			});*/
 
 			Ply.SetPosition(32, 73, 19);
 		}
@@ -160,9 +160,14 @@ namespace RaylibGame.States {
 		}
 
 		void UpdateGUI() {
-			InfoLbl.Clear();
-			InfoLbl.WriteLine("Pos: {0}, {1}, {2}", (int)Ply.Position.X, (int)Ply.Position.Y, (int)Ply.Position.Z);
-			InfoLbl.WriteLine("Vel: {0}", MathF.Round(PlyVelocity.Length(), 2));
+			InfoLbl.Enabled = false;
+
+			if (Program.DebugMode) {
+				InfoLbl.Enabled = true;
+				InfoLbl.Clear();
+				InfoLbl.WriteLine("Pos: {0}, {1}, {2}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
+				InfoLbl.WriteLine("Vel: {0}", MathF.Round(PlyVelocity.Length(), 3));
+			}
 		}
 
 

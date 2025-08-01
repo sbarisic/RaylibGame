@@ -30,6 +30,8 @@ namespace Voxelgine.GUI {
 		public Vector2 HoverPos;
 		public bool IsHoveredOn;
 
+		public bool Enabled = true;
+
 		public OnMouseClickedFunc OnClickedFunc;
 
 		protected bool MouseDown_Left = false;
@@ -46,6 +48,11 @@ namespace Voxelgine.GUI {
 		bool ButtonHeldDown = false;
 
 		public virtual void Update() {
+			if (!Enabled) {
+				ButtonHeldDown = false;
+				return;
+			}
+
 			if (IsInside(MousePos)) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
 					if (Raylib.IsMouseButtonPressed(MouseButton.Left) && !ButtonHeldDown) {

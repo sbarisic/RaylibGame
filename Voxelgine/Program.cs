@@ -13,6 +13,8 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine {
 	internal class Program {
+		public static bool DebugMode;
+
 		public static GameWindow Window;
 
 		public static GameStateImpl MainMenuState;
@@ -24,6 +26,8 @@ namespace Voxelgine {
 		public static float TotalTime;
 
 		static void Main(string[] args) {
+			DebugMode = Debugger.IsAttached;
+
 			Clipb = new Clipboard();
 
 			Window = new GameWindow(1920, 1080, "Aurora Falls");

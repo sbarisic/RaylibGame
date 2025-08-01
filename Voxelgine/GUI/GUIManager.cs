@@ -56,6 +56,9 @@ namespace Voxelgine.GUI {
 			bool MouseDown = Window.InMgr.IsInputDown(InputKey.Click_Left);
 
 			foreach (GUIElement E in Elements) {
+				if (!E.Enabled)
+					continue;
+
 				Hovered = E.IsInside(MousePos);
 				E.Draw(Hovered, MouseClicked, MouseDown);
 			}

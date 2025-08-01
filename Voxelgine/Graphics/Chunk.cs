@@ -170,44 +170,31 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void ComputeLighting() {
-			// Initialize ALL blocks to black (0) light
+			// Set all blocks to light level 0 first
 			for (int i = 0; i < Blocks.Length; i++) {
 				Blocks[i].SetBlockLight(new BlockLight(0));
 			}
 
-			// Queue for light propagation using BFS  
 			Queue<Vector3> lightQueue = new Queue<Vector3>();
 
-			// For each column, propagate sunlight down through air blocks until a solid block is hit
+			// Set all non-air blocks to sunlight (15)
 			for (int x = 0; x < ChunkSize; x++) {
-				for (int z = 0; z < ChunkSize; z++) {
-					// Start from top of chunk
-					bool foundFirstSolid = false;
-					for (int y = ChunkSize - 1; y >= 0; y--) {
+				for (int y = 0; y < ChunkSize; y++) {
+					for (int z = 0; z < ChunkSize; z++) {
 						PlacedBlock block = GetBlock(x, y, z);
-						if (!foundFirstSolid) {
-							if (block.Type == BlockType.None || !BlockInfo.IsOpaque(block.Type)) {
-								// Full sunlight for air blocks and transparent blocks
-								SetLightLevel(x, y, z, 15);
-								lightQueue.Enqueue(new Vector3(x, y, z));
-							} else {
-								// Found first solid block
-								foundFirstSolid = true;
-								// Give it some light but not full
-								SetLightLevel(x, y, z, 13);
-								lightQueue.Enqueue(new Vector3(x, y, z));
-							}
+						if (block.Type != BlockType.None) {
+							SetLightLevel(x, y, z, 15);
+							lightQueue.Enqueue(new Vector3(x, y, z));
 						}
 					}
 				}
 			}
 
-			// Add artificial light sources  
+			// Set glowing blocks to 15 (redundant, but explicit)
 			for (int x = 0; x < ChunkSize; x++) {
 				for (int y = 0; y < ChunkSize; y++) {
 					for (int z = 0; z < ChunkSize; z++) {
 						PlacedBlock block = GetBlock(x, y, z);
-
 						if (block.Type == BlockType.Glowstone || block.Type == BlockType.Campfire) {
 							SetLightLevel(x, y, z, 15);
 							lightQueue.Enqueue(new Vector3(x, y, z));
@@ -216,18 +203,8 @@ namespace Voxelgine.Graphics {
 				}
 			}
 
-			// Propagate light using BFS  
+			// Propagate light globally
 			PropagateLight(lightQueue);
-
-			// DEBUG: Print light value of top air block in each column
-			for (int x = 0; x < ChunkSize; x++) {
-				for (int z = 0; z < ChunkSize; z++) {
-					PlacedBlock block = GetBlock(x, ChunkSize - 1, z);
-					if (block.Type == BlockType.None) {
-						Console.WriteLine($"Light at ({x},{ChunkSize - 1},{z}): {block.Lights[0].R}");
-					}
-				}
-			}
 		}
 
 		void PropagateLight(Queue<Vector3> lightQueue) {
@@ -241,11 +218,13 @@ namespace Voxelgine.Graphics {
 				Vector3 pos = lightQueue.Dequeue();
 				PlacedBlock currentBlock = GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
 
-				// Use the light value from the face in the direction we're propagating from
-				foreach (Vector3 dir in directions) {
-					int faceIndex = Utils.DirToByte(dir);
-					byte currentLight = currentBlock.Lights[faceIndex].R;
+				// Use the maximum light value from any face for propagation
+				byte currentLight = 0;
+				for (int i = 0; i < 6; i++)
+					if (currentBlock.Lights[i].R > currentLight)
+						currentLight = currentBlock.Lights[i].R;
 
+				foreach (Vector3 dir in directions) {
 					Vector3 neighborPos = pos + dir;
 					int nx = (int)neighborPos.X;
 					int ny = (int)neighborPos.Y;
@@ -257,46 +236,36 @@ namespace Voxelgine.Graphics {
 					if (isWithinChunk) {
 						neighborBlock = GetBlock(nx, ny, nz);
 					} else {
-						// Handle cross-chunk boundaries  
 						WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
 						neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
 					}
 
-					// Calculate light falloff  
-					byte newLight;
+					// Only propagate if not opaque
 					if (neighborBlock.Type != BlockType.None && BlockInfo.IsOpaque(neighborBlock.Type)) {
-						// Light doesn't pass through opaque blocks  
 						continue;
-					} else if (neighborBlock.Type != BlockType.None) {
-						// Light passes through but with more falloff for non-air blocks  
-						newLight = (byte)Math.Max(0, currentLight - 2);
-					} else {
-						// Air block - normal falloff  
-						newLight = (byte)Math.Max(0, currentLight - 1);
 					}
 
+					byte newLight = (byte)Math.Max(0, currentLight - 1);
 					if (newLight <= 0)
 						continue;
 
-					byte existingLight = neighborBlock.Lights[0].R; // Check existing light level  
+					byte existingLight = 0;
+					for (int i = 0; i < 6; i++)
+						if (neighborBlock.Lights[i].R > existingLight)
+							existingLight = neighborBlock.Lights[i].R;
 
-					// Only propagate if new light is brighter  
 					if (newLight > existingLight) {
-						// Set light for all faces  
 						for (int i = 0; i < 6; i++) {
 							neighborBlock.Lights[i] = new BlockLight(newLight);
 						}
 
-						// Update the block in the appropriate chunk  
 						if (isWithinChunk) {
 							SetBlock(nx, ny, nz, neighborBlock);
 						} else {
-							// Update in neighboring chunk  
 							WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
 							WorldMap.SetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, neighborBlock);
 						}
 
-						// Add to queue for further propagation if light is still significant  
 						if (newLight > 1) {
 							lightQueue.Enqueue(neighborPos);
 						}

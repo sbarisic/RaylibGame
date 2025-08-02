@@ -71,6 +71,8 @@ namespace Voxelgine.Engine {
 		}
 
 		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)
+		// Also checks for collision with the player and triggers OnPlayerTouch only once per entry
+		private bool wasPlayerTouching = false;
 		public virtual void UpdatePhysics(ChunkMap map, float Dt) {
 			GameState GS = GetGameState();
 
@@ -97,10 +99,36 @@ namespace Voxelgine.Engine {
 			else
 				Velocity.Z = 0;
 
-			// TODO: Implement collision check with the player, if collision occurs, trigger OnPlayerTouch.
-			// OnPlayerTouch should only trigger once, it should retrigger once the player leaves and then enters the entity collision box again.
-
 			Position = newPos;
+
+			// --- Player collision check ---
+			if (GS != null && GS.Ply != null) {
+				// Player AABB
+				Vector3 playerFeet = GS.Ply.Position - new Vector3(0, Player.PlayerEyeOffset, 0);
+				Vector3 playerMin = new Vector3(
+					playerFeet.X - Player.PlayerRadius,
+					playerFeet.Y,
+					playerFeet.Z - Player.PlayerRadius
+				);
+				Vector3 playerMax = new Vector3(
+					playerFeet.X + Player.PlayerRadius,
+					playerFeet.Y + Player.PlayerHeight,
+					playerFeet.Z + Player.PlayerRadius
+				);
+				// Entity AABB
+				Vector3 entMin = Position;
+				Vector3 entMax = Position + Size;
+				bool touching =
+					entMin.X <= playerMax.X && entMax.X >= playerMin.X &&
+					entMin.Y <= playerMax.Y && entMax.Y >= playerMin.Y &&
+					entMin.Z <= playerMax.Z && entMax.Z >= playerMin.Z;
+				if (touching && !wasPlayerTouching) {
+					OnPlayerTouch(GS.Ply);
+					wasPlayerTouching = true;
+				} else if (!touching) {
+					wasPlayerTouching = false;
+				}
+			}
 		}
 
 		// Checks if any blocks are present in the AABB at pos with size

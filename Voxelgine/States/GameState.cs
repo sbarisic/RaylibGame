@@ -466,25 +466,38 @@ namespace RaylibGame.States {
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
 
-			// Ledge safety logic: use a smaller collision box to detect edge
+			// Ledge safety logic: use a smaller collision box to detect edge, allow input towards any supported block
 			bool ledgeSafety = OnGround && Raylib.IsKeyDown(KeyboardKey.LeftShift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
-				float innerRadius = playerRadius - 0.3f; // Smaller collision box
+				float innerRadius = 0.4f; // Smaller collision box
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
 				float minY = points.Min(p => p.Y);
 				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
-				bool anySupported = false;
+				List<Vector3> supportedPoints = new List<Vector3>();
 				foreach (var pt in feetPoints) {
 					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
 					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
-						anySupported = true;
-						break;
+						supportedPoints.Add(pt);
 					}
 				}
-				if (!anySupported) {
+				if (supportedPoints.Count == 0) {
 					PlyVelocity.X = 0;
 					PlyVelocity.Z = 0;
 					wishdir = Vector3.Zero;
+				} else {
+					bool allow = false;
+					foreach (var spt in supportedPoints) {
+						Vector3 toSupport = Vector3.Normalize(spt - feetPos);
+						if (Vector3.Dot(wishdir, toSupport) > 0) {
+							allow = true;
+							break;
+						}
+					}
+					if (!allow) {
+						PlyVelocity.X = 0;
+						PlyVelocity.Z = 0;
+						wishdir = Vector3.Zero;
+					}
 				}
 			}
 

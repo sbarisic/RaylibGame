@@ -16,14 +16,13 @@ namespace Voxelgine.Engine {
 		}
 
 		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
-			DrawPlayerCollisionBox(Position);
+			DrawCollisionBox();
 		}
 
-		 void DrawPlayerCollisionBox(Vector3 feetPos) {
-			float playerRadius = Player.PlayerRadius;
-			float playerHeight = Player.PlayerHeight;
-			Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
-			Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
+		 // Draws the collision box at Position with Size
+		 void DrawCollisionBox() {
+			Vector3 min = Position;
+			Vector3 max = Position + Size;
 			Color color = Color.Red;
 			Vector3[] corners = new Vector3[8];
 			corners[0] = new Vector3(min.X, min.Y, min.Z);

@@ -51,7 +51,8 @@ namespace Voxelgine.GUI {
 
 			// Update children positions and call their Update
 			foreach (var child in Children) {
-				child.MousePos = mouse - Pos - child.Pos;
+				// Pass mouse position relative to the window (not subtracting child.Pos)
+				child.MousePos = mouse - Pos;
 				child.Update();
 			}
 		}
@@ -68,12 +69,14 @@ namespace Voxelgine.GUI {
 			Mgr.DrawRectLines(Pos, Size, Color.Black);
 
 			// Draw children (relative to window position)
+			Vector2 localMouse = this.MousePos - Pos;
 			foreach (var child in Children) {
-				Vector2 childDrawPos = Pos + child.Pos;
-				// Save and set child.Pos for drawing
+				bool hovered = child.IsInside(localMouse);
+				child.OnHovered(localMouse, hovered);
+				// Draw at correct position by offsetting with window position
 				var oldPos = child.Pos;
-				child.Pos = childDrawPos;
-				child.Draw(child.IsInside(this.MousePos - Pos - oldPos), MouseClicked, MouseDown);
+				child.Pos = Pos + child.Pos;
+				child.Draw(hovered, MouseClicked && hovered, MouseDown && hovered);
 				child.Pos = oldPos;
 			}
 		}

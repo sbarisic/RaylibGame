@@ -338,7 +338,7 @@ namespace RaylibGame.States {
         private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4)
         {
             float playerRadius = 0.4f;
-            float playerHeight = 1.0f;
+            float playerHeight = 1.9f; // Match bounding box and collision
             // Use feet position for collision
             Vector3 feetPos = pos - new Vector3(0, 1.8f, 0);
             Vector3 move = velocity * dt;
@@ -844,7 +844,7 @@ namespace RaylibGame.States {
 			private void DrawPlayerCollisionBox()
 			{
 				float playerRadius = 0.4f;
-				float playerHeight = 1.0f;
+				float playerHeight = 1.9f; // Slightly above eye level
 				// The feet position is Ply.Position - new Vector3(0, 1.8f, 0)
 				Vector3 feetPos = Ply.Position - new Vector3(0, 1.8f, 0);
 				Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);

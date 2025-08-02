@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.GUI;
 using System.ComponentModel.Design;
+using Voxelgine.Engine.Physics;
 
 namespace RaylibGame.States {
 	unsafe class GameState : GameStateImpl {
@@ -25,6 +26,7 @@ namespace RaylibGame.States {
 
 		GUIManager GUI;
 		GUIInventory Inventory;
+		PhysData PhysicsData;
 
 		bool NoClip = false;
 
@@ -35,6 +37,7 @@ namespace RaylibGame.States {
 			Snd = new SoundMgr();
 			Snd.Init();
 
+			PhysicsData = new PhysData();
 			Map = new ChunkMap(this);
 			//Map.LoadFromChunk("data/map0.chunk");
 

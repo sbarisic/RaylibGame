@@ -565,16 +565,17 @@ namespace Voxelgine.Engine {
 			Utils.EndRaycastRecord();
 		}
 
-		public void Tick() {
+		public void Tick(InputMgr InMgr) {
 			string AnimName = "idle";
 
-			if (MoveFd = Raylib.IsKeyDown(KeyboardKey.W))
+			// Use InputMgr for movement keys
+			if (MoveFd = InMgr.IsInputDown(InputKey.W))
 				AnimName = "forward";
-			else if (MoveLt = Raylib.IsKeyDown(KeyboardKey.A))
+			else if (MoveLt = InMgr.IsInputDown(InputKey.A))
 				AnimName = "left";
-			else if (MoveRt = Raylib.IsKeyDown(KeyboardKey.D))
+			else if (MoveRt = InMgr.IsInputDown(InputKey.D))
 				AnimName = "right";
-			else if (MoveBk = Raylib.IsKeyDown(KeyboardKey.S))
+			else if (MoveBk = InMgr.IsInputDown(InputKey.S))
 				AnimName = "backward";
 
 			if (CurAnim == null)
@@ -587,9 +588,11 @@ namespace Voxelgine.Engine {
 
 			FPSCamera.Update(CursorDisabled, ref Cam);
 
-			if (Raylib.IsKeyPressed(KeyboardKey.F1))
+			// Use InputMgr for F1
+			if (InMgr.IsInputPressed(InputKey.F1))
 				ToggleMouse();
 
+			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
 			foreach (var KV in OnKeyFuncs) {
 				if (Raylib.IsKeyPressed(KV.Key))
 					KV.Value();

@@ -80,7 +80,7 @@ namespace RaylibGame.States {
 				return;
 			}
 			Map.Tick();
-			Ply.Tick();
+			Ply.Tick(Window.InMgr);
 			Ply.TickGUI(Window.InMgr, Map);
 
 			if (Window.InMgr.IsInputPressed(InputKey.F5)) {

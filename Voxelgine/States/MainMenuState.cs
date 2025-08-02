@@ -41,7 +41,15 @@ namespace RaylibGame.States {
 			};
 			GUI.AddElement(Btn_NewGame);
 
-			//Pos.Y = Pos.Y + BtnSize.Y + BtnMargin;
+			// Add Options button between New Game and Quit
+			GUIButton Btn_Options = new GUIButton(GUI);
+			Btn_Options.Pos = GUI.WindowScale(new Vector2(0.3f, 0.35f));
+			Btn_Options.Size = BtnSize;
+			Btn_Options.Text = "Options";
+			Btn_Options.OnClickedFunc = (E) => {
+				Console.WriteLine("Options clicked");
+			};
+			GUI.AddElement(Btn_Options);
 
 			GUIButton Btn_Quit = new GUIButton(GUI);
 			Btn_Quit.Pos = GUI.WindowScale(new Vector2(0.3f, 0.4f));
@@ -63,6 +71,7 @@ namespace RaylibGame.States {
 
 			List<GUIElement> IB = new List<GUIElement>();
 			IB.Add(Btn_NewGame);
+			IB.Add(Btn_Options);
 			IB.Add(Btn_Quit);
 
 			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
@@ -98,9 +107,13 @@ namespace RaylibGame.States {
 			Raylib.SetTextureFilter(Icon, TextureFilter.Point);
 			Btn_NewGame.SetIcon(Icon);
 
+			Texture2D IconOptions = ResMgr.GetTexture("items/hammer.png");
+			Raylib.SetTextureFilter(IconOptions, TextureFilter.Point);
+			Btn_Options.SetIcon(IconOptions);
+
 			Texture2D Icon2 = ResMgr.GetTexture("items/lava.png");
 			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
-			Btn_Quit.SetIcon(Icon2);
+			Btn_Quit.SetIcon(Icon);
 
 			//============
 

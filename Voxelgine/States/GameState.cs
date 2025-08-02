@@ -19,14 +19,12 @@ namespace RaylibGame.States {
 		public SoundMgr Snd;
 
 		List<Tuple<Vector3, Vector3>> MarkerList = new();
-		GUIManager GUI;
-		GUIInventory Inventory;
+		GUIManager GUI;		
 		PhysData PhysicsData;
-		bool NoClip = false;
 
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
-			InitGUI();
+
 			Snd = new SoundMgr();
 			Snd.Init();
 			PhysicsData = new PhysData();
@@ -40,6 +38,9 @@ namespace RaylibGame.States {
 			}
 
 			Ply = new Player(GUI, "snoutx10k", true, Snd);
+			Ply.InitGUI(window);
+			Ply.Init(Map);
+
 			if (File.Exists("player.bin")) {
 				using (FileStream fs = File.OpenRead("player.bin"))
 				using (BinaryReader reader = new BinaryReader(fs)) {
@@ -48,80 +49,8 @@ namespace RaylibGame.States {
 			} else {
 				Ply.SetPosition(32, 73, 19);
 			}
-			Stopwatch SWatch = Stopwatch.StartNew();
 
-			Ply.AddOnKeyPressed(KeyboardKey.F2, () => {
-				Console.WriteLine("Compute light!");
-				SWatch.Restart();
-				Map.ComputeLighting();
-				SWatch.Stop();
-				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
-			});
-
-			Ply.AddOnKeyPressed(KeyboardKey.F3, () => { Program.DebugMode = !Program.DebugMode; });
-
-			Ply.AddOnKeyPressed(KeyboardKey.F4, () => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
-
-			Ply.AddOnKeyPressed(KeyboardKey.C, () => {
-				NoClip = !NoClip;
-				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
-			});
 		}
-
-		GUIItemBox Box_Health;
-		GUILabel InfoLbl;
-		BlockType PlayerSelectedBlockType;
-		void InitGUI() {
-			Box_Health = new GUIItemBox(GUI);
-			Box_Health.Pos = new Vector2(64, Window.Height - 128);
-			Box_Health.Text = "100";
-			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
-			GUI.AddElement(Box_Health);
-
-			InfoLbl = new GUILabel(GUI);
-			InfoLbl.Pos = new Vector2(16, 40);
-			InfoLbl.Size = new Vector2(300, 250);
-			InfoLbl.Clear();
-			InfoLbl.WriteLine("Hello World!");
-			GUI.AddElement(InfoLbl);
-
-			Inventory = new GUIInventory(GUI);
-			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f));
-			Inventory.Pos -= new Vector2(Inventory.Size.X / 2, 0);
-			GUI.AddElement(Inventory);
-
-			SetInvItem(Inventory, 0, BlockType.Dirt, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Dirt);
-			SetInvItem(Inventory, 1, BlockType.Stone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Stone);
-			SetInvItem(Inventory, 2, BlockType.StoneBrick, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.StoneBrick);
-			SetInvItem(Inventory, 3, BlockType.Bricks, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Bricks);
-			SetInvItem(Inventory, 4, BlockType.Plank, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Plank);
-			SetInvItem(Inventory, 5, BlockType.CraftingTable, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.CraftingTable);
-			SetInvItem(Inventory, 6, BlockType.Glowstone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Glowstone);
-		}
-
-		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
-			GUIItemBox Itm = Inventory.GetItem(Idx);
-			
-			BlockInfo.GetBlockTexCoords(BType, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
-			
-			Itm.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
-			Itm.OnClickedFunc = (E) => {
-				Inventory.SetSelectedIndex(Idx);
-				OnClick(E as GUIItemBox, Idx);
-			};
-		}
-
-		void UpdateGUI() {
-            InfoLbl.Enabled = false;
-            if (Program.DebugMode) {
-                InfoLbl.Enabled = true;
-                InfoLbl.Clear();
-                InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
-                InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(Ply.GetVelocity().Length(), 3));
-                InfoLbl.WriteLine("No-clip: {0}", NoClip ? "ON" : "OFF");
-                InfoLbl.WriteLine("OnGround: {0}", Ply.GetWasLastLegsOnFloor() ? "YES" : "NO");
-            }
-        }
 
 		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
 			for (int x = (int)min.X; x <= (int)max.X; x++)
@@ -152,82 +81,17 @@ namespace RaylibGame.States {
 			}
 			Map.Tick();
 			Ply.Tick();
+			Ply.TickGUI(Window.InMgr, Map);
+
 			if (Window.InMgr.IsInputPressed(InputKey.F5)) {
 				SaveGameState();
 			}
-			bool Left = Window.InMgr.IsInputPressed(InputKey.Click_Left);
-			bool Right = Window.InMgr.IsInputPressed(InputKey.Click_Right);
-			bool Middle = Window.InMgr.IsInputPressed(InputKey.Click_Middle);
-			const float MaxLen = 20;
-			float Wheel = Window.InMgr.GetMouseWheel();
-			if (Wheel >= 1)
-				Inventory.SelectNext();
-			else if (Wheel <= -1)
-				Inventory.SelectPrevious();
-			if ((Left || Right || Middle) && Ply.CursorDisabled) {
-				Vector3 Dir = Ply.GetForward();
-				Vector3 Start = Ply.Position;
-				if (Left) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							Snd.PlayCombo("block_break", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, BlockType.None);
-							return true;
-						}
-						return false;
-					});
-				}
-				if (Right) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							X += (int)Face.X;
-							Y += (int)Face.Y;
-							Z += (int)Face.Z;
-							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, PlayerSelectedBlockType);
-							return true;
-						}
-						return false;
-					});
-				}
-				if (Middle) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							X += (int)Face.X;
-							Y += (int)Face.Y;
-							Z += (int)Face.Z;
-							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, BlockType.Campfire);
-							return true;
-						}
-						return false;
-					});
-				}
-			}
-			if (!Ply.CursorDisabled) {
-				GUI.Tick();
-			} else {
-				if (Window.InMgr.IsInputPressed(InputKey.Q))
-					Inventory.SelectPrevious();
-				if (Window.InMgr.IsInputPressed(InputKey.E)) {
-					Vector3 Start = Ply.Position;
-					Vector3 End = Map.RaycastPos(Start, 1.5f, Ply.GetForward(), out Vector3 Face);
-					if (Face.Y == 1)
-						End.Y -= 0.001f;
-					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
-					if (Blk.Type == BlockType.CraftingTable) {
-						Console.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
-						return;
-					}
-					Inventory.SelectNext();
-				}
-				Inventory.Update();
-			}
-			UpdateGUI();
+
+			Ply.UpdateGUI();
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt) {
-			Ply.UpdatePhysics(Map, PhysicsData, NoClip, Dt);
+			Ply.UpdatePhysics(Map, PhysicsData, Dt);
 		}
 
 		public override void Draw(float TimeAlpha) {

@@ -41,6 +41,15 @@ namespace Voxelgine.GUI {
 			Elements.Add(E);
 		}
 
+		public T FindFirstElementOrDefault<T>() where T : GUIElement {
+			foreach (var E in Elements) {
+				if (E is T TE)
+					return TE;
+			}
+
+			return null;
+		}
+
 		public void Tick() {
 			MousePos = Window.InMgr.GetMousePos();
 

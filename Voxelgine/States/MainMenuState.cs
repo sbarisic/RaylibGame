@@ -21,17 +21,8 @@ namespace RaylibGame.States {
 
 		Rectangle DbgRect = new Rectangle();
 
-		public MainMenuState(GameWindow window) : base(window) {
-			GUI = new GUIManager(window);
-			//GUI.CreateConsole(window, out Lbl, out OutLbl);
-
-			Vector2 BtnSize = GUI.WindowScale(new Vector2(0.2f, 0.07f));
-			Vector2 Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
-
-			GUIImage TitleImage = new GUIImage(GUI, "title.png", 10);
-			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
-			GUI.AddElement(TitleImage);
-
+		private void CreateMenuButtons(List<GUIElement> IB, Vector2 BtnSize)
+		{
 			GUIButton Btn_NewGame = new GUIButton(GUI);
 			Btn_NewGame.Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
 			Btn_NewGame.Size = BtnSize;
@@ -41,7 +32,6 @@ namespace RaylibGame.States {
 			};
 			GUI.AddElement(Btn_NewGame);
 
-			// Add Options button between New Game and Quit
 			GUIButton Btn_Options = new GUIButton(GUI);
 			Btn_Options.Pos = GUI.WindowScale(new Vector2(0.3f, 0.35f));
 			Btn_Options.Size = BtnSize;
@@ -69,16 +59,58 @@ namespace RaylibGame.States {
 			};
 			GUI.AddElement(Btn_Wat);
 
-			List<GUIElement> IB = new List<GUIElement>();
 			IB.Add(Btn_NewGame);
 			IB.Add(Btn_Options);
 			IB.Add(Btn_Quit);
 
+			Texture2D Icon = ResMgr.GetTexture("items/pickaxe.png");
+			Raylib.SetTextureFilter(Icon, TextureFilter.Point);
+			Btn_NewGame.SetIcon(Icon);
+
+			Texture2D IconOptions = ResMgr.GetTexture("items/hammer.png");
+			Raylib.SetTextureFilter(IconOptions, TextureFilter.Point);
+			Btn_Options.SetIcon(IconOptions);
+
+			Texture2D Icon2 = ResMgr.GetTexture("items/lava.png");
+			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
+			Btn_Quit.SetIcon(Icon2);
+
+			IB.Add(Btn_Wat);
+		}
+
+		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {
+			GUIItemBox IBox = new GUIItemBox(GUI);
+			IBox.Pos = Pos;
+			IBox.Size = new Vector2(64, 64);
+			IBox.IsSelected = false;
+			IBox.Text = "64";
+			IBox.OnClickedFunc = (E) => {
+				Console.WriteLine("Clicked item!");
+			};
+			GUI.AddElement(IBox);
+
+			Raylib.SetTextureFilter(Icn, TextureFilter.Point);
+			IBox.SetIcon(Icn, 3);
+			return IBox;
+		}
+
+		public MainMenuState(GameWindow window) : base(window) {
+			GUI = new GUIManager(window);
+			//GUI.CreateConsole(window, out Lbl, out OutLbl);
+
+			Vector2 BtnSize = GUI.WindowScale(new Vector2(0.2f, 0.07f));
+			Vector2 Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
+
+			GUIImage TitleImage = new GUIImage(GUI, "title.png", 10);
+			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
+			GUI.AddElement(TitleImage);
+
+			List<GUIElement> IB = new List<GUIElement>();
+			CreateMenuButtons(IB, BtnSize);
+
 			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
 			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
 			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
-
-			IB.Add(Btn_Wat);
 
 			Vector2 CenterSize = new Vector2(400, 500);
 
@@ -103,37 +135,9 @@ namespace RaylibGame.States {
 			GUI.AddElement(IcnBar2);*/
 
 
-			Texture2D Icon = ResMgr.GetTexture("items/pickaxe.png");
-			Raylib.SetTextureFilter(Icon, TextureFilter.Point);
-			Btn_NewGame.SetIcon(Icon);
-
-			Texture2D IconOptions = ResMgr.GetTexture("items/hammer.png");
-			Raylib.SetTextureFilter(IconOptions, TextureFilter.Point);
-			Btn_Options.SetIcon(IconOptions);
-
-			Texture2D Icon2 = ResMgr.GetTexture("items/lava.png");
-			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
-			Btn_Quit.SetIcon(Icon);
-
 			//============
 
 
-		}
-
-		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {
-			GUIItemBox IBox = new GUIItemBox(GUI);
-			IBox.Pos = Pos;
-			IBox.Size = new Vector2(64, 64);
-			IBox.IsSelected = false;
-			IBox.Text = "64";
-			IBox.OnClickedFunc = (E) => {
-				Console.WriteLine("Clicked item!");
-			};
-			GUI.AddElement(IBox);
-
-			Raylib.SetTextureFilter(Icn, TextureFilter.Point);
-			IBox.SetIcon(Icn, 3);
-			return IBox;
 		}
 
 		public override void SwapTo() {

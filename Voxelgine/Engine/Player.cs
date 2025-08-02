@@ -15,6 +15,12 @@ using Voxelgine.GUI;
 namespace Voxelgine.Engine {
 	delegate void OnKeyPressedFunc();
 
+	enum ViewModelRotationMode {
+		Tool,
+		Gun,
+		GunIronsight,
+	}
+
 	unsafe class Player {
 		const bool DEBUG_PLAYER = true;
 
@@ -25,7 +31,8 @@ namespace Voxelgine.Engine {
 
 		// Viewmodel fields
 		Model ViewModel; // Non-animated viewmodel
-		const string DefaultViewModelName = "hammer/hammer.obj";
+		const string DefaultViewModelName = "gun/gun.obj";
+		ViewModelRotationMode ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
 
 		bool MoveFd;
 		bool MoveBk;
@@ -685,6 +692,24 @@ namespace Voxelgine.Engine {
 			// Viewmodel position offset from camera
 			Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 
+			switch (ViewMdlRotMode) {
+				case ViewModelRotationMode.Tool:
+					vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+					break;
+
+				case ViewModelRotationMode.Gun:
+					vmPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.3f;
+					break;
+
+				case ViewModelRotationMode.GunIronsight: {					
+					vmPos = cam.Position + camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+					break;
+				}
+
+				default:
+					throw new NotImplementedException();
+			}
+
 			// Get yaw and pitch from camera angles (in radians)
 			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;   // Yaw: horizontal, around world Y
 			float pitch = Utils.ToRad(90) - CamAngle.Y * MathF.PI / 180f; // Pitch: vertical, around local right
@@ -702,11 +727,31 @@ namespace Voxelgine.Engine {
 			var qYaw = Quaternion.CreateFromAxisAngle(worldUp, -yaw);
 			var qPitch = Quaternion.CreateFromAxisAngle(camRight, -pitch);
 
+
+
 			var qInitial = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(90));
 			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
 			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
 
-			var qFinal = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
+			var qFinal = qPitch * qYaw;
+
+			switch (ViewMdlRotMode) {
+				case ViewModelRotationMode.Tool:
+					qFinal = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
+					break;
+
+				case ViewModelRotationMode.Gun:
+					qFinal = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+					break;
+
+				case ViewModelRotationMode.GunIronsight:
+					qFinal = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+					break;
+
+				default:
+					throw new NotImplementedException();
+			}
+
 			qFinal = System.Numerics.Quaternion.Normalize(qFinal);
 			float angle = 2.0f * MathF.Acos(qFinal.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - qFinal.W * qFinal.W);

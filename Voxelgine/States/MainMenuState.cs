@@ -20,6 +20,7 @@ namespace RaylibGame.States {
 		Vector2 MousePos;*/
 
 		Rectangle DbgRect = new Rectangle();
+		GUIWindow OptionsWnd;
 
 		private void CreateMenuButtons(List<GUIElement> IB, Vector2 BtnSize)
 		{
@@ -37,6 +38,7 @@ namespace RaylibGame.States {
 			Btn_Options.Text = "Options";
 			Btn_Options.OnClickedFunc = (E) => {
 				Console.WriteLine("Options clicked");
+				OptionsWnd.Enabled = true;
 			};
 
 			GUIButton Btn_Quit = new GUIButton(GUI);
@@ -89,6 +91,17 @@ namespace RaylibGame.States {
 			return IBox;
 		}
 
+		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize)
+		{
+			GUIButton Btn_Close = new GUIButton(GUI);
+			Btn_Close.Size = BtnSize;
+			Btn_Close.Text = "Close";
+			Btn_Close.OnClickedFunc = (E) => {
+				OptionsWnd.Enabled = false;
+			};
+			IB.Add(Btn_Close);
+		}
+
 		public MainMenuState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
 			//GUI.CreateConsole(window, out Lbl, out OutLbl);
@@ -112,6 +125,14 @@ namespace RaylibGame.States {
 			GWnd.Pos = DbgRect.Position;
 			GUI.AddElement(GWnd);
 
+			// Create the options window, same size/pos as GWnd, but disabled by default
+			OptionsWnd = new GUIWindow(GUI);
+			OptionsWnd.Size = DbgRect.Size;
+			OptionsWnd.Pos = DbgRect.Position;
+			OptionsWnd.Enabled = false;
+			OptionsWnd.Title = "Options";
+			GUI.AddElement(OptionsWnd);
+
 			List<GUIElement> IB = new List<GUIElement>();
 			CreateMenuButtons(IB, BtnSize);
 			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
@@ -126,22 +147,14 @@ namespace RaylibGame.States {
 
 			GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
 
-			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
-			IcnBar.Pos = new Vector2(800, 200);
-			IcnBar.Txt = "XP Level";
-			GUI.AddElement(IcnBar);
-
-			GUIIconBar IcnBar2 = new GUIIconBar(GUI, IconBarStyle.Hearts);
-			IcnBar2.Pos = new Vector2(800, 300);
-			IcnBar2.TxtOffset = new Vector2(0, -10);
-			IcnBar2.Txt = "Helth";
-			IcnBar2.Value = 20;
-			GUI.AddElement(IcnBar2);*/
-
-
-			//============
-
-
+			// Options window buttons
+			List<GUIElement> OptIB = new List<GUIElement>();
+			CreateOptionsButtons(OptIB, BtnSize);
+			foreach (var el in OptIB) {
+				el.Pos -= DbgRect.Position;
+				OptionsWnd.AddChild(el);
+			}
+			GUI.CenterVertical(Vector2.Zero, OptionsWnd.Size, new Vector2(15, 10), 5, OptIB.ToArray());
 		}
 
 		public override void SwapTo() {

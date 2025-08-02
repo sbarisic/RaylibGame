@@ -107,8 +107,10 @@ namespace RaylibGame.States {
 			Map.Draw();
 			Map.DrawTransparent();
 			Ply.Draw();
+
 			if (Program.DebugMode)
 				DrawPlayerCollisionBox();
+
 			foreach (var L in MarkerList)
 				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);
 			Raylib.DrawLine3D(Vector3.Zero, new Vector3(100, 0, 0), Color.Red);

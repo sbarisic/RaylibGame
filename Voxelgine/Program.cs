@@ -49,7 +49,7 @@ namespace Voxelgine {
 
 			float Time = 0;
 
-			float DeltaTime = 0.015f; // 66.6 update ticks per second
+			float DeltaTime = 0.01f;  //float DeltaTime = 0.015f; // 66.6 update ticks per second
 									  //float DeltaTime = 0.04f; // 25 updates per second
 									  //float DeltaTime = 0.2f; // 5 updates per second
 

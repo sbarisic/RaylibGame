@@ -101,7 +101,9 @@ namespace RaylibGame.States {
 
 		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
 			GUIItemBox Itm = Inventory.GetItem(Idx);
+			
 			BlockInfo.GetBlockTexCoords(BType, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
+			
 			Itm.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
 			Itm.OnClickedFunc = (E) => {
 				Inventory.SetSelectedIndex(Idx);
@@ -111,6 +113,7 @@ namespace RaylibGame.States {
 
 		void UpdateGUI() {
 			InfoLbl.Enabled = false;
+			
 			if (Program.DebugMode) {
 				InfoLbl.Enabled = true;
 				InfoLbl.Clear();
@@ -128,8 +131,10 @@ namespace RaylibGame.States {
 		float ClampToZero(float Num, float ClampHyst) {
 			if (Num < 0 && Num > -ClampHyst)
 				return 0;
+			
 			if (Num > 0 && Num < ClampHyst)
 				return 0;
+			
 			return Num;
 		}
 
@@ -140,21 +145,27 @@ namespace RaylibGame.States {
 				Height = Player.PlayerHeight;
 			int RadialDivs = 12;
 			int HeightDivs = 4;
+			
 			for (int h = 0; h < HeightDivs; h++) {
 				float heightRatio = (float)h / (HeightDivs - 1);
 				float currentHeight = heightRatio * Height;
+				
 				for (int i = 0; i < RadialDivs; i++) {
 					float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
 					float x = MathF.Cos(angle) * Radius;
 					float z = MathF.Sin(angle) * Radius;
+					
 					yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
 				}
 			}
+			
 			for (int h = 0; h < HeightDivs; h++) {
 				float heightRatio = (float)h / (HeightDivs - 1);
 				float currentHeight = heightRatio * Height;
+				
 				yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
 			}
+			
 			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
 			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
 		}
@@ -171,10 +182,13 @@ namespace RaylibGame.States {
 		void ClampToZero(ref Vector3 Vec, float ClampHyst) {
 			if (float.IsNaN(Vec.X))
 				Vec.X = 0;
+			
 			if (float.IsNaN(Vec.Y))
 				Vec.Y = 0;
+			
 			if (float.IsNaN(Vec.Z))
 				Vec.Z = 0;
+			
 			Vec.X = ClampToZero(Vec.X, ClampHyst);
 			Vec.Y = ClampToZero(Vec.Y, ClampHyst);
 			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
@@ -186,57 +200,73 @@ namespace RaylibGame.States {
 		private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false) {
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
+			
 			Vector3 feetPos = Ply.FeetPosition;
 			Vector3 move = velocity * dt;
+			
 			LastWallNormal = Vector3.Zero; // Reset before each move
+			
 			for (int slide = 0; slide < maxSlides; slide++) {
 				Vector3 tryPos = feetPos + move;
+				
 				if (!HasBlocksInBounds(
 					tryPos - new Vector3(playerRadius, 0, playerRadius),
 					tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryPos;
 					break;
 				}
+				
 				Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
 				Vector3 stepTry = stepUp + move;
+				
 				if (!HasBlocksInBounds(
 					stepTry - new Vector3(playerRadius, 0, playerRadius),
 					stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = stepTry;
 					break;
 				}
+				
 				Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
+				
 				if (!HasBlocksInBounds(
 					tryX - new Vector3(playerRadius, 0, playerRadius),
 					tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryX;
 					move.Z = 0;
+					
 					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(1, 0, 0), 1e-5f);
 					LastWallNormal = new Vector3(MathF.Sign(move.X), 0, 0); // Store wall normal
-					// Clamp vertical velocity if airborne and moving up
-					if (!onGround && PlyVelocity.Y > 0)
-						PlyVelocity.Y = 0;
+																			// Clamp vertical velocity if airborne and moving up
+					/*if (!onGround && PlyVelocity.Y > 0)
+						PlyVelocity.Y = 0;*/
+
 					continue;
 				}
+				
 				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
+				
 				if (!HasBlocksInBounds(
 					tryZ - new Vector3(playerRadius, 0, playerRadius),
 					tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryZ;
 					move.X = 0;
+					
 					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(0, 0, 1), 1e-5f);
 					LastWallNormal = new Vector3(0, 0, MathF.Sign(move.Z)); // Store wall normal
-					if (!onGround && PlyVelocity.Y > 0)
-						PlyVelocity.Y = 0;
+					
+					/*if (!onGround && PlyVelocity.Y > 0)
+						PlyVelocity.Y = 0;*/
+					
 					continue;
 				}
 				break;
 			}
+			
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
 
 		void UpdatePhysics(float Dt) {
-			const float GroundHitBelowFeet = -0.065f;
+			const float GroundHitBelowFeet = -0.075f;
 
 			Ply.UpdatePhysics(Dt);
 			float playerHeight = Player.PlayerHeight;
@@ -304,7 +334,8 @@ namespace RaylibGame.States {
 				GroundGraceTimer = 0.1f; // 100ms grace period
 			} else {
 				GroundGraceTimer -= Dt;
-				if (GroundGraceTimer < 0) GroundGraceTimer = 0;
+				if (GroundGraceTimer < 0)
+					GroundGraceTimer = 0;
 			}
 			bool OnGroundGrace = GroundGraceTimer > 0f;
 			Vector3 wishdir = Vector3.Zero;
@@ -312,6 +343,7 @@ namespace RaylibGame.States {
 			fwd2.Y = 0;
 			fwd2 = Vector3.Normalize(fwd2);
 			Vector3 lft2 = Ply.GetLeft();
+
 			if (Raylib.IsKeyDown(KeyboardKey.W))
 				wishdir += fwd2;
 			if (Raylib.IsKeyDown(KeyboardKey.S))
@@ -322,13 +354,16 @@ namespace RaylibGame.States {
 				wishdir -= lft2;
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
+
 			bool ledgeSafety = OnGroundGrace && Raylib.IsKeyDown(KeyboardKey.LeftShift);
+
 			if (ledgeSafety && wishdir != Vector3.Zero) {
 				float innerRadius = 0.4f;
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
 				float minY = points.Min(p => p.Y);
 				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
 				List<Vector3> supportedPoints = new();
+
 				foreach (var pt in feetPoints) {
 					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
 					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
@@ -355,7 +390,9 @@ namespace RaylibGame.States {
 					}
 				}
 			}
+
 			float VelLen = PlyVelocity.Length();
+			
 			if (OnGroundGrace) {
 				if (!WasLastLegsOnFloor) {
 					WasLastLegsOnFloor = true;
@@ -366,15 +403,18 @@ namespace RaylibGame.States {
 			} else {
 				WasLastLegsOnFloor = false;
 			}
+
 			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
 				GroundGraceTimer = 0; // lose grace on jump
 			}
+
 			if (OnGroundGrace) {
 				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 				float speed = velH.Length();
+			
 				if (speed > 0) {
 					float drop = speed * PhysicsData.GroundFriction * Dt;
 					float newSpeed = MathF.Max(speed - drop, 0);
@@ -394,6 +434,7 @@ namespace RaylibGame.States {
 			} else if (PlyVelocity.Y < 0) {
 				PlyVelocity.Y = 0;
 			}
+			
 			// Use stepHeight only if OnGround, otherwise set to 0 to prevent wall climbing
 			float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
 			Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
@@ -401,10 +442,12 @@ namespace RaylibGame.States {
 				Ply.SetPosition(newPos);
 			else
 				PlyVelocity = Vector3.Zero;
+			
 			// Only apply air acceleration if not stuck to wall
 			if (wishdir != Vector3.Zero) {
 				// If airborne and collided with a wall, project wishdir onto wall plane
 				Vector3 accelDir = wishdir;
+			
 				if (!OnGroundGrace && LastWallNormal != Vector3.Zero) {
 					// Remove component into the wall
 					accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
@@ -413,7 +456,9 @@ namespace RaylibGame.States {
 					else
 						accelDir = Vector3.Zero;
 				}
+				
 				bool canApplyAirAccel = OnGroundGrace || accelDir != Vector3.Zero;
+				
 				if (canApplyAirAccel) {
 					float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
 					float addSpeed, accel;
@@ -434,6 +479,7 @@ namespace RaylibGame.States {
 					}
 				}
 			}
+			
 			if (PlyVelocity.Y > 0) {
 				float headEpsilon = 0.02f;
 				Vector3 headPos = feetPos + new Vector3(0, playerHeight - headEpsilon, 0);
@@ -444,6 +490,7 @@ namespace RaylibGame.States {
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
 					headPos
 				};
+				
 				foreach (var pt in headCheckPoints) {
 					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
 						PlyVelocity.Y = 0;
@@ -451,14 +498,17 @@ namespace RaylibGame.States {
 					}
 				}
 			}
+			
 			Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed2 = horizVel2.Length();
 			float maxSpeed2 = OnGroundGrace ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
+			
 			if (horizSpeed2 > maxSpeed2) {
 				float scale = maxSpeed2 / horizSpeed2;
 				PlyVelocity.X *= scale;
 				PlyVelocity.Z *= scale;
 			}
+			
 			if (PlyVelocity.Y > 0) {
 				float headEpsilon = 0.02f;
 				Vector3 feetPos2 = Ply.FeetPosition;
@@ -470,6 +520,7 @@ namespace RaylibGame.States {
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
 					headPos
 				};
+			
 				foreach (var pt in headCheckPoints) {
 					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
 						PlyVelocity.Y = 0;
@@ -477,6 +528,7 @@ namespace RaylibGame.States {
 					}
 				}
 			}
+			
 			Utils.EndRaycastRecord();
 		}
 
@@ -581,6 +633,8 @@ namespace RaylibGame.States {
 		}
 
 		public override void Draw(float TimeAlpha) {
+			Ply.UpdateFPSCamera();
+
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
 			Draw3D(TimeAlpha);

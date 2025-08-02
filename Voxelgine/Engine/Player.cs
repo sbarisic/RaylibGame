@@ -364,10 +364,22 @@ namespace Voxelgine.Engine {
 			get => FPSCamera.CamAngle;
 			set => FPSCamera.CamAngle = value;
 		}
-		public Vector3 GetForward() => FPSCamera.GetForward();
-		public Vector3 GetLeft() => FPSCamera.GetLeft();
-		public Vector3 GetUp() => FPSCamera.GetUp();
-		public void UpdateCamera(bool handleRotation) => FPSCamera.Update(handleRotation, ref Cam);
-		public Vector2 GetPreviousMousePos() => FPSCamera.GetPreviousMousePos();
+
+		Vector3 Fwd;
+		Vector3 Left;
+		Vector3 Up;
+
+		public Vector3 GetForward() => Fwd;
+		public Vector3 GetLeft() => Left;
+		public Vector3 GetUp() => Up;
+
+		public void UpdateFPSCamera() {
+			Fwd = FPSCamera.GetForward();
+			Left = FPSCamera.GetLeft();
+			Up = FPSCamera.GetUp();
+		}
+
+		//public void UpdateCamera(bool handleRotation) => FPSCamera.Update(handleRotation, ref Cam);
+		//public Vector2 GetPreviousMousePos() => FPSCamera.GetPreviousMousePos();
 	}
 }

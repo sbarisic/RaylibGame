@@ -544,6 +544,26 @@ namespace RaylibGame.States {
 				PlyVelocity.Y = 0;
 			}
 
+			// Ceiling collision: if moving up and hit block above, reset Y velocity
+			if (PlyVelocity.Y > 0) {
+				// Check above the player's head for collision
+				float headEpsilon = 0.02f;
+				Vector3 headPos = feetPos + new Vector3(0, playerHeight - headEpsilon, 0);
+				Vector3[] headCheckPoints = new Vector3[] {
+					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
+					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
+					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
+					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
+					headPos
+				};
+				foreach (var pt in headCheckPoints) {
+					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+						PlyVelocity.Y = 0;
+						break;
+					}
+				}
+			}
+
 			// Cap horizontal speed
 			Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed = horizVel.Length();

@@ -610,7 +610,7 @@ namespace Voxelgine.Engine {
 					});
 				}
 				if (Right) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
+					/*Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
 							X += (int)Face.X;
 							Y += (int)Face.Y;
@@ -620,7 +620,11 @@ namespace Voxelgine.Engine {
 							return true;
 						}
 						return false;
-					});
+					});*/
+					ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
+
+				} else {
+					ViewMdlRotMode = ViewModelRotationMode.Gun;
 				}
 				if (Middle) {
 					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
@@ -680,6 +684,12 @@ namespace Voxelgine.Engine {
 			Rlgl.EnableDepthTest();
 		}
 
+		Vector3 DesiredViewModelPos;
+		Vector3 ViewModelPos;
+
+		Quaternion DesiredVMRot;
+		Quaternion VMRot;
+
 		// Draw the viewmodel in first person
 		private void DrawViewModel() {
 			// Camera basis
@@ -690,25 +700,27 @@ namespace Voxelgine.Engine {
 			Vector3 camUp = GetUp();
 
 			// Viewmodel position offset from camera
-			Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+			//Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 
 			switch (ViewMdlRotMode) {
 				case ViewModelRotationMode.Tool:
-					vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+					DesiredViewModelPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 					break;
 
 				case ViewModelRotationMode.Gun:
-					vmPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.3f;
+					DesiredViewModelPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.3f;
 					break;
 
-				case ViewModelRotationMode.GunIronsight: {					
-					vmPos = cam.Position + camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+				case ViewModelRotationMode.GunIronsight: {
+					DesiredViewModelPos = cam.Position + camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
 					break;
 				}
 
 				default:
 					throw new NotImplementedException();
 			}
+
+			ViewModelPos = DesiredViewModelPos;
 
 			// Get yaw and pitch from camera angles (in radians)
 			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;   // Yaw: horizontal, around world Y
@@ -721,7 +733,7 @@ namespace Voxelgine.Engine {
 			// Pitch rotation (around right after yaw)
 			var pitchRot = Matrix4x4.CreateFromAxisAngle(camRight, -pitch);
 			// Compose final rotation
-			var modelMat = pitchRot * yawRot * Matrix4x4.CreateTranslation(vmPos);
+			var modelMat = pitchRot * yawRot * Matrix4x4.CreateTranslation(ViewModelPos);
 
 			// Quaternion for Raylib.DrawModelEx
 			var qYaw = Quaternion.CreateFromAxisAngle(worldUp, -yaw);
@@ -733,31 +745,33 @@ namespace Voxelgine.Engine {
 			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
 			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
 
-			var qFinal = qPitch * qYaw;
+			var DesiredVMRot = qPitch * qYaw;
 
 			switch (ViewMdlRotMode) {
 				case ViewModelRotationMode.Tool:
-					qFinal = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
+					DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
 					break;
 
 				case ViewModelRotationMode.Gun:
-					qFinal = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+					DesiredVMRot = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
 					break;
 
 				case ViewModelRotationMode.GunIronsight:
-					qFinal = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+					DesiredVMRot = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
 					break;
 
 				default:
 					throw new NotImplementedException();
 			}
 
-			qFinal = System.Numerics.Quaternion.Normalize(qFinal);
-			float angle = 2.0f * MathF.Acos(qFinal.W) * 180f / MathF.PI;
-			float s = MathF.Sqrt(1 - qFinal.W * qFinal.W);
-			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(qFinal.X / s, qFinal.Y / s, qFinal.Z / s);
+			DesiredVMRot = System.Numerics.Quaternion.Normalize(DesiredVMRot);
+			VMRot = DesiredVMRot;
 
-			Raylib.DrawModelEx(ViewModel, vmPos, axis, angle, new Vector3(1, 1, 1), Color.White);
+			float angle = 2.0f * MathF.Acos(VMRot.W) * 180f / MathF.PI;
+			float s = MathF.Sqrt(1 - VMRot.W * VMRot.W);
+			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(VMRot.X / s, VMRot.Y / s, VMRot.Z / s);
+
+			Raylib.DrawModelEx(ViewModel, ViewModelPos, axis, angle, new Vector3(1, 1, 1), Color.White);
 		}
 
 		public void AddOnKeyPressed(KeyboardKey K, Action Act) {

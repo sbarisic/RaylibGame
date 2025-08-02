@@ -478,5 +478,13 @@ namespace Voxelgine {
 				return new Vector3(Vec.X - Normal.X * Dot / SqrMag, Vec.Y - Normal.Y * Dot / SqrMag, Vec.Z - Normal.Z * Dot / SqrMag);
 			}
 		}
+
+		// If F = 0, then it's A, as F approaches 1, then it returns lerp towards B.
+		// If < 0, return A, if > 1, return B.
+		public static Vector3 Lerp(Vector3 A, Vector3 B, float F) {
+		}
+
+		public static Quaternion Lerp(Quaternion A, Quaternion B, float F) {
+		}
 	}
 }

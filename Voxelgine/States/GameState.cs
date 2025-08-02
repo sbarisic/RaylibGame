@@ -466,25 +466,22 @@ namespace RaylibGame.States {
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
 
-			// Ledge safety logic: allow some overhang, but stop if not enough support
+			// Ledge safety logic: use a smaller collision box to detect edge
 			bool ledgeSafety = OnGround && Raylib.IsKeyDown(KeyboardKey.LeftShift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
-				float stopDist = 0.2f; // Minimum distance to stop before ledge
-				float minSupportFrac = 0.5f; // Require at least 50% of feet points to be supported
-				Vector3 checkDir = wishdir;
-				Vector3 feetCheckPos = feetPos + checkDir * stopDist;
-				var points = Phys_PlayerCollisionPointsImproved(feetCheckPos, playerRadius, Player.PlayerHeight).ToArray();
+				float innerRadius = playerRadius - 0.3f; // Smaller collision box
+				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
 				float minY = points.Min(p => p.Y);
 				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
-				int supported = 0;
+				bool anySupported = false;
 				foreach (var pt in feetPoints) {
 					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
 					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
-						supported++;
+						anySupported = true;
+						break;
 					}
 				}
-				float supportFrac = (float)supported / feetPoints.Length;
-				if (supportFrac < minSupportFrac) {
+				if (!anySupported) {
 					PlyVelocity.X = 0;
 					PlyVelocity.Z = 0;
 					wishdir = Vector3.Zero;

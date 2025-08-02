@@ -23,6 +23,10 @@ namespace Voxelgine.Engine {
 		EntityAnimation CurAnim;
 		GUIManager GUI;
 
+		// Viewmodel fields
+		Model ViewModel; // Non-animated viewmodel
+		const string DefaultViewModelName = "hammer/hammer.obj";
+
 		bool MoveFd;
 		bool MoveBk;
 		bool MoveLt;
@@ -66,6 +70,12 @@ namespace Voxelgine.Engine {
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
 			PlayerEntity = Entities.Load(ModelName);
+
+			// Load default viewmodel (pickaxe)
+			ViewModel = ResMgr.GetModel(DefaultViewModelName);
+
+			if (ViewModel.MeshCount == 0)
+				Console.WriteLine("Warning! Zero meshes in model {0}", DefaultViewModelName);
 
 			Position = Vector3.Zero;
 			Rotation = Matrix4x4.Identity;
@@ -641,6 +651,11 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Draw() {
+			// Draw the viewmodel (pickaxe) in first person
+			if (LocalPlayer) {
+				DrawViewModel();
+			}
+
 			if (!DEBUG_PLAYER && LocalPlayer)
 				return;
 
@@ -651,6 +666,43 @@ namespace Voxelgine.Engine {
 
 			PlayerEntity.Mdl.Transform = Rotation;
 			Raylib.DrawModel(PlayerEntity.Mdl, DrawPos, 0.25f, Color.White);
+		}
+
+		// Draw the viewmodel in first person
+		private void DrawViewModel() {
+			// Camera basis
+			var cam = Cam;
+			Vector3 worldUp = Vector3.UnitY;
+			Vector3 camForward = GetForward();
+			Vector3 camRight = -GetLeft();
+			Vector3 camUp = GetUp();
+
+			// Viewmodel position offset from camera
+			Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+
+			// Get yaw and pitch from camera angles (in radians)
+			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;   // Yaw: horizontal, around world Y
+			float pitch = Utils.ToRad(90) - CamAngle.Y * MathF.PI / 180f; // Pitch: vertical, around local right
+
+			// Yaw rotation (around world up)
+			var yawRot = Matrix4x4.CreateFromAxisAngle(worldUp, -yaw);
+			// Right vector after yaw
+			camRight = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, yawRot));
+			// Pitch rotation (around right after yaw)
+			var pitchRot = Matrix4x4.CreateFromAxisAngle(camRight, -pitch);
+			// Compose final rotation
+			var modelMat = pitchRot * yawRot * Matrix4x4.CreateTranslation(vmPos);
+
+			// Quaternion for Raylib.DrawModelEx
+			var qYaw = System.Numerics.Quaternion.CreateFromAxisAngle(worldUp, -yaw);
+			var qPitch = System.Numerics.Quaternion.CreateFromAxisAngle(camRight, -pitch);
+			var qFinal = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22)) * Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 45)) * Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(90)) * qPitch * qYaw;
+			qFinal = System.Numerics.Quaternion.Normalize(qFinal);
+			float angle = 2.0f * MathF.Acos(qFinal.W) * 180f / MathF.PI;
+			float s = MathF.Sqrt(1 - qFinal.W * qFinal.W);
+			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(qFinal.X / s, qFinal.Y / s, qFinal.Z / s);
+
+			Raylib.DrawModelEx(ViewModel, vmPos, axis, angle, new Vector3(1, 1, 1), Color.White);
 		}
 
 		public void AddOnKeyPressed(KeyboardKey K, Action Act) {

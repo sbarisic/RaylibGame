@@ -250,6 +250,7 @@ namespace Voxelgine.Graphics {
         }
 
         // Add back RaycastPos and Collide for GameState compatibility
+        // RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.
         public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir) {
             // Block-based raycast: returns the first solid block hit, or Vector3.Zero if none
             Vector3 hitPos = Vector3.Zero;
@@ -278,6 +279,7 @@ namespace Voxelgine.Graphics {
             return closest;
         }
         // Add back Collide overload for GameState compatibility
+        // Collide: Checks if the position is inside a solid block, or if moving in ProbeDir hits a block. Returns true and the collision normal if a block is hit, otherwise false.
         public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal) {
             // Check if the position is inside a solid block, or if moving in ProbeDir hits a block
             Vector3 probe = Pos + ProbeDir * 0.1f;

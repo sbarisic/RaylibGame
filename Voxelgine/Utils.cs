@@ -273,7 +273,8 @@ namespace Voxelgine {
 			StepZ *= StepScale;*/
 
 			// See description above. The initial values depend on the fractional
-			// part of the origin.
+			// part of the origin. tMaxX, tMaxY, and tMaxZ store the t-value at which we cross a cube boundary along each axis.
+			// The following logic chooses the closest cube boundary and updates the position and face normal accordingly.
 			float tMaxX = IntBound(Origin.X, Dx);
 			float tMaxY = IntBound(Origin.Y, Dy);
 			float tMaxZ = IntBound(Origin.Z, Dz);

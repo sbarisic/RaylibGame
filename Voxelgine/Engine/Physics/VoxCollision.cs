@@ -188,8 +188,7 @@ namespace Voxelgine.Engine {
 
 				// tMaxX stores the t-value at which we cross a cube boundary along the
 				// X axis, and similarly for Y and Z. Therefore, choosing the least tMax
-				// chooses the closest cube boundary. Only the first case of the four
-				// has been commented in detail.
+				// chooses the closest cube boundary. The following cases update the position and face normal accordingly.
 				if (tMaxX < tMaxY) {
 					if (tMaxX < tMaxZ) {
 						if (tMaxX > radius)

@@ -170,6 +170,7 @@ namespace Voxelgine.Graphics {
 		}
 
 		// Helper struct for queue (faster than Vector3 for ints)
+		// BlockPos is used to represent integer block positions in the light propagation queue.
 		struct BlockPos {
 			public int X, Y, Z;
 			public BlockPos(int x, int y, int z) { X = x; Y = y; Z = z; }

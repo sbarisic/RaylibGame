@@ -33,7 +33,7 @@ namespace Voxelgine.Engine {
 
 		bool NoClip;
 
-		Dictionary<KeyboardKey, Action> OnKeyFuncs = new Dictionary<KeyboardKey, Action>();
+		Dictionary<InputKey, Action> OnKeyFuncs = new Dictionary<InputKey, Action>();
 
 		Stopwatch LegTimer = Stopwatch.StartNew();
 		long LastWalkSound = 0;
@@ -93,7 +93,7 @@ namespace Voxelgine.Engine {
 		public void Init(ChunkMap Map) {
 			Stopwatch SWatch = Stopwatch.StartNew();
 
-			AddOnKeyPressed(KeyboardKey.F2, () => {
+			AddOnKeyPressed(InputKey.F2, () => {
 				Console.WriteLine("Compute light!");
 				SWatch.Restart();
 				Map.ComputeLighting();
@@ -101,11 +101,11 @@ namespace Voxelgine.Engine {
 				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
 			});
 
-			AddOnKeyPressed(KeyboardKey.F3, () => { Program.DebugMode = !Program.DebugMode; });
+			AddOnKeyPressed(InputKey.F3, () => { Program.DebugMode = !Program.DebugMode; });
 
-			AddOnKeyPressed(KeyboardKey.F4, () => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
+			AddOnKeyPressed(InputKey.F4, () => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
 
-			AddOnKeyPressed(KeyboardKey.C, () => {
+			AddOnKeyPressed(InputKey.C, () => {
 				NoClip = !NoClip;
 				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
 			});
@@ -247,17 +247,17 @@ namespace Voxelgine.Engine {
 				Vector3 fwd = GetForward();
 				Vector3 lft = GetLeft();
 				Vector3 up = GetUp();
-				if (Raylib.IsKeyDown(KeyboardKey.W))
+				if (InMgr.IsInputDown(InputKey.W))
 					move += fwd;
-				if (Raylib.IsKeyDown(KeyboardKey.S))
+				if (InMgr.IsInputDown(InputKey.S))
 					move -= fwd;
-				if (Raylib.IsKeyDown(KeyboardKey.A))
+				if (InMgr.IsInputDown(InputKey.A))
 					move += lft;
-				if (Raylib.IsKeyDown(KeyboardKey.D))
+				if (InMgr.IsInputDown(InputKey.D))
 					move -= lft;
-				if (Raylib.IsKeyDown(KeyboardKey.Space))
+				if (InMgr.IsInputDown(InputKey.Space))
 					move += up;
-				if (Raylib.IsKeyDown(KeyboardKey.LeftShift))
+				if (InMgr.IsInputDown(InputKey.Shift))
 					move -= up;
 				if (move != Vector3.Zero) {
 					move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
@@ -313,17 +313,17 @@ namespace Voxelgine.Engine {
 			fwd2.Y = 0;
 			fwd2 = Vector3.Normalize(fwd2);
 			Vector3 lft2 = GetLeft();
-			if (Raylib.IsKeyDown(KeyboardKey.W))
+			if (InMgr.IsInputDown(InputKey.W))
 				wishdir += fwd2;
-			if (Raylib.IsKeyDown(KeyboardKey.S))
+			if (InMgr.IsInputDown(InputKey.S))
 				wishdir -= fwd2;
-			if (Raylib.IsKeyDown(KeyboardKey.A))
+			if (InMgr.IsInputDown(InputKey.A))
 				wishdir += lft2;
-			if (Raylib.IsKeyDown(KeyboardKey.D))
+			if (InMgr.IsInputDown(InputKey.D))
 				wishdir -= lft2;
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
-			bool ledgeSafety = OnGroundGrace && Raylib.IsKeyDown(KeyboardKey.LeftShift);
+			bool ledgeSafety = OnGroundGrace && InMgr.IsInputDown(InputKey.Shift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
 				float innerRadius = 0.4f;
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
@@ -367,7 +367,7 @@ namespace Voxelgine.Engine {
 			} else {
 				WasLastLegsOnFloor = false;
 			}
-			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
+			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
@@ -413,7 +413,7 @@ namespace Voxelgine.Engine {
 				if (canApplyAirAccel) {
 					float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
 					float addSpeed, accel;
-					float maxGroundSpeed = Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
+					float maxGroundSpeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 					if (OnGroundGrace) {
 						addSpeed = maxGroundSpeed - curSpeed;
 						accel = PhysicsData.GroundAccel;
@@ -449,7 +449,7 @@ namespace Voxelgine.Engine {
 			}
 			Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed2 = horizVel2.Length();
-			float maxSpeed2 = OnGroundGrace ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
+			float maxSpeed2 = OnGroundGrace ? (InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
 			if (horizSpeed2 > maxSpeed2) {
 				float scale = maxSpeed2 / horizSpeed2;
 				PlyVelocity.X *= scale;
@@ -507,7 +507,7 @@ namespace Voxelgine.Engine {
 
 			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
 			foreach (var KV in OnKeyFuncs) {
-				if (Raylib.IsKeyPressed(KV.Key))
+				if (InMgr.IsInputPressed(KV.Key))
 					KV.Value();
 			}
 
@@ -672,7 +672,7 @@ namespace Voxelgine.Engine {
 			Rlgl.EnableDepthTest();
 		}
 
-		public void AddOnKeyPressed(KeyboardKey K, Action Act) {
+		public void AddOnKeyPressed(InputKey K, Action Act) {
 			OnKeyFuncs.Add(K, Act);
 		}
 

@@ -379,21 +379,21 @@ namespace RaylibGame.States {
 		void UpdatePhysics(float Dt) {
 			Ply.UpdatePhysics(Dt);
 
-			// Quake/Half-Life 2 style movement constants
-			float groundFriction = 8.0f;
-			float groundAccel = 50.0f;
-			float airFriction = 0.2f;
-			float airAccel = 20.0f;
-			float maxGroundSpeed = 4.4f;
-			float maxAirSpeed = 5.4f;
-			float jumpImpulse = 5.2f;
-			float gravity = 10.5f;
+			// Use PhysData instance for movement constants
+			float groundFriction = PhysicsData.GroundFriction;
+			float groundAccel = PhysicsData.GroundAccel;
+			float airFriction = PhysicsData.AirFriction;
+			float airAccel = PhysicsData.AirAccel;
+			float maxGroundSpeed = PhysicsData.MaxGroundSpeed;
+			float maxAirSpeed = PhysicsData.MaxAirSpeed;
+			float jumpImpulse = PhysicsData.JumpImpulse;
+			float gravity = PhysicsData.Gravity;
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;
-			float clampHyst = 0.02f;
-			float noClipMoveSpeed = 10.0f;
-			float groundEpsilon = 0.02f; // Small offset to start ray inside player
-			float groundCheckDist = 0.12f; // Small distance to check below feet
+			float clampHyst = PhysicsData.ClampHyst;
+			float noClipMoveSpeed = PhysicsData.NoClipMoveSpeed;
+			float groundEpsilon = PhysicsData.GroundEpsilon; // Small offset to start ray inside player
+			float groundCheckDist = PhysicsData.GroundCheckDist; // Small distance to check below feet
 
 			if (NoClip) {
 				// No-clip movement: ignore collisions and physics, move freely

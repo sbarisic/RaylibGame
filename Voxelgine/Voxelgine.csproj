@@ -343,6 +343,9 @@
     <None Update="data\textures\npc\humanoid.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="data\textures\particles\p1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\textures\progress\empty.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -365,6 +368,10 @@
     <Folder Include="data\models\meat\" />
     <Folder Include="data\models\pickaxe\" />
     <Folder Include="data\textures\items\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Engine\Entities\BaseEntity.cs" />
   </ItemGroup>
 
 </Project>

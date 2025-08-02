@@ -22,13 +22,21 @@ namespace RaylibGame.States {
 		GUIManager GUI;
 		PhysData PhysicsData;
 
+		EntityManager EntMgr;
+
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
+			EntMgr = new EntityManager();
 
 			Snd = new SoundMgr();
 			Snd.Init();
 			PhysicsData = new PhysData();
 			Map = new ChunkMap(this);
+
+			BaseEntity BE = new BaseEntity();
+			BE.SetPosition(new Vector3(37, 66, 15));
+			BE.SetSize(new Vector3(1, 1, 1));
+			EntMgr.Spawn(BE);
 
 			if (File.Exists("map.bin")) {
 				using FileStream FS = File.OpenRead("map.bin");
@@ -92,6 +100,7 @@ namespace RaylibGame.States {
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
+			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
 		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo) {
@@ -111,6 +120,9 @@ namespace RaylibGame.States {
 		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			Map.Draw();
 			Map.DrawTransparent();
+
+			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
+
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurFame);
 
 			if (Program.DebugMode)

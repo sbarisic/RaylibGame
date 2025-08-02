@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 
 using Raylib_cs;
 
+using RaylibGame.States;
+
 namespace Voxelgine.Engine {
 	class BaseEntity : IEntity {
 		Vector3 Position;
 		Vector3 Size;
+		Vector3 Velocity;
 
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 		}
@@ -61,6 +64,25 @@ namespace Voxelgine.Engine {
 
 		public void SetSize(Vector3 Size) {
 			this.Size = Size;
+		}
+
+        // Applies simple physics: gravity and velocity integration, no input
+        public virtual void UpdatePhysics(float Dt) {
+            const float Gravity = 9.81f;
+            // Apply gravity
+            Velocity.Y -= Gravity * Dt;
+            // Integrate position
+            Position += Velocity * Dt;
+        }
+
+		GameState GameState;
+
+		public GameState GetGameState() {
+			return GameState;
+		}
+
+		public void SetGameState(GameState State) {
+			GameState = State;
 		}
 	}
 }

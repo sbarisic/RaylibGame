@@ -482,9 +482,27 @@ namespace Voxelgine {
 		// If F = 0, then it's A, as F approaches 1, then it returns lerp towards B.
 		// If < 0, return A, if > 1, return B.
 		public static Vector3 Lerp(Vector3 A, Vector3 B, float F) {
+			if (F <= 0) return A;
+			if (F >= 1) return B;
+			return new Vector3(
+				A.X + (B.X - A.X) * F,
+				A.Y + (B.Y - A.Y) * F,
+				A.Z + (B.Z - A.Z) * F
+			);
 		}
 
 		public static Quaternion Lerp(Quaternion A, Quaternion B, float F) {
+			if (F <= 0) return A;
+			if (F >= 1) return B;
+			// Linear interpolation, not normalized
+			Quaternion result = new Quaternion(
+				A.X + (B.X - A.X) * F,
+				A.Y + (B.Y - A.Y) * F,
+				A.Z + (B.Z - A.Z) * F,
+				A.W + (B.W - A.W) * F
+			);
+			// Normalize to avoid drift
+			return Quaternion.Normalize(result);
 		}
 	}
 }

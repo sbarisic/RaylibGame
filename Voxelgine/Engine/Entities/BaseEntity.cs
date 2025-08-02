@@ -9,6 +9,8 @@ using Raylib_cs;
 
 using RaylibGame.States;
 
+using Voxelgine.Graphics;
+
 namespace Voxelgine.Engine {
 	class BaseEntity : IEntity {
 		Vector3 Position;
@@ -16,14 +18,16 @@ namespace Voxelgine.Engine {
 		Vector3 Velocity;
 
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+			GameState GS = GetGameState();
+			UpdatePhysics(GS.Map, Dt);
 		}
 
 		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
 			DrawCollisionBox();
 		}
 
-		 // Draws the collision box at Position with Size
-		 void DrawCollisionBox() {
+		// Draws the collision box at Position with Size
+		void DrawCollisionBox() {
 			Vector3 min = Position;
 			Vector3 max = Position + Size;
 			Color color = Color.Red;
@@ -66,14 +70,44 @@ namespace Voxelgine.Engine {
 			this.Size = Size;
 		}
 
-        // Applies simple physics: gravity and velocity integration, no input
-        public virtual void UpdatePhysics(float Dt) {
-            const float Gravity = 9.81f;
-            // Apply gravity
-            Velocity.Y -= Gravity * Dt;
-            // Integrate position
-            Position += Velocity * Dt;
-        }
+		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)
+		public virtual void UpdatePhysics(ChunkMap map, float Dt) {
+			const float Gravity = 9.81f;
+			// Apply gravity
+			Velocity.Y -= Gravity * Dt;
+			// Try to move entity by velocity, axis by axis (AABB sweep)
+			Vector3 newPos = Position;
+			Vector3 move = Velocity * Dt;
+			// X axis
+			if (!HasBlocksInBounds(map, new Vector3(newPos.X + move.X, newPos.Y, newPos.Z), Size))
+				newPos.X += move.X;
+			else
+				Velocity.X = 0;
+			// Y axis
+			if (!HasBlocksInBounds(map, new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z), Size))
+				newPos.Y += move.Y;
+			else {
+				Velocity.Y = 0;
+			}
+			// Z axis
+			if (!HasBlocksInBounds(map, new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z), Size))
+				newPos.Z += move.Z;
+			else
+				Velocity.Z = 0;
+			Position = newPos;
+		}
+
+		// Checks if any blocks are present in the AABB at pos with size
+		bool HasBlocksInBounds(ChunkMap map, Vector3 pos, Vector3 size) {
+			Vector3 min = pos;
+			Vector3 max = pos + size;
+			for (int x = (int)MathF.Floor(min.X); x <= (int)MathF.Floor(max.X); x++)
+				for (int y = (int)MathF.Floor(min.Y); y <= (int)MathF.Floor(max.Y); y++)
+					for (int z = (int)MathF.Floor(min.Z); z <= (int)MathF.Floor(max.Z); z++)
+						if (map.GetBlock(x, y, z) != BlockType.None)
+							return true;
+			return false;
+		}
 
 		GameState GameState;
 

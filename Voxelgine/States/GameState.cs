@@ -36,7 +36,7 @@ namespace RaylibGame.States {
 			BaseEntity BE = new BaseEntity();
 			BE.SetPosition(new Vector3(37, 66, 15));
 			BE.SetSize(new Vector3(1, 1, 1));
-			EntMgr.Spawn(BE);
+			EntMgr.Spawn(this, BE);
 
 			if (File.Exists("map.bin")) {
 				using FileStream FS = File.OpenRead("map.bin");

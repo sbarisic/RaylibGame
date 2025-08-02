@@ -1,4 +1,6 @@
-﻿using System;
+﻿using RaylibGame.States;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,10 +14,11 @@ namespace Voxelgine.Engine {
 			Entities = new List<IEntity>();
 		}
 
-		public void Spawn(IEntity Ent) {
+		public void Spawn(GameState GState, IEntity Ent) {
 			if (Ent == null)
 				return;
 
+			Ent.SetGameState(GState);
 			Entities.Add(Ent);
 		}
 

@@ -9,6 +9,8 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.Graphics;
+using Voxelgine.GUI;
 
 namespace Voxelgine.Engine {
 	public unsafe class BoneInformation {
@@ -112,6 +114,7 @@ namespace Voxelgine.Engine {
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
 		AnimatedEntity PlayerEntity;
 		EntityAnimation CurAnim;
+		GUIManager GUI;
 
 		bool MoveFd;
 		bool MoveBk;
@@ -141,7 +144,14 @@ namespace Voxelgine.Engine {
 
 		public Vector3 FeetPosition => Position - new Vector3(0, PlayerEyeOffset, 0);
 
-		public Player(string ModelName, bool LocalPlayer, SoundMgr Snd) {
+		// --- Player movement/physics fields ---
+		Vector3 PlyVelocity = Vector3.Zero;
+		bool WasLastLegsOnFloor = false;
+		float GroundGraceTimer = 0f; // Coyote time for ground detection
+		Vector3 LastWallNormal = Vector3.Zero;
+		Stopwatch JumpCounter = Stopwatch.StartNew();
+
+		public Player(GUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd) {
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
 			PlayerEntity = Entities.Load(ModelName);
@@ -197,51 +207,333 @@ namespace Voxelgine.Engine {
 			return PreviousPosition;
 		}
 
-		public void UpdatePhysics(float Dt) {
-
+		float ClampToZero(float Num, float ClampHyst) {
+			if (Num < 0 && Num > -ClampHyst)
+				return 0;
+			if (Num > 0 && Num < ClampHyst)
+				return 0;
+			return Num;
 		}
 
-		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump) {
-			return;
+		void ClampToZero(ref Vector3 Vec, float ClampHyst) {
+			if (float.IsNaN(Vec.X)) Vec.X = 0;
+			if (float.IsNaN(Vec.Y)) Vec.Y = 0;
+			if (float.IsNaN(Vec.Z)) Vec.Z = 0;
+			Vec.X = ClampToZero(Vec.X, ClampHyst);
+			Vec.Y = ClampToZero(Vec.Y, ClampHyst);
+			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
+		}
 
-			Vector3 Fwd = FPSCamera.GetForward();
-
-			if (Walk) {
-				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
-					LastWalkSound = LegTimer.ElapsedMilliseconds;
-
-					//Console.WriteLine("Walk");
-					Snd.PlayCombo("walk", FPSCamera.Position, Fwd, Pos);
+		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = -1, float Height = -1) {
+			if (Radius < 0)
+				Radius = Player.PlayerRadius;
+			if (Height < 0)
+				Height = Player.PlayerHeight;
+			int RadialDivs = 12;
+			int HeightDivs = 4;
+			for (int h = 0; h < HeightDivs; h++) {
+				float heightRatio = (float)h / (HeightDivs - 1);
+				float currentHeight = heightRatio * Height;
+				for (int i = 0; i < RadialDivs; i++) {
+					float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
+					float x = MathF.Cos(angle) * Radius;
+					float z = MathF.Sin(angle) * Radius;
+					yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
 				}
-			} else if (Jump) {
-				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350) {
-					LastJumpSound = LegTimer.ElapsedMilliseconds;
-
-					//Console.WriteLine("Walk");
-					Snd.PlayCombo("jump", FPSCamera.Position, Fwd, Pos);
-				}
-			} else if (Feet && !Side) {
-
-				if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350) {
-					LastCrashSound = LegTimer.ElapsedMilliseconds;
-
-					if (Force < 4) {
-						Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
-					} else if (Force >= 4 && Force < 8) {
-						Snd.PlayCombo("crash2", FPSCamera.Position, Fwd, Pos);
-					} else if (Force >= 8) {
-						Snd.PlayCombo("crash3", FPSCamera.Position, Fwd, Pos);
-					}
-				}
-			} else {
-				Console.WriteLine("Sid: {0}, Ft: {1}, F: {2}, W: {3}", Side, Feet, Force, Walk);
 			}
+			for (int h = 0; h < HeightDivs; h++) {
+				float heightRatio = (float)h / (HeightDivs - 1);
+				float currentHeight = heightRatio * Height;
+				yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
+			}
+			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
+			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
 		}
 
-		public void Parkour(Vector3 NewPos) {
-			Console.WriteLine("Parkour!");
-			SetPosition(NewPos);
+		private Vector3 QuakeMoveWithCollision(ChunkMap Map, Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false) {
+			float playerRadius = Player.PlayerRadius;
+			float playerHeight = Player.PlayerHeight;
+			Vector3 feetPos = FeetPosition;
+			Vector3 move = velocity * dt;
+			LastWallNormal = Vector3.Zero; // Reset before each move
+			for (int slide = 0; slide < maxSlides; slide++) {
+				Vector3 tryPos = feetPos + move;
+				if (!HasBlocksInBounds(Map, tryPos - new Vector3(playerRadius, 0, playerRadius), tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryPos;
+					break;
+				}
+				Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
+				Vector3 stepTry = stepUp + move;
+				if (!HasBlocksInBounds(Map, stepTry - new Vector3(playerRadius, 0, playerRadius), stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = stepTry;
+					break;
+				}
+				Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
+				if (!HasBlocksInBounds(Map, tryX - new Vector3(playerRadius, 0, playerRadius), tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryX;
+					move.Z = 0;
+					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(1, 0, 0), 1e-5f);
+					LastWallNormal = new Vector3(MathF.Sign(move.X), 0, 0); // Store wall normal
+					continue;
+				}
+				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
+				if (!HasBlocksInBounds(Map, tryZ - new Vector3(playerRadius, 0, playerRadius), tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryZ;
+					move.X = 0;
+					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(0, 0, 1), 1e-5f);
+					LastWallNormal = new Vector3(0, 0, MathF.Sign(move.Z)); // Store wall normal
+					continue;
+				}
+				break;
+			}
+			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
+
+		bool HasBlocksInBounds(ChunkMap Map, Vector3 min, Vector3 max) {
+			for (int x = (int)min.X; x <= (int)max.X; x++)
+				for (int y = (int)min.Y; y <= (int)max.Y; y++)
+					for (int z = (int)min.Z; z <= (int)max.Z; z++)
+						if (Map.GetBlock(x, y, z) != BlockType.None)
+							return true;
+			return false;
+		}
+
+		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, bool NoClip, float Dt) {
+            const float GroundHitBelowFeet = -0.075f;
+            float playerHeight = Player.PlayerHeight;
+            float playerRadius = Player.PlayerRadius;
+            if (NoClip) {
+                Vector3 move = Vector3.Zero;
+                Vector3 fwd = GetForward();
+                Vector3 lft = GetLeft();
+                Vector3 up = GetUp();
+                if (Raylib.IsKeyDown(KeyboardKey.W))
+                    move += fwd;
+                if (Raylib.IsKeyDown(KeyboardKey.S))
+                    move -= fwd;
+                if (Raylib.IsKeyDown(KeyboardKey.A))
+                    move += lft;
+                if (Raylib.IsKeyDown(KeyboardKey.D))
+                    move -= lft;
+                if (Raylib.IsKeyDown(KeyboardKey.Space))
+                    move += up;
+                if (Raylib.IsKeyDown(KeyboardKey.LeftShift))
+                    move -= up;
+                if (move != Vector3.Zero) {
+                    move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
+                    SetPosition(Position + move);
+                }
+                return;
+            }
+            if (!Utils.HasRecord())
+                Utils.BeginRaycastRecord();
+            ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
+            Vector3 feetPos = FeetPosition;
+            Vector3[] groundCheckPoints = new Vector3[] {
+                new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
+                new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
+                new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z + playerRadius),
+                new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z + playerRadius),
+                feetPos + new Vector3(0, PhysicsData.GroundEpsilon, 0)
+            };
+            bool OnGround = false;
+            Vector3 HitFloor = Vector3.Zero;
+            foreach (var pt in groundCheckPoints) {
+                Vector3 localFace;
+                Vector3 hit = Map.RaycastPos(pt, PhysicsData.GroundCheckDist, new Vector3(0, -1f, 0), out localFace);
+                if (hit != Vector3.Zero && localFace.Y > 0.99f && Math.Abs(localFace.X) < 0.05f && Math.Abs(localFace.Z) < 0.05f && PlyVelocity.Y <= 0 && hit.Y < feetPos.Y + GroundHitBelowFeet) {
+                    OnGround = true;
+                    HitFloor = hit;
+                    break;
+                }
+            }
+            if (!OnGround) {
+                foreach (var pt in groundCheckPoints) {
+                    Vector3 TestPoint = pt + PlyVelocity * Dt;
+                    if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
+                        if (PicNorm.Y > 0.99f && Math.Abs(PicNorm.X) < 0.05f && Math.Abs(PicNorm.Z) < 0.05f && PlyVelocity.Y <= 0 && TestPoint.Y < feetPos.Y + GroundHitBelowFeet) {
+                            OnGround = true;
+                            HitFloor = TestPoint;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (OnGround) {
+                GroundGraceTimer = 0.1f;
+            } else {
+                GroundGraceTimer -= Dt;
+                if (GroundGraceTimer < 0)
+                    GroundGraceTimer = 0;
+            }
+            bool OnGroundGrace = GroundGraceTimer > 0f;
+            Vector3 wishdir = Vector3.Zero;
+            Vector3 fwd2 = GetForward();
+            fwd2.Y = 0;
+            fwd2 = Vector3.Normalize(fwd2);
+            Vector3 lft2 = GetLeft();
+            if (Raylib.IsKeyDown(KeyboardKey.W))
+                wishdir += fwd2;
+            if (Raylib.IsKeyDown(KeyboardKey.S))
+                wishdir -= fwd2;
+            if (Raylib.IsKeyDown(KeyboardKey.A))
+                wishdir += lft2;
+            if (Raylib.IsKeyDown(KeyboardKey.D))
+                wishdir -= lft2;
+            if (wishdir != Vector3.Zero)
+                wishdir = Vector3.Normalize(wishdir);
+            bool ledgeSafety = OnGroundGrace && Raylib.IsKeyDown(KeyboardKey.LeftShift);
+            if (ledgeSafety && wishdir != Vector3.Zero) {
+                float innerRadius = 0.4f;
+                var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
+                float minY = points.Min(p => p.Y);
+                var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
+                List<Vector3> supportedPoints = new();
+                foreach (var pt in feetPoints) {
+                    Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
+                    if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
+                        supportedPoints.Add(pt);
+                    }
+                }
+                if (supportedPoints.Count == 0) {
+                    PlyVelocity.X = 0;
+                    PlyVelocity.Z = 0;
+                    wishdir = Vector3.Zero;
+                } else {
+                    bool allow = false;
+                    foreach (var spt in supportedPoints) {
+                        Vector3 toSupport = Vector3.Normalize(spt - feetPos);
+                        if (Vector3.Dot(wishdir, toSupport) > 0) {
+                            allow = true;
+                            break;
+                        }
+                    }
+                    if (!allow) {
+                        PlyVelocity.X = 0;
+                        PlyVelocity.Z = 0;
+                        wishdir = Vector3.Zero;
+                    }
+                }
+            }
+            float VelLen = PlyVelocity.Length();
+            if (OnGroundGrace) {
+                if (!WasLastLegsOnFloor) {
+                    WasLastLegsOnFloor = true;
+                    this.PhysicsHit(Position, VelLen, false, true, false, false);
+                } else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2)) {
+                    this.PhysicsHit(HitFloor, VelLen, false, true, true, false);
+                }
+            } else {
+                WasLastLegsOnFloor = false;
+            }
+            if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
+                JumpCounter.Restart();
+                PlyVelocity.Y = PhysicsData.JumpImpulse;
+                this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
+                GroundGraceTimer = 0;
+            }
+            if (OnGroundGrace) {
+                Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+                float speed = velH.Length();
+                if (speed > 0) {
+                    float drop = speed * PhysicsData.GroundFriction * Dt;
+                    float newSpeed = MathF.Max(speed - drop, 0);
+                    if (newSpeed != speed) {
+                        newSpeed /= speed;
+                        PlyVelocity.X *= newSpeed;
+                        PlyVelocity.Z *= newSpeed;
+                    }
+                }
+            } else {
+                PlyVelocity.X *= (1.0f - PhysicsData.AirFriction * Dt);
+                PlyVelocity.Z *= (1.0f - PhysicsData.AirFriction * Dt);
+            }
+            if (!OnGroundGrace) {
+                PlyVelocity.Y -= PhysicsData.Gravity * Dt;
+            } else if (PlyVelocity.Y < 0) {
+                PlyVelocity.Y = 0;
+            }
+            float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
+            Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
+            if (newPos != Position)
+                SetPosition(newPos);
+            else
+                PlyVelocity = Vector3.Zero;
+            if (wishdir != Vector3.Zero) {
+                Vector3 accelDir = wishdir;
+                if (!OnGroundGrace && LastWallNormal != Vector3.Zero) {
+                    accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
+                    if (accelDir.LengthSquared() > 1e-4f)
+                        accelDir = Vector3.Normalize(accelDir);
+                    else
+                        accelDir = Vector3.Zero;
+                }
+                bool canApplyAirAccel = OnGroundGrace || accelDir != Vector3.Zero;
+                if (canApplyAirAccel) {
+                    float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
+                    float addSpeed, accel;
+                    float maxGroundSpeed = Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
+                    if (OnGroundGrace) {
+                        addSpeed = maxGroundSpeed - curSpeed;
+                        accel = PhysicsData.GroundAccel;
+                    } else {
+                        addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
+                        accel = PhysicsData.AirAccel;
+                    }
+                    if (addSpeed > 0) {
+                        float accelSpeed = accel * Dt * maxGroundSpeed;
+                        if (accelSpeed > addSpeed)
+                            accelSpeed = addSpeed;
+                        PlyVelocity.X += accelSpeed * accelDir.X;
+                        PlyVelocity.Z += accelSpeed * accelDir.Z;
+                    }
+                }
+            }
+            if (PlyVelocity.Y > 0) {
+                float headEpsilon = 0.02f;
+                Vector3 headPos = feetPos + new Vector3(0, playerHeight - headEpsilon, 0);
+                Vector3[] headCheckPoints = new Vector3[] {
+                    new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
+                    new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
+                    new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
+                    new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
+                    headPos
+                };
+                foreach (var pt in headCheckPoints) {
+                    if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+                        PlyVelocity.Y = 0;
+                        break;
+                    }
+                }
+            }
+            Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+            float horizSpeed2 = horizVel2.Length();
+            float maxSpeed2 = OnGroundGrace ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
+            if (horizSpeed2 > maxSpeed2) {
+                float scale = maxSpeed2 / horizSpeed2;
+                PlyVelocity.X *= scale;
+                PlyVelocity.Z *= scale;
+            }
+            if (PlyVelocity.Y > 0) {
+                float headEpsilon = 0.02f;
+                Vector3 feetPos2 = FeetPosition;
+                Vector3 headPos = feetPos2 + new Vector3(0, playerHeight - headEpsilon, 0);
+                Vector3[] headCheckPoints = new Vector3[] {
+                    new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
+                    new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
+                    new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
+                    new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
+                    headPos
+                };
+                foreach (var pt in headCheckPoints) {
+                    if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+                        PlyVelocity.Y = 0;
+                        break;
+                    }
+                }
+            }
+            Utils.EndRaycastRecord();
+        }
 
 		public void Tick() {
 			string AnimName = "idle";
@@ -381,5 +673,38 @@ namespace Voxelgine.Engine {
 
 		//public void UpdateCamera(bool handleRotation) => FPSCamera.Update(handleRotation, ref Cam);
 		//public Vector2 GetPreviousMousePos() => FPSCamera.GetPreviousMousePos();
+
+        // Add accessors in Player for velocity and ground state for GUI
+        public Vector3 GetVelocity() => PlyVelocity;
+        public bool GetWasLastLegsOnFloor() => WasLastLegsOnFloor;
+
+        // Add back the PhysicsHit method (was present in Player, but was return; previously)
+        public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump) {
+            Vector3 Fwd = FPSCamera.GetForward();
+            if (Walk) {
+                if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
+                    LastWalkSound = LegTimer.ElapsedMilliseconds;
+                    Snd.PlayCombo("walk", FPSCamera.Position, Fwd, Pos);
+                }
+            } else if (Jump) {
+                if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350) {
+                    LastJumpSound = LegTimer.ElapsedMilliseconds;
+                    Snd.PlayCombo("jump", FPSCamera.Position, Fwd, Pos);
+                }
+            } else if (Feet && !Side) {
+                if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350) {
+                    LastCrashSound = LegTimer.ElapsedMilliseconds;
+                    if (Force < 4) {
+                        Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
+                    } else if (Force >= 4 && Force < 8) {
+                        Snd.PlayCombo("crash2", FPSCamera.Position, Fwd, Pos);
+                    } else if (Force >= 8) {
+                        Snd.PlayCombo("crash3", FPSCamera.Position, Fwd, Pos);
+                    }
+                }
+            } else {
+                // Console.WriteLine("Sid: {0}, Ft: {1}, F: {2}, W: {3}", Side, Feet, Force, Walk);
+            }
+        }
 	}
 }

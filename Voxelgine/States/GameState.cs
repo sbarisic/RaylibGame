@@ -40,16 +40,12 @@ namespace RaylibGame.States {
 			}
 
 			Ply = new Player("snoutx10k", true, Snd);
-			if (File.Exists("player.bin"))
-			{
+			if (File.Exists("player.bin")) {
 				using (FileStream fs = File.OpenRead("player.bin"))
-				using (BinaryReader reader = new BinaryReader(fs))
-				{
+				using (BinaryReader reader = new BinaryReader(fs)) {
 					Ply.Read(reader);
 				}
-			}
-			else
-			{
+			} else {
 				Ply.SetPosition(32, 73, 19);
 			}
 			Stopwatch SWatch = Stopwatch.StartNew();
@@ -121,11 +117,13 @@ namespace RaylibGame.States {
 				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Ply.Position.X, 2), MathF.Round(Ply.Position.Y, 2), MathF.Round(Ply.Position.Z, 2));
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(PlyVelocity.Length(), 3));
 				InfoLbl.WriteLine("No-clip: {0}", NoClip ? "ON" : "OFF");
+				InfoLbl.WriteLine("OnGround: {0}", WasLastLegsOnFloor ? "YES" : "NO");
 			}
 		}
 
 		Vector3 PlyVelocity = Vector3.Zero;
 		bool WasLastLegsOnFloor = false;
+		float GroundGraceTimer = 0f; // Coyote time for ground detection
 
 		float ClampToZero(float Num, float ClampHyst) {
 			if (Num < 0 && Num > -ClampHyst)
@@ -182,11 +180,15 @@ namespace RaylibGame.States {
 			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
 		}
 
-		private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4) {
+		// Add a field to store the last wall normal
+		Vector3 LastWallNormal = Vector3.Zero;
+
+		private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false) {
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
 			Vector3 feetPos = Ply.FeetPosition;
 			Vector3 move = velocity * dt;
+			LastWallNormal = Vector3.Zero; // Reset before each move
 			for (int slide = 0; slide < maxSlides; slide++) {
 				Vector3 tryPos = feetPos + move;
 				if (!HasBlocksInBounds(
@@ -209,6 +211,11 @@ namespace RaylibGame.States {
 					tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryX;
 					move.Z = 0;
+					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(1, 0, 0), 1e-5f);
+					LastWallNormal = new Vector3(MathF.Sign(move.X), 0, 0); // Store wall normal
+					// Clamp vertical velocity if airborne and moving up
+					if (!onGround && PlyVelocity.Y > 0)
+						PlyVelocity.Y = 0;
 					continue;
 				}
 				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
@@ -217,6 +224,10 @@ namespace RaylibGame.States {
 					tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryZ;
 					move.X = 0;
+					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(0, 0, 1), 1e-5f);
+					LastWallNormal = new Vector3(0, 0, MathF.Sign(move.Z)); // Store wall normal
+					if (!onGround && PlyVelocity.Y > 0)
+						PlyVelocity.Y = 0;
 					continue;
 				}
 				break;
@@ -225,6 +236,8 @@ namespace RaylibGame.States {
 		}
 
 		void UpdatePhysics(float Dt) {
+			const float GroundHitBelowFeet = -0.065f;
+
 			Ply.UpdatePhysics(Dt);
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;
@@ -267,7 +280,8 @@ namespace RaylibGame.States {
 			foreach (var pt in groundCheckPoints) {
 				Vector3 localFace;
 				Vector3 hit = Map.RaycastPos(pt, PhysicsData.GroundCheckDist, new Vector3(0, -1f, 0), out localFace);
-				if (hit != Vector3.Zero && localFace.Y == 1) {
+				// Only consider ground if normal is almost perfectly up, player is not moving upwards, and hit is well below feet
+				if (hit != Vector3.Zero && localFace.Y > 0.99f && Math.Abs(localFace.X) < 0.05f && Math.Abs(localFace.Z) < 0.05f && PlyVelocity.Y <= 0 && hit.Y < feetPos.Y + GroundHitBelowFeet) {
 					OnGround = true;
 					HitFloor = hit;
 					break;
@@ -277,7 +291,7 @@ namespace RaylibGame.States {
 				foreach (var pt in groundCheckPoints) {
 					Vector3 TestPoint = pt + PlyVelocity * Dt;
 					if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
-						if (PicNorm.Y > 0) {
+						if (PicNorm.Y > 0.99f && Math.Abs(PicNorm.X) < 0.05f && Math.Abs(PicNorm.Z) < 0.05f && PlyVelocity.Y <= 0 && TestPoint.Y < feetPos.Y + GroundHitBelowFeet) {
 							OnGround = true;
 							HitFloor = TestPoint;
 							break;
@@ -285,6 +299,14 @@ namespace RaylibGame.States {
 					}
 				}
 			}
+			// --- Coyote time logic ---
+			if (OnGround) {
+				GroundGraceTimer = 0.1f; // 100ms grace period
+			} else {
+				GroundGraceTimer -= Dt;
+				if (GroundGraceTimer < 0) GroundGraceTimer = 0;
+			}
+			bool OnGroundGrace = GroundGraceTimer > 0f;
 			Vector3 wishdir = Vector3.Zero;
 			Vector3 fwd2 = Ply.GetForward();
 			fwd2.Y = 0;
@@ -300,7 +322,7 @@ namespace RaylibGame.States {
 				wishdir -= lft2;
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
-			bool ledgeSafety = OnGround && Raylib.IsKeyDown(KeyboardKey.LeftShift);
+			bool ledgeSafety = OnGroundGrace && Raylib.IsKeyDown(KeyboardKey.LeftShift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
 				float innerRadius = 0.4f;
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
@@ -334,7 +356,7 @@ namespace RaylibGame.States {
 				}
 			}
 			float VelLen = PlyVelocity.Length();
-			if (OnGround) {
+			if (OnGroundGrace) {
 				if (!WasLastLegsOnFloor) {
 					WasLastLegsOnFloor = true;
 					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
@@ -344,13 +366,13 @@ namespace RaylibGame.States {
 			} else {
 				WasLastLegsOnFloor = false;
 			}
-			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {
+			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
-				OnGround = false;
+				GroundGraceTimer = 0; // lose grace on jump
 			}
-			if (OnGround) {
+			if (OnGroundGrace) {
 				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 				float speed = velH.Length();
 				if (speed > 0) {
@@ -366,29 +388,51 @@ namespace RaylibGame.States {
 				PlyVelocity.X *= (1.0f - PhysicsData.AirFriction * Dt);
 				PlyVelocity.Z *= (1.0f - PhysicsData.AirFriction * Dt);
 			}
-			if (wishdir != Vector3.Zero) {
-				float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
-				float addSpeed, accel;
-				float maxGroundSpeed = Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
-				if (OnGround) {
-					addSpeed = maxGroundSpeed - curSpeed;
-					accel = PhysicsData.GroundAccel;
-				} else {
-					addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
-					accel = PhysicsData.AirAccel;
-				}
-				if (addSpeed > 0) {
-					float accelSpeed = accel * Dt * maxGroundSpeed;
-					if (accelSpeed > addSpeed)
-						accelSpeed = addSpeed;
-					PlyVelocity.X += accelSpeed * wishdir.X;
-					PlyVelocity.Z += accelSpeed * wishdir.Z;
-				}
-			}
-			if (!OnGround) {
+			// Gravity should always be applied before collision
+			if (!OnGroundGrace) {
 				PlyVelocity.Y -= PhysicsData.Gravity * Dt;
 			} else if (PlyVelocity.Y < 0) {
 				PlyVelocity.Y = 0;
+			}
+			// Use stepHeight only if OnGround, otherwise set to 0 to prevent wall climbing
+			float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
+			Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
+			if (newPos != Ply.Position)
+				Ply.SetPosition(newPos);
+			else
+				PlyVelocity = Vector3.Zero;
+			// Only apply air acceleration if not stuck to wall
+			if (wishdir != Vector3.Zero) {
+				// If airborne and collided with a wall, project wishdir onto wall plane
+				Vector3 accelDir = wishdir;
+				if (!OnGroundGrace && LastWallNormal != Vector3.Zero) {
+					// Remove component into the wall
+					accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
+					if (accelDir.LengthSquared() > 1e-4f)
+						accelDir = Vector3.Normalize(accelDir);
+					else
+						accelDir = Vector3.Zero;
+				}
+				bool canApplyAirAccel = OnGroundGrace || accelDir != Vector3.Zero;
+				if (canApplyAirAccel) {
+					float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
+					float addSpeed, accel;
+					float maxGroundSpeed = Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
+					if (OnGroundGrace) {
+						addSpeed = maxGroundSpeed - curSpeed;
+						accel = PhysicsData.GroundAccel;
+					} else {
+						addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
+						accel = PhysicsData.AirAccel;
+					}
+					if (addSpeed > 0) {
+						float accelSpeed = accel * Dt * maxGroundSpeed;
+						if (accelSpeed > addSpeed)
+							accelSpeed = addSpeed;
+						PlyVelocity.X += accelSpeed * accelDir.X;
+						PlyVelocity.Z += accelSpeed * accelDir.Z;
+					}
+				}
 			}
 			if (PlyVelocity.Y > 0) {
 				float headEpsilon = 0.02f;
@@ -407,11 +451,11 @@ namespace RaylibGame.States {
 					}
 				}
 			}
-			Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
-			float horizSpeed = horizVel.Length();
-			float maxSpeed = OnGround ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
-			if (horizSpeed > maxSpeed) {
-				float scale = maxSpeed / horizSpeed;
+			Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+			float horizSpeed2 = horizVel2.Length();
+			float maxSpeed2 = OnGroundGrace ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
+			if (horizSpeed2 > maxSpeed2) {
+				float scale = maxSpeed2 / horizSpeed2;
 				PlyVelocity.X *= scale;
 				PlyVelocity.Z *= scale;
 			}
@@ -433,27 +477,19 @@ namespace RaylibGame.States {
 					}
 				}
 			}
-			Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
-			if (newPos != Ply.Position)
-				Ply.SetPosition(newPos);
-			else
-				PlyVelocity = Vector3.Zero;
 			Utils.EndRaycastRecord();
 		}
 
 		Stopwatch JumpCounter = Stopwatch.StartNew();
 
-		private void SaveGameState()
-		{
+		private void SaveGameState() {
 			Console.WriteLine("Saving map and player!");
-			using (MemoryStream ms = new())
-			{
+			using (MemoryStream ms = new()) {
 				Map.Write(ms);
 				File.WriteAllBytes("map.bin", ms.ToArray());
 			}
 			using (FileStream fs = File.Open("player.bin", FileMode.Create, FileAccess.Write))
-			using (BinaryWriter writer = new BinaryWriter(fs))
-			{
+			using (BinaryWriter writer = new BinaryWriter(fs)) {
 				Ply.Write(writer);
 			}
 			Console.WriteLine("Done!");

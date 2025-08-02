@@ -325,6 +325,65 @@ namespace RaylibGame.States {
 			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
 		}
 
+		// Quake/Half-Life 2 style slide-move and step-move collision
+        // Attempts to move the player along velocity, sliding along walls and stepping up if possible
+        private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4)
+        {
+            float playerRadius = 0.4f;
+            float playerHeight = 1.0f; // Reduced from 1.8f for more Quake/HL2-like collision
+            Vector3 originalPos = pos;
+            Vector3 move = velocity * dt;
+            Vector3 outVel = velocity;
+            for (int slide = 0; slide < maxSlides; slide++)
+            {
+                Vector3 tryPos = pos + move;
+                if (!HasBlocksInBounds(
+                    tryPos - new Vector3(playerRadius, 0, playerRadius),
+                    tryPos + new Vector3(playerRadius, playerHeight, playerRadius)))
+                {
+                    // No collision, move fully
+                    pos = tryPos;
+                    break;
+                }
+                // Try to step up
+                Vector3 stepUp = pos + new Vector3(0, stepHeight, 0);
+                Vector3 stepTry = stepUp + move;
+                if (!HasBlocksInBounds(
+                    stepTry - new Vector3(playerRadius, 0, playerRadius),
+                    stepTry + new Vector3(playerRadius, playerHeight, playerRadius)))
+                {
+                    // Step up and move
+                    pos = stepTry;
+                    break;
+                }
+                // Slide along the first hit axis
+                // Try X only
+                Vector3 tryX = new Vector3(pos.X + move.X, pos.Y, pos.Z);
+                if (!HasBlocksInBounds(
+                    tryX - new Vector3(playerRadius, 0, playerRadius),
+                    tryX + new Vector3(playerRadius, playerHeight, playerRadius)))
+                {
+                    pos = tryX;
+                    move.Z = 0;
+                    continue;
+                }
+                // Try Z only
+                Vector3 tryZ = new Vector3(pos.X, pos.Y, pos.Z + move.Z);
+                if (!HasBlocksInBounds(
+                    tryZ - new Vector3(playerRadius, 0, playerRadius),
+                    tryZ + new Vector3(playerRadius, playerHeight, playerRadius)))
+                {
+                    pos = tryZ;
+                    move.X = 0;
+                    continue;
+                }
+                // Can't move, stop
+                outVel = Vector3.Zero;
+                break;
+            }
+            return pos;
+        }
+
 		void UpdatePhysics(float Dt) {
             Ply.UpdatePhysics(Dt);
 
@@ -468,47 +527,13 @@ namespace RaylibGame.States {
                 PlyVelocity.Z *= scale;
             }
 
-            // Move and collide
+            // Move and collide using Quake-style slide/step
             if (PlyVelocity != Vector3.Zero) {
-                Vector3 NewPlyPos = Ply.Position + (PlyVelocity * Dt);
-                Vector3 MoveDir = Vector3.Normalize(PlyVelocity);
-                Vector3 NewPlyVelocity = PlyVelocity;
-
-                if (Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm)) {
-                    // Project velocity onto collision surface
-                    NewPlyVelocity = Utils.ProjectOnPlane(PlyVelocity, HitNorm, clampHyst);
-                    if (NewPlyVelocity == Vector3.Zero) {
-                        if (Phys_CollidePlayerSingle(NewPlyPos, out Vector3 HitNrm, out Vector3 HitPt, out float Dst)) {
-                            NewPlyVelocity = HitNrm * Dst;
-                        }
-                    }
-                    MoveDir = Vector3.Normalize(NewPlyVelocity);
-                    NewPlyPos = Ply.Position + (NewPlyVelocity * Dt);
-                    if (!Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm2)) {
-                        PlyVelocity = NewPlyVelocity;
-                        Ply.SetPosition(NewPlyPos);
-                    } else {
-                        PlyVelocity = Vector3.Zero;
-                        if (Phys_CollidePlayer(Ply.Position, MoveDir, out Vector3 _)) {
-                            PlyVelocity = Vector3.Zero;
-                            Ply.SetPosition(Ply.GetPreviousPosition());
-                        } else {
-                            PlyVelocity += HitNorm2;
-                            Ply.SetPosition(Ply.Position);
-                        }
-                    }
-                } else {
-                    if (Map.GetBlock(NewPlyPos) == BlockType.None) {
-                        Ply.SetPosition(NewPlyPos);
-                    } else {
-                        if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
-                            PlyVelocity = Vector3.Zero;
-                            Ply.SetPosition(Ply.GetPreviousPosition());
-                        } else {
-                            Ply.SetPosition(Ply.Position);
-                        }
-                    }
-                }
+                Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
+                if (newPos != Ply.Position)
+                    Ply.SetPosition(newPos);
+                else
+                    PlyVelocity = Vector3.Zero;
             }
 
             Utils.EndRaycastRecord();
@@ -646,7 +671,7 @@ namespace RaylibGame.States {
 							Z += (int)Face.Z;
 
 							Map.SetBlock(X, Y, Z, BlockType.Test);
-							return true;
+						 return true;
 						}*/
 
 						return false;
@@ -782,6 +807,11 @@ namespace RaylibGame.States {
 
 			Ply.Draw();
 
+			if (Program.DebugMode)
+			{
+				DrawPlayerCollisionBox();
+			}
+
 			foreach (var L in MarkerList) {
 				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);
 			}
@@ -799,6 +829,44 @@ namespace RaylibGame.States {
 			//Raylib.DrawLine3D(Start, End, Color.White);
 
 		}
+
+		// Draw the player's collision bounding box for debugging
+			private void DrawPlayerCollisionBox()
+			{
+				float playerRadius = 0.4f;
+				float playerHeight = 1.0f;
+				Vector3 pos = Ply.Position;
+				// The collision box is from (pos.X - r, pos.Y, pos.Z - r) to (pos.X + r, pos.Y + h, pos.Z + r)
+				Vector3 min = new Vector3(pos.X - playerRadius, pos.Y, pos.Z - playerRadius);
+				Vector3 max = new Vector3(pos.X + playerRadius, pos.Y + playerHeight, pos.Z + playerRadius);
+				Color color = Color.Red;
+				// Draw all 12 edges of the box
+				Vector3[] corners = new Vector3[8];
+				corners[0] = new Vector3(min.X, min.Y, min.Z);
+				corners[1] = new Vector3(max.X, min.Y, min.Z);
+				corners[2] = new Vector3(max.X, min.Y, max.Z);
+				corners[3] = new Vector3(min.X, min.Y, max.Z);
+				corners[4] = new Vector3(min.X, max.Y, min.Z);
+				corners[5] = new Vector3(max.X, max.Y, min.Z);
+				corners[6] = new Vector3(max.X, max.Y, max.Z);
+				corners[7] = new Vector3(min.X, max.Y, max.Z);
+				// Bottom
+				Raylib.DrawLine3D(corners[0], corners[1], color);
+				Raylib.DrawLine3D(corners[1], corners[2], color);
+				Raylib.DrawLine3D(corners[2], corners[3], color);
+				Raylib.DrawLine3D(corners[3], corners[0], color);
+				// Top
+				Raylib.DrawLine3D(corners[4], corners[5], color);
+				Raylib.DrawLine3D(corners[5], corners[6], color);
+				Raylib.DrawLine3D(corners[6], corners[7], color);
+				Raylib.DrawLine3D(corners[7], corners[4], color);
+				// Sides
+				Raylib.DrawLine3D(corners[0], corners[4], color);
+				Raylib.DrawLine3D(corners[1], corners[5], color);
+				Raylib.DrawLine3D(corners[2], corners[6], color);
+				Raylib.DrawLine3D(corners[3], corners[7], color);
+			}
+		
 
 		public override void Draw2D() {
 			//Camera2D GUICam = new Camera2D();

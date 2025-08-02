@@ -694,9 +694,14 @@ namespace Voxelgine.Engine {
 			var modelMat = pitchRot * yawRot * Matrix4x4.CreateTranslation(vmPos);
 
 			// Quaternion for Raylib.DrawModelEx
-			var qYaw = System.Numerics.Quaternion.CreateFromAxisAngle(worldUp, -yaw);
-			var qPitch = System.Numerics.Quaternion.CreateFromAxisAngle(camRight, -pitch);
-			var qFinal = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22)) * Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 45)) * Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(90)) * qPitch * qYaw;
+			var qYaw = Quaternion.CreateFromAxisAngle(worldUp, -yaw);
+			var qPitch = Quaternion.CreateFromAxisAngle(camRight, -pitch);
+
+			var qInitial = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(90));
+			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
+			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
+
+			var qFinal = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
 			qFinal = System.Numerics.Quaternion.Normalize(qFinal);
 			float angle = 2.0f * MathF.Acos(qFinal.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - qFinal.W * qFinal.W);

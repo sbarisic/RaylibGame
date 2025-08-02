@@ -20,7 +20,7 @@ namespace Voxelgine.Engine {
 			// Once per frame
 		}
 
-		public virtual void UpdateLockstep(float TotalTime, float Dt) {
+		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			// Multiple times per frame, fixed delta
 		}
 

@@ -132,7 +132,7 @@ namespace Voxelgine.Engine {
 		}
 
 		public void UpdateLockstep(float TotalTime, float Dt) {
-			State.UpdateLockstep(TotalTime, Dt);
+			State.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
 		void BeginScreenShader() {

@@ -237,7 +237,7 @@ namespace Voxelgine.Engine {
 			return false;
 		}
 
-		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt) {
+		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr) {
 			const float GroundHitBelowFeet = -0.075f;
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;

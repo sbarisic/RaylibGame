@@ -90,8 +90,8 @@ namespace RaylibGame.States {
 			Ply.UpdateGUI();
 		}
 
-		public override void UpdateLockstep(float TotalTime, float Dt) {
-			Ply.UpdatePhysics(Map, PhysicsData, Dt);
+		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
 		}
 
 		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo) {

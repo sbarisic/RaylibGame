@@ -477,8 +477,6 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Tick(InputMgr InMgr) {
-			ViewMdl.UpdateAnimations();
-
 			string AnimName = "idle";
 
 			// Use InputMgr for movement keys
@@ -651,10 +649,10 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void Draw() {
+		public void Draw(float TimeAlpha) {
 			// Draw the viewmodel (pickaxe) in first person
 			if (LocalPlayer) {
-				ViewMdl.DrawViewModel(this);
+				ViewMdl.DrawViewModel(this, TimeAlpha);
 			}
 
 			if (!DEBUG_PLAYER && LocalPlayer)
@@ -683,6 +681,8 @@ namespace Voxelgine.Engine {
 			writer.Write(Position.X);
 			writer.Write(Position.Y);
 			writer.Write(Position.Z);
+
+			Vector3 CamAngle = GetCamAngle();
 			// Write camera angle
 			writer.Write(CamAngle.X);
 			writer.Write(CamAngle.Y);
@@ -714,7 +714,9 @@ namespace Voxelgine.Engine {
 			// Read position
 			SetPosition(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()));
 			// Read camera angle
-			CamAngle = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+			Vector3 CamAngle = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+			SetCamAngle(CamAngle);
+
 			// Read rotation
 			for (int row = 0; row < 4; row++)
 				for (int col = 0; col < 4; col++)
@@ -738,10 +740,6 @@ namespace Voxelgine.Engine {
 			CursorDisabled = reader.ReadBoolean();
 		}
 
-		public Vector3 CamAngle {
-			get => FPSCamera.CamAngle;
-			set => FPSCamera.CamAngle = value;
-		}
 
 		Vector3 Fwd;
 		Vector3 Left;
@@ -751,7 +749,18 @@ namespace Voxelgine.Engine {
 		public Vector3 GetLeft() => Left;
 		public Vector3 GetUp() => Up;
 
-		public void UpdateFPSCamera() {
+		public void SetCamAngle(Vector3 CamAngle) {
+			FPSCamera.CamAngle = CamAngle;
+		}
+
+		public Vector3 GetCamAngle() {
+			return FPSCamera.CamAngle;
+		}
+
+		public void UpdateFPSCamera(ref GameFrameInfo FInfo) {
+			//Cam = FInfo.Cam;
+			//FPSCamera.Position = FInfo.Pos;
+
 			Fwd = FPSCamera.GetForward();
 			Left = FPSCamera.GetLeft();
 			Up = FPSCamera.GetUp();

@@ -26,11 +26,11 @@ namespace Voxelgine.Engine {
 		const string DefaultViewModelName = "gun/gun.obj";
 		ViewModelRotationMode ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
 
-		Vector3 DesiredViewModelPos;
-		Vector3 ViewModelPos;
+		Vector3 DesiredViewModelPos = Vector3.Zero;
+		Vector3 ViewModelPos = Vector3.Zero;
 
-		Quaternion DesiredVMRot;
-		Quaternion VMRot;
+		Quaternion DesiredVMRot = Quaternion.Identity;
+		Quaternion VMRot = Quaternion.Identity;
 
 		public ViewModel() {
 			VModel = ResMgr.GetModel(DefaultViewModelName);
@@ -48,11 +48,7 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void UpdateAnimations() {
-		
-		}
-
-		public void DrawViewModel(Player Ply) {
+		public void DrawViewModel(Player Ply, float TimeAlpha) {
 			// Camera basis
 			var cam = Ply.Cam;
 			Vector3 worldUp = Vector3.UnitY;
@@ -81,11 +77,12 @@ namespace Voxelgine.Engine {
 					throw new NotImplementedException();
 			}
 
-			ViewModelPos = DesiredViewModelPos;
+
+			Vector3 CamAngle = Ply.GetCamAngle();
 
 			// Get yaw and pitch from camera angles (in radians)
-			float yaw = Utils.ToRad(0) - Ply.CamAngle.X * MathF.PI / 180f;   // Yaw: horizontal, around world Y
-			float pitch = Utils.ToRad(90) - Ply.CamAngle.Y * MathF.PI / 180f; // Pitch: vertical, around local right
+			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;   // Yaw: horizontal, around world Y
+			float pitch = Utils.ToRad(90) - CamAngle.Y * MathF.PI / 180f; // Pitch: vertical, around local right
 
 			// Yaw rotation (around world up)
 			var yawRot = Matrix4x4.CreateFromAxisAngle(worldUp, -yaw);
@@ -106,7 +103,7 @@ namespace Voxelgine.Engine {
 			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
 			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
 
-			var DesiredVMRot = qPitch * qYaw;
+			DesiredVMRot = qPitch * qYaw;
 
 			switch (ViewMdlRotMode) {
 				case ViewModelRotationMode.Tool:
@@ -126,6 +123,8 @@ namespace Voxelgine.Engine {
 			}
 
 			DesiredVMRot = System.Numerics.Quaternion.Normalize(DesiredVMRot);
+
+			ViewModelPos = DesiredViewModelPos;
 			VMRot = DesiredVMRot;
 
 			float angle = 2.0f * MathF.Acos(VMRot.W) * 180f / MathF.PI;

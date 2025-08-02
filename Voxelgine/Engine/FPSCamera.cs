@@ -59,32 +59,8 @@ namespace Voxelgine.Engine {
 
 			Vector3 Forward = GetForward();
 
-			/*if (UseCameraMove) {
-				Vector3 Left = GetLeft();
-				Vector3 Up = GetUp();
-
-				if (Raylib.IsKeyDown(KeyboardKey.W))
-					Position += Forward * PlyMoveSen;
-				if (Raylib.IsKeyDown(KeyboardKey.S))
-					Position -= Forward * PlyMoveSen;
-
-				if (Raylib.IsKeyDown(KeyboardKey.A))
-					Position += Left * PlyMoveSen;
-				if (Raylib.IsKeyDown(KeyboardKey.D))
-					Position -= Left * PlyMoveSen;
-
-				if (Raylib.IsKeyDown(KeyboardKey.Space))
-					Position += Up * PlyMoveSen;
-				if (Raylib.IsKeyDown(KeyboardKey.C))
-					Position -= Up * PlyMoveSen;
-			}*/
-
 			Cam.Position = Position;
 			Cam.Target = Position + (Forward * FocusDist);
-
-			//Vector4 RES = RotMat * new Vector4(0, 0, 0, 0);
-
-			//Console.WriteLine("new Vector3({0}, {1}, {2})", (int)Position.X, (int)Position.Y, (int)Position.Z);
 		}
 
 		public static Matrix4x4 GetRotationMatrix() {

@@ -94,19 +94,22 @@ namespace RaylibGame.States {
 			Ply.UpdatePhysics(Map, PhysicsData, Dt);
 		}
 
-		public override void Draw(float TimeAlpha) {
-			Ply.UpdateFPSCamera();
+		public override void Draw(float TimeAlpha, ref GameFrameInfo FInfo) {
+			Ply.UpdateFPSCamera(ref FInfo);
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
 			Draw3D(TimeAlpha);
 			Raylib.EndMode3D();
+
+			//FInfo.Cam = Ply.Cam;
+			//FInfo.Pos = FPSCamera.Position;
 		}
 
 		void Draw3D(float TimeAlpha) {
 			Map.Draw();
 			Map.DrawTransparent();
-			Ply.Draw();
+			Ply.Draw(TimeAlpha);
 
 			if (Program.DebugMode)
 				DrawPlayerCollisionBox();

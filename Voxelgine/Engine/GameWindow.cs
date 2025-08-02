@@ -10,6 +10,45 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
+	struct GameFrameInfo {
+		public bool Empty;
+		public Camera3D Cam;
+		public Vector3 Pos;
+		public Vector3 CamAngle;
+
+		public GameFrameInfo() {
+			Empty = true;
+		}
+
+		public GameFrameInfo Interpolate(GameFrameInfo Old, float T) {
+			// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
+
+			GameFrameInfo New = new GameFrameInfo();
+
+			New.Cam.FovY = float.Lerp(Old.Cam.FovY, Cam.FovY, T);
+			New.Cam.Position = Vector3.Lerp(Old.Cam.Position, Cam.Position, T);
+			New.Cam.Target = Vector3.Lerp(Old.Cam.Target, Cam.Target, T);
+			New.Cam.Up = Cam.Up;
+			New.Cam.Projection = Cam.Projection;
+			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
+			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);
+
+			return New;
+		}
+
+		public static Camera3D Lerp(Camera3D Old, Camera3D Cam, float T) {
+			Camera3D New = new Camera3D();
+
+			New.Projection = Cam.Projection;
+			New.FovY = float.Lerp(Old.FovY, Cam.FovY, T);
+			New.Position = Vector3.Lerp(Old.Position, Cam.Position, T);
+			New.Target = Vector3.Lerp(Old.Target, Cam.Target, T);
+			New.Up = Cam.Up;
+
+			return New;
+		}
+	}
+
 	class GameWindow {
 		public InputMgr InMgr;
 
@@ -123,7 +162,17 @@ namespace Voxelgine.Engine {
 			Raylib.EndShaderMode();
 		}
 
-		public void Draw(float TimeAlpha) {
+		// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
+		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame) {
+			GameFrameInfo FInfo = new GameFrameInfo();
+			//FPSCamera.Position = LastFrame.Pos;
+			if (State is GameState GS && !LastFrame.Empty) {
+				GS.Ply.Cam = GameFrameInfo.Lerp(LastFrame.Cam, GS.Ply.Cam, TimeAlpha);
+				GS.Ply.SetCamAngle(Vector3.Lerp(LastFrame.CamAngle, GS.Ply.GetCamAngle(), TimeAlpha));
+
+				//FPSCamera.Position = Vector3.Lerp(LastFrame.Pos, FPSCamera.Position, TimeAlpha);
+			}
+
 			if (Raylib.IsWindowResized()) {
 				Width = Raylib.GetRenderWidth();
 				Height = Raylib.GetRenderHeight();
@@ -134,7 +183,7 @@ namespace Voxelgine.Engine {
 			Raylib.ClearBackground(new Color(200, 150, 100, 255));
 
 			BeginScreenShader();
-			State.Draw(TimeAlpha);
+			State.Draw(TimeAlpha, ref FInfo);
 			EndScreenShader("screen");
 
 			BeginScreenShader();
@@ -142,6 +191,14 @@ namespace Voxelgine.Engine {
 			EndScreenShader("screen_gui");
 
 			Raylib.EndDrawing();
+
+			if (State is GameState GS2) {
+				FInfo.Empty = false;
+				FInfo.Cam = GS2.Ply.Cam;
+				FInfo.CamAngle = GS2.Ply.GetCamAngle();
+				//FInfo.Pos = FPSCamera.Position;
+			}
+			return FInfo;
 		}
 	}
 }

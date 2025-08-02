@@ -665,7 +665,12 @@ namespace Voxelgine.Engine {
 				DrawPos = Vector3.Zero;
 
 			PlayerEntity.Mdl.Transform = Rotation;
+
+			Rlgl.DisableDepthTest();
+			Rlgl.DisableDepthMask();
 			Raylib.DrawModel(PlayerEntity.Mdl, DrawPos, 0.25f, Color.White);
+			Rlgl.EnableDepthMask();
+			Rlgl.EnableDepthTest();
 		}
 
 		// Draw the viewmodel in first person

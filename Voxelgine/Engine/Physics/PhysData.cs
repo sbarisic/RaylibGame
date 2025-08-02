@@ -12,6 +12,7 @@ namespace Voxelgine.Engine {
 		public float AirAccel { get; set; } = 20.0f;
 		public float MaxGroundSpeed { get; set; } = 3.4f;
 		public float MaxAirSpeed { get; set; } = 4.0f;
+		public float MaxWalkSpeed { get; set; } = 1.8f;
 		public float JumpImpulse { get; set; } = 5.0f;
 		public float Gravity { get; set; } = 12.5f;
 		public float ClampHyst { get; set; } = 0.02f;

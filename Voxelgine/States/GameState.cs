@@ -510,15 +510,16 @@ namespace RaylibGame.States {
 			if (wishdir != Vector3.Zero) {
 				float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
 				float addSpeed, accel;
+				float maxGroundSpeed = Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 				if (OnGround) {
-					addSpeed = PhysicsData.MaxGroundSpeed - curSpeed;
+					addSpeed = maxGroundSpeed - curSpeed;
 					accel = PhysicsData.GroundAccel;
 				} else {
 					addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
 					accel = PhysicsData.AirAccel;
 				}
 				if (addSpeed > 0) {
-					float accelSpeed = accel * Dt * PhysicsData.MaxGroundSpeed;
+					float accelSpeed = accel * Dt * maxGroundSpeed;
 					if (accelSpeed > addSpeed)
 						accelSpeed = addSpeed;
 					PlyVelocity.X += accelSpeed * wishdir.X;
@@ -556,7 +557,7 @@ namespace RaylibGame.States {
 			// Cap horizontal speed
 			Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed = horizVel.Length();
-			float maxSpeed = OnGround ? PhysicsData.MaxGroundSpeed : PhysicsData.MaxAirSpeed;
+			float maxSpeed = OnGround ? (Raylib.IsKeyDown(KeyboardKey.LeftShift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
 			if (horizSpeed > maxSpeed) {
 				float scale = maxSpeed / horizSpeed;
 				PlyVelocity.X *= scale;

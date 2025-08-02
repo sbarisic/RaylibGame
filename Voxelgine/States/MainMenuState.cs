@@ -120,6 +120,10 @@ namespace RaylibGame.States {
 					(Window.Height / 1.65f) - (CenterSize.Y / 2)
 				), CenterSize);
 
+			GUIWindow GWnd = new GUIWindow(GUI);
+			GWnd.Size = DbgRect.Size;
+			GUI.AddElement(GWnd);
+
 			GUI.CenterVertical(DbgRect.Position, DbgRect.Size, new Vector2(15, 10), 5, IB.ToArray());
 			
 			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);

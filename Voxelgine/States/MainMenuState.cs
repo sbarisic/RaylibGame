@@ -30,7 +30,6 @@ namespace RaylibGame.States {
 			Btn_NewGame.OnClickedFunc = (E) => {
 				Program.Window.SetState(Program.GameState);
 			};
-			GUI.AddElement(Btn_NewGame);
 
 			GUIButton Btn_Options = new GUIButton(GUI);
 			Btn_Options.Pos = GUI.WindowScale(new Vector2(0.3f, 0.35f));
@@ -39,7 +38,6 @@ namespace RaylibGame.States {
 			Btn_Options.OnClickedFunc = (E) => {
 				Console.WriteLine("Options clicked");
 			};
-			GUI.AddElement(Btn_Options);
 
 			GUIButton Btn_Quit = new GUIButton(GUI);
 			Btn_Quit.Pos = GUI.WindowScale(new Vector2(0.3f, 0.4f));
@@ -48,7 +46,6 @@ namespace RaylibGame.States {
 			Btn_Quit.OnClickedFunc = (E) => {
 				Program.Window.Close();
 			};
-			GUI.AddElement(Btn_Quit);
 
 			GUIButton Btn_Wat = new GUIButton(GUI);
 			Btn_Wat.Pos = GUI.WindowScale(new Vector2(0.5f, 0.4f));
@@ -57,7 +54,6 @@ namespace RaylibGame.States {
 			Btn_Wat.OnClickedFunc = (E) => {
 				Console.WriteLine("Wat");
 			};
-			GUI.AddElement(Btn_Wat);
 
 			IB.Add(Btn_NewGame);
 			IB.Add(Btn_Options);
@@ -87,7 +83,6 @@ namespace RaylibGame.States {
 			IBox.OnClickedFunc = (E) => {
 				Console.WriteLine("Clicked item!");
 			};
-			GUI.AddElement(IBox);
 
 			Raylib.SetTextureFilter(Icn, TextureFilter.Point);
 			IBox.SetIcon(Icn, 3);
@@ -105,15 +100,7 @@ namespace RaylibGame.States {
 			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
 			GUI.AddElement(TitleImage);
 
-			List<GUIElement> IB = new List<GUIElement>();
-			CreateMenuButtons(IB, BtnSize);
-
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
-
 			Vector2 CenterSize = new Vector2(400, 500);
-
 			DbgRect = new Rectangle(
 				new Vector2(
 					(Window.Width / 2) - (CenterSize.X / 2),
@@ -122,10 +109,23 @@ namespace RaylibGame.States {
 
 			GUIWindow GWnd = new GUIWindow(GUI);
 			GWnd.Size = DbgRect.Size;
+			GWnd.Pos = DbgRect.Position;
 			GUI.AddElement(GWnd);
 
-			GUI.CenterVertical(DbgRect.Position, DbgRect.Size, new Vector2(15, 10), 5, IB.ToArray());
-			
+			List<GUIElement> IB = new List<GUIElement>();
+			CreateMenuButtons(IB, BtnSize);
+			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
+			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
+			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
+
+			// Adjust all element positions to be relative to the window
+			foreach (var el in IB) {
+				el.Pos -= DbgRect.Position;
+				GWnd.AddChild(el);
+			}
+
+			GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
+
 			/*GUIIconBar IcnBar = new GUIIconBar(GUI, IconBarStyle.XpBar);
 			IcnBar.Pos = new Vector2(800, 200);
 			IcnBar.Txt = "XP Level";
@@ -160,7 +160,7 @@ namespace RaylibGame.States {
 			Raylib.ClearBackground(new Color(150, 150, 150, 255));
 
 			//Raylib.BeginBlendMode(BlendMode.Alpha);
-			GUI.DrawWindowBorder(DbgRect.Position, DbgRect.Size);
+			//GUI.DrawWindowBorder(DbgRect.Position, DbgRect.Size);
 			//Raylib.EndBlendMode();
 
 			GUI.Draw();

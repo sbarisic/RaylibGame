@@ -449,19 +449,6 @@ namespace RaylibGame.States {
 				}
 			}
 
-			// Floor hit events
-			float VelLen = PlyVelocity.Length();
-			if (OnGround) {
-				if (!WasLastLegsOnFloor) {
-					WasLastLegsOnFloor = true;
-					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
-				} else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2)) {
-					Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
-				}
-			} else {
-				WasLastLegsOnFloor = false;
-			}
-
 			// Get movement input (wishdir)
 			Vector3 wishdir = Vector3.Zero;
 			Vector3 fwd2 = FPSCamera.GetForward();
@@ -478,6 +465,44 @@ namespace RaylibGame.States {
 				wishdir -= lft2;
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
+
+			// Ledge safety logic: prevent falling off when holding shift
+			bool ledgeSafety = OnGround && Raylib.IsKeyDown(KeyboardKey.LeftShift);
+			if (ledgeSafety && wishdir != Vector3.Zero) {
+				float stopDist = 0.2f; // Minimum distance to stop before ledge
+				float checkStep = 0.05f; // Step for sampling along the player's width
+				Vector3 checkDir = wishdir;
+				Vector3 perp = new Vector3(-checkDir.Z, 0, checkDir.X); // Perpendicular to movement
+				bool foundLedge = false;
+				// Check if any point at the stop distance is not supported
+				for (float offset = -playerRadius + 0.01f; offset <= playerRadius - 0.01f; offset += checkStep) {
+					Vector3 edgePoint = feetPos + checkDir * (playerRadius + stopDist) + perp * offset;
+					Vector3 groundCheck = edgePoint + new Vector3(0, -0.15f, 0); // Check slightly below feet
+					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) == BlockType.None) {
+						foundLedge = true;
+						break;
+					}
+				}
+				if (foundLedge) {
+					// Prevent any movement towards the ledge
+					PlyVelocity.X = 0;
+					PlyVelocity.Z = 0;
+					wishdir = Vector3.Zero;
+				}
+			}
+
+			// Floor hit events
+			float VelLen = PlyVelocity.Length();
+			if (OnGround) {
+				if (!WasLastLegsOnFloor) {
+					WasLastLegsOnFloor = true;
+					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
+				} else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2)) {
+					Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
+				}
+			} else {
+				WasLastLegsOnFloor = false;
+			}
 
 			// Jump
 			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {

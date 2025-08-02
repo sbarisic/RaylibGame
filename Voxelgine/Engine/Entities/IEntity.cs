@@ -19,6 +19,8 @@ namespace Voxelgine.Engine {
 
 		public GameState GetGameState();
 
+		public void OnPlayerTouch(Player Ply);
+
 		public void SetGameState(GameState State);
 
 		public void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr);

@@ -72,6 +72,8 @@ namespace Voxelgine.Engine {
 
 		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)
 		public virtual void UpdatePhysics(ChunkMap map, float Dt) {
+			GameState GS = GetGameState();
+
 			const float Gravity = 9.81f;
 			// Apply gravity
 			Velocity.Y -= Gravity * Dt;
@@ -94,6 +96,10 @@ namespace Voxelgine.Engine {
 				newPos.Z += move.Z;
 			else
 				Velocity.Z = 0;
+
+			// TODO: Implement collision check with the player, if collision occurs, trigger OnPlayerTouch.
+			// OnPlayerTouch should only trigger once, it should retrigger once the player leaves and then enters the entity collision box again.
+
 			Position = newPos;
 		}
 
@@ -117,6 +123,10 @@ namespace Voxelgine.Engine {
 
 		public void SetGameState(GameState State) {
 			GameState = State;
+		}
+
+		public void OnPlayerTouch(Player Ply) {
+			Console.WriteLine("Player touched me!");
 		}
 	}
 }

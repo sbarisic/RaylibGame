@@ -379,25 +379,11 @@ namespace RaylibGame.States {
 		void UpdatePhysics(float Dt) {
 			Ply.UpdatePhysics(Dt);
 
-			// Use PhysData instance for movement constants
-			float groundFriction = PhysicsData.GroundFriction;
-			float groundAccel = PhysicsData.GroundAccel;
-			float airFriction = PhysicsData.AirFriction;
-			float airAccel = PhysicsData.AirAccel;
-			float maxGroundSpeed = PhysicsData.MaxGroundSpeed;
-			float maxAirSpeed = PhysicsData.MaxAirSpeed;
-			float jumpImpulse = PhysicsData.JumpImpulse;
-			float gravity = PhysicsData.Gravity;
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;
-			float clampHyst = PhysicsData.ClampHyst;
-			float noClipMoveSpeed = PhysicsData.NoClipMoveSpeed;
-			float groundEpsilon = PhysicsData.GroundEpsilon; // Small offset to start ray inside player
-			float groundCheckDist = PhysicsData.GroundCheckDist; // Small distance to check below feet
 
 			if (NoClip) {
 				// No-clip movement: ignore collisions and physics, move freely
-				float moveSpeed = noClipMoveSpeed;
 				Vector3 move = Vector3.Zero;
 				Vector3 fwd = FPSCamera.GetForward();
 				Vector3 lft = FPSCamera.GetLeft();
@@ -415,7 +401,7 @@ namespace RaylibGame.States {
 				if (Raylib.IsKeyDown(KeyboardKey.LeftShift))
 					move -= up;
 				if (move != Vector3.Zero) {
-					move = Vector3.Normalize(move) * moveSpeed * Dt;
+					move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
 					Ply.SetPosition(Ply.Position + move);
 				}
 				return;
@@ -424,23 +410,23 @@ namespace RaylibGame.States {
 			if (!Utils.HasRecord())
 				Utils.BeginRaycastRecord();
 
-			ClampToZero(ref PlyVelocity, clampHyst);
+			ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
 
 			// Improved floor detection: check all four corners and center, from just above feet to just below
 			Vector3 feetPos = Ply.FeetPosition;
 			Vector3[] groundCheckPoints = new Vector3[] {
-				new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
-				new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
-				new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
-				new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
-				feetPos + new Vector3(0, groundEpsilon, 0)
+				new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
+				new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
+				new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z + playerRadius),
+				new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z + playerRadius),
+				feetPos + new Vector3(0, PhysicsData.GroundEpsilon, 0)
 			};
 			bool OnGround = false;
 			Vector3 HitFloor = Vector3.Zero;
 			Vector3 Face1 = Vector3.Zero;
 			foreach (var pt in groundCheckPoints) {
 				Vector3 localFace;
-				Vector3 hit = Map.RaycastPos(pt, groundCheckDist, new Vector3(0, -1f, 0), out localFace);
+				Vector3 hit = Map.RaycastPos(pt, PhysicsData.GroundCheckDist, new Vector3(0, -1f, 0), out localFace);
 				if (hit != Vector3.Zero && localFace.Y == 1) {
 					OnGround = true;
 					HitFloor = hit;
@@ -469,7 +455,7 @@ namespace RaylibGame.States {
 				if (!WasLastLegsOnFloor) {
 					WasLastLegsOnFloor = true;
 					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
-				} else if (VelLen >= (maxGroundSpeed / 2)) {
+				} else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2)) {
 					Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
 				}
 			} else {
@@ -496,7 +482,7 @@ namespace RaylibGame.States {
 			// Jump
 			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
-				PlyVelocity.Y = jumpImpulse;
+				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
 				OnGround = false;
 			}
@@ -506,7 +492,7 @@ namespace RaylibGame.States {
 				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 				float speed = velH.Length();
 				if (speed > 0) {
-					float drop = speed * groundFriction * Dt;
+					float drop = speed * PhysicsData.GroundFriction * Dt;
 					float newSpeed = MathF.Max(speed - drop, 0);
 					if (newSpeed != speed) {
 						newSpeed /= speed;
@@ -516,8 +502,8 @@ namespace RaylibGame.States {
 				}
 			} else {
 				// Air friction (very low)
-				PlyVelocity.X *= (1.0f - airFriction * Dt);
-				PlyVelocity.Z *= (1.0f - airFriction * Dt);
+				PlyVelocity.X *= (1.0f - PhysicsData.AirFriction * Dt);
+				PlyVelocity.Z *= (1.0f - PhysicsData.AirFriction * Dt);
 			}
 
 			// Acceleration
@@ -525,14 +511,14 @@ namespace RaylibGame.States {
 				float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
 				float addSpeed, accel;
 				if (OnGround) {
-					addSpeed = maxGroundSpeed - curSpeed;
-					accel = groundAccel;
+					addSpeed = PhysicsData.MaxGroundSpeed - curSpeed;
+					accel = PhysicsData.GroundAccel;
 				} else {
-					addSpeed = maxAirSpeed - curSpeed;
-					accel = airAccel;
+					addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
+					accel = PhysicsData.AirAccel;
 				}
 				if (addSpeed > 0) {
-					float accelSpeed = accel * Dt * maxGroundSpeed;
+					float accelSpeed = accel * Dt * PhysicsData.MaxGroundSpeed;
 					if (accelSpeed > addSpeed)
 						accelSpeed = addSpeed;
 					PlyVelocity.X += accelSpeed * wishdir.X;
@@ -542,7 +528,7 @@ namespace RaylibGame.States {
 
 			// Gravity
 			if (!OnGround) {
-				PlyVelocity.Y -= gravity * Dt;
+				PlyVelocity.Y -= PhysicsData.Gravity * Dt;
 			} else if (PlyVelocity.Y < 0) {
 				PlyVelocity.Y = 0;
 			}
@@ -570,7 +556,7 @@ namespace RaylibGame.States {
 			// Cap horizontal speed
 			Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed = horizVel.Length();
-			float maxSpeed = OnGround ? maxGroundSpeed : maxAirSpeed;
+			float maxSpeed = OnGround ? PhysicsData.MaxGroundSpeed : PhysicsData.MaxAirSpeed;
 			if (horizSpeed > maxSpeed) {
 				float scale = maxSpeed / horizSpeed;
 				PlyVelocity.X *= scale;

@@ -197,9 +197,9 @@ namespace RaylibGame.States {
 
 
 		// Helper to get the player's feet position
-        private Vector3 GetPlayerFeetPosition() {
-            return Ply.FeetPosition;
-        }
+		private Vector3 GetPlayerFeetPosition() {
+			return Ply.FeetPosition;
+		}
 
 		bool Phys_CollidePlayer(Vector3 Pos, Vector3 ProbeDir, out Vector3 HitNorm) {
 			Vector3 feetPos = Ply.FeetPosition;
@@ -271,32 +271,34 @@ namespace RaylibGame.States {
 		}
 
 		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = -1, float Height = -1) {
-			if (Radius < 0) Radius = Player.PlayerRadius;
-            if (Height < 0) Height = Player.PlayerHeight;
-            int RadialDivs = 12;
-            int HeightDivs = 4;
+			if (Radius < 0)
+				Radius = Player.PlayerRadius;
+			if (Height < 0)
+				Height = Player.PlayerHeight;
+			int RadialDivs = 12;
+			int HeightDivs = 4;
 
-            for (int h = 0; h < HeightDivs; h++) {
-                float heightRatio = (float)h / (HeightDivs - 1);
-                float currentHeight = heightRatio * Height;
+			for (int h = 0; h < HeightDivs; h++) {
+				float heightRatio = (float)h / (HeightDivs - 1);
+				float currentHeight = heightRatio * Height;
 
-                for (int i = 0; i < RadialDivs; i++) {
-                    float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
-                    float x = MathF.Cos(angle) * Radius;
-                    float z = MathF.Sin(angle) * Radius;
-                    yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
-                }
-            }
+				for (int i = 0; i < RadialDivs; i++) {
+					float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
+					float x = MathF.Cos(angle) * Radius;
+					float z = MathF.Sin(angle) * Radius;
+					yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
+				}
+			}
 
-            for (int h = 0; h < HeightDivs; h++) {
-                float heightRatio = (float)h / (HeightDivs - 1);
-                float currentHeight = heightRatio * Height;
-                yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
-            }
+			for (int h = 0; h < HeightDivs; h++) {
+				float heightRatio = (float)h / (HeightDivs - 1);
+				float currentHeight = heightRatio * Height;
+				yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
+			}
 
-            yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
-            yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
-        }
+			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
+			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
+		}
 
 		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
 			// Quick check if there are any non-air blocks in the bounding box  
@@ -326,238 +328,243 @@ namespace RaylibGame.States {
 		}
 
 		// Quake/Half-Life 2 style slide-move and step-move collision
-        // Attempts to move the player along velocity, sliding along walls and stepping up if possible
-        private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4)
-        {
-            float playerRadius = Player.PlayerRadius;
-            float playerHeight = Player.PlayerHeight;
-            Vector3 feetPos = Ply.FeetPosition;
-            Vector3 move = velocity * dt;
-            Vector3 outVel = velocity;
-            for (int slide = 0; slide < maxSlides; slide++)
-            {
-                Vector3 tryPos = feetPos + move;
-                if (!HasBlocksInBounds(
-                    tryPos - new Vector3(playerRadius, 0, playerRadius),
-                    tryPos + new Vector3(playerRadius, playerHeight, playerRadius)))
-                {
-                    feetPos = tryPos;
-                    break;
-                }
-                Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
-                Vector3 stepTry = stepUp + move;
-                if (!HasBlocksInBounds(
-                    stepTry - new Vector3(playerRadius, 0, playerRadius),
-                    stepTry + new Vector3(playerRadius, playerHeight, playerRadius)))
-                {
-                    feetPos = stepTry;
-                    break;
-                }
-                Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
-                if (!HasBlocksInBounds(
-                    tryX - new Vector3(playerRadius, 0, playerRadius),
-                    tryX + new Vector3(playerRadius, playerHeight, playerRadius)))
-                {
-                    feetPos = tryX;
-                    move.Z = 0;
-                    continue;
-                }
-                Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
-                if (!HasBlocksInBounds(
-                    tryZ - new Vector3(playerRadius, 0, playerRadius),
-                    tryZ + new Vector3(playerRadius, playerHeight, playerRadius)))
-                {
-                    feetPos = tryZ;
-                    move.X = 0;
-                    continue;
-                }
-                outVel = Vector3.Zero;
-                break;
-            }
-            return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
-        }
+		// Attempts to move the player along velocity, sliding along walls and stepping up if possible
+		private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4) {
+			float playerRadius = Player.PlayerRadius;
+			float playerHeight = Player.PlayerHeight;
+			Vector3 feetPos = Ply.FeetPosition;
+			Vector3 move = velocity * dt;
+			Vector3 outVel = velocity;
+			for (int slide = 0; slide < maxSlides; slide++) {
+				Vector3 tryPos = feetPos + move;
+				if (!HasBlocksInBounds(
+					tryPos - new Vector3(playerRadius, 0, playerRadius),
+					tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryPos;
+					break;
+				}
+				Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
+				Vector3 stepTry = stepUp + move;
+				if (!HasBlocksInBounds(
+					stepTry - new Vector3(playerRadius, 0, playerRadius),
+					stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = stepTry;
+					break;
+				}
+				Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
+				if (!HasBlocksInBounds(
+					tryX - new Vector3(playerRadius, 0, playerRadius),
+					tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryX;
+					move.Z = 0;
+					continue;
+				}
+				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
+				if (!HasBlocksInBounds(
+					tryZ - new Vector3(playerRadius, 0, playerRadius),
+					tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = tryZ;
+					move.X = 0;
+					continue;
+				}
+				outVel = Vector3.Zero;
+				break;
+			}
+			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
+		}
 
 		void UpdatePhysics(float Dt) {
-            Ply.UpdatePhysics(Dt);
+			Ply.UpdatePhysics(Dt);
 
-            // Quake/Half-Life 2 style movement constants
-            float groundFriction = 8.0f;
-            float groundAccel = 50.0f;
-            float airFriction = 0.2f;
-            float airAccel = 20.0f;
-            float maxGroundSpeed = 4.4f;
-            float maxAirSpeed = 5.4f;
-            float jumpImpulse = 5.2f;
-            float gravity = 10.5f;
-            float playerHeight = Player.PlayerHeight;
-            float playerRadius = Player.PlayerRadius;
-            float clampHyst = 0.02f;
-            float noClipMoveSpeed = 10.0f;
-            float groundEpsilon = 0.02f; // Small offset to start ray inside player
-            float groundCheckDist = 0.12f; // Small distance to check below feet
+			// Quake/Half-Life 2 style movement constants
+			float groundFriction = 8.0f;
+			float groundAccel = 50.0f;
+			float airFriction = 0.2f;
+			float airAccel = 20.0f;
+			float maxGroundSpeed = 4.4f;
+			float maxAirSpeed = 5.4f;
+			float jumpImpulse = 5.2f;
+			float gravity = 10.5f;
+			float playerHeight = Player.PlayerHeight;
+			float playerRadius = Player.PlayerRadius;
+			float clampHyst = 0.02f;
+			float noClipMoveSpeed = 10.0f;
+			float groundEpsilon = 0.02f; // Small offset to start ray inside player
+			float groundCheckDist = 0.12f; // Small distance to check below feet
 
-            if (NoClip) {
-                // No-clip movement: ignore collisions and physics, move freely
-                float moveSpeed = noClipMoveSpeed;
-                Vector3 move = Vector3.Zero;
-                Vector3 fwd = FPSCamera.GetForward();
-                Vector3 lft = FPSCamera.GetLeft();
-                Vector3 up = FPSCamera.GetUp();
-                if (Raylib.IsKeyDown(KeyboardKey.W)) move += fwd;
-                if (Raylib.IsKeyDown(KeyboardKey.S)) move -= fwd;
-                if (Raylib.IsKeyDown(KeyboardKey.A)) move += lft;
-                if (Raylib.IsKeyDown(KeyboardKey.D)) move -= lft;
-                if (Raylib.IsKeyDown(KeyboardKey.Space)) move += up;
-                if (Raylib.IsKeyDown(KeyboardKey.LeftShift)) move -= up;
-                if (move != Vector3.Zero)
-                {
-                    move = Vector3.Normalize(move) * moveSpeed * Dt;
-                    Ply.SetPosition(Ply.Position + move);
-                }
-                return;
-            }
+			if (NoClip) {
+				// No-clip movement: ignore collisions and physics, move freely
+				float moveSpeed = noClipMoveSpeed;
+				Vector3 move = Vector3.Zero;
+				Vector3 fwd = FPSCamera.GetForward();
+				Vector3 lft = FPSCamera.GetLeft();
+				Vector3 up = FPSCamera.GetUp();
+				if (Raylib.IsKeyDown(KeyboardKey.W))
+					move += fwd;
+				if (Raylib.IsKeyDown(KeyboardKey.S))
+					move -= fwd;
+				if (Raylib.IsKeyDown(KeyboardKey.A))
+					move += lft;
+				if (Raylib.IsKeyDown(KeyboardKey.D))
+					move -= lft;
+				if (Raylib.IsKeyDown(KeyboardKey.Space))
+					move += up;
+				if (Raylib.IsKeyDown(KeyboardKey.LeftShift))
+					move -= up;
+				if (move != Vector3.Zero) {
+					move = Vector3.Normalize(move) * moveSpeed * Dt;
+					Ply.SetPosition(Ply.Position + move);
+				}
+				return;
+			}
 
-            if (!Utils.HasRecord())
-                Utils.BeginRaycastRecord();
+			if (!Utils.HasRecord())
+				Utils.BeginRaycastRecord();
 
-            ClampToZero(ref PlyVelocity, clampHyst);
+			ClampToZero(ref PlyVelocity, clampHyst);
 
-            // Improved floor detection: check all four corners and center, from just above feet to just below
-            Vector3 feetPos = Ply.FeetPosition;
-            Vector3[] groundCheckPoints = new Vector3[] {
-                new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
-                new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
-                new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
-                new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
-                feetPos + new Vector3(0, groundEpsilon, 0)
-            };
-            bool OnGround = false;
-            Vector3 HitFloor = Vector3.Zero;
-            Vector3 Face1 = Vector3.Zero;
-            foreach (var pt in groundCheckPoints) {
-                Vector3 localFace;
-                Vector3 hit = Map.RaycastPos(pt, groundCheckDist, new Vector3(0, -1f, 0), out localFace);
-                if (hit != Vector3.Zero && localFace.Y == 1) {
-                    OnGround = true;
-                    HitFloor = hit;
-                    Face1 = localFace;
-                    break;
-                }
-            }
-            if (!OnGround) {
-                // Try a secondary check with velocity factored in
-                foreach (var pt in groundCheckPoints) {
-                    Vector3 TestPoint = pt + PlyVelocity * Dt;
-                    if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
-                        if (PicNorm.Y > 0) {
-                            OnGround = true;
-                            HitFloor = TestPoint;
-                            Face1 = PicNorm;
-                            break;
-                        }
-                    }
-                }
-            }
+			// Improved floor detection: check all four corners and center, from just above feet to just below
+			Vector3 feetPos = Ply.FeetPosition;
+			Vector3[] groundCheckPoints = new Vector3[] {
+				new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
+				new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
+				new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
+				new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
+				feetPos + new Vector3(0, groundEpsilon, 0)
+			};
+			bool OnGround = false;
+			Vector3 HitFloor = Vector3.Zero;
+			Vector3 Face1 = Vector3.Zero;
+			foreach (var pt in groundCheckPoints) {
+				Vector3 localFace;
+				Vector3 hit = Map.RaycastPos(pt, groundCheckDist, new Vector3(0, -1f, 0), out localFace);
+				if (hit != Vector3.Zero && localFace.Y == 1) {
+					OnGround = true;
+					HitFloor = hit;
+					Face1 = localFace;
+					break;
+				}
+			}
+			if (!OnGround) {
+				// Try a secondary check with velocity factored in
+				foreach (var pt in groundCheckPoints) {
+					Vector3 TestPoint = pt + PlyVelocity * Dt;
+					if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
+						if (PicNorm.Y > 0) {
+							OnGround = true;
+							HitFloor = TestPoint;
+							Face1 = PicNorm;
+							break;
+						}
+					}
+				}
+			}
 
-            // Floor hit events
-            float VelLen = PlyVelocity.Length();
-            if (OnGround) {
-                if (!WasLastLegsOnFloor) {
-                    WasLastLegsOnFloor = true;
-                    Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
-                } else if (VelLen >= (maxGroundSpeed / 2)) {
-                    Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
-                }
-            } else {
-                WasLastLegsOnFloor = false;
-            }
+			// Floor hit events
+			float VelLen = PlyVelocity.Length();
+			if (OnGround) {
+				if (!WasLastLegsOnFloor) {
+					WasLastLegsOnFloor = true;
+					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
+				} else if (VelLen >= (maxGroundSpeed / 2)) {
+					Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
+				}
+			} else {
+				WasLastLegsOnFloor = false;
+			}
 
-            // Get movement input (wishdir)
-            Vector3 wishdir = Vector3.Zero;
-            Vector3 fwd2 = FPSCamera.GetForward();
-            fwd2.Y = 0;
-            fwd2 = Vector3.Normalize(fwd2);
-            Vector3 lft2 = FPSCamera.GetLeft();
-            if (Raylib.IsKeyDown(KeyboardKey.W)) wishdir += fwd2;
-            if (Raylib.IsKeyDown(KeyboardKey.S)) wishdir -= fwd2;
-            if (Raylib.IsKeyDown(KeyboardKey.A)) wishdir += lft2;
-            if (Raylib.IsKeyDown(KeyboardKey.D)) wishdir -= lft2;
-            if (wishdir != Vector3.Zero) wishdir = Vector3.Normalize(wishdir);
+			// Get movement input (wishdir)
+			Vector3 wishdir = Vector3.Zero;
+			Vector3 fwd2 = FPSCamera.GetForward();
+			fwd2.Y = 0;
+			fwd2 = Vector3.Normalize(fwd2);
+			Vector3 lft2 = FPSCamera.GetLeft();
+			if (Raylib.IsKeyDown(KeyboardKey.W))
+				wishdir += fwd2;
+			if (Raylib.IsKeyDown(KeyboardKey.S))
+				wishdir -= fwd2;
+			if (Raylib.IsKeyDown(KeyboardKey.A))
+				wishdir += lft2;
+			if (Raylib.IsKeyDown(KeyboardKey.D))
+				wishdir -= lft2;
+			if (wishdir != Vector3.Zero)
+				wishdir = Vector3.Normalize(wishdir);
 
-            // Jump
-            if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {
-                JumpCounter.Restart();
-                PlyVelocity.Y = jumpImpulse;
-                Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
-                OnGround = false;
-            }
+			// Jump
+			if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {
+				JumpCounter.Restart();
+				PlyVelocity.Y = jumpImpulse;
+				Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
+				OnGround = false;
+			}
 
-            // Friction
-            if (OnGround) {
-                Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
-                float speed = velH.Length();
-                if (speed > 0) {
-                    float drop = speed * groundFriction * Dt;
-                    float newSpeed = MathF.Max(speed - drop, 0);
-                    if (newSpeed != speed) {
-                        newSpeed /= speed;
-                        PlyVelocity.X *= newSpeed;
-                        PlyVelocity.Z *= newSpeed;
-                    }
-                }
-            } else {
-                // Air friction (very low)
-                PlyVelocity.X *= (1.0f - airFriction * Dt);
-                PlyVelocity.Z *= (1.0f - airFriction * Dt);
-            }
+			// Friction
+			if (OnGround) {
+				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+				float speed = velH.Length();
+				if (speed > 0) {
+					float drop = speed * groundFriction * Dt;
+					float newSpeed = MathF.Max(speed - drop, 0);
+					if (newSpeed != speed) {
+						newSpeed /= speed;
+						PlyVelocity.X *= newSpeed;
+						PlyVelocity.Z *= newSpeed;
+					}
+				}
+			} else {
+				// Air friction (very low)
+				PlyVelocity.X *= (1.0f - airFriction * Dt);
+				PlyVelocity.Z *= (1.0f - airFriction * Dt);
+			}
 
-            // Acceleration
-            if (wishdir != Vector3.Zero) {
-                float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
-                float addSpeed, accel;
-                if (OnGround) {
-                    addSpeed = maxGroundSpeed - curSpeed;
-                    accel = groundAccel;
-                } else {
-                    addSpeed = maxAirSpeed - curSpeed;
-                    accel = airAccel;
-                }
-                if (addSpeed > 0) {
-                    float accelSpeed = accel * Dt * maxGroundSpeed;
-                    if (accelSpeed > addSpeed) accelSpeed = addSpeed;
-                    PlyVelocity.X += accelSpeed * wishdir.X;
-                    PlyVelocity.Z += accelSpeed * wishdir.Z;
-                }
-            }
+			// Acceleration
+			if (wishdir != Vector3.Zero) {
+				float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
+				float addSpeed, accel;
+				if (OnGround) {
+					addSpeed = maxGroundSpeed - curSpeed;
+					accel = groundAccel;
+				} else {
+					addSpeed = maxAirSpeed - curSpeed;
+					accel = airAccel;
+				}
+				if (addSpeed > 0) {
+					float accelSpeed = accel * Dt * maxGroundSpeed;
+					if (accelSpeed > addSpeed)
+						accelSpeed = addSpeed;
+					PlyVelocity.X += accelSpeed * wishdir.X;
+					PlyVelocity.Z += accelSpeed * wishdir.Z;
+				}
+			}
 
-            // Gravity
-            if (!OnGround) {
-                PlyVelocity.Y -= gravity * Dt;
-            } else if (PlyVelocity.Y < 0) {
-                PlyVelocity.Y = 0;
-            }
+			// Gravity
+			if (!OnGround) {
+				PlyVelocity.Y -= gravity * Dt;
+			} else if (PlyVelocity.Y < 0) {
+				PlyVelocity.Y = 0;
+			}
 
-            // Cap horizontal speed
-            Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
-            float horizSpeed = horizVel.Length();
-            float maxSpeed = OnGround ? maxGroundSpeed : maxAirSpeed;
-            if (horizSpeed > maxSpeed) {
-                float scale = maxSpeed / horizSpeed;
-                PlyVelocity.X *= scale;
-                PlyVelocity.Z *= scale;
-            }
+			// Cap horizontal speed
+			Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+			float horizSpeed = horizVel.Length();
+			float maxSpeed = OnGround ? maxGroundSpeed : maxAirSpeed;
+			if (horizSpeed > maxSpeed) {
+				float scale = maxSpeed / horizSpeed;
+				PlyVelocity.X *= scale;
+				PlyVelocity.Z *= scale;
+			}
 
-            // Move and collide using Quake-style slide/step
-            if (PlyVelocity != Vector3.Zero) {
-                Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
-                if (newPos != Ply.Position)
-                    Ply.SetPosition(newPos);
-                else
-                    PlyVelocity = Vector3.Zero;
-            }
+			// Move and collide using Quake-style slide/step
+			if (PlyVelocity != Vector3.Zero) {
+				Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
+				if (newPos != Ply.Position)
+					Ply.SetPosition(newPos);
+				else
+					PlyVelocity = Vector3.Zero;
+			}
 
-            Utils.EndRaycastRecord();
-        }
+			Utils.EndRaycastRecord();
+		}
 
 		// TODO: Move out into a scalable in-game timer event or something
 		Stopwatch JumpCounter = Stopwatch.StartNew();
@@ -827,8 +834,7 @@ namespace RaylibGame.States {
 
 			Ply.Draw();
 
-			if (Program.DebugMode)
-			{
+			if (Program.DebugMode) {
 				DrawPlayerCollisionBox();
 			}
 
@@ -851,37 +857,36 @@ namespace RaylibGame.States {
 		}
 
 		// Draw the player's collision bounding box for debugging
-			private void DrawPlayerCollisionBox()
-			{
-				float playerRadius = Player.PlayerRadius;
-				float playerHeight = Player.PlayerHeight;
-				Vector3 feetPos = Ply.FeetPosition;
-				Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
-				Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
-				Color color = Color.Red;
-				Vector3[] corners = new Vector3[8];
-				corners[0] = new Vector3(min.X, min.Y, min.Z);
-				corners[1] = new Vector3(max.X, min.Y, min.Z);
-				corners[2] = new Vector3(max.X, min.Y, max.Z);
-				corners[3] = new Vector3(min.X, min.Y, max.Z);
-				corners[4] = new Vector3(min.X, max.Y, min.Z);
-				corners[5] = new Vector3(max.X, max.Y, min.Z);
-				corners[6] = new Vector3(max.X, max.Y, max.Z);
-				corners[7] = new Vector3(min.X, max.Y, max.Z);
-				Raylib.DrawLine3D(corners[0], corners[1], color);
-				Raylib.DrawLine3D(corners[1], corners[2], color);
-				Raylib.DrawLine3D(corners[2], corners[3], color);
-				Raylib.DrawLine3D(corners[3], corners[0], color);
-				Raylib.DrawLine3D(corners[4], corners[5], color);
-				Raylib.DrawLine3D(corners[5], corners[6], color);
-				Raylib.DrawLine3D(corners[6], corners[7], color);
-				Raylib.DrawLine3D(corners[7], corners[4], color);
-				Raylib.DrawLine3D(corners[0], corners[4], color);
-				Raylib.DrawLine3D(corners[1], corners[5], color);
-				Raylib.DrawLine3D(corners[2], corners[6], color);
-				Raylib.DrawLine3D(corners[3], corners[7], color);
-			}
-		
+		private void DrawPlayerCollisionBox() {
+			float playerRadius = Player.PlayerRadius;
+			float playerHeight = Player.PlayerHeight;
+			Vector3 feetPos = Ply.FeetPosition;
+			Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
+			Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
+			Color color = Color.Red;
+			Vector3[] corners = new Vector3[8];
+			corners[0] = new Vector3(min.X, min.Y, min.Z);
+			corners[1] = new Vector3(max.X, min.Y, min.Z);
+			corners[2] = new Vector3(max.X, min.Y, max.Z);
+			corners[3] = new Vector3(min.X, min.Y, max.Z);
+			corners[4] = new Vector3(min.X, max.Y, min.Z);
+			corners[5] = new Vector3(max.X, max.Y, min.Z);
+			corners[6] = new Vector3(max.X, max.Y, max.Z);
+			corners[7] = new Vector3(min.X, max.Y, max.Z);
+			Raylib.DrawLine3D(corners[0], corners[1], color);
+			Raylib.DrawLine3D(corners[1], corners[2], color);
+			Raylib.DrawLine3D(corners[2], corners[3], color);
+			Raylib.DrawLine3D(corners[3], corners[0], color);
+			Raylib.DrawLine3D(corners[4], corners[5], color);
+			Raylib.DrawLine3D(corners[5], corners[6], color);
+			Raylib.DrawLine3D(corners[6], corners[7], color);
+			Raylib.DrawLine3D(corners[7], corners[4], color);
+			Raylib.DrawLine3D(corners[0], corners[4], color);
+			Raylib.DrawLine3D(corners[1], corners[5], color);
+			Raylib.DrawLine3D(corners[2], corners[6], color);
+			Raylib.DrawLine3D(corners[3], corners[7], color);
+		}
+
 
 		public override void Draw2D() {
 			//Camera2D GUICam = new Camera2D();

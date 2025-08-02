@@ -230,9 +230,9 @@ namespace RaylibGame.States {
 			float playerRadius = Player.PlayerRadius;
 			if (NoClip) {
 				Vector3 move = Vector3.Zero;
-				Vector3 fwd = FPSCamera.GetForward();
-				Vector3 lft = FPSCamera.GetLeft();
-				Vector3 up = FPSCamera.GetUp();
+				Vector3 fwd = Ply.GetForward();
+				Vector3 lft = Ply.GetLeft();
+				Vector3 up = Ply.GetUp();
 				if (Raylib.IsKeyDown(KeyboardKey.W))
 					move += fwd;
 				if (Raylib.IsKeyDown(KeyboardKey.S))
@@ -286,10 +286,10 @@ namespace RaylibGame.States {
 				}
 			}
 			Vector3 wishdir = Vector3.Zero;
-			Vector3 fwd2 = FPSCamera.GetForward();
+			Vector3 fwd2 = Ply.GetForward();
 			fwd2.Y = 0;
 			fwd2 = Vector3.Normalize(fwd2);
-			Vector3 lft2 = FPSCamera.GetLeft();
+			Vector3 lft2 = Ply.GetLeft();
 			if (Raylib.IsKeyDown(KeyboardKey.W))
 				wishdir += fwd2;
 			if (Raylib.IsKeyDown(KeyboardKey.S))
@@ -479,8 +479,8 @@ namespace RaylibGame.States {
 			else if (Wheel <= -1)
 				Inventory.SelectPrevious();
 			if ((Left || Right || Middle) && Ply.CursorDisabled) {
-				Vector3 Dir = FPSCamera.GetForward();
-				Vector3 Start = FPSCamera.Position;
+				Vector3 Dir = Ply.GetForward();
+				Vector3 Start = Ply.Position;
 				if (Left) {
 					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
@@ -525,7 +525,7 @@ namespace RaylibGame.States {
 					Inventory.SelectPrevious();
 				if (Window.InMgr.IsInputPressed(InputKey.E)) {
 					Vector3 Start = Ply.Position;
-					Vector3 End = Map.RaycastPos(Start, 1.5f, FPSCamera.GetForward(), out Vector3 Face);
+					Vector3 End = Map.RaycastPos(Start, 1.5f, Ply.GetForward(), out Vector3 Face);
 					if (Face.Y == 1)
 						End.Y -= 0.001f;
 					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);

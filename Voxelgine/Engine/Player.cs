@@ -330,9 +330,7 @@ namespace Voxelgine.Engine {
 
 		public void Read(System.IO.BinaryReader reader) {
 			// Read position
-			Position.X = reader.ReadSingle();
-			Position.Y = reader.ReadSingle();
-			Position.Z = reader.ReadSingle();
+			SetPosition(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()));
 			// Read rotation
 			for (int row = 0; row < 4; row++)
 				for (int col = 0; col < 4; col++)
@@ -355,5 +353,15 @@ namespace Voxelgine.Engine {
 			// Read cursor state
 			CursorDisabled = reader.ReadBoolean();
 		}
+
+		public Vector3 CamAngle {
+			get => FPSCamera.CamAngle;
+			set => FPSCamera.CamAngle = value;
+		}
+		public Vector3 GetForward() => FPSCamera.GetForward();
+		public Vector3 GetLeft() => FPSCamera.GetLeft();
+		public Vector3 GetUp() => FPSCamera.GetUp();
+		public void UpdateCamera(bool handleRotation) => FPSCamera.Update(handleRotation, ref Cam);
+		public Vector2 GetPreviousMousePos() => FPSCamera.GetPreviousMousePos();
 	}
 }

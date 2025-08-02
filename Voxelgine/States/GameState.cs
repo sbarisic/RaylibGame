@@ -466,25 +466,25 @@ namespace RaylibGame.States {
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
 
-			// Ledge safety logic: prevent falling off when holding shift
+			// Ledge safety logic: allow some overhang, but stop if not enough support
 			bool ledgeSafety = OnGround && Raylib.IsKeyDown(KeyboardKey.LeftShift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
 				float stopDist = 0.2f; // Minimum distance to stop before ledge
-				float checkStep = 0.05f; // Step for sampling along the player's width
+				float minSupportFrac = 0.5f; // Require at least 50% of feet points to be supported
 				Vector3 checkDir = wishdir;
-				Vector3 perp = new Vector3(-checkDir.Z, 0, checkDir.X); // Perpendicular to movement
-				bool foundLedge = false;
-				// Check if any point at the stop distance is not supported
-				for (float offset = -playerRadius + 0.01f; offset <= playerRadius - 0.01f; offset += checkStep) {
-					Vector3 edgePoint = feetPos + checkDir * (playerRadius + stopDist) + perp * offset;
-					Vector3 groundCheck = edgePoint + new Vector3(0, -0.15f, 0); // Check slightly below feet
-					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) == BlockType.None) {
-						foundLedge = true;
-						break;
+				Vector3 feetCheckPos = feetPos + checkDir * stopDist;
+				var points = Phys_PlayerCollisionPointsImproved(feetCheckPos, playerRadius, Player.PlayerHeight).ToArray();
+				float minY = points.Min(p => p.Y);
+				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
+				int supported = 0;
+				foreach (var pt in feetPoints) {
+					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
+					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
+						supported++;
 					}
 				}
-				if (foundLedge) {
-					// Prevent any movement towards the ledge
+				float supportFrac = (float)supported / feetPoints.Length;
+				if (supportFrac < minSupportFrac) {
 					PlyVelocity.X = 0;
 					PlyVelocity.Z = 0;
 					wishdir = Vector3.Zero;

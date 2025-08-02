@@ -390,8 +390,11 @@ namespace RaylibGame.States {
             float jumpImpulse = 5.2f;
             float gravity = 10.5f;
             float playerHeight = Player.PlayerHeight;
+            float playerRadius = Player.PlayerRadius;
             float clampHyst = 0.02f;
             float noClipMoveSpeed = 10.0f;
+            float groundEpsilon = 0.02f; // Small offset to start ray inside player
+            float groundCheckDist = 0.12f; // Small distance to check below feet
 
             if (NoClip) {
                 // No-clip movement: ignore collisions and physics, move freely
@@ -419,16 +422,40 @@ namespace RaylibGame.States {
 
             ClampToZero(ref PlyVelocity, clampHyst);
 
-            // Floor detection
-            Vector3 TorsoPos = Ply.Position + new Vector3(0, -1.2f, 0);
-            Vector3 HitFloor = Map.RaycastPos(TorsoPos, 0.6f + clampHyst, new Vector3(0, -1f, 0), out Vector3 Face1);
-            bool OnGround = HitFloor != Vector3.Zero && Face1.Y == 1;
+            // Improved floor detection: check all four corners and center, from just above feet to just below
+            Vector3 feetPos = Ply.FeetPosition;
+            Vector3[] groundCheckPoints = new Vector3[] {
+                new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
+                new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z - playerRadius),
+                new Vector3(feetPos.X - playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
+                new Vector3(feetPos.X + playerRadius, feetPos.Y + groundEpsilon, feetPos.Z + playerRadius),
+                feetPos + new Vector3(0, groundEpsilon, 0)
+            };
+            bool OnGround = false;
+            Vector3 HitFloor = Vector3.Zero;
+            Vector3 Face1 = Vector3.Zero;
+            foreach (var pt in groundCheckPoints) {
+                Vector3 localFace;
+                Vector3 hit = Map.RaycastPos(pt, groundCheckDist, new Vector3(0, -1f, 0), out localFace);
+                if (hit != Vector3.Zero && localFace.Y == 1) {
+                    OnGround = true;
+                    HitFloor = hit;
+                    Face1 = localFace;
+                    break;
+                }
+            }
             if (!OnGround) {
-                Vector3 TestPoint = TorsoPos - new Vector3(0, 0.6f, 0) + PlyVelocity * Dt;
-                if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
-                    HitFloor = TestPoint;
-                    if (PicNorm.Y > 0)
-                        OnGround = true;
+                // Try a secondary check with velocity factored in
+                foreach (var pt in groundCheckPoints) {
+                    Vector3 TestPoint = pt + PlyVelocity * Dt;
+                    if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
+                        if (PicNorm.Y > 0) {
+                            OnGround = true;
+                            HitFloor = TestPoint;
+                            Face1 = PicNorm;
+                            break;
+                        }
+                    }
                 }
             }
 

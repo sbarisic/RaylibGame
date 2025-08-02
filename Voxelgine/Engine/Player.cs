@@ -24,7 +24,7 @@ namespace Voxelgine.Engine {
 		EntityAnimation CurAnim;
 		GUIManager GUI;
 
-		ViewModel ViewMdl;
+		public ViewModel ViewMdl;
 
 		bool MoveFd;
 		bool MoveBk;
@@ -649,10 +649,10 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void Draw(float TimeAlpha) {
+		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			// Draw the viewmodel (pickaxe) in first person
 			if (LocalPlayer) {
-				ViewMdl.DrawViewModel(this, TimeAlpha);
+				ViewMdl.DrawViewModel(this, TimeAlpha, ref LastFrame, ref CurFame);
 			}
 
 			if (!DEBUG_PLAYER && LocalPlayer)

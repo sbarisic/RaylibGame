@@ -27,10 +27,10 @@ namespace Voxelgine.Engine {
 		ViewModelRotationMode ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
 
 		Vector3 DesiredViewModelPos = Vector3.Zero;
-		Vector3 ViewModelPos = Vector3.Zero;
+		public Vector3 ViewModelPos = Vector3.Zero;
 
 		Quaternion DesiredVMRot = Quaternion.Identity;
-		Quaternion VMRot = Quaternion.Identity;
+		public Quaternion VMRot = Quaternion.Identity;
 
 		public ViewModel() {
 			VModel = ResMgr.GetModel(DefaultViewModelName);
@@ -48,7 +48,7 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void DrawViewModel(Player Ply, float TimeAlpha) {
+		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			// Camera basis
 			var cam = Ply.Cam;
 			Vector3 worldUp = Vector3.UnitY;
@@ -124,8 +124,15 @@ namespace Voxelgine.Engine {
 
 			DesiredVMRot = System.Numerics.Quaternion.Normalize(DesiredVMRot);
 
+			//ViewModelPos = Vector3.Lerp(ViewModelPos, DesiredViewModelPos, 0.1f);
+			//VMRot = Quaternion.Slerp(VMRot, DesiredVMRot, 0.1f);
+
 			ViewModelPos = DesiredViewModelPos;
 			VMRot = DesiredVMRot;
+
+
+			//CurFame.ViewModelPos = ViewModelPos = Vector3.Lerp(LastFrame.ViewModelPos, ViewModelPos, TimeAlpha);
+			//CurFame.ViewModelRot = VMRot = Quaternion.Slerp(LastFrame.ViewModelRot, VMRot, TimeAlpha);
 
 			float angle = 2.0f * MathF.Acos(VMRot.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - VMRot.W * VMRot.W);

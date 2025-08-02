@@ -24,7 +24,7 @@ namespace Voxelgine.Engine {
 			// Multiple times per frame, fixed delta
 		}
 
-		public virtual void Draw(float TimeAlpha, ref GameFrameInfo FInfo) {
+		public virtual void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo) {
 		}
 
 		public virtual void Draw2D() {

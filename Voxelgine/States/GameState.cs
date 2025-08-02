@@ -19,7 +19,7 @@ namespace RaylibGame.States {
 		public SoundMgr Snd;
 
 		List<Tuple<Vector3, Vector3>> MarkerList = new();
-		GUIManager GUI;		
+		GUIManager GUI;
 		PhysData PhysicsData;
 
 		public GameState(GameWindow window) : base(window) {
@@ -94,25 +94,27 @@ namespace RaylibGame.States {
 			Ply.UpdatePhysics(Map, PhysicsData, Dt);
 		}
 
-		public override void Draw(float TimeAlpha, ref GameFrameInfo FInfo) {
+		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo) {
 			Ply.UpdateFPSCamera(ref FInfo);
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
-			Draw3D(TimeAlpha);
+			Draw3D(TimeAlpha, ref LastFrame, ref FInfo);
 			Raylib.EndMode3D();
 
 			//FInfo.Cam = Ply.Cam;
 			//FInfo.Pos = FPSCamera.Position;
 		}
 
-		void Draw3D(float TimeAlpha) {
+		public Vector3 PlayerCollisionBoxPos;
+
+		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			Map.Draw();
 			Map.DrawTransparent();
-			Ply.Draw(TimeAlpha);
+			Ply.Draw(TimeAlpha, ref LastFrame, ref CurFame);
 
 			if (Program.DebugMode)
-				DrawPlayerCollisionBox();
+				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
 
 			foreach (var L in MarkerList)
 				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);
@@ -122,10 +124,9 @@ namespace RaylibGame.States {
 			Utils.DrawRaycastRecord();
 		}
 
-		private void DrawPlayerCollisionBox() {
+		private void DrawPlayerCollisionBox(Vector3 feetPos) {
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
-			Vector3 feetPos = Ply.FeetPosition;
 			Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
 			Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
 			Color color = Color.Red;

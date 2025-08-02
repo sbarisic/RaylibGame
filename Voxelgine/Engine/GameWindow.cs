@@ -9,12 +9,17 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Windows.Storage.Pickers;
+
 namespace Voxelgine.Engine {
 	struct GameFrameInfo {
 		public bool Empty;
 		public Camera3D Cam;
 		public Vector3 Pos;
 		public Vector3 CamAngle;
+		public Quaternion ViewModelRot;
+		public Vector3 ViewModelPos;
+		public Vector3 FeetPosition;
 
 		public GameFrameInfo() {
 			Empty = true;
@@ -32,6 +37,9 @@ namespace Voxelgine.Engine {
 			New.Cam.Projection = Cam.Projection;
 			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
 			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);
+			New.ViewModelPos = Vector3.Lerp(Old.ViewModelPos, ViewModelPos, T);
+			New.ViewModelRot = Quaternion.Slerp(Old.ViewModelRot, ViewModelRot, T);
+			New.FeetPosition = Vector3.Lerp(Old.FeetPosition, FeetPosition, T);
 
 			return New;
 		}
@@ -162,13 +170,37 @@ namespace Voxelgine.Engine {
 			Raylib.EndShaderMode();
 		}
 
+		void GetCurrentFrame(ref GameFrameInfo FInfo, GameState GState) {
+			if (GState == null)
+				return;
+
+			FInfo.Empty = false;
+			FInfo.Pos = FPSCamera.Position;
+			FInfo.Cam = GState.Ply.Cam;
+			FInfo.CamAngle = GState.Ply.GetCamAngle();
+			FInfo.FeetPosition = GState.Ply.FeetPosition;
+			//FInfo.Pos = FPSCamera.Position;
+
+			FInfo.ViewModelPos = GState.Ply.ViewMdl.ViewModelPos;
+			FInfo.ViewModelRot = GState.Ply.ViewMdl.VMRot;
+		}
+
 		// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
 		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame) {
 			GameFrameInfo FInfo = new GameFrameInfo();
+			GetCurrentFrame(ref FInfo, State as GameState);
+
 			//FPSCamera.Position = LastFrame.Pos;
 			if (State is GameState GS && !LastFrame.Empty) {
-				GS.Ply.Cam = GameFrameInfo.Lerp(LastFrame.Cam, GS.Ply.Cam, TimeAlpha);
-				GS.Ply.SetCamAngle(Vector3.Lerp(LastFrame.CamAngle, GS.Ply.GetCamAngle(), TimeAlpha));
+				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
+
+				//FPSCamera.Position = Interp.Pos;
+				GS.Ply.Cam = Interp.Cam;
+				GS.Ply.SetCamAngle(Interp.CamAngle);
+				GS.PlayerCollisionBoxPos = Interp.FeetPosition;
+
+				//GS.Ply.ViewMdl.ViewModelPos = Interp.ViewModelPos;
+				//GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
 
 				//FPSCamera.Position = Vector3.Lerp(LastFrame.Pos, FPSCamera.Position, TimeAlpha);
 			}
@@ -183,7 +215,7 @@ namespace Voxelgine.Engine {
 			Raylib.ClearBackground(new Color(200, 150, 100, 255));
 
 			BeginScreenShader();
-			State.Draw(TimeAlpha, ref FInfo);
+			State.Draw(TimeAlpha, ref LastFrame, ref FInfo);
 			EndScreenShader("screen");
 
 			BeginScreenShader();
@@ -192,12 +224,7 @@ namespace Voxelgine.Engine {
 
 			Raylib.EndDrawing();
 
-			if (State is GameState GS2) {
-				FInfo.Empty = false;
-				FInfo.Cam = GS2.Ply.Cam;
-				FInfo.CamAngle = GS2.Ply.GetCamAngle();
-				//FInfo.Pos = FPSCamera.Position;
-			}
+			GetCurrentFrame(ref FInfo, State as GameState);
 			return FInfo;
 		}
 	}

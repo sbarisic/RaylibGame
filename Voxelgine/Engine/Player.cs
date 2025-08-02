@@ -135,6 +135,12 @@ namespace Voxelgine.Engine {
 
 		SoundMgr Snd;
 
+		public const float PlayerHeight = 1.9f;
+		public const float PlayerEyeOffset = 1.8f;
+		public const float PlayerRadius = 0.4f;
+
+		public Vector3 FeetPosition => Position - new Vector3(0, PlayerEyeOffset, 0);
+
 		public Player(string ModelName, bool LocalPlayer, SoundMgr Snd) {
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;

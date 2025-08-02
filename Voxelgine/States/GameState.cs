@@ -198,13 +198,11 @@ namespace RaylibGame.States {
 
 		// Helper to get the player's feet position
         private Vector3 GetPlayerFeetPosition() {
-            // Ply.Position is eye position, feet are 1.8 units below
-            return Ply.Position - new Vector3(0, 1.8f, 0);
+            return Ply.FeetPosition;
         }
 
 		bool Phys_CollidePlayer(Vector3 Pos, Vector3 ProbeDir, out Vector3 HitNorm) {
-			// Use feet position for collision
-			Vector3 feetPos = Pos - new Vector3(0, 1.8f, 0);
+			Vector3 feetPos = Ply.FeetPosition;
 			bool Res = Phys_CollidePlayerAdvanced(feetPos, ProbeDir, out HitNorm, out Vector3 _, out float _);
 
 			if (!Res) {
@@ -217,8 +215,7 @@ namespace RaylibGame.States {
 		}
 
 		bool Phys_CollidePlayerAdvanced(Vector3 Pos, Vector3 ProbeDir, out Vector3 HitNorm, out Vector3 HitPoint, out float HitDistance) {
-			// Use feet position for collision
-			Vector3 feetPos = Pos - new Vector3(0, 1.8f, 0);
+			Vector3 feetPos = Ply.FeetPosition;
 			HitNorm = Vector3.Zero;
 			HitPoint = Vector3.Zero;
 			HitDistance = float.MaxValue;
@@ -231,7 +228,6 @@ namespace RaylibGame.States {
 					hasCollision = true;
 					float distance = Vector3.Distance(feetPos, P);
 
-					// Keep track of closest collision  
 					if (distance < HitDistance) {
 						HitDistance = distance;
 						HitNorm = tempNorm;
@@ -244,8 +240,7 @@ namespace RaylibGame.States {
 		}
 
 		bool Phys_CollidePlayerSingle(Vector3 Pos, out Vector3 HitNorm, out Vector3 HitPoint, out float HitDistance, bool FeetOnly = false) {
-			// Use feet position for collision
-			Vector3 feetPos = Pos - new Vector3(0, 1.8f, 0);
+			Vector3 feetPos = Ply.FeetPosition;
 			HitDistance = float.MaxValue;
 			HitPoint = Vector3.Zero;
 			HitNorm = Vector3.Zero;
@@ -264,7 +259,6 @@ namespace RaylibGame.States {
 					hasCollision = true;
 					float distance = Vector3.Distance(feetPos, P);
 
-					// Keep track of closest collision  
 					if (distance < HitDistance) {
 						HitDistance = distance;
 						HitNorm = Vector3.Normalize(feetPos - P);
@@ -276,35 +270,33 @@ namespace RaylibGame.States {
 			return hasCollision;
 		}
 
-		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = 0.4f, float Height = 1.8f) {
-			int RadialDivs = 12; // Increased from 6 for better precision  
-			int HeightDivs = 4;  // Multiple height levels for better coverage  
+		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = -1, float Height = -1) {
+			if (Radius < 0) Radius = Player.PlayerRadius;
+            if (Height < 0) Height = Player.PlayerHeight;
+            int RadialDivs = 12;
+            int HeightDivs = 4;
 
-			// Generate cylinder points at multiple heights (feet to head)
-			for (int h = 0; h < HeightDivs; h++) {
-				float heightRatio = (float)h / (HeightDivs - 1);
-				float currentHeight = heightRatio * Height; // from 0 (feet) to Height (head)
+            for (int h = 0; h < HeightDivs; h++) {
+                float heightRatio = (float)h / (HeightDivs - 1);
+                float currentHeight = heightRatio * Height;
 
-				for (int i = 0; i < RadialDivs; i++) {
-					float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
-					float x = MathF.Cos(angle) * Radius;
-					float z = MathF.Sin(angle) * Radius;
-					yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
-				}
-			}
+                for (int i = 0; i < RadialDivs; i++) {
+                    float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
+                    float x = MathF.Cos(angle) * Radius;
+                    float z = MathF.Sin(angle) * Radius;
+                    yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
+                }
+            }
 
-			// Add center points for better internal collision detection  
-			for (int h = 0; h < HeightDivs; h++) {
-				float heightRatio = (float)h / (HeightDivs - 1);
-				float currentHeight = heightRatio * Height;
-				yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
-			}
+            for (int h = 0; h < HeightDivs; h++) {
+                float heightRatio = (float)h / (HeightDivs - 1);
+                float currentHeight = heightRatio * Height;
+                yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
+            }
 
-			// Add top and bottom cap points  
-			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);   // Top center
-			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);            // Bottom center
-		}
-
+            yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
+            yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
+        }
 
 		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
 			// Quick check if there are any non-air blocks in the bounding box  
@@ -337,10 +329,9 @@ namespace RaylibGame.States {
         // Attempts to move the player along velocity, sliding along walls and stepping up if possible
         private Vector3 QuakeMoveWithCollision(Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4)
         {
-            float playerRadius = 0.4f;
-            float playerHeight = 1.9f; // Match bounding box and collision
-            // Use feet position for collision
-            Vector3 feetPos = pos - new Vector3(0, 1.8f, 0);
+            float playerRadius = Player.PlayerRadius;
+            float playerHeight = Player.PlayerHeight;
+            Vector3 feetPos = Ply.FeetPosition;
             Vector3 move = velocity * dt;
             Vector3 outVel = velocity;
             for (int slide = 0; slide < maxSlides; slide++)
@@ -350,23 +341,18 @@ namespace RaylibGame.States {
                     tryPos - new Vector3(playerRadius, 0, playerRadius),
                     tryPos + new Vector3(playerRadius, playerHeight, playerRadius)))
                 {
-                    // No collision, move fully
                     feetPos = tryPos;
                     break;
                 }
-                // Try to step up
                 Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
                 Vector3 stepTry = stepUp + move;
                 if (!HasBlocksInBounds(
                     stepTry - new Vector3(playerRadius, 0, playerRadius),
                     stepTry + new Vector3(playerRadius, playerHeight, playerRadius)))
                 {
-                    // Step up and move
                     feetPos = stepTry;
                     break;
                 }
-                // Slide along the first hit axis
-                // Try X only
                 Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
                 if (!HasBlocksInBounds(
                     tryX - new Vector3(playerRadius, 0, playerRadius),
@@ -376,7 +362,6 @@ namespace RaylibGame.States {
                     move.Z = 0;
                     continue;
                 }
-                // Try Z only
                 Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
                 if (!HasBlocksInBounds(
                     tryZ - new Vector3(playerRadius, 0, playerRadius),
@@ -386,12 +371,10 @@ namespace RaylibGame.States {
                     move.X = 0;
                     continue;
                 }
-                // Can't move, stop
                 outVel = Vector3.Zero;
                 break;
             }
-            // Return new eye position (feetPos + 1.8f)
-            return feetPos + new Vector3(0, 1.8f, 0);
+            return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
         }
 
 		void UpdatePhysics(float Dt) {
@@ -406,7 +389,7 @@ namespace RaylibGame.States {
             float maxAirSpeed = 5.4f;
             float jumpImpulse = 5.2f;
             float gravity = 10.5f;
-            float playerHeight = 1.8f;
+            float playerHeight = Player.PlayerHeight;
             float clampHyst = 0.02f;
             float noClipMoveSpeed = 10.0f;
 
@@ -843,14 +826,12 @@ namespace RaylibGame.States {
 		// Draw the player's collision bounding box for debugging
 			private void DrawPlayerCollisionBox()
 			{
-				float playerRadius = 0.4f;
-				float playerHeight = 1.9f; // Slightly above eye level
-				// The feet position is Ply.Position - new Vector3(0, 1.8f, 0)
-				Vector3 feetPos = Ply.Position - new Vector3(0, 1.8f, 0);
+				float playerRadius = Player.PlayerRadius;
+				float playerHeight = Player.PlayerHeight;
+				Vector3 feetPos = Ply.FeetPosition;
 				Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
 				Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
 				Color color = Color.Red;
-				// Draw all 12 edges of the box
 				Vector3[] corners = new Vector3[8];
 				corners[0] = new Vector3(min.X, min.Y, min.Z);
 				corners[1] = new Vector3(max.X, min.Y, min.Z);
@@ -860,17 +841,14 @@ namespace RaylibGame.States {
 				corners[5] = new Vector3(max.X, max.Y, min.Z);
 				corners[6] = new Vector3(max.X, max.Y, max.Z);
 				corners[7] = new Vector3(min.X, max.Y, max.Z);
-				// Bottom
 				Raylib.DrawLine3D(corners[0], corners[1], color);
 				Raylib.DrawLine3D(corners[1], corners[2], color);
 				Raylib.DrawLine3D(corners[2], corners[3], color);
 				Raylib.DrawLine3D(corners[3], corners[0], color);
-				// Top
 				Raylib.DrawLine3D(corners[4], corners[5], color);
 				Raylib.DrawLine3D(corners[5], corners[6], color);
 				Raylib.DrawLine3D(corners[6], corners[7], color);
 				Raylib.DrawLine3D(corners[7], corners[4], color);
-				// Sides
 				Raylib.DrawLine3D(corners[0], corners[4], color);
 				Raylib.DrawLine3D(corners[1], corners[5], color);
 				Raylib.DrawLine3D(corners[2], corners[6], color);

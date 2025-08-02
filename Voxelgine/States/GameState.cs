@@ -326,174 +326,193 @@ namespace RaylibGame.States {
 		}
 
 		void UpdatePhysics(float Dt) {
-			Ply.UpdatePhysics(Dt);
+            Ply.UpdatePhysics(Dt);
 
-			// Physics constants - consolidated for better organization  
-			var physicsConfig = new {
-				ClampHyst = 0.02f,
-				Gravity = 10.5f,
-				MaxPlayerVelocity = 3.6f,
-				MaxPlayerControllableVelocity = 4.0f,
-				MaxPlayerFallVelocity = 10.0f,
-				PlayerJumpVelocity = 5.2f,
-				PlyMoveSen = 3.2f,
-				PlayerHeight = 1.8f,
-				NoClipMoveSpeed = 10.0f
-			};
+            // Quake/Half-Life 2 style movement constants
+            float groundFriction = 8.0f;
+            float groundAccel = 50.0f;
+            float airFriction = 0.2f;
+            float airAccel = 20.0f;
+            float maxGroundSpeed = 4.4f;
+            float maxAirSpeed = 5.4f;
+            float jumpImpulse = 5.2f;
+            float gravity = 10.5f;
+            float playerHeight = 1.8f;
+            float clampHyst = 0.02f;
+            float noClipMoveSpeed = 10.0f;
 
-			if (NoClip) {
-				// No-clip movement: ignore collisions and physics, move freely
-				float moveSpeed = physicsConfig.NoClipMoveSpeed;
-				Vector3 move = Vector3.Zero;
-				Vector3 forward = FPSCamera.GetForward();
-				Vector3 left = FPSCamera.GetLeft();
-				Vector3 up = FPSCamera.GetUp();
-				if (Raylib.IsKeyDown(KeyboardKey.W)) move += forward;
-				if (Raylib.IsKeyDown(KeyboardKey.S)) move -= forward;
-				if (Raylib.IsKeyDown(KeyboardKey.A)) move += left;
-				if (Raylib.IsKeyDown(KeyboardKey.D)) move -= left;
-				if (Raylib.IsKeyDown(KeyboardKey.Space)) move += up;
-				if (Raylib.IsKeyDown(KeyboardKey.LeftShift)) move -= up;
-				if (move != Vector3.Zero)
-				{
-					move = Vector3.Normalize(move) * moveSpeed * Dt;
-					Ply.SetPosition(Ply.Position + move);
-				}
-				return;
-			}
+            if (NoClip) {
+                // No-clip movement: ignore collisions and physics, move freely
+                float moveSpeed = noClipMoveSpeed;
+                Vector3 move = Vector3.Zero;
+                Vector3 fwd = FPSCamera.GetForward();
+                Vector3 lft = FPSCamera.GetLeft();
+                Vector3 up = FPSCamera.GetUp();
+                if (Raylib.IsKeyDown(KeyboardKey.W)) move += fwd;
+                if (Raylib.IsKeyDown(KeyboardKey.S)) move -= fwd;
+                if (Raylib.IsKeyDown(KeyboardKey.A)) move += lft;
+                if (Raylib.IsKeyDown(KeyboardKey.D)) move -= lft;
+                if (Raylib.IsKeyDown(KeyboardKey.Space)) move += up;
+                if (Raylib.IsKeyDown(KeyboardKey.LeftShift)) move -= up;
+                if (move != Vector3.Zero)
+                {
+                    move = Vector3.Normalize(move) * moveSpeed * Dt;
+                    Ply.SetPosition(Ply.Position + move);
+                }
+                return;
+            }
 
-			if (!Utils.HasRecord())
-				Utils.BeginRaycastRecord();
+            if (!Utils.HasRecord())
+                Utils.BeginRaycastRecord();
 
-			// Velocity clamping  
-			ClampToZero(ref PlyVelocity, physicsConfig.ClampHyst);
+            ClampToZero(ref PlyVelocity, clampHyst);
 
-			float VelLen = PlyVelocity.Length();
+            // Floor detection
+            Vector3 TorsoPos = Ply.Position + new Vector3(0, -1.2f, 0);
+            Vector3 HitFloor = Map.RaycastPos(TorsoPos, 0.6f + clampHyst, new Vector3(0, -1f, 0), out Vector3 Face1);
+            bool OnGround = HitFloor != Vector3.Zero && Face1.Y == 1;
+            if (!OnGround) {
+                Vector3 TestPoint = TorsoPos - new Vector3(0, 0.6f, 0) + PlyVelocity * Dt;
+                if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
+                    HitFloor = TestPoint;
+                    if (PicNorm.Y > 0)
+                        OnGround = true;
+                }
+            }
 
-			// Floor detection - simplified to single raycast  
-			Vector3 TorsoPos = Ply.Position + new Vector3(0, -1.2f, 0);
+            // Floor hit events
+            float VelLen = PlyVelocity.Length();
+            if (OnGround) {
+                if (!WasLastLegsOnFloor) {
+                    WasLastLegsOnFloor = true;
+                    Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
+                } else if (VelLen >= (maxGroundSpeed / 2)) {
+                    Ply.PhysicsHit(HitFloor, VelLen, false, true, true, false);
+                }
+            } else {
+                WasLastLegsOnFloor = false;
+            }
 
-			Vector3 HitFloor = Map.RaycastPos(TorsoPos, 0.6f + physicsConfig.ClampHyst, new Vector3(0, -1f, 0), out Vector3 Face1);
-			bool HasHitFloor = HitFloor != Vector3.Zero && Face1.Y == 1;
+            // Get movement input (wishdir)
+            Vector3 wishdir = Vector3.Zero;
+            Vector3 fwd2 = FPSCamera.GetForward();
+            fwd2.Y = 0;
+            fwd2 = Vector3.Normalize(fwd2);
+            Vector3 lft2 = FPSCamera.GetLeft();
+            if (Raylib.IsKeyDown(KeyboardKey.W)) wishdir += fwd2;
+            if (Raylib.IsKeyDown(KeyboardKey.S)) wishdir -= fwd2;
+            if (Raylib.IsKeyDown(KeyboardKey.A)) wishdir += lft2;
+            if (Raylib.IsKeyDown(KeyboardKey.D)) wishdir -= lft2;
+            if (wishdir != Vector3.Zero) wishdir = Vector3.Normalize(wishdir);
 
-			if (!HasHitFloor) {
-				Vector3 TestPoint = TorsoPos - new Vector3(0, 0.6f, 0) + PlyVelocity * Dt;
-				if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
-					HitFloor = TestPoint;
+            // Jump
+            if (Raylib.IsKeyDown(KeyboardKey.Space) && OnGround && JumpCounter.ElapsedMilliseconds > 50) {
+                JumpCounter.Restart();
+                PlyVelocity.Y = jumpImpulse;
+                Ply.PhysicsHit(HitFloor, VelLen, false, false, false, true);
+                OnGround = false;
+            }
 
-					if (PicNorm.Y > 0)
-						HasHitFloor = true;
-				}
+            // Friction
+            if (OnGround) {
+                Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+                float speed = velH.Length();
+                if (speed > 0) {
+                    float drop = speed * groundFriction * Dt;
+                    float newSpeed = MathF.Max(speed - drop, 0);
+                    if (newSpeed != speed) {
+                        newSpeed /= speed;
+                        PlyVelocity.X *= newSpeed;
+                        PlyVelocity.Z *= newSpeed;
+                    }
+                }
+            } else {
+                // Air friction (very low)
+                PlyVelocity.X *= (1.0f - airFriction * Dt);
+                PlyVelocity.Z *= (1.0f - airFriction * Dt);
+            }
 
-			}
+            // Acceleration
+            if (wishdir != Vector3.Zero) {
+                float curSpeed = PlyVelocity.X * wishdir.X + PlyVelocity.Z * wishdir.Z;
+                float addSpeed, accel;
+                if (OnGround) {
+                    addSpeed = maxGroundSpeed - curSpeed;
+                    accel = groundAccel;
+                } else {
+                    addSpeed = maxAirSpeed - curSpeed;
+                    accel = airAccel;
+                }
+                if (addSpeed > 0) {
+                    float accelSpeed = accel * Dt * maxGroundSpeed;
+                    if (accelSpeed > addSpeed) accelSpeed = addSpeed;
+                    PlyVelocity.X += accelSpeed * wishdir.X;
+                    PlyVelocity.Z += accelSpeed * wishdir.Z;
+                }
+            }
 
+            // Gravity
+            if (!OnGround) {
+                PlyVelocity.Y -= gravity * Dt;
+            } else if (PlyVelocity.Y < 0) {
+                PlyVelocity.Y = 0;
+            }
 
-			// Floor hit events  
-			if (HasHitFloor) {
-				if (!WasLastLegsOnFloor) {
-					WasLastLegsOnFloor = true;
-					Ply.PhysicsHit(Ply.Position, VelLen, false, true, false, false);
-				} else if (PlyVelocity.Length() >= (physicsConfig.MaxPlayerVelocity / 2)) {
-					Ply.PhysicsHit(HitFloor, PlyVelocity.Length(), false, true, true, false);
-				}
-			} else {
-				WasLastLegsOnFloor = false;
-			}
+            // Cap horizontal speed
+            Vector2 horizVel = new Vector2(PlyVelocity.X, PlyVelocity.Z);
+            float horizSpeed = horizVel.Length();
+            float maxSpeed = OnGround ? maxGroundSpeed : maxAirSpeed;
+            if (horizSpeed > maxSpeed) {
+                float scale = maxSpeed / horizSpeed;
+                PlyVelocity.X *= scale;
+                PlyVelocity.Z *= scale;
+            }
 
-			// Movement input handling  
-			Vector3 MovementInput = HandleMovementInput(physicsConfig.PlyMoveSen, physicsConfig.PlayerJumpVelocity, ref HasHitFloor, HitFloor);
-			bool IsBraking = MovementInput == Vector3.Zero;
+            // Move and collide
+            if (PlyVelocity != Vector3.Zero) {
+                Vector3 NewPlyPos = Ply.Position + (PlyVelocity * Dt);
+                Vector3 MoveDir = Vector3.Normalize(PlyVelocity);
+                Vector3 NewPlyVelocity = PlyVelocity;
 
-			// Apply movement based on ground state  
-			if (HasHitFloor) {
-				if (Math.Abs(PlyVelocity.X) > MovementInput.X)
-					PlyVelocity.X += MovementInput.X;
-				else
-					PlyVelocity.X = MovementInput.X;
+                if (Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm)) {
+                    // Project velocity onto collision surface
+                    NewPlyVelocity = Utils.ProjectOnPlane(PlyVelocity, HitNorm, clampHyst);
+                    if (NewPlyVelocity == Vector3.Zero) {
+                        if (Phys_CollidePlayerSingle(NewPlyPos, out Vector3 HitNrm, out Vector3 HitPt, out float Dst)) {
+                            NewPlyVelocity = HitNrm * Dst;
+                        }
+                    }
+                    MoveDir = Vector3.Normalize(NewPlyVelocity);
+                    NewPlyPos = Ply.Position + (NewPlyVelocity * Dt);
+                    if (!Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm2)) {
+                        PlyVelocity = NewPlyVelocity;
+                        Ply.SetPosition(NewPlyPos);
+                    } else {
+                        PlyVelocity = Vector3.Zero;
+                        if (Phys_CollidePlayer(Ply.Position, MoveDir, out Vector3 _)) {
+                            PlyVelocity = Vector3.Zero;
+                            Ply.SetPosition(Ply.GetPreviousPosition());
+                        } else {
+                            PlyVelocity += HitNorm2;
+                            Ply.SetPosition(Ply.Position);
+                        }
+                    }
+                } else {
+                    if (Map.GetBlock(NewPlyPos) == BlockType.None) {
+                        Ply.SetPosition(NewPlyPos);
+                    } else {
+                        if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
+                            PlyVelocity = Vector3.Zero;
+                            Ply.SetPosition(Ply.GetPreviousPosition());
+                        } else {
+                            Ply.SetPosition(Ply.Position);
+                        }
+                    }
+                }
+            }
 
-				if (Math.Abs(PlyVelocity.Z) > MovementInput.Z)
-					PlyVelocity.Z += MovementInput.Z;
-				else
-					PlyVelocity.Z = MovementInput.Z;
-
-				if (MovementInput.Y > physicsConfig.ClampHyst) {
-					if (PlyVelocity.Y < 0)
-						PlyVelocity.Y = MovementInput.Y;
-					else
-						PlyVelocity.Y += MovementInput.Y;
-					//HasHitFloor = false;
-				}
-			} else {
-				PlyVelocity += new Vector3(MovementInput.X, 0, MovementInput.Z) * 0.1f;
-
-				float MaxVel = physicsConfig.MaxPlayerControllableVelocity;
-				PlyVelocity.X = Utils.Clamp(PlyVelocity.X, -MaxVel, MaxVel);
-				PlyVelocity.Z = Utils.Clamp(PlyVelocity.Z, -MaxVel, MaxVel);
-
-				/*if (PlyVelocity.Length() <= physicsConfig.MaxPlayerControllableVelocity) {
-					PlyVelocity += new Vector3(MovementInput.X, 0, MovementInput.Z) * 0.1f;
-				}*/
-			}
-
-			// Velocity processing and constraints  
-			ProcessVelocityConstraints(physicsConfig, HasHitFloor, HitFloor, IsBraking, Dt);
-
-			if (PlyVelocity != Vector3.Zero) {
-				/*if (Phys_CollidePlayerSingle(Ply.Position, out Vector3 HitNrm, out Vector3 HitPoint, out float Dist)) {
-					Ply.Position = Ply.Position - (HitNrm * Dist);
-				}*/
-
-				Vector3 NewPlyPos = Ply.Position + (PlyVelocity * Dt);
-				Vector3 MoveDir = Vector3.Normalize(PlyVelocity);
-				Vector3 NewPlyVelocity = PlyVelocity;
-
-				if (Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm)) {
-					// Project velocity onto collision surface  
-					NewPlyVelocity = Utils.ProjectOnPlane(PlyVelocity, HitNorm, physicsConfig.ClampHyst);
-
-					if (NewPlyVelocity == Vector3.Zero) {
-						if (Phys_CollidePlayerSingle(NewPlyPos, out Vector3 HitNrm, out Vector3 HitPt, out float Dst)) {
-							NewPlyVelocity = HitNrm * Dst;
-						}
-					}
-
-					MoveDir = Vector3.Normalize(NewPlyVelocity);
-
-					// Try to move with projected velocity  
-					NewPlyPos = Ply.Position + (NewPlyVelocity * Dt);
-					if (!Phys_CollidePlayer(NewPlyPos, MoveDir, out Vector3 HitNorm2)) {
-						PlyVelocity = NewPlyVelocity;
-						Ply.SetPosition(NewPlyPos);
-					} else {
-						// If still colliding, stop movement  
-						PlyVelocity = Vector3.Zero;
-
-						if (Phys_CollidePlayer(Ply.Position, MoveDir, out Vector3 _)) {
-							PlyVelocity = Vector3.Zero;
-							Ply.SetPosition(Ply.GetPreviousPosition());
-						} else {
-							PlyVelocity += HitNorm2;
-							Ply.SetPosition(Ply.Position);
-						}
-					}
-				} else {
-					// No collision, move normally  
-					if (Map.GetBlock(NewPlyPos) == BlockType.None) {
-						Ply.SetPosition(NewPlyPos);
-					} else {
-
-						if (Phys_CollidePlayer(Ply.Position, Vector3.Zero, out Vector3 _)) {
-							PlyVelocity = Vector3.Zero;
-							Ply.SetPosition(Ply.GetPreviousPosition());
-						} else {
-							Ply.SetPosition(Ply.Position);
-						}
-					}
-				}
-			}
-
-			Utils.EndRaycastRecord();
-		}
+            Utils.EndRaycastRecord();
+        }
 
 		// TODO: Move out into a scalable in-game timer event or something
 		Stopwatch JumpCounter = Stopwatch.StartNew();

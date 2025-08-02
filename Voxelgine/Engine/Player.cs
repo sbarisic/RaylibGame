@@ -305,6 +305,10 @@ namespace Voxelgine.Engine {
 			writer.Write(Position.X);
 			writer.Write(Position.Y);
 			writer.Write(Position.Z);
+			// Write camera angle
+			writer.Write(CamAngle.X);
+			writer.Write(CamAngle.Y);
+			writer.Write(CamAngle.Z);
 			// Write rotation (Matrix4x4 as 16 floats)
 			for (int row = 0; row < 4; row++)
 				for (int col = 0; col < 4; col++)
@@ -331,6 +335,8 @@ namespace Voxelgine.Engine {
 		public void Read(System.IO.BinaryReader reader) {
 			// Read position
 			SetPosition(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()));
+			// Read camera angle
+			CamAngle = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
 			// Read rotation
 			for (int row = 0; row < 4; row++)
 				for (int col = 0; col < 4; col++)

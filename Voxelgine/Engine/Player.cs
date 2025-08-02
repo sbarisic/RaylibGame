@@ -299,5 +299,61 @@ namespace Voxelgine.Engine {
 		public void AddOnKeyPressed(KeyboardKey K, Action Act) {
 			OnKeyFuncs.Add(K, Act);
 		}
+
+		public void Write(System.IO.BinaryWriter writer) {
+			// Write position
+			writer.Write(Position.X);
+			writer.Write(Position.Y);
+			writer.Write(Position.Z);
+			// Write rotation (Matrix4x4 as 16 floats)
+			for (int row = 0; row < 4; row++)
+				for (int col = 0; col < 4; col++)
+					writer.Write(Rotation[row, col]);
+			// Write upper body rotation
+			for (int row = 0; row < 4; row++)
+				for (int col = 0; col < 4; col++)
+					writer.Write(UpperBodyRotation[row, col]);
+			// Write camera (just position and target for now)
+			writer.Write(Cam.Position.X);
+			writer.Write(Cam.Position.Y);
+			writer.Write(Cam.Position.Z);
+			writer.Write(Cam.Target.X);
+			writer.Write(Cam.Target.Y);
+			writer.Write(Cam.Target.Z);
+			// Write previous position
+			writer.Write(PreviousPosition.X);
+			writer.Write(PreviousPosition.Y);
+			writer.Write(PreviousPosition.Z);
+			// Write cursor state
+			writer.Write(CursorDisabled);
+		}
+
+		public void Read(System.IO.BinaryReader reader) {
+			// Read position
+			Position.X = reader.ReadSingle();
+			Position.Y = reader.ReadSingle();
+			Position.Z = reader.ReadSingle();
+			// Read rotation
+			for (int row = 0; row < 4; row++)
+				for (int col = 0; col < 4; col++)
+					Rotation[row, col] = reader.ReadSingle();
+			// Read upper body rotation
+			for (int row = 0; row < 4; row++)
+				for (int col = 0; col < 4; col++)
+					UpperBodyRotation[row, col] = reader.ReadSingle();
+			// Read camera
+			Cam.Position.X = reader.ReadSingle();
+			Cam.Position.Y = reader.ReadSingle();
+			Cam.Position.Z = reader.ReadSingle();
+			Cam.Target.X = reader.ReadSingle();
+			Cam.Target.Y = reader.ReadSingle();
+			Cam.Target.Z = reader.ReadSingle();
+			// Read previous position
+			PreviousPosition.X = reader.ReadSingle();
+			PreviousPosition.Y = reader.ReadSingle();
+			PreviousPosition.Z = reader.ReadSingle();
+			// Read cursor state
+			CursorDisabled = reader.ReadBoolean();
+		}
 	}
 }

@@ -40,6 +40,18 @@ namespace RaylibGame.States {
 			}
 
 			Ply = new Player("snoutx10k", true, Snd);
+			if (File.Exists("player.bin"))
+			{
+				using (FileStream fs = File.OpenRead("player.bin"))
+				using (BinaryReader reader = new BinaryReader(fs))
+				{
+					Ply.Read(reader);
+				}
+			}
+			else
+			{
+				Ply.SetPosition(32, 73, 19);
+			}
 			Stopwatch SWatch = Stopwatch.StartNew();
 
 			Ply.AddOnKeyPressed(KeyboardKey.F2, () => {
@@ -49,9 +61,11 @@ namespace RaylibGame.States {
 				SWatch.Stop();
 				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
 			});
+
 			Ply.AddOnKeyPressed(KeyboardKey.F3, () => { Program.DebugMode = !Program.DebugMode; });
+
 			Ply.AddOnKeyPressed(KeyboardKey.F4, () => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
-			Ply.SetPosition(32, 73, 19);
+
 			Ply.AddOnKeyPressed(KeyboardKey.C, () => {
 				NoClip = !NoClip;
 				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
@@ -86,7 +100,7 @@ namespace RaylibGame.States {
 			SetInvItem(Inventory, 3, BlockType.Bricks, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Bricks);
 			SetInvItem(Inventory, 4, BlockType.Plank, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Plank);
 			SetInvItem(Inventory, 5, BlockType.CraftingTable, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.CraftingTable);
-			SetInvItem(Inventory, 5, BlockType.Glowstone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Glowstone);
+			SetInvItem(Inventory, 6, BlockType.Glowstone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Glowstone);
 		}
 
 		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
@@ -401,17 +415,49 @@ namespace RaylibGame.States {
 				PlyVelocity.X *= scale;
 				PlyVelocity.Z *= scale;
 			}
-			if (PlyVelocity != Vector3.Zero) {
-				Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
-				if (newPos != Ply.Position)
-					Ply.SetPosition(newPos);
-				else
-					PlyVelocity = Vector3.Zero;
+			if (PlyVelocity.Y > 0) {
+				float headEpsilon = 0.02f;
+				Vector3 feetPos2 = Ply.FeetPosition;
+				Vector3 headPos = feetPos2 + new Vector3(0, playerHeight - headEpsilon, 0);
+				Vector3[] headCheckPoints = new Vector3[] {
+					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
+					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
+					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
+					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
+					headPos
+				};
+				foreach (var pt in headCheckPoints) {
+					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+						PlyVelocity.Y = 0;
+						break;
+					}
+				}
 			}
+			Vector3 newPos = QuakeMoveWithCollision(Ply.Position, PlyVelocity, Dt);
+			if (newPos != Ply.Position)
+				Ply.SetPosition(newPos);
+			else
+				PlyVelocity = Vector3.Zero;
 			Utils.EndRaycastRecord();
 		}
 
 		Stopwatch JumpCounter = Stopwatch.StartNew();
+
+		private void SaveGameState()
+		{
+			Console.WriteLine("Saving map and player!");
+			using (MemoryStream ms = new())
+			{
+				Map.Write(ms);
+				File.WriteAllBytes("map.bin", ms.ToArray());
+			}
+			using (FileStream fs = File.Open("player.bin", FileMode.Create, FileAccess.Write))
+			using (BinaryWriter writer = new BinaryWriter(fs))
+			{
+				Ply.Write(writer);
+			}
+			Console.WriteLine("Done!");
+		}
 
 		public override void Tick() {
 			if (Window.InMgr.IsInputPressed(InputKey.Esc)) {
@@ -421,11 +467,7 @@ namespace RaylibGame.States {
 			Map.Tick();
 			Ply.Tick();
 			if (Window.InMgr.IsInputPressed(InputKey.F5)) {
-				Console.WriteLine("Saving map!");
-				using MemoryStream MS = new();
-				Map.Write(MS);
-				File.WriteAllBytes("map.bin", MS.ToArray());
-				Console.WriteLine("Done!");
+				SaveGameState();
 			}
 			bool Left = Window.InMgr.IsInputPressed(InputKey.Click_Left);
 			bool Right = Window.InMgr.IsInputPressed(InputKey.Click_Right);

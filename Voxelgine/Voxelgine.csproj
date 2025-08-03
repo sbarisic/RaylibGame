@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Engine\Entities\NPCEntity.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="af.ico" />
     <Content Include="data\models\barrel\composter_bottom.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -401,6 +405,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Engine\Entities\NPCEntity.cs" />
     <None Include="Engine\Entities\BaseEntity.cs" />
   </ItemGroup>
 

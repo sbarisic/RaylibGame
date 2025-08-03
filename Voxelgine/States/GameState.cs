@@ -44,7 +44,9 @@ namespace RaylibGame.States {
 			BE.IsRotating = true;
 			EntMgr.Spawn(this, BE);
 
-
+			NPCEntity NPC = new NPCEntity();
+			NPC.SetPosition(new Vector3(32, 66, 14));
+			EntMgr.Spawn(this, NPC);
 
 			if (File.Exists(map_file)) {
 				using FileStream FS = File.OpenRead(map_file);

@@ -13,9 +13,9 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	class BaseEntity : IEntity {
-		Vector3 Position;
-		Vector3 Size;
-		Vector3 Velocity;
+	protected 	Vector3 Position;
+		protected Vector3 Size;
+		protected Vector3 Velocity;
 
 		bool HasModel;
 		string EntModelName;
@@ -56,7 +56,7 @@ namespace Voxelgine.Engine {
 			UpdatePhysics(GS.Map, Dt);
 		}
 
-		public void SetModel(string MdlName) {
+		public virtual void SetModel(string MdlName) {
 			HasModel = false;
 			ModelOffset = Vector3.Zero;
 			ModelRotationDeg = 0;

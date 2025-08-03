@@ -40,6 +40,9 @@ namespace Voxelgine.Engine {
 		static List<EngineResourceBase> ResourceList = new List<EngineResourceBase>();
 
 		public static Texture2D AtlasTexture;
+		public static Texture2D ItemTexture;
+
+		public const int ItemSize = 16;
 
 		static List<string> ReloadList = new List<string>();
 
@@ -81,6 +84,7 @@ namespace Voxelgine.Engine {
 
 		public static void InitResources() {
 			AtlasTexture = GetTexture("atlas.png", TextureFilter.Point);
+			ItemTexture = GetTexture("items.png", TextureFilter.Point);
 		}
 
 		static bool TryGetResource<T>(string Name, out EngineResource<T> OutRes) {

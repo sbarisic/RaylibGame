@@ -12,7 +12,9 @@ using Voxelgine.Engine;
 namespace Voxelgine.GUI {
 	class GUIItemBox : GUIElement {
 		public bool IsSelected = false;
+
 		public GUIInventory Parent;
+		public InventoryItem Item;
 
 		public string Text;
 
@@ -39,6 +41,12 @@ namespace Voxelgine.GUI {
 
 			TexSel = ResMgr.GetTexture("gui/itembox_sel.png");
 			Raylib.SetTextureFilter(TexSel, TextureFilter.Point);
+		}
+
+		public void SetItem(GUIInventory Parent, InventoryItem Item) {
+			this.Parent = Parent;
+			this.Item = Item;
+			Item.SetupItemBox(this);
 		}
 
 		public void SetIcon(Texture2D? Icon, float Scale, Vector2 Coords, Vector2 Size) {

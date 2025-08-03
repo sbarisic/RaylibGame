@@ -43,7 +43,6 @@ namespace Voxelgine.Engine {
 		Vector3 PreviousPosition;
 		bool LocalPlayer;
 		SoundMgr Snd;
-		BlockType PlayerSelectedBlockType = BlockType.Dirt;
 
 		public const float PlayerHeight = 1.7f;
 		public const float PlayerEyeOffset = 1.6f;
@@ -489,7 +488,8 @@ namespace Voxelgine.Engine {
 			else if (MoveBk = InMgr.IsInputDown(InputKey.S))
 				AnimName = "backward";
 
-			ViewMdl.SetRotationMode(InMgr.IsInputDown(InputKey.Click_Right) ? ViewModelRotationMode.GunIronsight : ViewModelRotationMode.Gun);
+			// ViewMdl.SetRotationMode(InMgr.IsInputDown(InputKey.Click_Right) ? ViewModelRotationMode.GunIronsight : ViewModelRotationMode.Gun);
+			ActiveSelection?.Tick(ViewMdl, InMgr);
 
 			if (CurAnim == null)
 				CurAnim = PlayerEntity.GetAnim(AnimName);
@@ -523,6 +523,8 @@ namespace Voxelgine.Engine {
 		GUILabel InfoLbl;
 		GUIInventory Inventory;
 
+		InventoryItem ActiveSelection;
+
 		public void InitGUI(GameWindow Window) {
 			Box_Health = new GUIItemBox(GUI);
 			Box_Health.Pos = new Vector2(64, Window.Height - 128);
@@ -542,13 +544,31 @@ namespace Voxelgine.Engine {
 			Inventory.Pos -= new Vector2(Inventory.Size.X / 2, 0);
 			GUI.AddElement(Inventory);
 
-			SetInvItem(Inventory, 0, BlockType.Dirt, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Dirt);
-			SetInvItem(Inventory, 1, BlockType.Stone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Stone);
-			SetInvItem(Inventory, 2, BlockType.StoneBrick, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.StoneBrick);
-			SetInvItem(Inventory, 3, BlockType.Bricks, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Bricks);
-			SetInvItem(Inventory, 4, BlockType.Plank, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Plank);
-			SetInvItem(Inventory, 5, BlockType.CraftingTable, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.CraftingTable);
-			SetInvItem(Inventory, 6, BlockType.Glowstone, (ItmBox, Idx) => PlayerSelectedBlockType = BlockType.Glowstone);
+			Inventory.OnActiveSelectionChanged = (E) => {
+				if (ActiveSelection != null) {
+					ActiveSelection.OnDeselected(ViewMdl);
+					ActiveSelection = null;
+				}
+
+				ActiveSelection = E.ItmBox.Item;
+
+				if (ActiveSelection != null) {
+					ActiveSelection.OnSelected(ViewMdl);
+				}
+			};
+
+			int ItmIdx = 0;
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Gun", IconType.Gun).SetViewModelInfo(ViewModelRotationMode.Gun).SetupModel("gun/gun.obj"));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Hammer", IconType.Hammer).SetViewModelInfo(ViewModelRotationMode.Tool).SetupModel("hammer/hammer.obj"));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Plank));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.CraftingTable));
+
+			Inventory.SetSelectedIndex(0);
 		}
 
 		public void UpdateGUI() {
@@ -562,6 +582,11 @@ namespace Voxelgine.Engine {
 				InfoLbl.WriteLine("No-clip: {0}", NoClip ? "ON" : "OFF");
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
 			}
+		}
+
+		void SetInvItem(GUIInventory Inventory, int Idx, InventoryItem InvItem) {
+			GUIItemBox Itm = Inventory.GetItem(Idx);
+			Itm.SetItem(Inventory, InvItem);
 		}
 
 		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
@@ -588,46 +613,22 @@ namespace Voxelgine.Engine {
 			else if (Wheel <= -1)
 				Inventory.SelectPrevious();
 			if ((Left || Right || Middle) && CursorDisabled) {
-				Vector3 Dir = GetForward();
-				Vector3 Start = Position;
-				if (Left) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							Snd.PlayCombo("block_break", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, BlockType.None);
-							return true;
-						}
-						return false;
-					});
-				}
-				if (Right) {
-					/*Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							X += (int)Face.X;
-							Y += (int)Face.Y;
-							Z += (int)Face.Z;
-							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, PlayerSelectedBlockType);
-							return true;
-						}
-						return false;
-					});*/
-				}
+				if (ActiveSelection != null) {
+					Vector3 Start = Position;
+					Vector3 Dir = GetForward();
+					InventoryClickEventArgs E = new InventoryClickEventArgs(Map, Start, Dir, MaxLen);
 
-				if (Middle) {
-					Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
-						if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-							X += (int)Face.X;
-							Y += (int)Face.Y;
-							Z += (int)Face.Z;
-							Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
-							Map.SetBlock(X, Y, Z, BlockType.Campfire);
-							return true;
-						}
-						return false;
-					});
+					if (Left)
+						ActiveSelection.OnLeftClick(E);
+
+					if (Right)
+						ActiveSelection.OnRightClick(E);
+
+					if (Middle)
+						ActiveSelection.OnMiddleClick(E);
 				}
 			}
+
 			if (!CursorDisabled) {
 				GUI.Tick();
 			} else {

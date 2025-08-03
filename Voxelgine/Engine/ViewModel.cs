@@ -15,6 +15,7 @@ using Voxelgine.GUI;
 
 namespace Voxelgine.Engine {
 	enum ViewModelRotationMode {
+		Block,
 		Tool,
 		Gun,
 		GunIronsight,
@@ -32,11 +33,24 @@ namespace Voxelgine.Engine {
 		Quaternion DesiredVMRot = Quaternion.Identity;
 		public Quaternion VMRot = Quaternion.Identity;
 
-		public ViewModel() {
-			VModel = ResMgr.GetModel(DefaultViewModelName);
+		public bool IsActive;
 
-			if (VModel.MeshCount == 0)
+		public ViewModel() {
+			SetModel(DefaultViewModelName);
+			IsActive = true;
+
+			if (VModel.MeshCount == 0) {
+				IsActive = false;
 				Console.WriteLine("======================== Warning! Zero meshes in model {0}", DefaultViewModelName);
+			}
+		}
+
+		public void SetModel(string ModelName) {
+			VModel = ResMgr.GetModel(ModelName);
+		}
+
+		public void SetModel(Model Mdl) {
+			VModel = Mdl;
 		}
 
 		public void SetRotationMode(ViewModelRotationMode Mode) {
@@ -49,6 +63,9 @@ namespace Voxelgine.Engine {
 		}
 
 		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
+			if (!IsActive)
+				return;
+
 			// Camera basis
 			var cam = Ply.Cam;
 			Vector3 worldUp = Vector3.UnitY;
@@ -60,6 +77,7 @@ namespace Voxelgine.Engine {
 			//Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 
 			switch (ViewMdlRotMode) {
+				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
 					DesiredViewModelPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 					break;
@@ -106,6 +124,7 @@ namespace Voxelgine.Engine {
 			DesiredVMRot = qPitch * qYaw;
 
 			switch (ViewMdlRotMode) {
+				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
 					DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
 					break;

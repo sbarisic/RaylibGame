@@ -35,6 +35,21 @@ namespace Voxelgine.Engine {
 		Campfire
 	}
 
+	enum IconType : ushort {
+		None,
+
+		Particle1,
+		Gun,
+
+		Apple,
+		Hammer,
+		HeartEmpty,
+		HeartFull,
+		HeartHalf,
+		Lava,
+		Pickaxe
+	}
+
 	static class BlockInfo {
 		public static bool IsOpaque(BlockType T) {
 			switch (T) {
@@ -64,7 +79,60 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public static void GetBlockTexCoords(BlockType BlockType,Vector3 FaceNormal, out Vector2 UVSize, out Vector2 UVPos) {
+		public static void GetIconTexCoords(IconType Icon, out Texture2D Texture, out Vector2 UVSize, out Vector2 UVPos, out float Scale) {
+			UVSize = Vector2.One;
+			UVPos = Vector2.Zero;
+			Scale = 3.8f;
+
+			switch (Icon) {			
+				case IconType.Particle1:
+					Texture = ResMgr.GetTexture("items/particle1.png", TextureFilter.Point);
+					return;
+
+				case IconType.Gun:
+					Scale = 1.8f;
+					Texture = ResMgr.GetTexture("items/gun.png", TextureFilter.Point);
+					return;
+
+				case IconType.Apple:
+					Texture = ResMgr.GetTexture("items/apple.png", TextureFilter.Point);
+					return;
+
+				case IconType.Hammer:
+					Texture = ResMgr.GetTexture("items/hammer.png", TextureFilter.Point);
+					return;
+
+				case IconType.HeartEmpty:
+					Texture = ResMgr.GetTexture("items/heart_empty.png", TextureFilter.Point);
+					return;
+
+				case IconType.HeartFull:
+					Texture = ResMgr.GetTexture("items/heart_full.png", TextureFilter.Point);
+					return;
+
+				case IconType.HeartHalf:
+					Texture = ResMgr.GetTexture("items/heart_half.png", TextureFilter.Point);
+					return;
+
+				case IconType.Lava:
+					Texture = ResMgr.GetTexture("items/lava.png", TextureFilter.Point);
+					return;
+
+				case IconType.Pickaxe:
+					Texture = ResMgr.GetTexture("items/pickaxe.png", TextureFilter.Point);
+					return;
+			}
+
+			int IconID = (int)Icon - 1;
+			int IconX = IconID % Chunk.AtlasSize;
+			int IconY = IconID / Chunk.AtlasSize;
+
+			Texture = ResMgr.ItemTexture;
+			UVSize = new Vector2(1.0f / ResMgr.ItemSize, 1.0f / ResMgr.ItemSize);
+			UVPos = UVSize * new Vector2(IconX, IconY);
+		}
+
+		public static void GetBlockTexCoords(BlockType BlockType, Vector3 FaceNormal, out Vector2 UVSize, out Vector2 UVPos) {
 			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
 			int BlockX = BlockID % Chunk.AtlasSize;
 			int BlockY = BlockID / Chunk.AtlasSize;

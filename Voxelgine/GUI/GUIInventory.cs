@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Voxelgine.Engine;
 
 namespace Voxelgine.GUI {
+	record struct InventoryChangeEventArgs(GUIItemBox ItmBox);
+
 	class GUIInventory : GUIElement {
 		private List<GUIItemBox> ItemBoxes;
 		private int SelectedIndex = 0;
@@ -24,6 +26,8 @@ namespace Voxelgine.GUI {
 		private bool ScrollRightPressed = false;
 		private bool SelectNextPressed = false;
 		private bool SelectPrevPressed = false;
+
+		public Action<InventoryChangeEventArgs> OnActiveSelectionChanged;
 
 		public GUIInventory(GUIManager Mgr, int maxItems = 10, int visibleItems = 10) {
 			this.Mgr = Mgr;
@@ -124,12 +128,20 @@ namespace Voxelgine.GUI {
 			}
 		}
 
+		int LastSelectedIdx = -1;
+
 		void SelectIdx(int Idx) {
 			for (int i = 0; i < ItemBoxes.Count; i++) {
 				ItemBoxes[i].IsSelected = false;
 			}
 
 			ItemBoxes[Idx].IsSelected = true;
+
+			if (LastSelectedIdx != Idx) {
+				OnActiveSelectionChanged?.Invoke(new InventoryChangeEventArgs(ItemBoxes[Idx]));
+			}
+
+			LastSelectedIdx = Idx;
 		}
 
 		public void SelectNext() {
@@ -145,7 +157,8 @@ namespace Voxelgine.GUI {
 				}
 			}
 
-			GetSelectedItem().OnMouseClick();
+			GUIItemBox SelItm = GetSelectedItem();
+			SelItm.OnMouseClick();
 		}
 
 		public void SelectPrevious() {
@@ -161,7 +174,8 @@ namespace Voxelgine.GUI {
 				}
 			}
 
-			GetSelectedItem().OnMouseClick();
+			GUIItemBox SelItm = GetSelectedItem();
+			SelItm.OnMouseClick();
 		}
 
 		public void SetItemIcon(int index, Texture2D? icon, float scale = 2.0f) {

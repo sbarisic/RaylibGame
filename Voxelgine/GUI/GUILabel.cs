@@ -33,6 +33,8 @@ namespace Voxelgine.GUI {
 		int SelectionLen;
 		int Cursor;
 
+		GUIUpdateResult UpdateResult;
+
 		public GUILabel(GUIManager Mgr) {
 			this.Mgr = Mgr;
 		}
@@ -54,6 +56,8 @@ namespace Voxelgine.GUI {
 		public void Input(string Str) {
 			if (string.IsNullOrEmpty(Str))
 				return;
+
+			UpdateResult = GUIUpdateResult.ConsumedInput;
 
 			if (IsInput) {
 				if (Str == "\b") {
@@ -295,6 +299,10 @@ namespace Voxelgine.GUI {
 
 		public override GUIUpdateResult Update() {
 			int KeyPressed = 0;
+			UpdateResult = GUIUpdateResult.OK;
+
+			if (IsReading)
+				UpdateResult = GUIUpdateResult.ConsumedInput;
 
 			if (IsReading) {
 				do {
@@ -381,7 +389,10 @@ namespace Voxelgine.GUI {
 				Scroll = Scroll - 16;
 			}
 
-			return base.Update();
+			if (base.Update() == GUIUpdateResult.ConsumedInput)
+				UpdateResult = GUIUpdateResult.ConsumedInput;
+
+			return UpdateResult;
 		}
 	}
 }

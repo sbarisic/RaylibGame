@@ -50,6 +50,9 @@ namespace Voxelgine.GUI {
 		}
 
 		public void BringToFront(GUIElement E) {
+			if (E.ZOrder == CalcLastZOrder())
+				return; // Already at the front
+
 			if (Elements.Contains(E)) {
 				// Remove and re-add to move to the end of the list
 				Elements.Remove(E);

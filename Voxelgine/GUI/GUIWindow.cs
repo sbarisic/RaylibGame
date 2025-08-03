@@ -43,8 +43,12 @@ namespace Voxelgine.GUI {
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
 			bool insideWindow = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, Size));
 
-			if (insideWindow) {
+			if (insideWindow || overTitleBar) {
 				Res = GUIUpdateResult.ConsumedInput;
+
+				if (Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+					Mgr.BringToFront(this);
+				}
 			}
 
 			if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {

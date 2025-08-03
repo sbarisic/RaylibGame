@@ -22,6 +22,11 @@ using Windows.Media.Core;
 namespace Voxelgine.GUI {
 	delegate void OnMouseClickedFunc(GUIElement El);
 
+	enum GUIUpdateResult {
+		OK,
+		Disabled,
+	}
+
 	abstract class GUIElement {
 		public Vector2 Pos;
 		public Vector2 Size;
@@ -49,10 +54,12 @@ namespace Voxelgine.GUI {
 
 		bool ButtonHeldDown = false;
 
-		public virtual void Update() {
+		public virtual GUIUpdateResult Update() {
+			GUIUpdateResult Res = GUIUpdateResult.OK;
+
 			if (!Enabled) {
 				ButtonHeldDown = false;
-				return;
+				return GUIUpdateResult.Disabled;
 			}
 
 			if (IsInside(MousePos)) {
@@ -76,6 +83,7 @@ namespace Voxelgine.GUI {
 			}
 
 			MouseDown_Left = ButtonHeldDown;
+			return Res;
 		}
 
 		public virtual void OnHovered(Vector2 HoverPos, bool Hovered) {

@@ -29,8 +29,8 @@ namespace Voxelgine.GUI {
 			Children.Add(child);
 		}
 
-		public override void Update() {
-			if (!Enabled) return;
+		public override GUIUpdateResult Update() {
+			if (!Enabled) return GUIUpdateResult.Disabled;
 
 			// Use public MousePos from GUIElement base (set by GUIManager)
 			Vector2 mouse = this.MousePos;
@@ -57,6 +57,8 @@ namespace Voxelgine.GUI {
 				child.MousePos = childMouse;
 				child.Update();
 			}
+
+			return GUIUpdateResult.OK;
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {

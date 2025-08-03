@@ -61,7 +61,7 @@ namespace Voxelgine.GUI {
 			}
 		}
 
-		public override void Update() {
+		public override GUIUpdateResult Update() {
 			base.Update();
 
 			// Handle scrolling input (using A/D keys since mouse wheel isn't in InputMgr)  
@@ -103,6 +103,8 @@ namespace Voxelgine.GUI {
 				ItemBoxes[itemIndex].MousePos = MousePos;
 				ItemBoxes[itemIndex].Update();
 			}
+
+			return GUIUpdateResult.OK;
 		}
 
 		private void UpdateItemPositions() {

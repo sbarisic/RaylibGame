@@ -293,7 +293,7 @@ namespace Voxelgine.GUI {
 			ScissorManager.EndScissor();
 		}
 
-		public override void Update() {
+		public override GUIUpdateResult Update() {
 			int KeyPressed = 0;
 
 			if (IsReading) {
@@ -381,7 +381,7 @@ namespace Voxelgine.GUI {
 				Scroll = Scroll - 16;
 			}
 
-			base.Update();
+			return base.Update();
 		}
 	}
 }

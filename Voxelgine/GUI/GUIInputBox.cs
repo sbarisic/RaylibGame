@@ -50,9 +50,9 @@ namespace Voxelgine.GUI {
 			InputLabel.Pos = new Vector2(Padding, Padding + labelSize.Y + LabelSpacing);
 		}
 
-		public override void Update() {
+		public override GUIUpdateResult Update() {
 			if (!Enabled)
-				return;
+				return GUIUpdateResult.Disabled;
 
 			// Update input label state
 			InputLabel.MousePos = MousePos - InputLabel.Pos;
@@ -66,6 +66,8 @@ namespace Voxelgine.GUI {
 				IsActive = false;
 				InputLabel.IsReading = false;
 			}
+
+			return GUIUpdateResult.OK;
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {

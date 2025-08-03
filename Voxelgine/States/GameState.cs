@@ -24,6 +24,9 @@ namespace RaylibGame.States {
 
 		EntityManager EntMgr;
 
+		const string map_file = "data/map.bin";
+		const string player_file = "data/player.bin";
+
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
 			EntMgr = new EntityManager();
@@ -41,8 +44,10 @@ namespace RaylibGame.States {
 			BE.IsRotating = true;
 			EntMgr.Spawn(this, BE);
 
-			if (File.Exists("map.bin")) {
-				using FileStream FS = File.OpenRead("map.bin");
+
+
+			if (File.Exists(map_file)) {
+				using FileStream FS = File.OpenRead(map_file);
 				Map.Read(FS);
 			} else {
 				Map.GenerateFloatingIsland(64, 64);
@@ -52,8 +57,8 @@ namespace RaylibGame.States {
 			Ply.InitGUI(window);
 			Ply.Init(Map);
 
-			if (File.Exists("player.bin")) {
-				using (FileStream fs = File.OpenRead("player.bin"))
+			if (File.Exists(player_file)) {
+				using (FileStream fs = File.OpenRead(player_file))
 				using (BinaryReader reader = new BinaryReader(fs)) {
 					Ply.Read(reader);
 				}
@@ -76,9 +81,9 @@ namespace RaylibGame.States {
 			Console.WriteLine("Saving map and player!");
 			using (MemoryStream ms = new()) {
 				Map.Write(ms);
-				File.WriteAllBytes("map.bin", ms.ToArray());
+				File.WriteAllBytes(map_file, ms.ToArray());
 			}
-			using (FileStream fs = File.Open("player.bin", FileMode.Create, FileAccess.Write))
+			using (FileStream fs = File.Open(player_file, FileMode.Create, FileAccess.Write))
 			using (BinaryWriter writer = new BinaryWriter(fs)) {
 				Ply.Write(writer);
 			}

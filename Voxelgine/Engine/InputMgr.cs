@@ -124,6 +124,12 @@ namespace Voxelgine.Engine {
 			InputState_Cur.KeysDown[(int)InputKey.F4] = Raylib.IsKeyDown(KeyboardKey.F4);
 			InputState_Cur.KeysDown[(int)InputKey.F5] = Raylib.IsKeyDown(KeyboardKey.F5);
 
+			InputState_Cur.KeysDown[(int)InputKey.Up] = Raylib.IsKeyDown(KeyboardKey.Up);
+			InputState_Cur.KeysDown[(int)InputKey.Down] = Raylib.IsKeyDown(KeyboardKey.Down);
+			InputState_Cur.KeysDown[(int)InputKey.Left] = Raylib.IsKeyDown(KeyboardKey.Left);
+			InputState_Cur.KeysDown[(int)InputKey.Right] = Raylib.IsKeyDown(KeyboardKey.Right);
+			InputState_Cur.KeysDown[(int)InputKey.Esc] = Raylib.IsKeyDown(KeyboardKey.Escape);
+
 			InputState_Cur.KeysDown[(int)InputKey.Num0] = Raylib.IsKeyDown(KeyboardKey.Zero) || Raylib.IsKeyDown(KeyboardKey.Kp0);
 			InputState_Cur.KeysDown[(int)InputKey.Num1] = Raylib.IsKeyDown(KeyboardKey.One) || Raylib.IsKeyDown(KeyboardKey.Kp1);
 			InputState_Cur.KeysDown[(int)InputKey.Num2] = Raylib.IsKeyDown(KeyboardKey.Two) || Raylib.IsKeyDown(KeyboardKey.Kp2);
@@ -134,17 +140,12 @@ namespace Voxelgine.Engine {
 			InputState_Cur.KeysDown[(int)InputKey.Num7] = Raylib.IsKeyDown(KeyboardKey.Seven) || Raylib.IsKeyDown(KeyboardKey.Kp7);
 			InputState_Cur.KeysDown[(int)InputKey.Num8] = Raylib.IsKeyDown(KeyboardKey.Eight) || Raylib.IsKeyDown(KeyboardKey.Kp8);
 			InputState_Cur.KeysDown[(int)InputKey.Num9] = Raylib.IsKeyDown(KeyboardKey.Nine) || Raylib.IsKeyDown(KeyboardKey.Kp9);
-
-			InputState_Cur.KeysDown[(int)InputKey.Up] = Raylib.IsKeyDown(KeyboardKey.Up);
-			InputState_Cur.KeysDown[(int)InputKey.Down] = Raylib.IsKeyDown(KeyboardKey.Down);
-			InputState_Cur.KeysDown[(int)InputKey.Left] = Raylib.IsKeyDown(KeyboardKey.Left);
-			InputState_Cur.KeysDown[(int)InputKey.Right] = Raylib.IsKeyDown(KeyboardKey.Right);
 			InputState_Cur.KeysDown[(int)InputKey.Enter] = Raylib.IsKeyDown(KeyboardKey.Enter) || Raylib.IsKeyDown(KeyboardKey.KpEnter);
-
-			InputState_Cur.KeysDown[(int)InputKey.Esc] = Raylib.IsKeyDown(KeyboardKey.Escape);
 			InputState_Cur.KeysDown[(int)InputKey.Ctrl] = Raylib.IsKeyDown(KeyboardKey.LeftControl) || Raylib.IsKeyDown(KeyboardKey.RightControl);
 			InputState_Cur.KeysDown[(int)InputKey.Alt] = Raylib.IsKeyDown(KeyboardKey.LeftAlt) || Raylib.IsKeyDown(KeyboardKey.RightAlt);
 			InputState_Cur.KeysDown[(int)InputKey.Shift] = Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift);
+
+
 		}
 
 		public bool IsInputPressed(InputKey K) {

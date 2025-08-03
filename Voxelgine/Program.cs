@@ -13,6 +13,8 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine {
 	internal class Program {
+		public static GameConfig Cfg;
+
 		public static bool DebugMode;
 
 		public static GameWindow Window;
@@ -27,6 +29,9 @@ namespace Voxelgine {
 
 		static void Main(string[] args) {
 			DebugMode = Debugger.IsAttached;
+
+			Cfg = new GameConfig();
+			Cfg.LoadFromJson();
 
 			Clipb = new Clipboard();
 

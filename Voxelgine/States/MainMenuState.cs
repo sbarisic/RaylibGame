@@ -22,8 +22,7 @@ namespace RaylibGame.States {
 		Rectangle DbgRect = new Rectangle();
 		GUIWindow OptionsWnd;
 
-		private void CreateMenuButtons(List<GUIElement> IB, Vector2 BtnSize)
-		{
+		private void CreateMenuButtons(List<GUIElement> IB, Vector2 BtnSize) {
 			GUIButton Btn_NewGame = new GUIButton(GUI);
 			Btn_NewGame.Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
 			Btn_NewGame.Size = BtnSize;
@@ -91,8 +90,16 @@ namespace RaylibGame.States {
 			return IBox;
 		}
 
-		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize)
-		{
+		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
+			GUIButton Btn_ResetConfig = new GUIButton(GUI);
+			Btn_ResetConfig.Size = BtnSize;
+			Btn_ResetConfig.Text = "Reset Cfg";
+			Btn_ResetConfig.OnClickedFunc = (E) => {
+				Program.Cfg.GenerateDefaultKeybinds();
+				Program.Cfg.SaveToJson();
+			};
+			IB.Add(Btn_ResetConfig);
+
 			GUIButton Btn_Close = new GUIButton(GUI);
 			Btn_Close.Size = BtnSize;
 			Btn_Close.Text = "Close";

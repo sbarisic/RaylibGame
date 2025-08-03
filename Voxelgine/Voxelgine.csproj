@@ -94,6 +94,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="data\config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\entities\snoutx10k.lua">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -373,7 +376,7 @@
     <None Update="data\textures\title.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="map.bin">
+    <None Update="data\map.bin">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

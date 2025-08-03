@@ -16,6 +16,9 @@ namespace Voxelgine.Engine {
 		public virtual void SwapTo() {
 		}
 
+		public virtual void OnResize(GameWindow Window) {
+		}
+
 		public virtual void Tick() {
 			// Once per frame
 		}

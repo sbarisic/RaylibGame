@@ -26,6 +26,7 @@ namespace Voxelgine {
 		public static Clipboard Clipb;
 
 		public static float TotalTime;
+		public static LerpManager LerpMgr;
 
 		static void Main(string[] args) {
 			DebugMode = Debugger.IsAttached;
@@ -34,6 +35,7 @@ namespace Voxelgine {
 			Cfg.LoadFromJson();
 
 			Clipb = new Clipboard();
+			LerpMgr = new LerpManager();
 
 			Window = new GameWindow(Cfg.WindowWidth, Cfg.WindowHeight, "Aurora Falls");
 			ResMgr.InitResources();
@@ -83,6 +85,7 @@ namespace Voxelgine {
 					// PreviousState = CurrentState;
 
 					// Update
+					LerpMgr.Update(DeltaTime);
 					Window.UpdateLockstep(Time, DeltaTime);
 					Updates++;
 

@@ -530,6 +530,15 @@ namespace Voxelgine.Engine {
 
 		InventoryItem ActiveSelection;
 
+		public void RecalcGUI(GameWindow Window) {
+			Box_Health.Pos = new Vector2(64, Window.Height - 128);
+
+			InfoLbl.Pos = new Vector2(16, 40);
+			InfoLbl.Size = new Vector2(300, 250);
+
+			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
+		}
+
 		public void InitGUI(GameWindow Window) {
 			Box_Health = new GUIItemBox(GUI);
 			Box_Health.Pos = new Vector2(64, Window.Height - 128);
@@ -545,8 +554,7 @@ namespace Voxelgine.Engine {
 			GUI.AddElement(InfoLbl);
 
 			Inventory = new GUIInventory(GUI);
-			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f));
-			Inventory.Pos -= new Vector2(Inventory.Size.X / 2, 0);
+			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
 			GUI.AddElement(Inventory);
 
 			Inventory.OnActiveSelectionChanged = (E) => {

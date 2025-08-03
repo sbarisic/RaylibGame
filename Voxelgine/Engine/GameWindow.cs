@@ -239,6 +239,7 @@ namespace Voxelgine.Engine {
 				Width = Raylib.GetRenderWidth();
 				Height = Raylib.GetRenderHeight();
 				ReloadRT();
+				State.OnResize(this);
 			}
 
 			Raylib.BeginDrawing();

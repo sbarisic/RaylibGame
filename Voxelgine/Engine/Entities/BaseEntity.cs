@@ -31,16 +31,25 @@ namespace Voxelgine.Engine {
 
 		// Up down movement
 		public bool IsBobbing = false;
-		public float BobAmplitude = 0.25f;
+		public float BobAmplitude = 0.15f;
 		public float BobSpeed = 2;
-		float BobOffset = 0;
+		//float BobOffset = 0;
+
+		LerpVec3 BobbingLerp;
 
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			if (IsRotating)
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 
 			if (IsBobbing) {
-				BobOffset = MathF.Sin(InMgr.GetGameTime() * BobSpeed) * BobAmplitude;
+				//BobOffset = MathF.Sin(InMgr.GetGameTime() * BobSpeed) * BobAmplitude;
+
+				if (BobbingLerp == null) {
+					BobbingLerp = new LerpVec3();
+					BobbingLerp.Loop = true;
+					BobbingLerp.Easing = LerpEasing.EaseInOutQuint;
+					BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));
+				}
 			}
 
 			GameState GS = GetGameState();
@@ -65,7 +74,7 @@ namespace Voxelgine.Engine {
 
 		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
 			if (HasModel) {
-				Raylib.DrawModelEx(EntModel, Position + ModelOffset + new Vector3(0, BobOffset, 0), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
+				Raylib.DrawModelEx(EntModel, Position + ModelOffset + (BobbingLerp?.GetVec3() ?? Vector3.Zero), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
 			}
 
 			DrawCollisionBox();

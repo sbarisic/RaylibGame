@@ -68,6 +68,11 @@ namespace RaylibGame.States {
 
 		}
 
+		public override void OnResize(GameWindow Window) {
+			base.OnResize(Window);
+			Ply.RecalcGUI(Window);
+		}
+
 		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
 			for (int x = (int)min.X; x <= (int)max.X; x++)
 				for (int y = (int)min.Y; y <= (int)max.Y; y++)

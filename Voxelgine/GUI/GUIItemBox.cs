@@ -16,6 +16,7 @@ namespace Voxelgine.GUI {
 		public GUIInventory Parent;
 		public InventoryItem Item;
 
+		public bool UpdateTextFromItem;
 		public string Text;
 
 		Texture2D Tex;
@@ -88,6 +89,10 @@ namespace Voxelgine.GUI {
 
 			if (HasIcon) {
 				Mgr.DrawTexture(Icon, Pos + Size / 2 + DrawOffset, 0, IconScale, new Color(Clr, Clr, Clr), TextureCoords, TextureSize);
+			}
+
+			if (UpdateTextFromItem) {
+				Text = Item?.GetInvText() ?? null;
 			}
 
 			if (!string.IsNullOrEmpty(Text)) {

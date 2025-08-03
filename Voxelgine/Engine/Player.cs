@@ -560,13 +560,13 @@ namespace Voxelgine.Engine {
 			int ItmIdx = 0;
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Gun", IconType.Gun).SetViewModelInfo(ViewModelRotationMode.Gun).SetupModel("gun/gun.obj"));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Hammer", IconType.Hammer).SetViewModelInfo(ViewModelRotationMode.Tool).SetupModel("hammer/hammer.obj"));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Plank));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.CraftingTable));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(10));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.CraftingTable).SetCount(64));
 
 			Inventory.SetSelectedIndex(0);
 		}
@@ -579,13 +579,14 @@ namespace Voxelgine.Engine {
 				InfoLbl.Clear();
 				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Position.X, 2), MathF.Round(Position.Y, 2), MathF.Round(Position.Z, 2));
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(GetVelocity().Length(), 3));
-				InfoLbl.WriteLine("No-clip: {0}", NoClip ? "ON" : "OFF");
+				InfoLbl.WriteLine("NoClip (C): {0}", NoClip ? "ON" : "OFF");
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
 			}
 		}
 
 		void SetInvItem(GUIInventory Inventory, int Idx, InventoryItem InvItem) {
 			GUIItemBox Itm = Inventory.GetItem(Idx);
+			Itm.UpdateTextFromItem = true;
 			Itm.SetItem(Inventory, InvItem);
 		}
 

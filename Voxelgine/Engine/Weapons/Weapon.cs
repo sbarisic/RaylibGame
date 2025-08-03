@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -32,6 +33,9 @@ namespace Voxelgine.Engine {
 		Model RenderModel;
 
 		public ViewModelRotationMode ViewModelRotationMode;
+
+		// TODO: Maybe draw that item as disabled when count is 0?
+		public int Count = -1; // -1 means infinite, 0 means no items left, >0 item count
 
 		public InventoryItem(Player ParentPlayer, string Name, BlockType BlockIcon) {
 			this.ParentPlayer = ParentPlayer;
@@ -77,9 +81,19 @@ namespace Voxelgine.Engine {
 			return this;
 		}
 
-		public virtual void SetupItemBox(GUIItemBox ItmBox) {
-			//ItmBox.Text = Name;
+		public virtual InventoryItem SetCount(int Count) {
+			this.Count = Count;
+			return this;
+		}
 
+		public virtual string GetInvText() {
+			if (Count != -1)
+				return Count.ToString();
+
+			return null;
+		}
+
+		public virtual void SetupItemBox(GUIItemBox ItmBox) {
 			if (UseBlockIcon && BlockIcon != BlockType.None) {
 				BlockInfo.GetBlockTexCoords(BlockIcon, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
 				ItmBox.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
@@ -128,7 +142,7 @@ namespace Voxelgine.Engine {
 		public virtual void OnLeftClick(InventoryClickEventArgs E) {
 			Console.WriteLine("Left click '{0}'", Name);
 
-			if (UseViewmodel && UseBlockIcon) {
+			if (UseViewmodel && (UseBlockIcon || (!UseBlockIcon && Icon == IconType.Hammer))) {
 				DestroyBlock(E.Map, E.Start, E.Dir, E.MaxLen);
 			}
 		}
@@ -136,10 +150,13 @@ namespace Voxelgine.Engine {
 		public virtual void OnRightClick(InventoryClickEventArgs E) {
 			Console.WriteLine("Right click '{0}'", Name);
 
-			if (UseViewmodel && UseBlockIcon) {
+			if (UseViewmodel && UseBlockIcon && (Count > 0 || Count == -1)) {
 				Console.WriteLine("Use block: {0}", Name);
 
-				PlaceBlock(E.Map, E.Start, E.Dir, E.MaxLen, BlockIcon);
+				if (PlaceBlock(E.Map, E.Start, E.Dir, E.MaxLen, BlockIcon)) {
+					if (Count > 0)
+						Count--;
+				}
 			}
 		}
 
@@ -154,8 +171,8 @@ namespace Voxelgine.Engine {
 			});
 		}
 
-		public virtual void PlaceBlock(ChunkMap Map, Vector3 Start, Vector3 Dir, float MaxLen, BlockType BlockType) {
-			Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
+		public virtual bool PlaceBlock(ChunkMap Map, Vector3 Start, Vector3 Dir, float MaxLen, BlockType BlockType) {
+			return Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 				if (Map.GetBlock(X, Y, Z) != BlockType.None) {
 					X += (int)Face.X;
 					Y += (int)Face.Y;

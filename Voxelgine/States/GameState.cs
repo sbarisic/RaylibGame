@@ -45,7 +45,9 @@ namespace RaylibGame.States {
 			EntMgr.Spawn(this, BE);
 
 			NPCEntity NPC = new NPCEntity();
+			NPC.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			NPC.SetPosition(new Vector3(32, 66, 14));
+			NPC.SetModel("npc/humanoid.json");
 			EntMgr.Spawn(this, NPC);
 
 			if (File.Exists(map_file)) {

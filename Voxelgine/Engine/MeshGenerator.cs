@@ -30,6 +30,7 @@ namespace Voxelgine.Engine {
 
 		public CustomMaterial Material;
 		public Mesh Mesh;
+		public BoundingBox BBox;
 
 		public Matrix4x4 Matrix;
 
@@ -38,7 +39,7 @@ namespace Voxelgine.Engine {
 			Material = new CustomMaterial();
 			Matrix = Matrix4x4.Identity;
 
-
+			BBox = Raylib.GetMeshBoundingBox(M);
 		}
 
 		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
@@ -49,7 +50,7 @@ namespace Voxelgine.Engine {
 
 			Vector3 RotOr = RotationOrigin;
 			RotOr.X = 1 - RotOr.X;
-			RotOr.Z  = 0;
+			RotOr.Z = 0;
 
 			//if (Name != "body") {
 			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotOr);
@@ -76,6 +77,25 @@ namespace Voxelgine.Engine {
 		public CustomModel(Vector3 Position, Vector3 LookDirection) {
 			this.Position = Position;
 			this.LookDirection = Vector3.Normalize(LookDirection);
+		}
+
+		public BoundingBox GetBoundingBox() {
+			BoundingBox BBox = new BoundingBox();
+			bool Empty = true;
+
+			foreach (CustomMesh CM in Meshes) {
+				if (Empty) {
+					Empty = false;
+					BBox = CM.BBox;
+				} else {
+					// TODO: Combine bounding boxes correctly
+
+				}
+			}
+
+			BBox.Min += Position;
+			BBox.Max += Position;
+			return BBox;
 		}
 
 		public CustomMesh AddMesh(Mesh M) {

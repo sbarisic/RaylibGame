@@ -13,17 +13,17 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	class BaseEntity : IEntity {
-	protected 	Vector3 Position;
+		protected Vector3 Position;
 		protected Vector3 Size;
 		protected Vector3 Velocity;
 
-		bool HasModel;
-		string EntModelName;
-		Model EntModel;
-		Vector3 ModelOffset;
-		float ModelRotationDeg;
-		Color ModelColor;
-		Vector3 ModelScale;
+		protected bool HasModel;
+		protected string EntModelName;
+		protected Model EntModel;
+		protected Vector3 ModelOffset;
+		protected float ModelRotationDeg;
+		protected Color ModelColor;
+		protected Vector3 ModelScale;
 
 		// Rotate around Y axis at set sped
 		public bool IsRotating = false;
@@ -35,7 +35,7 @@ namespace Voxelgine.Engine {
 		public float BobSpeed = 2;
 		//float BobOffset = 0;
 
-		LerpVec3 BobbingLerp;
+		protected LerpVec3 BobbingLerp;
 
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			if (IsRotating)
@@ -81,7 +81,7 @@ namespace Voxelgine.Engine {
 		}
 
 		// Draws the collision box at Position with Size
-		void DrawCollisionBox() {
+		protected void DrawCollisionBox() {
 			if (!Program.DebugMode)
 				return;
 

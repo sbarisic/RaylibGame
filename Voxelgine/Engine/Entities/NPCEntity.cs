@@ -13,12 +13,11 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	class NPCEntity : BaseEntity {
+		CustomModel CModel;
 
-		public NPCEntity(GameState State, string Name, Vector3 Pos, Vector3 Size) : base(State, Name, Pos, Size) {
+		public NPCEntity() : base() {
 			IsRotating = false;
 			IsBobbing = false;
-
-			SetModel("npc/humanoid.json");
 		}
 
 		public override void SetModel(string MdlName) {
@@ -29,14 +28,26 @@ namespace Voxelgine.Engine {
 			ModelScale = Vector3.One;
 
 			if (Size != Vector3.Zero) {
-				ModelOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
+				//ModelOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
+
 			}
 
 			EntModelName = MdlName;
 			MinecraftModel JMdl = ResMgr.GetJsonModel("npc/humanoid.json");
-			EntModel = MeshGenerator.Generate(JMdl);
-			HasModel = EntModel.MeshCount > 0;
+			CModel = MeshGenerator.Generate(JMdl);
+			HasModel = true;
 		}
 
+		public override void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
+			if (HasModel) {
+				CModel.Position = Position + ModelOffset;
+				CModel.LookDirection = Vector3.UnitZ;
+				CModel.Draw();
+				//Raylib.DrawModelEx(EntModel, Position + ModelOffset + (BobbingLerp?.GetVec3() ?? Vector3.Zero), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
+			}
+
+			DrawCollisionBox();
+
+		}
 	}
 }

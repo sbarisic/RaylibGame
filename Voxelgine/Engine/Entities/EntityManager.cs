@@ -18,6 +18,7 @@ namespace Voxelgine.Engine {
 			if (Ent == null)
 				return;
 
+			Ent.SetEntityManager(this);
 			Ent.SetGameState(GState);
 			Entities.Add(Ent);
 		}

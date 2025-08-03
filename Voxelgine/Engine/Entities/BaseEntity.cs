@@ -156,5 +156,15 @@ namespace Voxelgine.Engine {
 		public void OnPlayerTouch(Player Ply) {
 			Console.WriteLine("Player touched me!");
 		}
+
+		EntityManager EntMgr;
+
+		public EntityManager GetEntityManager() {
+			return EntMgr;
+		}
+
+		public void SetEntityManager(EntityManager EntMgr) {
+			this.EntMgr = EntMgr;
+		}
 	}
 }

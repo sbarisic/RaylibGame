@@ -10,18 +10,18 @@ using System.Threading.Tasks;
 namespace Voxelgine.Engine {
 	interface IEntity {
 		public Vector3 GetPosition();
-
 		public void SetPosition(Vector3 Pos);
 
 		public Vector3 GetSize();
-
 		public void SetSize(Vector3 Size);
 
 		public GameState GetGameState();
+		public void SetGameState(GameState State);
+
+		public EntityManager GetEntityManager();
+		public void SetEntityManager(EntityManager EntMgr);
 
 		public void OnPlayerTouch(Player Ply);
-
-		public void SetGameState(GameState State);
 
 		public void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr);
 

@@ -15,6 +15,14 @@ namespace Voxelgine.Engine {
 		public string Version = "1.0.0";
 		public string Name = "Default Config";
 
+		public int WindowWidth = 1920;
+		public int WindowHeight = 1080;
+
+		public int TargetFPS = 240;
+		public bool HighDpiWindow = true;
+		public bool VSync = true;
+		public bool Msaa = false;
+
 		public KeyValuePair<InputKey, MouseButton>[] MouseButtonDown;
 		public KeyValuePair<InputKey, KeyboardKey>[] KeyDown;
 		public KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] TwoKeysDown;

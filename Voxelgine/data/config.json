@@ -1,6 +1,12 @@
 ﻿{
   "Version": "1.0.0",
   "Name": "Aurora Falls",
+  "WindowWidth": 1920,
+  "WindowHeight": 1080,
+  "TargetFPS": 240,
+  "HighDpiWindow": true,
+  "VSync": true,
+  "Msaa": false,
   "MouseButtonDown": [
 	{
 	  "Key": "Click_Left",

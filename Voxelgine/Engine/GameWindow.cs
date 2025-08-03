@@ -80,13 +80,23 @@ namespace Voxelgine.Engine {
 		public GameWindow(int W, int H, string Title) {
 			Open = true;
 
-			Raylib.SetWindowState(ConfigFlags.HighDpiWindow);
-			Raylib.SetWindowState(ConfigFlags.VSyncHint);
+			if (Program.Cfg.HighDpiWindow)
+				Raylib.SetWindowState(ConfigFlags.HighDpiWindow);
+
+			if (Program.Cfg.VSync)
+				Raylib.SetWindowState(ConfigFlags.VSyncHint);
+
+			if (Program.Cfg.Msaa) {
+				Enable_SSAA = true;
+				//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
+			} else {
+				Enable_SSAA = false;
+			}
 			//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
 			//Raylib.SetWindowState(ConfigFlags.)
 
 			Raylib.InitWindow(Width = W, Height = H, Title);
-			Raylib.SetTargetFPS(240);
+			Raylib.SetTargetFPS(Program.Cfg.TargetFPS);
 			Raylib.SetExitKey(0);
 
 			InMgr = new InputMgr();

@@ -33,7 +33,7 @@ namespace Voxelgine.Engine {
 
 		bool NoClip;
 
-		Dictionary<InputKey, Action> OnKeyFuncs = new Dictionary<InputKey, Action>();
+		Dictionary<InputKey, Action<OnKeyPressedEventArg>> OnKeyFuncs = new Dictionary<InputKey, Action<OnKeyPressedEventArg>>();
 
 		Stopwatch LegTimer = Stopwatch.StartNew();
 		long LastWalkSound = 0;
@@ -92,7 +92,7 @@ namespace Voxelgine.Engine {
 		public void Init(ChunkMap Map) {
 			Stopwatch SWatch = Stopwatch.StartNew();
 
-			AddOnKeyPressed(InputKey.F2, () => {
+			AddOnKeyPressed(InputKey.F2, (E) => {
 				Console.WriteLine("Compute light!");
 				SWatch.Restart();
 				Map.ComputeLighting();
@@ -100,14 +100,19 @@ namespace Voxelgine.Engine {
 				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
 			});
 
-			AddOnKeyPressed(InputKey.F3, () => { Program.DebugMode = !Program.DebugMode; });
+			AddOnKeyPressed(InputKey.F3, (E) => { Program.DebugMode = !Program.DebugMode; });
 
-			AddOnKeyPressed(InputKey.F4, () => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
+			AddOnKeyPressed(InputKey.F4, (E) => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
 
-			AddOnKeyPressed(InputKey.C, () => {
+			AddOnKeyPressed(InputKey.C, (E) => {
 				NoClip = !NoClip;
 				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
 			});
+
+			AddOnKeyPressed(InputKey.Num1, (K) => { Inventory?.SetSelectedIndex(0); });
+			AddOnKeyPressed(InputKey.Num2, (K) => { Inventory?.SetSelectedIndex(1); });
+			AddOnKeyPressed(InputKey.Num3, (K) => { Inventory?.SetSelectedIndex(2); });
+			AddOnKeyPressed(InputKey.Num4, (K) => { Inventory?.SetSelectedIndex(3); });
 		}
 
 		public void ToggleMouse(bool? Enable = null) {
@@ -508,7 +513,7 @@ namespace Voxelgine.Engine {
 			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
 			foreach (var KV in OnKeyFuncs) {
 				if (InMgr.IsInputPressed(KV.Key))
-					KV.Value();
+					KV.Value(new OnKeyPressedEventArg(KV.Key));
 			}
 
 
@@ -674,7 +679,7 @@ namespace Voxelgine.Engine {
 			Rlgl.EnableDepthTest();
 		}
 
-		public void AddOnKeyPressed(InputKey K, Action Act) {
+		public void AddOnKeyPressed(InputKey K, Action<OnKeyPressedEventArg> Act) {
 			OnKeyFuncs.Add(K, Act);
 		}
 

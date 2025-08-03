@@ -28,15 +28,18 @@ namespace Voxelgine.Engine {
 			ModelColor = Color.White;
 			ModelScale = Vector3.One;
 
-			if (Size != Vector3.Zero) {
-				//ModelOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
-
-			}
-
 			EntModelName = MdlName;
 			MinecraftModel JMdl = ResMgr.GetJsonModel("npc/humanoid.json");
 			CModel = MeshGenerator.Generate(JMdl);
 			HasModel = true;
+			BBox = CModel.GetBoundingBox();
+
+			if (Size != Vector3.Zero) {
+				//ModelOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
+
+				Vector3 Off = (BBox.Max - BBox.Min) / 2;
+				ModelOffset = new Vector3(Size.X / 2, 0, Size.Z / 2);
+			}
 		}
 
 		public override void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {

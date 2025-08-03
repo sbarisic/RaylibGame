@@ -14,6 +14,7 @@ using Voxelgine.Graphics;
 namespace Voxelgine.Engine {
 	class NPCEntity : BaseEntity {
 		CustomModel CModel;
+		BoundingBox BBox;
 
 		public NPCEntity() : base() {
 			IsRotating = false;
@@ -40,9 +41,13 @@ namespace Voxelgine.Engine {
 
 		public override void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
 			if (HasModel) {
+				BBox = CModel.GetBoundingBox();
+
 				CModel.Position = Position + ModelOffset;
 				CModel.LookDirection = Vector3.UnitZ;
 				CModel.Draw();
+
+				Raylib.DrawBoundingBox(BBox, Color.Blue);
 				//Raylib.DrawModelEx(EntModel, Position + ModelOffset + (BobbingLerp?.GetVec3() ?? Vector3.Zero), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
 			}
 

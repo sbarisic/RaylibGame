@@ -80,22 +80,22 @@ namespace Voxelgine.Engine {
 		}
 
 		public BoundingBox GetBoundingBox() {
-			BoundingBox BBox = new BoundingBox();
-			bool Empty = true;
+			if (Meshes.Count == 0)
+				return new BoundingBox();
 
-			foreach (CustomMesh CM in Meshes) {
-				if (Empty) {
-					Empty = false;
-					BBox = CM.BBox;
-				} else {
-					// TODO: Combine bounding boxes correctly
+			Vector3 min = Meshes[0].BBox.Min;
+			Vector3 max = Meshes[0].BBox.Max;
 
-				}
+			for (int i = 1; i < Meshes.Count; i++) {
+				var bbox = Meshes[i].BBox;
+				min = Vector3.Min(min, bbox.Min);
+				max = Vector3.Max(max, bbox.Max);
 			}
 
-			BBox.Min += Position;
-			BBox.Max += Position;
-			return BBox;
+
+			min += Position;
+			max += Position;
+			return new BoundingBox(min, max);
 		}
 
 		public CustomMesh AddMesh(Mesh M) {

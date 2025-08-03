@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
@@ -40,11 +41,13 @@ namespace Voxelgine.GUI {
 		}
 
 		private void UpdateLayout() {
-			// Set size based on label and input
+			// Set size based only on the larger of label or input, not both in a row
 			Vector2 labelSize = Mgr.MeasureText(Label);
 			Vector2 inputSize = InputLabel.Size;
-			Size = new Vector2(labelSize.X + LabelSpacing + inputSize.X + Padding * 2, MathF.Max(labelSize.Y, inputSize.Y) + Padding * 2);
-			InputLabel.Pos = new Vector2(Padding + labelSize.X + LabelSpacing, Padding);
+			float width = MathF.Max(labelSize.X, inputSize.X) + Padding * 2;
+			float height = labelSize.Y + inputSize.Y + LabelSpacing + Padding * 2;
+			Size = new Vector2(width, height);
+			InputLabel.Pos = new Vector2(Padding, Padding + labelSize.Y + LabelSpacing);
 		}
 
 		public override void Update() {
@@ -70,7 +73,10 @@ namespace Voxelgine.GUI {
 			Color bg = IsActive ? new Color(60, 60, 80, 200) : new Color(40, 40, 60, 180);
 			Mgr.Draw9Patch(ResMgr.GetTexture("gui/btn.png"), new Rectangle(Pos, Size), bg);
 
-			// Draw label
+			// Enable scissor mode to clip drawing inside the input box
+			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
+
+			// Draw label above the input field, inside the box
 			Mgr.DrawText(Label, Pos + new Vector2(Padding, Padding), Color.White);
 
 			// Draw input field (delegated to GUILabel)
@@ -78,6 +84,8 @@ namespace Voxelgine.GUI {
 			InputLabel.Pos = Pos + InputLabel.Pos;
 			InputLabel.Draw(IsActive, MouseClicked, MouseDown);
 			InputLabel.Pos = oldPos;
+
+			ScissorManager.EndScissor();
 		}
 	}
 }

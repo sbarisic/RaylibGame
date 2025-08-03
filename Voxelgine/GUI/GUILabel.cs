@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Graphics;
+
 namespace Voxelgine.GUI {
 	class GUILabel : GUIElement {
 		public bool IsInput = false;
@@ -165,7 +167,7 @@ namespace Voxelgine.GUI {
 			Mgr.DrawWindowBorder(Pos, Size);
 
 			//Mgr.DrawRectLines(Pos, Size, Color.Pink);
-			Raylib.BeginScissorMode((int)Pos.X, (int)Pos.Y, (int)Size.X, (int)Size.Y);
+			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
 
 			Color TextColor = new Color(225, 225, 225, 255);
 
@@ -288,7 +290,7 @@ namespace Voxelgine.GUI {
 				CenterOffset = Vector2.Zero;
 			}
 
-			Raylib.EndScissorMode();
+			ScissorManager.EndScissor();
 		}
 
 		public override void Update() {

@@ -12,6 +12,9 @@ namespace Voxelgine.Engine {
 		public Vector3 GetPosition();
 		public void SetPosition(Vector3 Pos);
 
+		public Vector3 GetVelocity();
+		public void SetVelocity(Vector3 Velocity);
+
 		public Vector3 GetSize();
 		public void SetSize(Vector3 Size);
 

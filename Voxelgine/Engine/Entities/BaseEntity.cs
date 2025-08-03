@@ -166,5 +166,13 @@ namespace Voxelgine.Engine {
 		public void SetEntityManager(EntityManager EntMgr) {
 			this.EntMgr = EntMgr;
 		}
+
+		public Vector3 GetVelocity() {
+			return Velocity;
+		}
+
+		public void SetVelocity(Vector3 Velocity) {
+			this.Velocity = Velocity;
+		}
 	}
 }

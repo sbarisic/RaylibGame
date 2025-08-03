@@ -58,9 +58,6 @@ namespace Voxelgine.Engine {
 	public class GameConfig {
 		const string ConfigFileName = "data/config.json";
 
-		public string Version = "1.0.0";
-		public string Name = "Default Config";
-
 		public int Monitor = -1;
 		public int WindowWidth = 1920;
 		public int WindowHeight = 1080;

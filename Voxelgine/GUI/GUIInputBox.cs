@@ -1,4 +1,5 @@
 ﻿using Raylib_cs;
+using Voxelgine.Engine;
 
 using System;
 using System.Collections.Generic;
@@ -13,15 +14,69 @@ namespace Voxelgine.GUI {
 
 		public string Label = "DefaultLabel";
 		public string Value = "";
+		public bool IsActive = false;
+		public Action<string> OnValueChanged;
+
+		private GUILabel InputLabel;
+		private float LabelSpacing = 8f;
+		private float Padding = 6f;
 
 		public GUIInputBox(GUIManager Mgr, string Label, string Value) {
 			this.Mgr = Mgr;
 			this.Label = Label;
 			this.Value = Value;
+
+			// Create a GUILabel for the input field (single-line, 24 chars by default)
+			InputLabel = new GUILabel(Mgr, 24);
+			InputLabel.IsInput = true;
+			InputLabel.IsReading = false;
+			InputLabel.OnInputFunc = (val) => {
+				Value = val;
+				OnValueChanged?.Invoke(val);
+			};
+			InputLabel.Input(Value);
+			UpdateLayout();
+		}
+
+		private void UpdateLayout() {
+			// Set size based on label and input
+			Vector2 labelSize = Mgr.MeasureText(Label);
+			Vector2 inputSize = InputLabel.Size;
+			Size = new Vector2(labelSize.X + LabelSpacing + inputSize.X + Padding * 2, MathF.Max(labelSize.Y, inputSize.Y) + Padding * 2);
+			InputLabel.Pos = new Vector2(Padding + labelSize.X + LabelSpacing, Padding);
+		}
+
+		public override void Update() {
+			if (!Enabled)
+				return;
+
+			// Update input label state
+			InputLabel.MousePos = MousePos - InputLabel.Pos;
+			InputLabel.Update();
+
+			// Activate input on click
+			if (IsInside(MousePos) && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				IsActive = true;
+				InputLabel.IsReading = true;
+			} else if (!IsInside(MousePos) && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				IsActive = false;
+				InputLabel.IsReading = false;
+			}
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
-			throw new NotImplementedException();
+			// Draw background
+			Color bg = IsActive ? new Color(60, 60, 80, 200) : new Color(40, 40, 60, 180);
+			Mgr.Draw9Patch(ResMgr.GetTexture("gui/btn.png"), new Rectangle(Pos, Size), bg);
+
+			// Draw label
+			Mgr.DrawText(Label, Pos + new Vector2(Padding, Padding), Color.White);
+
+			// Draw input field (delegated to GUILabel)
+			var oldPos = InputLabel.Pos;
+			InputLabel.Pos = Pos + InputLabel.Pos;
+			InputLabel.Draw(IsActive, MouseClicked, MouseDown);
+			InputLabel.Pos = oldPos;
 		}
 	}
 }

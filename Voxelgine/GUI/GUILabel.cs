@@ -187,15 +187,17 @@ namespace Voxelgine.GUI {
 				Mgr.DrawText(Text, Pos + Padding, TextColor);
 				Vector2 TxtSz = Raylib.MeasureTextEx(Mgr.TxtFont, Text, Mgr.FntSize, 1);
 
-				// Draw cursor
-				if (Cursor != Text.Length)
-					TxtSz = Raylib.MeasureTextEx(Mgr.TxtFont, Text.Substring(0, Cursor), Mgr.FntSize, 1);
+				if (IsReading) {
+					// Draw cursor
+					if (Cursor != Text.Length)
+						TxtSz = Raylib.MeasureTextEx(Mgr.TxtFont, Text.Substring(0, Cursor), Mgr.FntSize, 1);
 
-				float CursorWidth = CharSize.X * 0.8f;
-				float CursorSize = 2;
-				float CursorOffset = -3;
-				Rectangle CursorRect = new Rectangle(Pos + new Vector2(Padding.X + TxtSz.X, CharSize.Y - CursorSize + CursorOffset), new Vector2(CursorWidth, CursorSize));
-				Raylib.DrawRectanglePro(CursorRect, Vector2.Zero, 0, Color.White);
+					float CursorWidth = CharSize.X * 0.8f;
+					float CursorSize = 2;
+					float CursorOffset = -3;
+					Rectangle CursorRect = new Rectangle(Pos + new Vector2(Padding.X + TxtSz.X, CharSize.Y - CursorSize + CursorOffset), new Vector2(CursorWidth, CursorSize));
+					Raylib.DrawRectanglePro(CursorRect, Vector2.Zero, 0, Color.White);
+				}
 
 				// Draw selection
 				if (CheckSelectionBounds()) {

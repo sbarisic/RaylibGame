@@ -91,6 +91,14 @@ namespace RaylibGame.States {
 		}
 
 		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
+			GUIInputBox InBx = new GUIInputBox(GUI, "Test", "Okay");
+			//InBx.Size = BtnSize;
+			IB.Add(InBx);
+
+			GUIInputBox InBx2 = new GUIInputBox(GUI, "Test2", "Okay2");
+			//InBx.Size = BtnSize;
+			IB.Add(InBx2);
+
 			GUIButton Btn_ResetConfig = new GUIButton(GUI);
 			Btn_ResetConfig.Size = BtnSize;
 			Btn_ResetConfig.Text = "Reset Cfg";

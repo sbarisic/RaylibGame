@@ -118,8 +118,10 @@ namespace RaylibGame.States {
 			OptionsWnd = new GUISettingsWindow(GUI, Window);
 			OptionsWnd.Size = DbgRect.Size;
 			OptionsWnd.Pos = DbgRect.Position;
+			((GUISettingsWindow)OptionsWnd).RestoreSizePos();
 			OptionsWnd.Enabled = false;
 			OptionsWnd.Title = "Options";
+			OptionsWnd.CenterVertical();
 			GUI.AddElement(OptionsWnd);
 
 			List<GUIElement> IB = new List<GUIElement>();

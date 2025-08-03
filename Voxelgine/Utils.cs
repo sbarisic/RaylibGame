@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
@@ -482,8 +483,10 @@ namespace Voxelgine {
 		// If F = 0, then it's A, as F approaches 1, then it returns lerp towards B.
 		// If < 0, return A, if > 1, return B.
 		public static Vector3 Lerp(Vector3 A, Vector3 B, float F) {
-			if (F <= 0) return A;
-			if (F >= 1) return B;
+			if (F <= 0)
+				return A;
+			if (F >= 1)
+				return B;
 			return new Vector3(
 				A.X + (B.X - A.X) * F,
 				A.Y + (B.Y - A.Y) * F,
@@ -492,8 +495,10 @@ namespace Voxelgine {
 		}
 
 		public static Quaternion Lerp(Quaternion A, Quaternion B, float F) {
-			if (F <= 0) return A;
-			if (F >= 1) return B;
+			if (F <= 0)
+				return A;
+			if (F >= 1)
+				return B;
 			// Linear interpolation, not normalized
 			Quaternion result = new Quaternion(
 				A.X + (B.X - A.X) * F,
@@ -503,6 +508,13 @@ namespace Voxelgine {
 			);
 			// Normalize to avoid drift
 			return Quaternion.Normalize(result);
+		}
+
+		public static void RestartGame() {
+			string[] Args = Environment.GetCommandLineArgs().Skip(1).ToArray();
+			string FileName = Process.GetCurrentProcess().MainModule.FileName;
+			Process.Start(FileName, Args);
+			Environment.Exit(0);
 		}
 	}
 }

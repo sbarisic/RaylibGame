@@ -47,6 +47,14 @@ namespace Voxelgine.GUI {
 			return Children.ToArray();
 		}
 
+		public void CenterVertical() {
+			Mgr.CenterVertical(Vector2.Zero, new Vector2(Size.X, Size.Y - TitleBarHeight), CenterMargin, CenterIconMargin, Children.ToArray());
+		}
+
+		public virtual void OnResize() {
+			CenterVertical();
+		}
+
 		public override GUIUpdateResult Update() {
 			if (!Enabled)
 				return GUIUpdateResult.Disabled;
@@ -109,7 +117,7 @@ namespace Voxelgine.GUI {
 
 			// Always recenter children while resizing
 			if (IsResizing && Children.Count > 0) {
-				Mgr.CenterVertical(Vector2.Zero, new Vector2(Size.X, Size.Y - TitleBarHeight), CenterMargin, CenterIconMargin, Children.ToArray());
+				OnResize();
 			}
 
 			// Update children positions and call their Update

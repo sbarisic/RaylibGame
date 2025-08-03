@@ -1,7 +1,10 @@
-﻿using Raylib_cs;
+﻿using Microsoft.Win32.SafeHandles;
+
+using Raylib_cs;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -9,6 +12,8 @@ using System.Threading.Tasks;
 
 using Voxelgine.Engine;
 using Voxelgine.Graphics;
+
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Voxelgine.GUI {
 	class GUISettingsWindow : GUIWindow {
@@ -31,6 +36,30 @@ namespace Voxelgine.GUI {
 			}
 
 			Mgr.CenterVertical(Vector2.Zero, Size, new Vector2(15, 10), 5, GetChildren());
+		}
+
+		public void StoreSizePos() {
+			Program.Cfg.LastOptWnd_X = (int)Pos.X;
+			Program.Cfg.LastOptWnd_Y = (int)Pos.Y;
+			Program.Cfg.LastOptWnd_W = (int)Size.X;
+			Program.Cfg.LastOptWnd_H = (int)Size.Y;
+		}
+
+		public void RestoreSizePos() {
+			int X = Program.Cfg.LastOptWnd_X;
+			int Y = Program.Cfg.LastOptWnd_Y;
+			int W = Program.Cfg.LastOptWnd_W;
+			int H = Program.Cfg.LastOptWnd_H;
+
+			if (!(X == 0 && Y == 0 && W == 0 && H == 0)) {
+				Pos = new Vector2(X, Y);
+				Size = new Vector2(W, H);
+			}
+		}
+
+		public override void OnResize() {
+			base.OnResize();
+			StoreSizePos();
 		}
 
 		void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
@@ -62,11 +91,19 @@ namespace Voxelgine.GUI {
 			};
 			IB.Add(Btn_ResetConfig);
 
+			GUIButton Btn_Save = new GUIButton(Mgr);
+			Btn_Save.Size = BtnSize;
+			Btn_Save.Text = "Save & Restart";
+			Btn_Save.OnClickedFunc = (E) => {
+				Program.Cfg.SaveToJson();
+				Utils.RestartGame();
+			};
+			IB.Add(Btn_Save);
+
 			GUIButton Btn_Close = new GUIButton(Mgr);
 			Btn_Close.Size = BtnSize;
-			Btn_Close.Text = "Save & Close";
+			Btn_Close.Text = "Close";
 			Btn_Close.OnClickedFunc = (E) => {
-				Program.Cfg.SaveToJson();
 				this.Enabled = false;
 			};
 			IB.Add(Btn_Close);

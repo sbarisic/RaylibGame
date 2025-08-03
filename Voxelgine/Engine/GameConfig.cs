@@ -69,6 +69,12 @@ namespace Voxelgine.Engine {
 		public bool VSync = true;
 		public bool Msaa = false;
 
+		public int LastOptWnd_X = 0;
+		public int LastOptWnd_Y = 0;
+		public int LastOptWnd_W = 0;
+		public int LastOptWnd_H = 0;
+
+
 		public KeyValuePair<InputKey, MouseButton>[] MouseButtonDown;
 		public KeyValuePair<InputKey, KeyboardKey>[] KeyDown;
 		public KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] TwoKeysDown;

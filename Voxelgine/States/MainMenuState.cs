@@ -121,6 +121,7 @@ namespace RaylibGame.States {
 				), CenterSize);
 
 			GUIWindow GWnd = new GUIWindow(GUI);
+			GWnd.Title = "Main Menu";
 			GWnd.Size = DbgRect.Size;
 			GWnd.Pos = DbgRect.Position;
 			GUI.AddElement(GWnd);

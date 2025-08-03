@@ -17,13 +17,14 @@ namespace Voxelgine.GUI {
 		public string Label = "DefaultLabel";
 		string Value = "";
 		string OriginalValue;
+		bool WasEdited = false;
 
 		public bool IsActive = false;
 		public Action<string> OnValueChanged;
 
-		private GUILabel InputLabel;
-		private float LabelSpacing = 8f;
-		private float Padding = 6f;
+		GUILabel InputLabel;
+		float LabelSpacing = 8f;
+		float Padding = 6f;
 
 		public GUIInputBox(GUIManager Mgr, string Label, string Value) {
 			this.Mgr = Mgr;
@@ -40,9 +41,12 @@ namespace Voxelgine.GUI {
 				OnValueChanged?.Invoke(val);
 			};
 
+			InputLabel.DrawTextColor = new Color(130, 172, 209);
+
 			SetValue(Value, Value);
 
 			UpdateLayout();
+			WasEdited = false;
 		}
 
 		public void SetValue(string Value, string OriginalValue = null) {
@@ -52,16 +56,20 @@ namespace Voxelgine.GUI {
 
 			if (OriginalValue != null)
 				this.OriginalValue = OriginalValue;
+
+			WasEdited = true;
 		}
 
 		private void UpdateLayout() {
-			// Set size based only on the larger of label or input, not both in a row
+			// Arrange label and input in a single row
 			Vector2 labelSize = Mgr.MeasureText(Label);
 			Vector2 inputSize = InputLabel.Size;
-			float width = MathF.Max(labelSize.X, inputSize.X) + Padding * 2;
-			float height = labelSize.Y + inputSize.Y + LabelSpacing + Padding * 2;
+			float width = labelSize.X + LabelSpacing + inputSize.X + Padding * 2;
+			float height = MathF.Max(labelSize.Y, inputSize.Y) + Padding * 2;
 			Size = new Vector2(width, height);
-			InputLabel.Pos = new Vector2(Padding, Padding + labelSize.Y + LabelSpacing);
+			// Label at (Padding, center vertically)
+			// InputLabel at (Padding + labelSize.X + LabelSpacing, center vertically)
+			InputLabel.Pos = new Vector2(Padding + labelSize.X + LabelSpacing, Padding + (height - Padding * 2 - inputSize.Y) / 2);
 		}
 
 		public override GUIUpdateResult Update() {
@@ -91,10 +99,18 @@ namespace Voxelgine.GUI {
 			Color bg = IsActive ? new Color(60, 60, 80, 200) : new Color(40, 40, 60, 180);
 			Texture2D tex = ResMgr.GetTexture("gui/inputbox.png");
 
-			if (Value != OriginalValue) {
-				int bright = 30;
+			if (WasEdited) {
+				tex = ResMgr.GetTexture("gui/inputbox_edited.png");
 				bg = new Color(255, 255, 255, 200); // Highlight color if value changed
-				tex = ResMgr.GetTexture("gui/inputbox_changed.png"); // Use a different texture for changed state
+			}
+
+			if (Value != OriginalValue) {
+				bg = new Color(255, 255, 255, 200); // Highlight color if value changed
+
+				if (WasEdited)
+					tex = ResMgr.GetTexture("gui/inputbox_changed_edited.png");
+				else
+					tex = ResMgr.GetTexture("gui/inputbox_changed.png");
 			}
 
 			Mgr.Draw9Patch(tex, new Rectangle(Pos, Size), bg);
@@ -102,8 +118,10 @@ namespace Voxelgine.GUI {
 			// Enable scissor mode to clip drawing inside the input box
 			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
 
-			// Draw label above the input field, inside the box
-			Mgr.DrawText(Label, Pos + new Vector2(Padding, Padding), Color.White);
+			// Draw label to the left, vertically centered
+			Vector2 labelSize = Mgr.MeasureText(Label);
+			float labelY = Pos.Y + Padding + (Size.Y - Padding * 2 - labelSize.Y) / 2;
+			Mgr.DrawText(Label, new Vector2(Pos.X + Padding, labelY), Color.White);
 
 			// Draw input field (delegated to GUILabel)
 			var oldPos = InputLabel.Pos;

@@ -25,6 +25,7 @@ namespace Voxelgine.GUI {
 		Vector2 CenterOffset = Vector2.Zero;
 
 		public StringBuilder TextBuilder = new StringBuilder();
+		public Color DrawTextColor = Color.White;
 
 		string Text;
 		GUIManager Mgr;
@@ -177,12 +178,13 @@ namespace Voxelgine.GUI {
 			//Mgr.DrawRectLines(Pos, Size, Color.Pink);
 			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
 
-			Color TextColor = new Color(225, 225, 225, 255);
+			Color TextColor = DrawTextColor;
+			const float SFact = 0.78431372549f;
 
 			if (Hovered && !MouseDown)
-				TextColor = new Color(200, 200, 200, 255);
+				TextColor = new Color((int)(DrawTextColor.R * SFact), (int)(DrawTextColor.G * SFact), (int)(DrawTextColor.B * SFact), 255);
 			else if (Hovered && MouseDown)
-				TextColor = Color.White;
+				TextColor = DrawTextColor;
 
 
 			Vector2 Padding = new Vector2(5, 0);

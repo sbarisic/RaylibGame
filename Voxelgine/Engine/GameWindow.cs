@@ -46,6 +46,9 @@ namespace Voxelgine.Engine {
 			if (Program.Cfg.Borderless)
 				Raylib.SetWindowState(ConfigFlags.BorderlessWindowMode);
 
+			if (Program.Cfg.Resizable)
+				Raylib.SetWindowState(ConfigFlags.ResizableWindow);
+
 			if (Program.Cfg.Fullscreen && !Program.Cfg.Borderless)
 				Raylib.SetWindowState(ConfigFlags.FullscreenMode);
 

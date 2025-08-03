@@ -58,30 +58,68 @@ namespace Voxelgine.Engine {
 	public class GameConfig {
 		const string ConfigFileName = "data/config.json";
 
-		public int Monitor = -1;
-		public int WindowWidth = 1920;
-		public int WindowHeight = 1080;
-		public bool Fullscreen = false;
-		public bool UseFSDesktopRes = true;
-		public bool Borderless = false;
-		public bool SetFocused = true;
+		public int Monitor;
+		public int WindowWidth;
+		public int WindowHeight;
+		public bool Fullscreen;
+		public bool UseFSDesktopRes;
+		public bool Borderless;
+		public bool SetFocused;
+		public bool Resizable;
 
-		public int TargetFPS = -1;
-		public bool HighDpiWindow = true;
-		public bool VSync = true;
-		public bool Msaa = false;
+		public int TargetFPS;
 
-		public int LastOptWnd_X = 0;
-		public int LastOptWnd_Y = 0;
-		public int LastOptWnd_W = 0;
-		public int LastOptWnd_H = 0;
+		[SettingsHidden]
+		public bool HighDpiWindow;
 
+		public bool VSync;
+		public bool Msaa;
 
+		[SettingsHidden]
+		public int LastOptWnd_X;
+
+		[SettingsHidden]
+		public int LastOptWnd_Y;
+
+		[SettingsHidden]
+		public int LastOptWnd_W;
+
+		[SettingsHidden]
+		public int LastOptWnd_H;
+
+		[SettingsHidden]
 		public KeyValuePair<InputKey, MouseButton>[] MouseButtonDown;
+
+		[SettingsHidden]
 		public KeyValuePair<InputKey, KeyboardKey>[] KeyDown;
+
+		[SettingsHidden]
 		public KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] TwoKeysDown;
 
+		public void SetDefaults() {
+			Monitor = -1;
+			WindowWidth = 1920;
+			WindowHeight = 1080;
+			Fullscreen = false;
+			UseFSDesktopRes = true;
+			Borderless = false;
+			SetFocused = true;
+			TargetFPS = -1;
+			HighDpiWindow = true;
+			VSync = true;
+			Msaa = false;
+			Resizable = true;
+
+
+			LastOptWnd_X = 0;
+			LastOptWnd_Y = 0;
+			LastOptWnd_W = 0;
+			LastOptWnd_H = 0;
+		}
+
 		public GameConfig() {
+			SetDefaults();
+
 			MouseButtonDown = new KeyValuePair<InputKey, MouseButton>[] { };
 			KeyDown = new KeyValuePair<InputKey, KeyboardKey>[] { };
 			TwoKeysDown = new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] { };
@@ -92,7 +130,7 @@ namespace Voxelgine.Engine {
 
 			FieldInfo[] Fields = T.GetFields(BindingFlags.Public | BindingFlags.Instance);
 			foreach (FieldInfo F in Fields) {
-				if (F.FieldType.IsArray)
+				if (F.GetCustomAttribute<SettingsHiddenAttribute>() != null)
 					continue;
 
 				yield return new ConfigValueRef(F, F.Name);

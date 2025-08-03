@@ -86,6 +86,7 @@ namespace Voxelgine.GUI {
 			Btn_ResetConfig.Size = BtnSize;
 			Btn_ResetConfig.Text = "Reset Cfg";
 			Btn_ResetConfig.OnClickedFunc = (E) => {
+				Program.Cfg.SetDefaults();
 				Program.Cfg.GenerateDefaultKeybinds();
 				Program.Cfg.SaveToJson();
 			};

@@ -13,7 +13,6 @@ namespace Voxelgine.Graphics {
 		static Stack<Rectangle> ScissorStack = new Stack<Rectangle>();
 		static Rectangle CurrentScissorRect;
 
-		// TODO: Implement the rest of the functionality to clip rectangles
 		static Rectangle ClipAllRects() {
 			if (ScissorStack.Count == 0)
 				return new Rectangle(0, 0, 0, 0);

@@ -38,6 +38,8 @@ namespace Voxelgine.GUI {
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
 
 			if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				Mgr.BringToFront(this);
+
 				IsDragging = true;
 				DragOffset = mouse - Pos;
 			}

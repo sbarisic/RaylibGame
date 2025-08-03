@@ -37,8 +37,25 @@ namespace Voxelgine.GUI {
 			Elements.Clear();
 		}
 
+		int CalcLastZOrder() {
+			if (Elements.Count == 0)
+				return 0;
+		
+			return Elements.Max(e => e.ZOrder);
+		}
+
 		public void AddElement(GUIElement E) {
+			E.ZOrder = CalcLastZOrder() + 1;
 			Elements.Add(E);
+		}
+
+		public void BringToFront(GUIElement E) {
+			if (Elements.Contains(E)) {
+				// Remove and re-add to move to the end of the list
+				Elements.Remove(E);
+				E.ZOrder = CalcLastZOrder() + 1;
+				Elements.Add(E);
+			}
 		}
 
 		public T FindFirstElementOrDefault<T>() where T : GUIElement {
@@ -53,7 +70,9 @@ namespace Voxelgine.GUI {
 		public void Tick() {
 			MousePos = Window.InMgr.GetMousePos();
 
-			foreach (GUIElement E in Elements) {
+			// Sort elements by ZOrder before updating
+			var sortedElements = Elements.OrderBy(e => e.ZOrder).ToList();
+			foreach (GUIElement E in sortedElements) {
 				E.MousePos = MousePos;
 				E.Update();
 			}
@@ -64,7 +83,8 @@ namespace Voxelgine.GUI {
 			bool MouseClicked = Window.InMgr.IsInputPressed(InputKey.Click_Left);
 			bool MouseDown = Window.InMgr.IsInputDown(InputKey.Click_Left);
 
-			foreach (GUIElement E in Elements) {
+			var sortedElements = Elements.OrderBy(e => e.ZOrder).ToList();
+			foreach (GUIElement E in sortedElements) {
 				if (!E.Enabled)
 					continue;
 

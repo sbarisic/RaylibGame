@@ -15,14 +15,14 @@ namespace Voxelgine.Engine {
 		public string Version = "1.0.0";
 		public string Name = "Default Config";
 
-		public List<KeyValuePair<InputKey, MouseButton>> MouseButtonDown;
-		public List<KeyValuePair<InputKey, KeyboardKey>> KeyDown;
-		public List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>> TwoKeysDown;
+		public KeyValuePair<InputKey, MouseButton>[] MouseButtonDown;
+		public KeyValuePair<InputKey, KeyboardKey>[] KeyDown;
+		public KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] TwoKeysDown;
 
 		public GameConfig() {
-			MouseButtonDown = new List<KeyValuePair<InputKey, MouseButton>>();
-			KeyDown = new List<KeyValuePair<InputKey, KeyboardKey>>();
-			TwoKeysDown = new List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>>();
+			MouseButtonDown = new KeyValuePair<InputKey, MouseButton>[] { };
+			KeyDown = new KeyValuePair<InputKey, KeyboardKey>[] { };
+			TwoKeysDown = new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] { };
 		}
 
 		public void SaveToJson() {
@@ -41,9 +41,13 @@ namespace Voxelgine.Engine {
 		}
 
 		public void GenerateDefaultKeybinds() {
-			MouseButtonDown.Clear();
-			KeyDown.Clear();
-			TwoKeysDown.Clear();
+			List<KeyValuePair<InputKey, MouseButton>> MouseButtonDown = new List<KeyValuePair<InputKey, MouseButton>>();
+			List<KeyValuePair<InputKey, KeyboardKey>> KeyDown = new List<KeyValuePair<InputKey, KeyboardKey>>();
+			List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>> TwoKeysDown = new List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>>();
+
+			//MouseButtonDown.Clear();
+			//KeyDown.Clear();
+			//TwoKeysDown.Clear();
 
 			// Mouse buttons
 			MouseButtonDown.Add(new KeyValuePair<InputKey, MouseButton>(InputKey.Click_Left, MouseButton.Left));
@@ -91,10 +95,52 @@ namespace Voxelgine.Engine {
 			// Escape
 			KeyDown.Add(new KeyValuePair<InputKey, KeyboardKey>(InputKey.Esc, KeyboardKey.Escape));
 
-			// Number keys (main and keypad)
+			// Number keys (main and keypad) and combos
 			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num0,
 				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Zero, KeyboardKey.Kp0)));
 
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num1,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.One, KeyboardKey.Kp1)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num2,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Two, KeyboardKey.Kp2)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num3,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Three, KeyboardKey.Kp3)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num4,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Four, KeyboardKey.Kp4)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num5,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Five, KeyboardKey.Kp5)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num6,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Six, KeyboardKey.Kp6)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num7,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Seven, KeyboardKey.Kp7)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num8,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Eight, KeyboardKey.Kp8)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Num9,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Nine, KeyboardKey.Kp9)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Enter,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.Enter, KeyboardKey.KpEnter)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Ctrl,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.LeftControl, KeyboardKey.RightControl)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Alt,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.LeftAlt, KeyboardKey.RightAlt)));
+
+			TwoKeysDown.Add(new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>(InputKey.Shift,
+				new KeyValuePair<KeyboardKey, KeyboardKey>(KeyboardKey.LeftShift, KeyboardKey.RightShift)));
+
+			this.MouseButtonDown = MouseButtonDown.ToArray();
+			this.KeyDown = KeyDown.ToArray();
+			this.TwoKeysDown = TwoKeysDown.ToArray();
 		}
 	}
 }

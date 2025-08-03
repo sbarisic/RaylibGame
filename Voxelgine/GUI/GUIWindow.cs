@@ -20,6 +20,12 @@ namespace Voxelgine.GUI {
 		public string Title = "Window";
 		private Texture2D PanelTex;
 
+		private bool IsResizing = false;
+		private Vector2 ResizeStartMouse = Vector2.Zero;
+		private Vector2 ResizeStartSize = Vector2.Zero;
+		private const float ResizeHandleSize = 16f;
+		private Vector2 MinWindowSize = new Vector2(120, 80);
+
 		public GUIWindow(GUIManager Mgr) {
 			this.Mgr = Mgr;
 			Size = new Vector2(300, 200);
@@ -40,8 +46,16 @@ namespace Voxelgine.GUI {
 
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
 			bool insideWindow = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, Size));
+			// Check if mouse is over the resize handle (bottom right corner)
+			Rectangle resizeRect = new Rectangle(
+				Pos.X + Size.X - ResizeHandleSize,
+				Pos.Y + Size.Y - ResizeHandleSize,
+				ResizeHandleSize,
+				ResizeHandleSize
+			);
+			bool overResize = Raylib.CheckCollisionPointRec(mouse, resizeRect);
 
-			if (insideWindow || overTitleBar) {
+			if (insideWindow || overTitleBar || overResize) {
 				Res = GUIUpdateResult.ConsumedInput;
 
 				if (Raylib.IsMouseButtonPressed(MouseButton.Left)) {
@@ -49,17 +63,38 @@ namespace Voxelgine.GUI {
 				}
 			}
 
-			if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
-				Mgr.BringToFront(this);
-
-				IsDragging = true;
-				DragOffset = mouse - Pos;
+			// Start resizing
+			if (overResize && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				IsResizing = true;
+				ResizeStartMouse = mouse;
+				ResizeStartSize = Size;
 			}
-			if (IsDragging) {
+			// Resizing logic
+			if (IsResizing) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
-					Pos = mouse - DragOffset;
+					Vector2 delta = mouse - ResizeStartMouse;
+					Size = new Vector2(
+						MathF.Max(MinWindowSize.X, ResizeStartSize.X + delta.X),
+						MathF.Max(MinWindowSize.Y, ResizeStartSize.Y + delta.Y)
+					);
 				} else {
-					IsDragging = false;
+					IsResizing = false;
+				}
+				// Don't allow dragging while resizing
+				IsDragging = false;
+			} else {
+				// Start dragging
+				if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+					Mgr.BringToFront(this);
+					IsDragging = true;
+					DragOffset = mouse - Pos;
+				}
+				if (IsDragging) {
+					if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
+						Pos = mouse - DragOffset;
+					} else {
+						IsDragging = false;
+					}
 				}
 			}
 
@@ -83,6 +118,25 @@ namespace Voxelgine.GUI {
 
 			// Draw border
 			Mgr.DrawRectLines(Pos, Size, Color.Black);
+
+			// Draw resize handle (bottom right corner)
+			Rectangle resizeRect = new Rectangle(
+				Pos.X + Size.X - ResizeHandleSize,
+				Pos.Y + Size.Y - ResizeHandleSize,
+				ResizeHandleSize,
+				ResizeHandleSize
+			);
+			Raylib.DrawRectangleRec(resizeRect, new Color(100, 100, 100, 180));
+			// Optionally, draw diagonal lines for the handle
+			for (int i = 2; i < (int)ResizeHandleSize; i += 4) {
+				Raylib.DrawLine(
+					(int)(resizeRect.X + i),
+					(int)(resizeRect.Y + ResizeHandleSize),
+					(int)(resizeRect.X + ResizeHandleSize),
+					(int)(resizeRect.Y + ResizeHandleSize - i),
+					Color.Gray
+				);
+			}
 
 			// Draw children (relative to window position, below title bar)
 			Vector2 localMouse = this.MousePos - Pos - new Vector2(0, TitleBarHeight);

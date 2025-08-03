@@ -54,19 +54,19 @@ namespace Voxelgine.Engine {
 			Raylib.DrawLine3D(corners[3], corners[7], color);
 		}
 
-		public Vector3 GetPosition() {
+		public virtual Vector3 GetPosition() {
 			return Position;
 		}
 
-		public void SetPosition(Vector3 Pos) {
+		public virtual void SetPosition(Vector3 Pos) {
 			Position = Pos;
 		}
 
-		public Vector3 GetSize() {
+		public virtual Vector3 GetSize() {
 			return Size;
 		}
 
-		public void SetSize(Vector3 Size) {
+		public virtual void SetSize(Vector3 Size) {
 			this.Size = Size;
 		}
 
@@ -132,7 +132,7 @@ namespace Voxelgine.Engine {
 		}
 
 		// Checks if any blocks are present in the AABB at pos with size
-		bool HasBlocksInBounds(ChunkMap map, Vector3 pos, Vector3 size) {
+		public bool HasBlocksInBounds(ChunkMap map, Vector3 pos, Vector3 size) {
 			Vector3 min = pos;
 			Vector3 max = pos + size;
 			for (int x = (int)MathF.Floor(min.X); x <= (int)MathF.Floor(max.X); x++)

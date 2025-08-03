@@ -326,6 +326,18 @@ namespace Voxelgine.Graphics {
 
 						PlacedBlock CurBlock = null;
 						if ((CurBlock = GetBlock(x, y, z)).Type != BlockType.None) {
+							// --- Optimization: skip face culling for fully enclosed opaque blocks ---
+							if (BlockInfo.IsOpaque(CurBlock.Type)
+								&& BlockInfo.IsOpaque(GetBlock(x + 1, y, z).Type)
+								&& BlockInfo.IsOpaque(GetBlock(x - 1, y, z).Type)
+								&& BlockInfo.IsOpaque(GetBlock(x, y + 1, z).Type)
+								&& BlockInfo.IsOpaque(GetBlock(x, y - 1, z).Type)
+								&& BlockInfo.IsOpaque(GetBlock(x, y, z + 1).Type)
+								&& BlockInfo.IsOpaque(GetBlock(x, y, z - 1).Type))
+							{
+								// All neighbors are opaque, skip this block
+								continue;
+							}
 							Vertices.SetPositionOffset(new Vector3(x, y, z) * BlockSize);
 
 							BlockType XPosType = GetBlock(x + 1, y, z).Type;

@@ -17,6 +17,8 @@ namespace Voxelgine.GUI {
 		public float Scroll = 0;
 		public float MaxScroll = 0;
 
+		public bool ClearOnEnter = true;
+
 		public bool CenterText = false;
 		Vector2 CenterOffset = Vector2.Zero;
 
@@ -67,10 +69,12 @@ namespace Voxelgine.GUI {
 					if (OnInputFunc != null)
 						OnInputFunc(Text);
 
-					TextBuilder.Clear();
-					Cursor = 0;
-					SelectionLen = 0;
-					SelectionStart = 0;
+					if (ClearOnEnter) {
+						TextBuilder.Clear();
+						Cursor = 0;
+						SelectionLen = 0;
+						SelectionStart = 0;
+					}
 				} else {
 					if (SelectionLen > 0) {
 						TextBuilder.Remove(SelectionStart, SelectionLen);

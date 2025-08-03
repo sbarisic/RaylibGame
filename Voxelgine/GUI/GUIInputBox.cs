@@ -30,6 +30,7 @@ namespace Voxelgine.GUI {
 			InputLabel = new GUILabel(Mgr, 24);
 			InputLabel.IsInput = true;
 			InputLabel.IsReading = false;
+			InputLabel.ClearOnEnter = false;
 			InputLabel.OnInputFunc = (val) => {
 				Value = val;
 				OnValueChanged?.Invoke(val);

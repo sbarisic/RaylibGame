@@ -61,10 +61,15 @@ namespace Voxelgine.Engine {
 		public string Version = "1.0.0";
 		public string Name = "Default Config";
 
+		public int Monitor = -1;
 		public int WindowWidth = 1920;
 		public int WindowHeight = 1080;
+		public bool Fullscreen = false;
+		public bool UseFSDesktopRes = true;
+		public bool Borderless = false;
+		public bool SetFocused = true;
 
-		public int TargetFPS = 240;
+		public int TargetFPS = -1;
 		public bool HighDpiWindow = true;
 		public bool VSync = true;
 		public bool Msaa = false;

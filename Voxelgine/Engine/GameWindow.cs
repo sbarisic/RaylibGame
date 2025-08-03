@@ -9,55 +9,12 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.GUI;
+
 using Windows.Storage.Pickers;
 
 namespace Voxelgine.Engine {
-	struct GameFrameInfo {
-		public bool Empty;
-		public Camera3D Cam;
-		public Vector3 Pos;
-		public Vector3 CamAngle;
-		public Quaternion ViewModelRot;
-		public Vector3 ViewModelPos;
-		public Vector3 FeetPosition;
-
-		public GameFrameInfo() {
-			Empty = true;
-		}
-
-		public GameFrameInfo Interpolate(GameFrameInfo Old, float T) {
-			// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
-
-			GameFrameInfo New = new GameFrameInfo();
-
-			New.Cam.FovY = float.Lerp(Old.Cam.FovY, Cam.FovY, T);
-			New.Cam.Position = Vector3.Lerp(Old.Cam.Position, Cam.Position, T);
-			New.Cam.Target = Vector3.Lerp(Old.Cam.Target, Cam.Target, T);
-			New.Cam.Up = Cam.Up;
-			New.Cam.Projection = Cam.Projection;
-			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
-			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);
-			New.ViewModelPos = Vector3.Lerp(Old.ViewModelPos, ViewModelPos, T);
-			New.ViewModelRot = Quaternion.Slerp(Old.ViewModelRot, ViewModelRot, T);
-			New.FeetPosition = Vector3.Lerp(Old.FeetPosition, FeetPosition, T);
-
-			return New;
-		}
-
-		public static Camera3D Lerp(Camera3D Old, Camera3D Cam, float T) {
-			Camera3D New = new Camera3D();
-
-			New.Projection = Cam.Projection;
-			New.FovY = float.Lerp(Old.FovY, Cam.FovY, T);
-			New.Position = Vector3.Lerp(Old.Position, Cam.Position, T);
-			New.Target = Vector3.Lerp(Old.Target, Cam.Target, T);
-			New.Up = Cam.Up;
-
-			return New;
-		}
-	}
-
-	class GameWindow {
+	unsafe class GameWindow {
 		public InputMgr InMgr;
 
 		public int Width {
@@ -86,6 +43,12 @@ namespace Voxelgine.Engine {
 			if (Program.Cfg.VSync)
 				Raylib.SetWindowState(ConfigFlags.VSyncHint);
 
+			if (Program.Cfg.Borderless)
+				Raylib.SetWindowState(ConfigFlags.BorderlessWindowMode);
+
+			if (Program.Cfg.Fullscreen && !Program.Cfg.Borderless)
+				Raylib.SetWindowState(ConfigFlags.FullscreenMode);
+
 			if (Program.Cfg.Msaa) {
 				Enable_SSAA = true;
 				//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
@@ -96,8 +59,62 @@ namespace Voxelgine.Engine {
 			//Raylib.SetWindowState(ConfigFlags.)
 
 			Raylib.InitWindow(Width = W, Height = H, Title);
-			Raylib.SetTargetFPS(Program.Cfg.TargetFPS);
+
+			int MonCount = Raylib.GetMonitorCount();
+			int UseMon = 0;
+
+			if (Program.Cfg.Monitor >= 0 && Program.Cfg.Monitor < MonCount) {
+				UseMon = Program.Cfg.Monitor;
+			} else {
+				Program.Cfg.Monitor = 0;
+			}
+
+			int MW = Raylib.GetMonitorWidth(UseMon);
+			int MH = Raylib.GetMonitorHeight(UseMon);
+			int MFPS = Raylib.GetMonitorRefreshRate(UseMon);
+			string MonName = new string(Raylib.GetMonitorName(UseMon));
+
+			Console.WriteLine("Using monitor '{0}' ({1}x{2})", MonName, MW, MH);
+
+			if (MW < W)
+				W = MW;
+			if (MH < H)
+				H = MH;
+
+
+			int FPS = Program.Cfg.TargetFPS;
+			if (FPS <= 0) {
+				FPS = MFPS;
+			}
+
+			Console.WriteLine("Target FPS: {0}", FPS);
+			Raylib.SetTargetFPS(FPS);
 			Raylib.SetExitKey(0);
+
+
+			if (Program.Cfg.Borderless) {
+				Raylib.ToggleBorderlessWindowed();
+				Raylib.SetWindowSize(W, H);
+				Raylib.SetWindowPosition(MW / 2 - W / 2, MH / 2 - H / 2);
+			}
+
+			if (Program.Cfg.Fullscreen) {
+				if (Program.Cfg.Borderless) {
+					Raylib.SetWindowSize(MW, MH);
+				} else {
+					Raylib.SetWindowMonitor(UseMon);
+
+					if (Program.Cfg.UseFSDesktopRes) {
+						Width = W = MW;
+						Height = H = MH;
+						Raylib.SetWindowSize(W, H);
+					}
+
+					Raylib.ToggleFullscreen();
+				}
+			}
+
+			Raylib.SetWindowFocused();
 
 			InMgr = new InputMgr();
 

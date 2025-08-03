@@ -84,6 +84,13 @@ namespace Voxelgine.GUI {
 
 			// Activate input on click
 			if (IsInside(MousePos) && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				if (Raylib.IsKeyDown(KeyboardKey.LeftControl)) {
+					if (Value.ToLower() == "true" || Value.ToLower() == "false") {
+						bool V = !bool.Parse(Value);
+						SetValue(V.ToString());
+					}
+				}
+
 				IsActive = true;
 				InputLabel.IsReading = true;
 			} else if (!IsInside(MousePos) && Raylib.IsMouseButtonPressed(MouseButton.Left)) {

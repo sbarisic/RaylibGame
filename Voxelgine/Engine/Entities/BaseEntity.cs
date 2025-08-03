@@ -47,7 +47,7 @@ namespace Voxelgine.Engine {
 				if (BobbingLerp == null) {
 					BobbingLerp = new LerpVec3();
 					BobbingLerp.Loop = true;
-					BobbingLerp.Easing = LerpEasing.EaseInOutQuint;
+					BobbingLerp.Easing = Easing.EaseInOutQuart;
 					BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));
 				}
 			}

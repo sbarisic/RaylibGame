@@ -20,7 +20,7 @@ namespace Voxelgine.Engine {
 		public Action<AnimLerp> OnComplete;
 
 		public AnimLerp() {
-			Easing = LerpEasing.Linear;
+			Easing = Engine.Easing.Linear;
 			Program.LerpMgr.AddLerp(this);
 		}
 

@@ -21,7 +21,7 @@ namespace Voxelgine.Engine {
 		}
 	}
 
-	static class LerpEasing {
+	static class Easing {
 		public static float Linear(float T) {
 			return T;
 		}
@@ -36,7 +36,10 @@ namespace Voxelgine.Engine {
 
 		public static float EaseInOutQuint(float T) {
 			return T < 0.5 ? 16 * T * T * T * T * T : 1 - MathF.Pow(-2 * T + 2, 5) / 2;
+		}
 
+		public static float EaseInOutQuart(float T) {
+			return T < 0.5 ? 8 * T * T * T * T : 1 - MathF.Pow(-2 * T + 2, 4) / 2;
 		}
 	}
 }

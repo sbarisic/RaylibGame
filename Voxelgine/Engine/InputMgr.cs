@@ -70,6 +70,8 @@ namespace Voxelgine.Engine {
 	}
 
 	public unsafe struct InputState {
+		public float GameTime;
+
 		public fixed bool KeysDown[(int)InputKey.InputKeyCount];
 		public Vector2 MousePos;
 		public float MouseWheel;
@@ -79,9 +81,10 @@ namespace Voxelgine.Engine {
 		InputState InputState_Cur;
 		InputState InputState_Last;
 
-		public void Tick() {
+		public void Tick(float GameTime) {
 			InputState_Last = InputState_Cur;
 			InputState_Cur = new InputState();
+			InputState_Cur.GameTime = GameTime;
 
 			// TODO: Input mapping
 
@@ -168,6 +171,10 @@ namespace Voxelgine.Engine {
 
 		public float GetMouseWheel() {
 			return InputState_Cur.MouseWheel;
+		}
+
+		public float GetGameTime() {
+			return InputState_Cur.GameTime;
 		}
 	}
 }

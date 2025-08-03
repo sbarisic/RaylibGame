@@ -17,17 +17,65 @@ namespace Voxelgine.Engine {
 		Vector3 Size;
 		Vector3 Velocity;
 
+		bool HasModel;
+		string EntModelName;
+		Model EntModel;
+		Vector3 ModelOffset;
+		float ModelRotationDeg;
+		Color ModelColor;
+		Vector3 ModelScale;
+
+		// Rotate around Y axis at set sped
+		public bool IsRotating = false;
+		public float RotationSpeed = 30;
+
+		// Up down movement
+		public bool IsBobbing = false;
+		public float BobAmplitude = 0.25f;
+		public float BobSpeed = 2;
+		float BobOffset = 0;
+
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+			if (IsRotating)
+				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
+
+			if (IsBobbing) {
+				BobOffset = MathF.Sin(InMgr.GetGameTime() * BobSpeed) * BobAmplitude;
+			}
+
 			GameState GS = GetGameState();
 			UpdatePhysics(GS.Map, Dt);
 		}
 
+		public void SetModel(string MdlName) {
+			HasModel = false;
+			ModelOffset = Vector3.Zero;
+			ModelRotationDeg = 0;
+			ModelColor = Color.White;
+			ModelScale = Vector3.One;
+
+			if (Size != Vector3.Zero) {
+				ModelOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
+			}
+
+			EntModelName = MdlName;
+			EntModel = ResMgr.GetModel(MdlName);
+			HasModel = EntModel.MeshCount > 0;
+		}
+
 		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
+			if (HasModel) {
+				Raylib.DrawModelEx(EntModel, Position + ModelOffset + new Vector3(0, BobOffset, 0), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
+			}
+
 			DrawCollisionBox();
 		}
 
 		// Draws the collision box at Position with Size
 		void DrawCollisionBox() {
+			if (!Program.DebugMode)
+				return;
+
 			Vector3 min = Position;
 			Vector3 max = Position + Size;
 			Color color = Color.Red;

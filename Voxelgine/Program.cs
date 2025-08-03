@@ -72,7 +72,7 @@ namespace Voxelgine {
 				Accumulator += FrameTime;
 				int Updates = 0;
 
-				Window.Tick();
+				Window.Tick(NewTime);
 
 				while (Accumulator >= DeltaTime) {
 					// PreviousState = CurrentState;

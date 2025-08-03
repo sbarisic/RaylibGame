@@ -126,8 +126,8 @@ namespace Voxelgine.Engine {
 			Open = false;
 		}
 
-		public void Tick() {
-			InMgr.Tick();
+		public void Tick(float GameTime) {
+			InMgr.Tick(GameTime);
 			State.Tick();
 		}
 

@@ -36,6 +36,9 @@ namespace RaylibGame.States {
 			BaseEntity BE = new BaseEntity();
 			BE.SetPosition(new Vector3(37, 66, 15));
 			BE.SetSize(new Vector3(1, 1, 1));
+			BE.SetModel("orb_xp/orb_xp.obj");
+			BE.IsBobbing = true;
+			BE.IsRotating = true;
 			EntMgr.Spawn(this, BE);
 
 			if (File.Exists("map.bin")) {

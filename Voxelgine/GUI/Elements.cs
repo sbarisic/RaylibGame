@@ -25,6 +25,7 @@ namespace Voxelgine.GUI {
 	enum GUIUpdateResult {
 		OK,
 		Disabled,
+		ConsumedInput,
 	}
 
 	abstract class GUIElement {

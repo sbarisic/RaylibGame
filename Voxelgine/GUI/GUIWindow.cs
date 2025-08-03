@@ -1,10 +1,12 @@
 ﻿using Raylib_cs;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+
 using Voxelgine.Engine;
 
 namespace Voxelgine.GUI {
@@ -30,12 +32,20 @@ namespace Voxelgine.GUI {
 		}
 
 		public override GUIUpdateResult Update() {
-			if (!Enabled) return GUIUpdateResult.Disabled;
+			if (!Enabled)
+				return GUIUpdateResult.Disabled;
+
+			GUIUpdateResult Res = GUIUpdateResult.OK;
 
 			// Use public MousePos from GUIElement base (set by GUIManager)
 			Vector2 mouse = this.MousePos;
 			// Check if mouse is over the title bar
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
+			bool insideWindow = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, Size));
+
+			if (insideWindow) {
+				Res = GUIUpdateResult.ConsumedInput;
+			}
 
 			if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
 				Mgr.BringToFront(this);
@@ -58,7 +68,7 @@ namespace Voxelgine.GUI {
 				child.Update();
 			}
 
-			return GUIUpdateResult.OK;
+			return Res;
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {

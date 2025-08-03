@@ -40,7 +40,7 @@ namespace Voxelgine.GUI {
 		int CalcLastZOrder() {
 			if (Elements.Count == 0)
 				return 0;
-		
+
 			return Elements.Max(e => e.ZOrder);
 		}
 
@@ -71,10 +71,11 @@ namespace Voxelgine.GUI {
 			MousePos = Window.InMgr.GetMousePos();
 
 			// Sort elements by ZOrder before updating
-			var sortedElements = Elements.OrderBy(e => e.ZOrder).ToList();
+			var sortedElements = Elements.OrderByDescending(e => e.ZOrder).ToList();
 			foreach (GUIElement E in sortedElements) {
 				E.MousePos = MousePos;
-				E.Update();
+				if (E.Update() == GUIUpdateResult.ConsumedInput)
+					break;
 			}
 		}
 

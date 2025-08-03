@@ -44,6 +44,8 @@ namespace Voxelgine.GUI {
 
 		public int ZOrder = 0;
 
+		public float? OriginalWidth = null;
+
 		public virtual bool IsInside(Vector2 Pos2) {
 			Rectangle Rect = new Rectangle(Pos, Size);
 			return Raylib.CheckCollisionPointRec(Pos2, Rect);

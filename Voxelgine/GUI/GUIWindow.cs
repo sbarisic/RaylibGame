@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Voxelgine.Engine;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIWindow : GUIElement {
@@ -25,6 +26,10 @@ namespace Voxelgine.GUI {
 		private Vector2 ResizeStartSize = Vector2.Zero;
 		private const float ResizeHandleSize = 16f;
 		private Vector2 MinWindowSize = new Vector2(120, 80);
+
+		private bool WasResizing = false;
+		private Vector2 CenterMargin = new Vector2(15, 10);
+		private float CenterIconMargin = 5f;
 
 		public GUIWindow(GUIManager Mgr) {
 			this.Mgr = Mgr;
@@ -46,7 +51,6 @@ namespace Voxelgine.GUI {
 
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
 			bool insideWindow = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, Size));
-			// Check if mouse is over the resize handle (bottom right corner)
 			Rectangle resizeRect = new Rectangle(
 				Pos.X + Size.X - ResizeHandleSize,
 				Pos.Y + Size.Y - ResizeHandleSize,
@@ -63,13 +67,13 @@ namespace Voxelgine.GUI {
 				}
 			}
 
-			// Start resizing
+			bool resizingThisFrame = IsResizing;
+
 			if (overResize && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
 				IsResizing = true;
 				ResizeStartMouse = mouse;
 				ResizeStartSize = Size;
 			}
-			// Resizing logic
 			if (IsResizing) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
 					Vector2 delta = mouse - ResizeStartMouse;
@@ -98,6 +102,11 @@ namespace Voxelgine.GUI {
 				}
 			}
 
+			// Always recenter children while resizing
+			if (IsResizing && Children.Count > 0) {
+				Mgr.CenterVertical(Vector2.Zero, new Vector2(Size.X, Size.Y - TitleBarHeight), CenterMargin, CenterIconMargin, Children.ToArray());
+			}
+
 			// Update children positions and call their Update
 			Vector2 childMouse = mouse - Pos - new Vector2(0, TitleBarHeight);
 			foreach (var child in Children) {
@@ -109,6 +118,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
+			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
+
 			// Draw panel background using 9-patch
 			Mgr.Draw9Patch(PanelTex, new Rectangle(Pos, Size), PanelColor);
 
@@ -149,6 +160,8 @@ namespace Voxelgine.GUI {
 				child.Draw(hovered, MouseClicked && hovered, MouseDown && hovered);
 				child.Pos = oldPos;
 			}
+
+			ScissorManager.EndScissor();
 		}
 	}
 }

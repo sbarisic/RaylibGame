@@ -179,6 +179,14 @@ namespace Voxelgine.GUI {
 			foreach (GUIElement E in Elements) {
 				Counter++;
 
+				float? origWidth = E.OriginalWidth;
+				if (origWidth == null || origWidth <= 0) {
+					E.OriginalWidth = E.Size.X;
+					origWidth = E.Size.X;
+				}
+				E.Size.X = origWidth.Value;
+
+
 				NewOffs = new Vector2(Margin.X, NewOffs.Y);
 				Vector2 NewPos = Pos + NewOffs;
 

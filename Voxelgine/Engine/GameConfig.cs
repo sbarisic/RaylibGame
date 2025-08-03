@@ -7,8 +7,54 @@ using System.IO;
 
 using Newtonsoft.Json;
 using Raylib_cs;
+using System.Reflection;
 
 namespace Voxelgine.Engine {
+	public class ConfigValueRef {
+		public string FieldName;
+		public FieldInfo Field;
+
+		string LastValueString = null;
+
+		public ConfigValueRef(FieldInfo field, string fieldName) {
+			Field = field;
+			FieldName = fieldName;
+			GetValueString();
+		}
+
+		public string GetValueString() {
+			LastValueString = Field.GetValue(Program.Cfg)?.ToString() ?? "null";
+			return LastValueString;
+		}
+
+		public void SetValueString(string value) {
+			LastValueString = value;
+
+			if (value == "null") {
+				Field.SetValue(Program.Cfg, null);
+				return;
+			}
+
+			if (Field.FieldType == typeof(int)) {
+				Field.SetValue(Program.Cfg, int.Parse(value));
+			} else if (Field.FieldType == typeof(float)) {
+				Field.SetValue(Program.Cfg, float.Parse(value));
+			} else if (Field.FieldType == typeof(bool)) {
+				Field.SetValue(Program.Cfg, bool.Parse(value));
+			} else if (Field.FieldType == typeof(string)) {
+				Field.SetValue(Program.Cfg, value);
+			} else if (Field.FieldType.IsEnum) {
+				Field.SetValue(Program.Cfg, Enum.Parse(Field.FieldType, value));
+			} else {
+				throw new NotSupportedException($"Unsupported field type: {Field.FieldType}");
+			}
+		}
+
+		public override string ToString() {
+			return string.Format("{0} = '{1}'", FieldName, LastValueString);
+		}
+	}
+
 	public class GameConfig {
 		const string ConfigFileName = "data/config.json";
 
@@ -31,6 +77,18 @@ namespace Voxelgine.Engine {
 			MouseButtonDown = new KeyValuePair<InputKey, MouseButton>[] { };
 			KeyDown = new KeyValuePair<InputKey, KeyboardKey>[] { };
 			TwoKeysDown = new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] { };
+		}
+
+		public IEnumerable<ConfigValueRef> GetVariables() {
+			Type T = GetType();
+
+			FieldInfo[] Fields = T.GetFields(BindingFlags.Public | BindingFlags.Instance);
+			foreach (FieldInfo F in Fields) {
+				if (F.FieldType.IsArray)
+					continue;
+
+				yield return new ConfigValueRef(F, F.Name);
+			}
 		}
 
 		public void SaveToJson() {

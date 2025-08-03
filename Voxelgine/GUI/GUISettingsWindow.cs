@@ -33,22 +33,25 @@ namespace Voxelgine.GUI {
 			Mgr.CenterVertical(Vector2.Zero, Size, new Vector2(15, 10), 5, GetChildren());
 		}
 
-		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
+		void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
+			ConfigValueRef[] Vars = Program.Cfg.GetVariables().ToArray();
 
+			for (int i = 0; i < Vars.Length; i++) {
+				ConfigValueRef VRef = Vars[i];
 
-			GUIInputBox InBx = new GUIInputBox(Mgr, "Test", "Okay");
-			InBx.OnValueChanged = (V) => {
-				Console.WriteLine("Test: '{0}'", V);
-				InBx.SetValue(V, V);
-			};
-			IB.Add(InBx);
+				GUIInputBox IBx = new GUIInputBox(Mgr, VRef.FieldName, VRef.GetValueString());
+				IBx.OnValueChanged = (V) => {
+					try {
+						VRef.SetValueString(V);
+						IBx.SetValue(V, V);
+					} catch (Exception E) {
+						string VStr = VRef.GetValueString();
+						IBx.SetValue(VStr, VStr);
+					}
+				};
 
-			GUIInputBox InBx2 = new GUIInputBox(Mgr, "Test2", "Okay2");
-			InBx2.OnValueChanged = (V) => {
-				Console.WriteLine("Test2: '{0}'", V);
-				InBx2.SetValue(V, V);
-			};
-			IB.Add(InBx2);
+				IB.Add(IBx);
+			}
 
 			GUIButton Btn_ResetConfig = new GUIButton(Mgr);
 			Btn_ResetConfig.Size = BtnSize;
@@ -61,8 +64,9 @@ namespace Voxelgine.GUI {
 
 			GUIButton Btn_Close = new GUIButton(Mgr);
 			Btn_Close.Size = BtnSize;
-			Btn_Close.Text = "Close";
+			Btn_Close.Text = "Save & Close";
 			Btn_Close.OnClickedFunc = (E) => {
+				Program.Cfg.SaveToJson();
 				this.Enabled = false;
 			};
 			IB.Add(Btn_Close);

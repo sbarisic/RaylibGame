@@ -25,6 +25,7 @@ namespace Voxelgine.GUI {
 
 		public GUIButton(GUIManager Mgr) {
 			this.Mgr = Mgr;
+			Size = new Vector2(140, 60);
 
 			BtnTex = ResMgr.GetTexture("gui/btn.png");
 			Raylib.SetTextureFilter(BtnTex, TextureFilter.Point);

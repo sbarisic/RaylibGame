@@ -12,7 +12,8 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIWindow : GUIElement {
-		private GUIManager Mgr;
+		protected GUIManager Mgr;
+
 		private List<GUIElement> Children = new List<GUIElement>();
 		private bool IsDragging = false;
 		private Vector2 DragOffset = Vector2.Zero;
@@ -40,6 +41,10 @@ namespace Voxelgine.GUI {
 
 		public void AddChild(GUIElement child) {
 			Children.Add(child);
+		}
+
+		public GUIElement[] GetChildren() {
+			return Children.ToArray();
 		}
 
 		public override GUIUpdateResult Update() {
@@ -162,6 +167,11 @@ namespace Voxelgine.GUI {
 			}
 
 			ScissorManager.EndScissor();
+		}
+
+		public void Show() {
+			Enabled = true;
+			Mgr.BringToFront(this);
 		}
 	}
 }

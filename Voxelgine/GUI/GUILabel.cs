@@ -45,6 +45,10 @@ namespace Voxelgine.GUI {
 			Size.X = Size.X * (InputCharCount + 1);
 		}
 
+		public string GetText() {
+			return Text;
+		}
+
 		public void Clear() {
 			TextBuilder.Clear();
 			Text = "";

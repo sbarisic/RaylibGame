@@ -8,13 +8,16 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Graphics;
+using Windows.Management.Deployment;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
 		GUIManager Mgr;
 
 		public string Label = "DefaultLabel";
-		public string Value = "";
+		string Value = "";
+		string OriginalValue;
+
 		public bool IsActive = false;
 		public Action<string> OnValueChanged;
 
@@ -36,8 +39,19 @@ namespace Voxelgine.GUI {
 				Value = val;
 				OnValueChanged?.Invoke(val);
 			};
-			InputLabel.Input(Value);
+
+			SetValue(Value, Value);
+
 			UpdateLayout();
+		}
+
+		public void SetValue(string Value, string OriginalValue = null) {
+			this.Value = Value;
+			InputLabel.Clear();
+			InputLabel.Input(Value);
+
+			if (OriginalValue != null)
+				this.OriginalValue = OriginalValue;
 		}
 
 		private void UpdateLayout() {
@@ -58,6 +72,8 @@ namespace Voxelgine.GUI {
 			InputLabel.MousePos = MousePos - InputLabel.Pos;
 			InputLabel.Update();
 
+			Value = InputLabel.GetText();
+
 			// Activate input on click
 			if (IsInside(MousePos) && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
 				IsActive = true;
@@ -73,7 +89,15 @@ namespace Voxelgine.GUI {
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
 			// Draw background
 			Color bg = IsActive ? new Color(60, 60, 80, 200) : new Color(40, 40, 60, 180);
-			Mgr.Draw9Patch(ResMgr.GetTexture("gui/btn.png"), new Rectangle(Pos, Size), bg);
+			Texture2D tex = ResMgr.GetTexture("gui/inputbox.png");
+
+			if (Value != OriginalValue) {
+				int bright = 30;
+				bg = new Color(255, 255, 255, 200); // Highlight color if value changed
+				tex = ResMgr.GetTexture("gui/inputbox_changed.png"); // Use a different texture for changed state
+			}
+
+			Mgr.Draw9Patch(tex, new Rectangle(Pos, Size), bg);
 
 			// Enable scissor mode to clip drawing inside the input box
 			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);

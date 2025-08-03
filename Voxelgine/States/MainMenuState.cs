@@ -37,7 +37,7 @@ namespace RaylibGame.States {
 			Btn_Options.Text = "Options";
 			Btn_Options.OnClickedFunc = (E) => {
 				Console.WriteLine("Options clicked");
-				OptionsWnd.Enabled = true;
+				OptionsWnd.Show();
 			};
 
 			GUIButton Btn_Quit = new GUIButton(GUI);
@@ -48,13 +48,13 @@ namespace RaylibGame.States {
 				Program.Window.Close();
 			};
 
-			GUIButton Btn_Wat = new GUIButton(GUI);
+			/*GUIButton Btn_Wat = new GUIButton(GUI);
 			Btn_Wat.Pos = GUI.WindowScale(new Vector2(0.5f, 0.4f));
 			Btn_Wat.Size = BtnSize;
 			Btn_Wat.Text = "Wat";
 			Btn_Wat.OnClickedFunc = (E) => {
 				Console.WriteLine("Wat");
-			};
+			};*/
 
 			IB.Add(Btn_NewGame);
 			IB.Add(Btn_Options);
@@ -72,7 +72,7 @@ namespace RaylibGame.States {
 			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
 			Btn_Quit.SetIcon(Icon2);
 
-			IB.Add(Btn_Wat);
+			//IB.Add(Btn_Wat);
 		}
 
 		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {
@@ -88,33 +88,6 @@ namespace RaylibGame.States {
 			Raylib.SetTextureFilter(Icn, TextureFilter.Point);
 			IBox.SetIcon(Icn, 3);
 			return IBox;
-		}
-
-		private void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
-			GUIInputBox InBx = new GUIInputBox(GUI, "Test", "Okay");
-			InBx.OnValueChanged = (V) => { Console.WriteLine("Test: '{0}'", V); };
-			IB.Add(InBx);
-
-			GUIInputBox InBx2 = new GUIInputBox(GUI, "Test2", "Okay2");
-			InBx2.OnValueChanged = (V) => { Console.WriteLine("Test2: '{0}'", V); };
-			IB.Add(InBx2);
-
-			GUIButton Btn_ResetConfig = new GUIButton(GUI);
-			Btn_ResetConfig.Size = BtnSize;
-			Btn_ResetConfig.Text = "Reset Cfg";
-			Btn_ResetConfig.OnClickedFunc = (E) => {
-				Program.Cfg.GenerateDefaultKeybinds();
-				Program.Cfg.SaveToJson();
-			};
-			IB.Add(Btn_ResetConfig);
-
-			GUIButton Btn_Close = new GUIButton(GUI);
-			Btn_Close.Size = BtnSize;
-			Btn_Close.Text = "Close";
-			Btn_Close.OnClickedFunc = (E) => {
-				OptionsWnd.Enabled = false;
-			};
-			IB.Add(Btn_Close);
 		}
 
 		public MainMenuState(GameWindow window) : base(window) {
@@ -142,7 +115,7 @@ namespace RaylibGame.States {
 			GUI.AddElement(GWnd);
 
 			// Create the options window, same size/pos as GWnd, but disabled by default
-			OptionsWnd = new GUIWindow(GUI);
+			OptionsWnd = new GUISettingsWindow(GUI, Window);
 			OptionsWnd.Size = DbgRect.Size;
 			OptionsWnd.Pos = DbgRect.Position;
 			OptionsWnd.Enabled = false;
@@ -151,9 +124,9 @@ namespace RaylibGame.States {
 
 			List<GUIElement> IB = new List<GUIElement>();
 			CreateMenuButtons(IB, BtnSize);
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
-			IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
 
 			// Adjust all element positions to be relative to the window
 			foreach (var el in IB) {
@@ -163,14 +136,6 @@ namespace RaylibGame.States {
 
 			GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
 
-			// Options window buttons
-			List<GUIElement> OptIB = new List<GUIElement>();
-			CreateOptionsButtons(OptIB, BtnSize);
-			foreach (var el in OptIB) {
-				el.Pos -= DbgRect.Position;
-				OptionsWnd.AddChild(el);
-			}
-			GUI.CenterVertical(Vector2.Zero, OptionsWnd.Size, new Vector2(15, 10), 5, OptIB.ToArray());
 		}
 
 		public override void SwapTo() {

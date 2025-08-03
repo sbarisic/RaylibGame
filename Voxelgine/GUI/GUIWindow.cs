@@ -36,10 +36,8 @@ namespace Voxelgine.GUI {
 				return GUIUpdateResult.Disabled;
 
 			GUIUpdateResult Res = GUIUpdateResult.OK;
-
-			// Use public MousePos from GUIElement base (set by GUIManager)
 			Vector2 mouse = this.MousePos;
-			// Check if mouse is over the title bar
+
 			bool overTitleBar = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, new Vector2(Size.X, TitleBarHeight)));
 			bool insideWindow = Raylib.CheckCollisionPointRec(mouse, new Rectangle(Pos, Size));
 

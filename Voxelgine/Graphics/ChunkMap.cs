@@ -222,7 +222,7 @@ namespace Voxelgine.Graphics {
 			// Check if the position is inside a solid block, or if moving in ProbeDir hits a block
 			Vector3 probe = Pos + ProbeDir * 0.1f;
 
-			if (BlockInfo.IsSolid(GetBlock((int)(probe.X), (int)(probe.Y), (int)(probe.Z)))) {
+			if (BlockInfo.IsSolid(GetBlock((int)MathF.Floor(probe.X), (int)MathF.Floor(probe.Y), (int)MathF.Floor(probe.Z)))) {
 				PickNormal = -Vector3.Normalize(ProbeDir);
 				return true;
 			}
@@ -261,7 +261,9 @@ namespace Voxelgine.Graphics {
 				for (int y = minY; y <= maxY; y++)
 					for (int z = minZ; z <= maxZ; z++) {
 						if (SolidOnly) {
-							return IsSolid(x, y, z);
+							if (IsSolid(x, y, z))
+								return true;
+
 						} else {
 							if (GetBlock(x, y, z) != BlockType.None)
 								return true;

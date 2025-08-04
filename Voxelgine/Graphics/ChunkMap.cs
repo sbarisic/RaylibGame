@@ -240,12 +240,15 @@ namespace Voxelgine.Graphics {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 				KV.Value.Draw(ChunkPos);
 			}
+
 			Utils.DrawRaycastRecord();
 		}
 
 		public void DrawTransparent() {
-			foreach (var KV in Chunks.Items)
-				KV.Value.DrawTransparent();
+			foreach (var KV in Chunks.Items) {
+				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+				KV.Value.DrawTransparent(ChunkPos);
+			}
 		}
 
 		// Add back RaycastPos and Collide for GameState compatibility

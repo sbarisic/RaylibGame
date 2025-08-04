@@ -20,10 +20,15 @@ namespace Voxelgine.Graphics {
 
 		public PlacedBlock[] Blocks;
 		bool Dirty;
-		bool ModelValid;
+
+		bool ModelValidOpaque;
+		bool ModelValidTransp;
 
 		Model CachedModelOpaque;
 		Mesh CachedMeshOpaque;
+
+		Model CachedModelTransp;
+		Mesh CachedMeshTransp;
 
 		public Color ChunkColor = Color.White;
 
@@ -44,7 +49,7 @@ namespace Voxelgine.Graphics {
 				Blocks[i] = new PlacedBlock(BlockType.None);
 
 			Dirty = true;
-			ModelValid = false;
+			ModelValidTransp = ModelValidOpaque = false;
 
 			//int TileTexSize = AtlasTex.width / 16;
 		}
@@ -328,9 +333,17 @@ namespace Voxelgine.Graphics {
 			Verts.SetUVOffsetSize(UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1));
 		}
 
+		// For transparent blocks, like glass. Method does not calculate AO
+		Mesh GenMeshTransparent() {
+			MeshBuilder TranspVerts = new MeshBuilder();
+
+			// TODO: Implement rest of the method
+
+			return TranspVerts.ToMesh();
+		}
+
 		Mesh GenMesh(Vector3? cameraChunkIndex = null, float aoApproxDistance = 6f) {
 			MeshBuilder OpaqueVerts = new MeshBuilder();
-			MeshBuilder TranspVerts = new MeshBuilder();
 
 			Vector3 Size = new Vector3(BlockSize);
 
@@ -506,13 +519,13 @@ namespace Voxelgine.Graphics {
 			return OpaqueVerts.ToMesh();
 		}
 
-		Model GetModel() {
+		void RecalcModel() {
 			if (!Dirty)
-				return CachedModelOpaque;
+				return;
 
 			Dirty = false;
 
-			if (ModelValid) {
+			if (ModelValidOpaque) {
 				// Set texture ID to 1 to disable texture unloading? Does that even do anything?
 				CachedModelOpaque.Materials[0].Maps[0].Texture.Id = 0;
 				Raylib.UnloadModel(CachedModelOpaque);
@@ -522,12 +535,21 @@ namespace Voxelgine.Graphics {
 			CachedModelOpaque = Raylib.LoadModelFromMesh(CachedMeshOpaque);
 			CachedModelOpaque.Materials[0].Maps[0].Texture = ResMgr.AtlasTexture;
 			CachedModelOpaque.Materials[0].Shader = ResMgr.GetShader("default");
+			ModelValidOpaque = true;
 
-			//ComputeLighting();
+			if (ModelValidTransp) {
+				// Set texture ID to 1 to disable texture unloading? Does that even do anything?
+				CachedModelTransp.Materials[0].Maps[0].Texture.Id = 0;
+				Raylib.UnloadModel(CachedModelOpaque);
+			}
 
-			ModelValid = true;
-			return CachedModelOpaque;
+			CachedMeshTransp = GenMeshTransparent();
+			CachedModelTransp = Raylib.LoadModelFromMesh(CachedMeshTransp);
+			CachedModelTransp.Materials[0].Maps[0].Texture = ResMgr.AtlasTexture;
+			CachedModelTransp.Materials[0].Shader = ResMgr.GetShader("default");
+			ModelValidTransp = true;
 		}
+
 
 		public RayCollision Collide(Vector3 ChunkPosition, Ray R) {
 			Matrix4x4 Transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation(ChunkPosition));
@@ -535,11 +557,12 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void Draw(Vector3 ChunkPosition) {
-			Raylib.DrawModel(GetModel(), ChunkPosition, BlockSize, ChunkColor);
+			RecalcModel();
+			Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
 		}
 
-		public void DrawTransparent() {
-
+		public void DrawTransparent(Vector3 ChunkPosition) {
+			Raylib.DrawModel(CachedModelTransp, ChunkPosition, BlockSize, ChunkColor);
 		}
 	}
 }

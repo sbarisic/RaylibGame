@@ -293,14 +293,28 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public bool HasBlocksInBounds(Vector3 pos, Vector3 size) {
+		public bool HasBlocksInBounds(Vector3 pos, Vector3 size, bool SolidOnly = true) {
 			Vector3 min = pos;
 			Vector3 max = pos + size;
-			for (int x = (int)MathF.Floor(min.X); x <= (int)MathF.Floor(max.X); x++)
-				for (int y = (int)MathF.Floor(min.Y); y <= (int)MathF.Floor(max.Y); y++)
-					for (int z = (int)MathF.Floor(min.Z); z <= (int)MathF.Floor(max.Z); z++)
-						if (GetBlock(x, y, z) != BlockType.None)
-							return true;
+			return HasBlocksInBoundsMinMax(min, max, SolidOnly);
+		}
+
+		public bool HasBlocksInBoundsMinMax(Vector3 min, Vector3 max, bool SolidOnly = true) {
+			for (int x = (int)min.X; x <= (int)max.X; x++)
+				for (int y = (int)min.Y; y <= (int)max.Y; y++)
+					for (int z = (int)min.Z; z <= (int)max.Z; z++) {
+						if (SolidOnly) {
+
+							if (BlockInfo.IsSolid(GetBlock(x, y, z)))
+								return true;
+
+						} else {
+
+							if (GetBlock(x, y, z) != BlockType.None) 
+								return true;
+						}
+					}
+
 			return false;
 		}
 	}

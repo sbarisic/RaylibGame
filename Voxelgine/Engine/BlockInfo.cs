@@ -69,6 +69,16 @@ namespace Voxelgine.Engine {
 			}
 		}
 
+		public static bool IsSolid(BlockType T) {
+			switch (T) {
+				case BlockType.None:
+				case BlockType.Water:
+					return false;
+			}
+
+			return true;
+		}
+
 		public static bool EmitsLight(BlockType T) {
 			switch (T) {
 				case BlockType.Glowstone:

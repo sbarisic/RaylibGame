@@ -193,18 +193,18 @@ namespace Voxelgine.Engine {
 			LastWallNormal = Vector3.Zero; // Reset before each move
 			for (int slide = 0; slide < maxSlides; slide++) {
 				Vector3 tryPos = feetPos + move;
-				if (!HasBlocksInBounds(Map, tryPos - new Vector3(playerRadius, 0, playerRadius), tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
+				if (!Map.HasBlocksInBoundsMinMax(tryPos - new Vector3(playerRadius, 0, playerRadius), tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryPos;
 					break;
 				}
 				Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
 				Vector3 stepTry = stepUp + move;
-				if (!HasBlocksInBounds(Map, stepTry - new Vector3(playerRadius, 0, playerRadius), stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
+				if (!Map.HasBlocksInBoundsMinMax(stepTry - new Vector3(playerRadius, 0, playerRadius), stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = stepTry;
 					break;
 				}
 				Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
-				if (!HasBlocksInBounds(Map, tryX - new Vector3(playerRadius, 0, playerRadius), tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
+				if (!Map.HasBlocksInBoundsMinMax(tryX - new Vector3(playerRadius, 0, playerRadius), tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryX;
 					move.Z = 0;
 					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(1, 0, 0), 1e-5f);
@@ -212,7 +212,7 @@ namespace Voxelgine.Engine {
 					continue;
 				}
 				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
-				if (!HasBlocksInBounds(Map, tryZ - new Vector3(playerRadius, 0, playerRadius), tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
+				if (!Map.HasBlocksInBoundsMinMax(tryZ - new Vector3(playerRadius, 0, playerRadius), tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
 					feetPos = tryZ;
 					move.X = 0;
 					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(0, 0, 1), 1e-5f);
@@ -222,15 +222,6 @@ namespace Voxelgine.Engine {
 				break;
 			}
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
-		}
-
-		bool HasBlocksInBounds(ChunkMap Map, Vector3 min, Vector3 max) {
-			for (int x = (int)min.X; x <= (int)max.X; x++)
-				for (int y = (int)min.Y; y <= (int)max.Y; y++)
-					for (int z = (int)min.Z; z <= (int)max.Z; z++)
-						if (Map.GetBlock(x, y, z) != BlockType.None)
-							return true;
-			return false;
 		}
 
 		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr) {

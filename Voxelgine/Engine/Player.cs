@@ -20,8 +20,7 @@ namespace Voxelgine.Engine {
 		const bool DEBUG_PLAYER = true;
 
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
-		AnimatedEntity PlayerEntity;
-		EntityAnimation CurAnim;
+
 		GUIManager GUI;
 
 		public ViewModel ViewMdl;
@@ -67,24 +66,13 @@ namespace Voxelgine.Engine {
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
-			PlayerEntity = Entities.Load(ModelName);
 
-			// Load default viewmodel (pickaxe)
+
 			ViewMdl = new ViewModel();
 
 			Position = Vector3.Zero;
 			Rotation = Matrix4x4.Identity;
 			UpperBodyRotation = Matrix4x4.Identity;
-
-
-			// UPDATE: ?
-			//Raylib.SetCameraMode(Cam, CameraMode.CAMERA_CUSTOM);
-			ToggleMouse();
-
-
-			BoneInformation BBB = BoneInformation.FindBoneByName(PlayerEntity.GetBones(), "Head");
-			BBB.LocalTransform = Matrix4x4.CreateFromYawPitchRoll(0, 0, 90);
-			BBB.RecalcTransforms();
 
 			ToggleMouse(false);
 		}
@@ -481,29 +469,14 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Tick(InputMgr InMgr) {
-			string AnimName = "idle";
-
 			// Use InputMgr for movement keys
-			if (MoveFd = InMgr.IsInputDown(InputKey.W))
-				AnimName = "forward";
-			else if (MoveLt = InMgr.IsInputDown(InputKey.A))
-				AnimName = "left";
-			else if (MoveRt = InMgr.IsInputDown(InputKey.D))
-				AnimName = "right";
-			else if (MoveBk = InMgr.IsInputDown(InputKey.S))
-				AnimName = "backward";
+			MoveFd = InMgr.IsInputDown(InputKey.W);
+			MoveLt = InMgr.IsInputDown(InputKey.A);
+			MoveRt = InMgr.IsInputDown(InputKey.D);
+			MoveBk = InMgr.IsInputDown(InputKey.S);
 
 			// ViewMdl.SetRotationMode(InMgr.IsInputDown(InputKey.Click_Right) ? ViewModelRotationMode.GunIronsight : ViewModelRotationMode.Gun);
 			ActiveSelection?.Tick(ViewMdl, InMgr);
-
-			if (CurAnim == null)
-				CurAnim = PlayerEntity.GetAnim(AnimName);
-
-			if (CurAnim.Name != AnimName) {
-				CurAnim = PlayerEntity.GetAnim(AnimName);
-				CurAnim.Apply();
-			}
-
 			FPSCamera.Update(CursorDisabled, ref Cam);
 
 			// Use InputMgr for F1
@@ -516,12 +489,8 @@ namespace Voxelgine.Engine {
 					KV.Value(new OnKeyPressedEventArg(KV.Key));
 			}
 
-
-			//PlayerEntity.GetBone("Neck", out int BoneID);
-
 			Position = FPSCamera.Position;
-			Rotation = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI / 2, 0) /** Matrix4x4.CreateFromYawPitchRoll(0, 0, (float)((Math.PI / 2) - (FPSCamera.CamAngle.X * (Math.PI / 180))))*/;
-			/// CurAnim.Step();
+			Rotation = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI / 2, 0);
 		}
 
 		GUIItemBox Box_Health;
@@ -665,26 +634,18 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			// Draw the viewmodel (pickaxe) in first person
 			if (LocalPlayer) {
+				Rlgl.DisableDepthTest();
+				Rlgl.DisableDepthMask();
+
 				ViewMdl.DrawViewModel(this, TimeAlpha, ref LastFrame, ref CurFame);
+
+				Rlgl.EnableDepthMask();
+				Rlgl.EnableDepthTest();
 			}
 
 			if (!DEBUG_PLAYER && LocalPlayer)
 				return;
-
-			Vector3 DrawPos = Position - new Vector3(0, 1.8f, 0);
-
-			if (DEBUG_PLAYER)
-				DrawPos = Vector3.Zero;
-
-			PlayerEntity.Mdl.Transform = Rotation;
-
-			Rlgl.DisableDepthTest();
-			Rlgl.DisableDepthMask();
-			Raylib.DrawModel(PlayerEntity.Mdl, DrawPos, 0.25f, Color.White);
-			Rlgl.EnableDepthMask();
-			Rlgl.EnableDepthTest();
 		}
 
 		public void AddOnKeyPressed(InputKey K, Action<OnKeyPressedEventArg> Act) {
@@ -781,11 +742,10 @@ namespace Voxelgine.Engine {
 			Up = FPSCamera.GetUp();
 		}
 
-		//public void UpdateCamera(bool handleRotation) => FPSCamera.Update(handleRotation, ref Cam);
-		//public Vector2 GetPreviousMousePos() => FPSCamera.GetPreviousMousePos();
 
 		// Add accessors in Player for velocity and ground state for GUI
 		public Vector3 GetVelocity() => PlyVelocity;
+
 		public bool GetWasLastLegsOnFloor() => WasLastLegsOnFloor;
 
 		// Add back the PhysicsHit method (was present in Player, but was return; previously)

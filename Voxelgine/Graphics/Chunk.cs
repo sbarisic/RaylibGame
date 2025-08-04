@@ -355,15 +355,13 @@ namespace Voxelgine.Graphics {
 						BlockType ZPosType = GetBlock(x, y, z + 1).Type;
 						BlockType ZNegType = GetBlock(x, y, z - 1).Type;
 
-						bool XPosSkipFace = BlockInfo.IsOpaque(XPosType);
-						bool XNegSkipFace = BlockInfo.IsOpaque(XNegType);
-						bool YPosSkipFace = BlockInfo.IsOpaque(YPosType);
-						bool YNegSkipFace = BlockInfo.IsOpaque(YNegType);
-						bool ZPosSkipFace = BlockInfo.IsOpaque(ZPosType);
-						bool ZNegSkipFace = BlockInfo.IsOpaque(ZNegType);
-
-						// Transparent blocks: always render faces against non-same-type or none
-						// TODO: skip faces against same transparent type for better visuals)
+						// For transparent blocks, skip faces only if the neighbor is the same type (to avoid z-fighting and allow for proper blending)
+						bool XPosSkipFace = (XPosType == CurBlock.Type);
+						bool XNegSkipFace = (XNegType == CurBlock.Type);
+						bool YPosSkipFace = (YPosType == CurBlock.Type);
+						bool YNegSkipFace = (YNegType == CurBlock.Type);
+						bool ZPosSkipFace = (ZPosType == CurBlock.Type);
+						bool ZNegSkipFace = (ZNegType == CurBlock.Type);
 
 						// X++
 						if (!XPosSkipFace) {
@@ -377,7 +375,6 @@ namespace Voxelgine.Graphics {
 							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
 							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
 						}
-
 						// X--
 						if (!XNegSkipFace) {
 							Vector3 CurDir = new Vector3(-1, 0, 0);
@@ -390,7 +387,6 @@ namespace Voxelgine.Graphics {
 							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
 							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
 						}
-
 						// Y++
 						if (!YPosSkipFace) {
 							Vector3 CurDir = new Vector3(0, 1, 0);
@@ -415,7 +411,6 @@ namespace Voxelgine.Graphics {
 							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
 							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
 						}
-
 						// Z++
 						if (!ZPosSkipFace) {
 							Vector3 CurDir = new Vector3(0, 0, 1);

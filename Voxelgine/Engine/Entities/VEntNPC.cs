@@ -45,7 +45,8 @@ namespace Voxelgine.Engine {
 				CModel.LookDirection = Vector3.UnitZ;
 				CModel.Draw();
 
-				Raylib.DrawBoundingBox(BBox, Color.Blue);
+				if (Program.DebugMode)
+					Raylib.DrawBoundingBox(BBox, Color.Blue);
 				//Raylib.DrawModelEx(EntModel, Position + ModelOffset + (BobbingLerp?.GetVec3() ?? Vector3.Zero), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
 			}
 		}

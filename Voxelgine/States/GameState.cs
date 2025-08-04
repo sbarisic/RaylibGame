@@ -133,11 +133,13 @@ namespace RaylibGame.States {
 		public Vector3 PlayerCollisionBoxPos;
 
 		void DrawTransparent() {
-			//Raylib.BeginBlendMode(BlendMode.Multiplied);
+			Raylib.BeginBlendMode(BlendMode.Alpha);
+			Rlgl.DisableDepthMask();
 
 			Map.DrawTransparent();
 
-			//Raylib.EndBlendMode();
+			Rlgl.EnableDepthMask();
+			Raylib.EndBlendMode();
 		}
 
 		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {

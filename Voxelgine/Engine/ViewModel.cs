@@ -14,14 +14,14 @@ using Voxelgine.GUI;
 
 
 namespace Voxelgine.Engine {
-	enum ViewModelRotationMode {
+	public enum ViewModelRotationMode {
 		Block,
 		Tool,
 		Gun,
 		GunIronsight,
 	}
 
-	class ViewModel {
+	public class ViewModel {
 		// Viewmodel fields
 		Model VModel; // Non-animated viewmodel
 		const string DefaultViewModelName = "gun/gun.obj";

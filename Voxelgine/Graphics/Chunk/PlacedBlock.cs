@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Voxelgine.Engine;
 
 namespace Voxelgine.Graphics {
-	class PlacedBlock {
+	public class PlacedBlock {
 		public BlockType Type;
 		//public OnBlockActivateFunc OnBlockActivate;
 

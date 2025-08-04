@@ -77,7 +77,7 @@ namespace Voxelgine.Engine {
 		public float MouseWheel;
 	}
 
-	unsafe class InputMgr {
+	public unsafe class InputMgr {
 		InputState InputState_Cur;
 		InputState InputState_Last;
 

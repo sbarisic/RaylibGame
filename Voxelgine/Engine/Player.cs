@@ -14,9 +14,9 @@ using Voxelgine.GUI;
 using Windows.ApplicationModel.Appointments.DataProvider;
 
 namespace Voxelgine.Engine {
-	delegate void OnKeyPressedFunc();
+	public delegate void OnKeyPressedFunc();
 
-	unsafe class Player {
+	public unsafe class Player {
 		const bool DEBUG_PLAYER = true;
 
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);

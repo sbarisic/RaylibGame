@@ -12,7 +12,7 @@ using RaylibGame.States;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
-	class BaseEntity : IEntity {
+	public class BaseEntity : VoxEntity {
 		protected Vector3 Position;
 		protected Vector3 Size;
 		protected Vector3 Velocity;
@@ -37,7 +37,7 @@ namespace Voxelgine.Engine {
 
 		protected LerpVec3 BobbingLerp;
 
-		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			if (IsRotating)
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 
@@ -72,7 +72,7 @@ namespace Voxelgine.Engine {
 			HasModel = EntModel.MeshCount > 0;
 		}
 
-		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
+		public override void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
 			if (HasModel) {
 				Raylib.DrawModelEx(EntModel, Position + ModelOffset + (BobbingLerp?.GetVec3() ?? Vector3.Zero), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
 			}
@@ -111,19 +111,19 @@ namespace Voxelgine.Engine {
 			Raylib.DrawLine3D(corners[3], corners[7], color);
 		}
 
-		public virtual Vector3 GetPosition() {
+		public override Vector3 GetPosition() {
 			return Position;
 		}
 
-		public virtual void SetPosition(Vector3 Pos) {
+		public override void SetPosition(Vector3 Pos) {
 			Position = Pos;
 		}
 
-		public virtual Vector3 GetSize() {
+		public override Vector3 GetSize() {
 			return Size;
 		}
 
-		public virtual void SetSize(Vector3 Size) {
+		public override void SetSize(Vector3 Size) {
 			this.Size = Size;
 		}
 
@@ -202,33 +202,33 @@ namespace Voxelgine.Engine {
 
 		GameState GameState;
 
-		public GameState GetGameState() {
+		public override GameState GetGameState() {
 			return GameState;
 		}
 
-		public void SetGameState(GameState State) {
+		public override void SetGameState(GameState State) {
 			GameState = State;
 		}
 
-		public void OnPlayerTouch(Player Ply) {
+		public override void OnPlayerTouch(Player Ply) {
 			Console.WriteLine("Player touched me!");
 		}
 
 		EntityManager EntMgr;
 
-		public EntityManager GetEntityManager() {
+		public override EntityManager GetEntityManager() {
 			return EntMgr;
 		}
 
-		public void SetEntityManager(EntityManager EntMgr) {
+		public override void SetEntityManager(EntityManager EntMgr) {
 			this.EntMgr = EntMgr;
 		}
 
-		public Vector3 GetVelocity() {
+		public override Vector3 GetVelocity() {
 			return Velocity;
 		}
 
-		public void SetVelocity(Vector3 Velocity) {
+		public override void SetVelocity(Vector3 Velocity) {
 			this.Velocity = Velocity;
 		}
 	}

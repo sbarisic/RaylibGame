@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	class LerpVec3 : AnimLerp {
+	public class LerpVec3 : AnimLerp {
 		Vector3 Start;
 		Vector3 End;
 

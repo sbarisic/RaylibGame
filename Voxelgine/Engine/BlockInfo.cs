@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
-	enum BlockType : ushort {
+	public enum BlockType : ushort {
 		None,
 		Stone,
 		Dirt,
@@ -35,7 +35,7 @@ namespace Voxelgine.Engine {
 		Campfire
 	}
 
-	enum IconType : ushort {
+	public enum IconType : ushort {
 		None,
 
 		Particle1,
@@ -84,7 +84,7 @@ namespace Voxelgine.Engine {
 			UVPos = Vector2.Zero;
 			Scale = 3.8f;
 
-			switch (Icon) {			
+			switch (Icon) {
 				case IconType.Particle1:
 					Texture = ResMgr.GetTexture("items/particle1.png", TextureFilter.Point);
 					return;

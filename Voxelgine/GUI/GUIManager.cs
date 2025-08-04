@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Voxelgine.Engine;
 
 namespace Voxelgine.GUI {
-	class GUIManager {
+	public class GUIManager {
 		public int FntSize = 32;
 		public Font TxtFont;
 

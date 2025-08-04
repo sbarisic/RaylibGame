@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Graphics {
-	unsafe class Chunk {
+	public unsafe class Chunk {
 		public const int ChunkSize = 16;
 		public const float BlockSize = 1;
 		public const int AtlasSize = 16;
@@ -173,7 +173,11 @@ namespace Voxelgine.Graphics {
 		// BlockPos is used to represent integer block positions in the light propagation queue.
 		struct BlockPos {
 			public int X, Y, Z;
-			public BlockPos(int x, int y, int z) { X = x; Y = y; Z = z; }
+			public BlockPos(int x, int y, int z) {
+				X = x;
+				Y = y;
+				Z = z;
+			}
 		}
 
 		public void ComputeLighting() {
@@ -252,7 +256,8 @@ namespace Voxelgine.Graphics {
 						// Out of chunk, fallback to old logic for cross-chunk
 						WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 worldPos);
 						PlacedBlock neighborBlock = WorldMap.GetPlacedBlock((int)worldPos.X + nx, (int)worldPos.Y + ny, (int)worldPos.Z + nz, out Chunk neighborChunk);
-						if (BlockInfo.IsOpaque(neighborBlock.Type)) continue;
+						if (BlockInfo.IsOpaque(neighborBlock.Type))
+							continue;
 						byte neighborLight = 0;
 						for (int i = 0; i < 6; i++)
 							if (neighborBlock.Lights[i].R > neighborLight)
@@ -268,7 +273,8 @@ namespace Voxelgine.Graphics {
 					}
 					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
 					PlacedBlock neighborBlockInChunk = Blocks[nidx];
-					if (BlockInfo.IsOpaque(neighborBlockInChunk.Type)) continue;
+					if (BlockInfo.IsOpaque(neighborBlockInChunk.Type))
+						continue;
 					byte neighborLightInChunk = 0;
 					for (int i = 0; i < 6; i++)
 						if (neighborBlockInChunk.Lights[i].R > neighborLightInChunk)
@@ -285,41 +291,38 @@ namespace Voxelgine.Graphics {
 		}
 
 		// Returns true if this chunk is within a certain distance from the camera/player
-        private bool IsDistantChunk(Vector3 chunkIndex, Vector3 cameraChunkIndex, float maxDistance)
-        {
-            return Vector3.Distance(chunkIndex, cameraChunkIndex) > maxDistance;
-        }
+		private bool IsDistantChunk(Vector3 chunkIndex, Vector3 cameraChunkIndex, float maxDistance) {
+			return Vector3.Distance(chunkIndex, cameraChunkIndex) > maxDistance;
+		}
 
-        // Optimized AO calculation: use a simple approximation for distant chunks
-        Color CalcAOColor(Vector3 GlobalBlockPos, Vector3 A, Vector3 B, Vector3 C, bool useApproximation = false)
-        {
-            if (useApproximation)
-            {
-                // Simple AO: always return a fixed value (e.g., 0.8f brightness)
-                return Utils.Color(0.8f);
-            }
-            int Hits = 0;
-            if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + A)))
-                Hits++;
-            if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + B)))
-                Hits++;
-            if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + C)))
-                Hits++;
-            if (Hits != 0)
-                return Utils.Color(1.0f - (Hits * 0.2f));
-            return Utils.Color(1.0f);
-        }
+		// Optimized AO calculation: use a simple approximation for distant chunks
+		Color CalcAOColor(Vector3 GlobalBlockPos, Vector3 A, Vector3 B, Vector3 C, bool useApproximation = false) {
+			if (useApproximation) {
+				// Simple AO: always return a fixed value (e.g., 0.8f brightness)
+				return Utils.Color(0.8f);
+			}
+			int Hits = 0;
+			if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + A)))
+				Hits++;
+			if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + B)))
+				Hits++;
+			if (BlockInfo.IsOpaque(WorldMap.GetBlock(GlobalBlockPos + C)))
+				Hits++;
+			if (Hits != 0)
+				return Utils.Color(1.0f - (Hits * 0.2f));
+			return Utils.Color(1.0f);
+		}
 
-        void SetBlockTextureUV(BlockType BlockType, Vector3 FaceNormal, MeshBuilder Verts) {
-            int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
-            int BlockX = BlockID % AtlasSize;
-            int BlockY = BlockID / AtlasSize;
+		void SetBlockTextureUV(BlockType BlockType, Vector3 FaceNormal, MeshBuilder Verts) {
+			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
+			int BlockX = BlockID % AtlasSize;
+			int BlockY = BlockID / AtlasSize;
 
-            BlockInfo.GetBlockTexCoords(BlockType, FaceNormal, out Vector2 UVSize, out Vector2 UVPos);
-            Verts.SetUVOffsetSize(UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1));
-        }
+			BlockInfo.GetBlockTexCoords(BlockType, FaceNormal, out Vector2 UVSize, out Vector2 UVPos);
+			Verts.SetUVOffsetSize(UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1));
+		}
 
-        Mesh GenMesh(Vector3? cameraChunkIndex = null, float aoApproxDistance = 6f) {
+		Mesh GenMesh(Vector3? cameraChunkIndex = null, float aoApproxDistance = 6f) {
 			MeshBuilder Vertices = new MeshBuilder();
 			Vector3 Size = new Vector3(BlockSize);
 			Color AOColor = new Color(128, 128, 128);
@@ -343,8 +346,7 @@ namespace Voxelgine.Graphics {
 								&& BlockInfo.IsOpaque(GetBlock(x, y + 1, z).Type)
 								&& BlockInfo.IsOpaque(GetBlock(x, y - 1, z).Type)
 								&& BlockInfo.IsOpaque(GetBlock(x, y, z + 1).Type)
-								&& BlockInfo.IsOpaque(GetBlock(x, y, z - 1).Type))
-							{
+								&& BlockInfo.IsOpaque(GetBlock(x, y, z - 1).Type)) {
 								// All neighbors are opaque, skip this block
 								continue;
 							}
@@ -400,7 +402,7 @@ namespace Voxelgine.Graphics {
 									Vector3 CurDir = new Vector3(1, 0, 0);
 									Color FaceClr = Utils.ColorMul(CurBlock.GetBlockLight(CurDir).ToColor(), ChunkColor);
 									SetBlockTextureUV(CurBlock.Type, CurDir, Vertices);
-									
+
 									Vertices.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0), useApproxAO)));
 									Vertices.Add(new Vector3(1, 1, 1), new Vector2(0, 1), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(1, 0, 1), useApproxAO)));
 									Vertices.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, -1, 0), new Vector3(1, -1, 1), new Vector3(1, 0, 1), useApproxAO)));

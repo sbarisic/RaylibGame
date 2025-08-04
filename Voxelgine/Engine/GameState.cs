@@ -1,4 +1,5 @@
 ﻿using Raylib_cs;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	abstract class GameStateImpl {
+	public abstract class GameStateImpl {
 		public GameWindow Window;
 
 		public GameStateImpl(GameWindow window) {

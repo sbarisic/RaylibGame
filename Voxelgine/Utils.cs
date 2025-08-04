@@ -388,14 +388,222 @@ namespace Voxelgine {
 			RaycastDrawList.Add(new Tuple<Vector3, Vector3, Color>(Start, End, Clr));
 		}
 
-		static float IntBound(float S, float Ds) {
-			if (Ds < 0) {
-				Ds = -Ds;
-				S = -S;
-			}
+		// --- BEGIN MOVED FROM VoxCollision ---
+		public static IEnumerable<Vector3> Bresenham(Vector3 Start, Vector3 End) {
+			int startX = (int)Start.X, startY = (int)Start.Y, startZ = (int)Start.Z;
+			int endX = (int)End.X, endY = (int)End.Y, endZ = (int)End.Z;
 
-			return (1 - (S % 1 + 1) % 1) / Ds;
+			int dx, dy, dz;
+			int sx, sy, sz;
+			int accum, accum2;
+
+			dx = endX - startX;
+			dy = endY - startY;
+			dz = endZ - startZ;
+
+			sx = ((dx) < 0 ? -1 : ((dx) > 0 ? 1 : 0));
+			sy = ((dy) < 0 ? -1 : ((dy) > 0 ? 1 : 0));
+			sz = ((dz) < 0 ? -1 : ((dz) > 0 ? 1 : 0));
+
+			dx = Math.Abs(dx);
+			dy = Math.Abs(dy);
+			dz = Math.Abs(dz);
+
+			endX += sx;
+			endY += sy;
+			endZ += sz;
+
+			if (dx > dy) {
+				if (dx > dz) {
+					accum = dx >> 1;
+					accum2 = accum;
+					do {
+						yield return (new Vector3(startX, startY, startZ));
+
+						accum -= dy;
+						accum2 -= dz;
+						if (accum < 0) {
+							accum += dx;
+							startY += sy;
+						}
+						if (accum2 < 0) {
+							accum2 += dx;
+							startZ += sz;
+						}
+						startX += sx;
+					}
+					while (startX != endX);
+				} else {
+					accum = dz >> 1;
+					accum2 = accum;
+					do {
+						yield return (new Vector3(startX, startY, startZ));
+
+						accum -= dy;
+						accum2 -= dx;
+						if (accum < 0) {
+							accum += dz;
+							startY += sy;
+						}
+						if (accum2 < 0) {
+							accum2 += dz;
+							startX += sx;
+						}
+						startZ += sz;
+					}
+					while (startZ != endZ);
+				}
+			} else {
+				if (dy > dz) {
+					accum = dy >> 1;
+					accum2 = accum;
+					do {
+						yield return (new Vector3(startX, startY, startZ));
+
+						accum -= dx;
+						accum2 -= dz;
+						if (accum < 0) {
+							accum += dx;
+							startX += sx;
+						}
+						if (accum2 < 0) {
+							accum2 += dx;
+							startZ += sz;
+						}
+						startY += sy;
+					}
+					while (startY != endY);
+				} else {
+					accum = dz >> 1;
+					accum2 = accum;
+					do {
+						yield return (new Vector3(startX, startY, startZ));
+
+						accum -= dx;
+						accum2 -= dy;
+						if (accum < 0) {
+							accum += dx;
+							startX += sx;
+						}
+						if (accum2 < 0) {
+							accum2 += dx;
+							startY += sy;
+						}
+						startZ += sz;
+					}
+					while (startZ != endZ);
+				}
+			}
 		}
+
+		public static IEnumerable<Vector3> BresenhamDir(Vector3 Start, Vector3 Dir, float Len) {
+			return Bresenham(Start, Start + Dir * Len);
+		}
+
+		public static bool Trace(Vector3 Start, Vector3 End, Func<Vector3, bool> Trace) {
+			Vector3 TraceDir = Vector3.Normalize(End - Start);
+			foreach (var Point in Bresenham(Start, End)) {
+				if (Trace(Point))
+					return true;
+			}
+			return false;
+		}
+
+		public static void RaycastVoxel(Vector3 origin, Vector3 direction, float radius, Func<float, float, float, int, Vector3, bool> callback) {
+			// Cube containing origin point.
+			var x = MathF.Floor(origin[0]);
+			var y = MathF.Floor(origin[1]);
+			var z = MathF.Floor(origin[2]);
+			// Break out direction vector.
+			var dx = direction[0];
+			var dy = direction[1];
+			var dz = direction[2];
+			// Direction to increment x,y,z when stepping.
+			var stepX = Signum(dx);
+			var stepY = Signum(dy);
+			var stepZ = Signum(dz);
+			// See description above. The initial values depend on the fractional
+			// part of the origin.
+			var tMaxX = IntBound(origin[0], dx);
+			var tMaxY = IntBound(origin[1], dy);
+			var tMaxZ = IntBound(origin[2], dz);
+			// The change in t when taking a step (always positive).
+			var tDeltaX = stepX / dx;
+			var tDeltaY = stepY / dy;
+			var tDeltaZ = stepZ / dz;
+			// Buffer for reporting faces to the callback.
+			var face = new Vector3();
+
+			// Avoids an infinite loop.
+			if (dx == 0 && dy == 0 && dz == 0)
+				throw new NotImplementedException("Range error");
+
+			// Rescale from units of 1 cube-edge to units of 'direction' so we can
+			// compare with 't'.
+			radius /= MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+
+			int counter = 0;
+
+			while (true) {
+				if (callback(x, y, z, counter++, face))
+					break;
+				if (tMaxX < tMaxY) {
+					if (tMaxX < tMaxZ) {
+						if (tMaxX > radius)
+							break;
+						x += stepX;
+						tMaxX += tDeltaX;
+						face[0] = -stepX;
+						face[1] = 0;
+						face[2] = 0;
+					} else {
+						if (tMaxZ > radius)
+							break;
+						z += stepZ;
+						tMaxZ += tDeltaZ;
+						face[0] = 0;
+						face[1] = 0;
+						face[2] = -stepZ;
+					}
+				} else {
+					if (tMaxY < tMaxZ) {
+						if (tMaxY > radius)
+							break;
+						y += stepY;
+						tMaxY += tDeltaY;
+						face[0] = 0;
+						face[1] = -stepY;
+						face[2] = 0;
+					} else {
+						if (tMaxZ > radius)
+							break;
+						z += stepZ;
+						tMaxZ += tDeltaZ;
+						face[0] = 0;
+						face[1] = 0;
+						face[2] = -stepZ;
+					}
+				}
+			}
+		}
+
+		public static float IntBound(float s, float ds) {
+			if (ds < 0) {
+				return IntBound(-s, -ds);
+			} else {
+				s = Mod(s, 1);
+				return (1 - s) / ds;
+			}
+		}
+
+		public static float Signum(float x) {
+			return x > 0 ? 1 : x < 0 ? -1 : 0;
+		}
+
+		public static float Mod(float value, float modulus) {
+			return (value % modulus + modulus) % modulus;
+		}
+		// --- END MOVED FROM VoxCollision ---
 
 		public static string ToString(float F) {
 			string Str = string.Format(CultureInfo.InvariantCulture, "{0}", F);

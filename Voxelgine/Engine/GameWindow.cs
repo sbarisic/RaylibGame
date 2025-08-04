@@ -14,7 +14,7 @@ using Voxelgine.GUI;
 using Windows.Storage.Pickers;
 
 namespace Voxelgine.Engine {
-	unsafe class GameWindow {
+	public unsafe class GameWindow {
 		public InputMgr InMgr;
 
 		public int Width {

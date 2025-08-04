@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
-	class GUILabel : GUIElement {
+	public class GUILabel : GUIElement {
 		public bool IsInput = false;
 		public bool IsReading = false;
 		public Action<string> OnInputFunc;

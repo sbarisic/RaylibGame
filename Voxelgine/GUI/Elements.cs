@@ -20,15 +20,15 @@ using Windows.Graphics.Printing3D;
 using Windows.Media.Core;
 
 namespace Voxelgine.GUI {
-	delegate void OnMouseClickedFunc(GUIElement El);
+	public delegate void OnMouseClickedFunc(GUIElement El);
 
-	enum GUIUpdateResult {
+	public enum GUIUpdateResult {
 		OK,
 		Disabled,
 		ConsumedInput,
 	}
 
-	abstract class GUIElement {
+	public abstract class GUIElement {
 		public Vector2 Pos;
 		public Vector2 Size;
 		public Vector2 MousePos;

@@ -7,14 +7,14 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	internal class EntityManager {
-		List<IEntity> Entities;
+	public class EntityManager {
+		List<VoxEntity> Entities;
 
 		public EntityManager() {
-			Entities = new List<IEntity>();
+			Entities = new List<VoxEntity>();
 		}
 
-		public void Spawn(GameState GState, IEntity Ent) {
+		public void Spawn(GameState GState, VoxEntity Ent) {
 			if (Ent == null)
 				return;
 
@@ -25,7 +25,7 @@ namespace Voxelgine.Engine {
 
 		public void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			for (int i = 0; i < Entities.Count; i++) {
-				IEntity Ent = Entities[i];
+				VoxEntity Ent = Entities[i];
 
 				if (Ent == null)
 					continue;
@@ -36,7 +36,7 @@ namespace Voxelgine.Engine {
 
 		public void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
 			for (int i = 0; i < Entities.Count; i++) {
-				IEntity Ent = Entities[i];
+				VoxEntity Ent = Entities[i];
 
 				if (Ent == null)
 					continue;

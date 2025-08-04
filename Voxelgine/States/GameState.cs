@@ -13,7 +13,7 @@ using Voxelgine.GUI;
 using Voxelgine.Engine.Physics;
 
 namespace RaylibGame.States {
-	unsafe class GameState : GameStateImpl {
+	public unsafe class GameState : GameStateImpl {
 		public ChunkMap Map;
 		public Player Ply;
 		public SoundMgr Snd;

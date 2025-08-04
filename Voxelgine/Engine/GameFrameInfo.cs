@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	struct GameFrameInfo {
+	public struct GameFrameInfo {
 		public bool Empty;
 		public Camera3D Cam;
 		public Vector3 Pos;

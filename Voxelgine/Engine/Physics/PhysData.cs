@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	class PhysData {
+	public class PhysData {
 		public float GroundFriction { get; set; } = 8.0f;
 		public float GroundAccel { get; set; } = 50.0f;
 		public float AirFriction { get; set; } = 0.2f;

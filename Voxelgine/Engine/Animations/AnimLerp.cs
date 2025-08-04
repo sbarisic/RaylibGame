@@ -5,9 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	delegate float EasingFunc(float T);
+	public delegate float EasingFunc(float T);
 
-	abstract class AnimLerp {
+	public abstract class AnimLerp {
 		public float Duration;
 		public float ElapsedTime;
 		public float LerpVal;

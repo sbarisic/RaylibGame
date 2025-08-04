@@ -121,6 +121,7 @@ namespace RaylibGame.States {
 			((GUISettingsWindow)OptionsWnd).RestoreSizePos();
 			OptionsWnd.Enabled = false;
 			OptionsWnd.Title = "Options";
+			OptionsWnd.Resizable = true;
 			OptionsWnd.CenterVertical();
 			GUI.AddElement(OptionsWnd);
 

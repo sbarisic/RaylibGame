@@ -32,6 +32,7 @@ namespace Voxelgine.GUI {
 		private Vector2 CenterMargin = new Vector2(15, 10);
 		private float CenterIconMargin = 5f;
 
+		public bool Resizable = false;
 		public GUIWindow(GUIManager Mgr) {
 			this.Mgr = Mgr;
 			Size = new Vector2(300, 200);
@@ -74,19 +75,38 @@ namespace Voxelgine.GUI {
 
 			if (insideWindow || overTitleBar || overResize) {
 				Res = GUIUpdateResult.ConsumedInput;
-
 				if (Raylib.IsMouseButtonPressed(MouseButton.Left)) {
 					Mgr.BringToFront(this);
 				}
 			}
 
-			bool resizingThisFrame = IsResizing;
+			HandleResizing(mouse, overResize);
+			if (!IsResizing) {
+				HandleDragging(mouse, overTitleBar);
+			}
+
+			// Always recenter children while resizing
+			if (IsResizing && Children.Count > 0) {
+				OnResize();
+			}
+
+			UpdateChildren(mouse);
+
+			return Res;
+		}
+
+		private void HandleResizing(Vector2 mouse, bool overResize) {
+			if (!Resizable) {
+				IsResizing = false;
+				return;
+			}
 
 			if (overResize && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
 				IsResizing = true;
 				ResizeStartMouse = mouse;
 				ResizeStartSize = Size;
 			}
+
 			if (IsResizing) {
 				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
 					Vector2 delta = mouse - ResizeStartMouse;
@@ -99,35 +119,31 @@ namespace Voxelgine.GUI {
 				}
 				// Don't allow dragging while resizing
 				IsDragging = false;
-			} else {
-				// Start dragging
-				if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
-					Mgr.BringToFront(this);
-					IsDragging = true;
-					DragOffset = mouse - Pos;
-				}
-				if (IsDragging) {
-					if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
-						Pos = mouse - DragOffset;
-					} else {
-						IsDragging = false;
-					}
+			}
+		}
+
+		private void HandleDragging(Vector2 mouse, bool overTitleBar) {
+			// Start dragging
+			if (overTitleBar && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
+				Mgr.BringToFront(this);
+				IsDragging = true;
+				DragOffset = mouse - Pos;
+			}
+			if (IsDragging) {
+				if (Raylib.IsMouseButtonDown(MouseButton.Left)) {
+					Pos = mouse - DragOffset;
+				} else {
+					IsDragging = false;
 				}
 			}
+		}
 
-			// Always recenter children while resizing
-			if (IsResizing && Children.Count > 0) {
-				OnResize();
-			}
-
-			// Update children positions and call their Update
+		private void UpdateChildren(Vector2 mouse) {
 			Vector2 childMouse = mouse - Pos - new Vector2(0, TitleBarHeight);
 			foreach (var child in Children) {
 				child.MousePos = childMouse;
 				child.Update();
 			}
-
-			return Res;
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
@@ -143,23 +159,25 @@ namespace Voxelgine.GUI {
 			// Draw border
 			Mgr.DrawRectLines(Pos, Size, Color.Black);
 
-			// Draw resize handle (bottom right corner)
-			Rectangle resizeRect = new Rectangle(
-				Pos.X + Size.X - ResizeHandleSize,
-				Pos.Y + Size.Y - ResizeHandleSize,
-				ResizeHandleSize,
-				ResizeHandleSize
-			);
-			Raylib.DrawRectangleRec(resizeRect, new Color(100, 100, 100, 180));
-			// Optionally, draw diagonal lines for the handle
-			for (int i = 2; i < (int)ResizeHandleSize; i += 4) {
-				Raylib.DrawLine(
-					(int)(resizeRect.X + i),
-					(int)(resizeRect.Y + ResizeHandleSize),
-					(int)(resizeRect.X + ResizeHandleSize),
-					(int)(resizeRect.Y + ResizeHandleSize - i),
-					Color.Gray
+			if (Resizable) {
+				// Draw resize handle (bottom right corner)
+				Rectangle resizeRect = new Rectangle(
+					Pos.X + Size.X - ResizeHandleSize,
+					Pos.Y + Size.Y - ResizeHandleSize,
+					ResizeHandleSize,
+					ResizeHandleSize
 				);
+				Raylib.DrawRectangleRec(resizeRect, new Color(100, 100, 100, 180));
+				// Optionally, draw diagonal lines for the handle
+				for (int i = 2; i < (int)ResizeHandleSize; i += 4) {
+					Raylib.DrawLine(
+						(int)(resizeRect.X + i),
+						(int)(resizeRect.Y + ResizeHandleSize),
+						(int)(resizeRect.X + ResizeHandleSize),
+						(int)(resizeRect.Y + ResizeHandleSize - i),
+						Color.Gray
+					);
+				}
 			}
 
 			// Draw children (relative to window position, below title bar)

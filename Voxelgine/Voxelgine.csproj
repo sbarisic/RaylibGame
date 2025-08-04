@@ -401,7 +401,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Engine\Entities\BaseEntity.cs" />
+    <None Include="Engine\Entities\VEntPickup.cs" />
   </ItemGroup>
 
 </Project>

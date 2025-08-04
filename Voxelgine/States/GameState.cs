@@ -36,12 +36,10 @@ namespace RaylibGame.States {
 			PhysicsData = new PhysData();
 			Map = new ChunkMap(this);
 
-			BaseEntity BE = new BaseEntity();
+			VoxEntity BE = new VEntPickup();
 			BE.SetPosition(new Vector3(37, 66, 15));
 			BE.SetSize(new Vector3(1, 1, 1));
 			BE.SetModel("orb_xp/orb_xp.obj");
-			BE.IsBobbing = true;
-			BE.IsRotating = true;
 			EntMgr.Spawn(this, BE);
 
 			NPCEntity NPC = new NPCEntity();

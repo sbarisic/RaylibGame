@@ -16,6 +16,7 @@ using Windows.ApplicationModel.Appointments.DataProvider;
 namespace Voxelgine.Engine {
 	public delegate void OnKeyPressedFunc();
 
+	// TODO: Implement player as VEntity in class VEntPlayer
 	public unsafe class Player {
 		const bool DEBUG_PLAYER = true;
 
@@ -46,6 +47,9 @@ namespace Voxelgine.Engine {
 		public const float PlayerHeight = 1.7f;
 		public const float PlayerEyeOffset = 1.6f;
 		public const float PlayerRadius = 0.4f;
+
+		// TODO Implement bounding box calculation
+		public BoundingBox BBox;
 
 		public Vector3 Position;
 		public Matrix4x4 Rotation;
@@ -570,18 +574,6 @@ namespace Voxelgine.Engine {
 			GUIItemBox Itm = Inventory.GetItem(Idx);
 			Itm.UpdateTextFromItem = true;
 			Itm.SetItem(Inventory, InvItem);
-		}
-
-		void SetInvItem(GUIInventory Inventory, int Idx, BlockType BType, Action<GUIItemBox, int> OnClick) {
-			GUIItemBox Itm = Inventory.GetItem(Idx);
-
-			BlockInfo.GetBlockTexCoords(BType, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
-
-			Itm.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
-			Itm.OnClickedFunc = (E) => {
-				Inventory.SetSelectedIndex(Idx);
-				OnClick(E as GUIItemBox, Idx);
-			};
 		}
 
 		public void TickGUI(InputMgr InMgr, ChunkMap Map) {

@@ -12,7 +12,7 @@ using RaylibGame.States;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
-	public class NPCEntity : VoxEntity {
+	public class VEntNPC : VoxEntity {
 		CustomModel CModel;
 		BoundingBox BBox;
 

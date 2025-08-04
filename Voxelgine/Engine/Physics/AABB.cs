@@ -5,8 +5,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Voxelgine.Engine.Physics {
-	struct AABB {
+namespace Voxelgine.Engine {
+	public struct AABB {
 		public Vector3 Position;
 		public Vector3 Size;
 

@@ -10,7 +10,6 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using Voxelgine.GUI;
-using Voxelgine.Engine.Physics;
 
 namespace RaylibGame.States {
 	public unsafe class GameState : GameStateImpl {
@@ -42,7 +41,7 @@ namespace RaylibGame.States {
 			BE.SetModel("orb_xp/orb_xp.obj");
 			EntMgr.Spawn(this, BE);
 
-			NPCEntity NPC = new NPCEntity();
+			VEntNPC NPC = new VEntNPC();
 			NPC.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			NPC.SetPosition(new Vector3(32, 66, 14));
 			NPC.SetModel("npc/humanoid.json");
@@ -115,6 +114,7 @@ namespace RaylibGame.States {
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
+
 			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 

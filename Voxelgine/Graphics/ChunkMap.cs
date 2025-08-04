@@ -289,5 +289,16 @@ namespace Voxelgine.Graphics {
 			PickNormal = Vector3.Zero;
 			return false;
 		}
+
+		public bool HasBlocksInBounds(Vector3 pos, Vector3 size) {
+			Vector3 min = pos;
+			Vector3 max = pos + size;
+			for (int x = (int)MathF.Floor(min.X); x <= (int)MathF.Floor(max.X); x++)
+				for (int y = (int)MathF.Floor(min.Y); y <= (int)MathF.Floor(max.Y); y++)
+					for (int z = (int)MathF.Floor(min.Z); z <= (int)MathF.Floor(max.Z); z++)
+						if (GetBlock(x, y, z) != BlockType.None)
+							return true;
+			return false;
+		}
 	}
 }

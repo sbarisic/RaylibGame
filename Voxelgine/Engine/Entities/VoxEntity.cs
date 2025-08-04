@@ -13,9 +13,9 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
 	public abstract class VoxEntity {
-		protected Vector3 Position;
-		protected Vector3 Size;
-		protected Vector3 Velocity;
+		public Vector3 Position;
+		public Vector3 Size;
+		public Vector3 Velocity;
 
 		protected bool HasModel;
 		protected string EntModelName;
@@ -99,92 +99,13 @@ namespace Voxelgine.Engine {
 			if (IsRotating)
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 
-			/*if (IsBobbing) {
-				//BobOffset = MathF.Sin(InMgr.GetGameTime() * BobSpeed) * BobAmplitude;
-
-				if (BobbingLerp == null) {
-					BobbingLerp = new LerpVec3();
-					BobbingLerp.Loop = true;
-					BobbingLerp.Easing = Easing.EaseInOutQuart;
-					BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));
-				}
-			}*/
-
-			GameState GS = GetGameState();
-			UpdatePhysics(GS.Map, Dt);
 		}
 
 		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)
 		// Also checks for collision with the player and triggers OnPlayerTouch only once per entry
-		private bool wasPlayerTouching = false;
-		public virtual void UpdatePhysics(ChunkMap map, float Dt) {
-			GameState GS = GetGameState();
+		public bool _WasPlayerTouching = false;
 
-			const float Gravity = 9.81f;
-			// Apply gravity
-			Velocity.Y -= Gravity * Dt;
-			// Try to move entity by velocity, axis by axis (AABB sweep)
-			Vector3 newPos = Position;
-			Vector3 move = Velocity * Dt;
-			// X axis
-			if (!HasBlocksInBounds(map, new Vector3(newPos.X + move.X, newPos.Y, newPos.Z), Size))
-				newPos.X += move.X;
-			else
-				Velocity.X = 0;
-			// Y axis
-			if (!HasBlocksInBounds(map, new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z), Size))
-				newPos.Y += move.Y;
-			else {
-				Velocity.Y = 0;
-			}
-			// Z axis
-			if (!HasBlocksInBounds(map, new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z), Size))
-				newPos.Z += move.Z;
-			else
-				Velocity.Z = 0;
-
-			Position = newPos;
-
-			// --- Player collision check ---
-			if (GS != null && GS.Ply != null) {
-				// Player AABB
-				Vector3 playerFeet = GS.Ply.Position - new Vector3(0, Player.PlayerEyeOffset, 0);
-				Vector3 playerMin = new Vector3(
-					playerFeet.X - Player.PlayerRadius,
-					playerFeet.Y,
-					playerFeet.Z - Player.PlayerRadius
-				);
-				Vector3 playerMax = new Vector3(
-					playerFeet.X + Player.PlayerRadius,
-					playerFeet.Y + Player.PlayerHeight,
-					playerFeet.Z + Player.PlayerRadius
-				);
-				// Entity AABB
-				Vector3 entMin = Position;
-				Vector3 entMax = Position + Size;
-				bool touching =
-					entMin.X <= playerMax.X && entMax.X >= playerMin.X &&
-					entMin.Y <= playerMax.Y && entMax.Y >= playerMin.Y &&
-					entMin.Z <= playerMax.Z && entMax.Z >= playerMin.Z;
-				if (touching && !wasPlayerTouching) {
-					OnPlayerTouch(GS.Ply);
-					wasPlayerTouching = true;
-				} else if (!touching) {
-					wasPlayerTouching = false;
-				}
-			}
-		}
-
-		// Checks if any blocks are present in the AABB at pos with size
-		public bool HasBlocksInBounds(ChunkMap map, Vector3 pos, Vector3 size) {
-			Vector3 min = pos;
-			Vector3 max = pos + size;
-			for (int x = (int)MathF.Floor(min.X); x <= (int)MathF.Floor(max.X); x++)
-				for (int y = (int)MathF.Floor(min.Y); y <= (int)MathF.Floor(max.Y); y++)
-					for (int z = (int)MathF.Floor(min.Z); z <= (int)MathF.Floor(max.Z); z++)
-						if (map.GetBlock(x, y, z) != BlockType.None)
-							return true;
-			return false;
+		public virtual void OnUpdatePhysics(float Dt) {
 		}
 
 		protected Vector3 GetDrawPosition() {

@@ -643,7 +643,7 @@ namespace Voxelgine.Graphics {
 			if (ModelValidTransp) {
 				// Set texture ID to 1 to disable texture unloading? Does that even do anything?
 				CachedModelTransp.Materials[0].Maps[0].Texture.Id = 0;
-				Raylib.UnloadModel(CachedModelOpaque);
+				Raylib.UnloadModel(CachedModelTransp);
 			}
 
 			CachedMeshTransp = GenMeshTransparent();

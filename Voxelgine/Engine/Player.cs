@@ -552,7 +552,7 @@ namespace Voxelgine.Engine {
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(10));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.CraftingTable).SetCount(64));
+			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
 
 			Inventory.SetSelectedIndex(0);
 		}

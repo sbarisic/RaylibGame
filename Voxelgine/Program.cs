@@ -64,6 +64,7 @@ namespace Voxelgine {
 			float CurrentTime = 0;
 
 			GameFrameInfo LastFrame = new GameFrameInfo();
+			Rlgl.EnableBackfaceCulling();
 
 			while (Window.IsOpen()) {
 				TotalTime = (float)Raylib.GetTime();

@@ -65,14 +65,19 @@ namespace Voxelgine.Graphics {
 			for (int x = 0; x < Width; x++)
 				for (int z = 0; z < Length; z++)
 					for (int y = 0; y < WorldHeight; y++) {
+
 						Vector3 Pos = new Vector3(x, (WorldHeight - y), z);
+
 						float CenterFalloff = 1.0f - Utils.Clamp(((Center - Pos).Length() / CenterRadius) / 1.2f, 0, 1);
 						float Height = (float)y / WorldHeight;
+
 						const float HeightFallStart = 0.8f;
 						const float HeightFallEnd = 1.0f;
 						const float HeightFallRange = HeightFallEnd - HeightFallStart;
+
 						float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
 						float Density = Simplex(2, x, y * 0.5f, z, Scale) * CenterFalloff * HeightFalloff;
+
 						if (Density > 0.1f) {
 							float Caves = Simplex(1, x, y, z, Scale * 4) * HeightFalloff;
 							if (Caves < 0.65f)
@@ -86,21 +91,26 @@ namespace Voxelgine.Graphics {
 					for (int y = WorldHeight - 1; y >= 0; y--) {
 						if (GetBlock(x, y, z) != BlockType.None) {
 							DownRayHits++;
+
 							if (DownRayHits == 1)
 								SetBlock(x, y, z, BlockType.Grass);
 							else if (DownRayHits < 5)
 								SetBlock(x, y, z, BlockType.Dirt);
+
 						} else if (DownRayHits != 0)
 							break;
 					}
 				}
+
 			ComputeLighting();
 		}
 
 		float Simplex(int Octaves, float X, float Y, float Z, float Scale) {
 			float Val = 0.0f;
+
 			for (int i = 0; i < Octaves; i++)
 				Val += Noise.CalcPixel3D(X * Math.Pow(2, i), Y * Math.Pow(2, i), Z * Math.Pow(2, i), Scale);
+
 			return (Val / Octaves) / 255;
 		}
 
@@ -114,17 +124,19 @@ namespace Voxelgine.Graphics {
 			int[] xOffsets = { 0 }, yOffsets = { 0 }, zOffsets = { 0 };
 
 			if (XX == 0)
-				xOffsets = xOffsets.Concat(new[] { -1 }).ToArray();
+				xOffsets = xOffsets.Concat([-1]).ToArray();
 			if (XX == MaxBlock)
-				xOffsets = xOffsets.Concat(new[] { 1 }).ToArray();
+				xOffsets = xOffsets.Concat([1]).ToArray();
+
 			if (YY == 0)
-				yOffsets = yOffsets.Concat(new[] { -1 }).ToArray();
+				yOffsets = yOffsets.Concat([-1]).ToArray();
 			if (YY == MaxBlock)
-				yOffsets = yOffsets.Concat(new[] { 1 }).ToArray();
+				yOffsets = yOffsets.Concat([1]).ToArray();
+
 			if (ZZ == 0)
-				zOffsets = zOffsets.Concat(new[] { -1 }).ToArray();
+				zOffsets = zOffsets.Concat([-1]).ToArray();
 			if (ZZ == MaxBlock)
-				zOffsets = zOffsets.Concat(new[] { 1 }).ToArray();
+				zOffsets = zOffsets.Concat([1]).ToArray();
 
 			foreach (int xOffset in xOffsets)
 				foreach (int yOffset in yOffsets)
@@ -196,7 +208,6 @@ namespace Voxelgine.Graphics {
 			}
 		}
 
-		// Add back RaycastPos and Collide for GameState compatibility
 		// RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.
 		public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir) {
 			// Block-based raycast: returns the first solid block hit, or Vector3.Zero if none
@@ -216,7 +227,6 @@ namespace Voxelgine.Graphics {
 			return found ? hitPos : Vector3.Zero;
 		}
 
-		// Add back Collide overload for GameState compatibility
 		// Collide: Checks if the position is inside a solid block, or if moving in ProbeDir hits a block. Returns true and the collision normal if a block is hit, otherwise false.
 		public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal) {
 			// Check if the position is inside a solid block, or if moving in ProbeDir hits a block

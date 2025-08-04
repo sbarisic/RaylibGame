@@ -224,39 +224,52 @@ namespace Voxelgine.Engine {
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
 
+		void NoclipMove(PhysData PhysicsData, float Dt, InputMgr InMgr) {
+			Vector3 move = Vector3.Zero;
+			Vector3 fwd = GetForward();
+			Vector3 lft = GetLeft();
+			Vector3 up = GetUp();
+
+			if (InMgr.IsInputDown(InputKey.W))
+				move += fwd;
+
+			if (InMgr.IsInputDown(InputKey.S))
+				move -= fwd;
+
+			if (InMgr.IsInputDown(InputKey.A))
+				move += lft;
+
+			if (InMgr.IsInputDown(InputKey.D))
+				move -= lft;
+
+			if (InMgr.IsInputDown(InputKey.Space))
+				move += up;
+
+			if (InMgr.IsInputDown(InputKey.Shift))
+				move -= up;
+
+			if (move != Vector3.Zero) {
+				move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
+				SetPosition(Position + move);
+			}
+		}
+
 		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr) {
 			const float GroundHitBelowFeet = -0.075f;
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;
 
 			if (NoClip) {
-				Vector3 move = Vector3.Zero;
-				Vector3 fwd = GetForward();
-				Vector3 lft = GetLeft();
-				Vector3 up = GetUp();
-				if (InMgr.IsInputDown(InputKey.W))
-					move += fwd;
-				if (InMgr.IsInputDown(InputKey.S))
-					move -= fwd;
-				if (InMgr.IsInputDown(InputKey.A))
-					move += lft;
-				if (InMgr.IsInputDown(InputKey.D))
-					move -= lft;
-				if (InMgr.IsInputDown(InputKey.Space))
-					move += up;
-				if (InMgr.IsInputDown(InputKey.Shift))
-					move -= up;
-				if (move != Vector3.Zero) {
-					move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
-					SetPosition(Position + move);
-				}
+				NoclipMove(PhysicsData, Dt, InMgr);
 				return;
 			}
 
 			if (!Utils.HasRecord())
 				Utils.BeginRaycastRecord();
+
 			ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
 			Vector3 feetPos = FeetPosition;
+
 			Vector3[] groundCheckPoints = new Vector3[] {
 				new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
 				new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),
@@ -264,11 +277,14 @@ namespace Voxelgine.Engine {
 				new Vector3(feetPos.X + playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z + playerRadius),
 				feetPos + new Vector3(0, PhysicsData.GroundEpsilon, 0)
 			};
+
 			bool OnGround = false;
 			Vector3 HitFloor = Vector3.Zero;
+
 			foreach (var pt in groundCheckPoints) {
 				Vector3 localFace;
 				Vector3 hit = Map.RaycastPos(pt, PhysicsData.GroundCheckDist, new Vector3(0, -1f, 0), out localFace);
+
 				if (hit != Vector3.Zero && localFace.Y > 0.99f && Math.Abs(localFace.X) < 0.05f && Math.Abs(localFace.Z) < 0.05f && PlyVelocity.Y <= 0 && hit.Y < feetPos.Y + GroundHitBelowFeet) {
 					OnGround = true;
 					HitFloor = hit;
@@ -278,6 +294,7 @@ namespace Voxelgine.Engine {
 			if (!OnGround) {
 				foreach (var pt in groundCheckPoints) {
 					Vector3 TestPoint = pt + PlyVelocity * Dt;
+
 					if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
 						if (PicNorm.Y > 0.99f && Math.Abs(PicNorm.X) < 0.05f && Math.Abs(PicNorm.Z) < 0.05f && PlyVelocity.Y <= 0 && TestPoint.Y < feetPos.Y + GroundHitBelowFeet) {
 							OnGround = true;
@@ -294,28 +311,35 @@ namespace Voxelgine.Engine {
 				if (GroundGraceTimer < 0)
 					GroundGraceTimer = 0;
 			}
+
 			bool OnGroundGrace = GroundGraceTimer > 0f;
 			Vector3 wishdir = Vector3.Zero;
-			Vector3 fwd2 = GetForward();
-			fwd2.Y = 0;
-			fwd2 = Vector3.Normalize(fwd2);
+			Vector3 fwd2 = Vector3.Normalize(GetForward());
+
 			Vector3 lft2 = GetLeft();
+
 			if (InMgr.IsInputDown(InputKey.W))
 				wishdir += fwd2;
+
 			if (InMgr.IsInputDown(InputKey.S))
 				wishdir -= fwd2;
+
 			if (InMgr.IsInputDown(InputKey.A))
 				wishdir += lft2;
+
 			if (InMgr.IsInputDown(InputKey.D))
 				wishdir -= lft2;
+
 			if (wishdir != Vector3.Zero)
 				wishdir = Vector3.Normalize(wishdir);
+
 			bool ledgeSafety = OnGroundGrace && InMgr.IsInputDown(InputKey.Shift);
 			if (ledgeSafety && wishdir != Vector3.Zero) {
 				float innerRadius = 0.4f;
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
 				float minY = points.Min(p => p.Y);
 				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
+
 				List<Vector3> supportedPoints = new();
 				foreach (var pt in feetPoints) {
 					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
@@ -323,12 +347,14 @@ namespace Voxelgine.Engine {
 						supportedPoints.Add(pt);
 					}
 				}
+
 				if (supportedPoints.Count == 0) {
 					PlyVelocity.X = 0;
 					PlyVelocity.Z = 0;
 					wishdir = Vector3.Zero;
 				} else {
 					bool allow = false;
+
 					foreach (var spt in supportedPoints) {
 						Vector3 toSupport = Vector3.Normalize(spt - feetPos);
 						if (Vector3.Dot(wishdir, toSupport) > 0) {
@@ -336,6 +362,7 @@ namespace Voxelgine.Engine {
 							break;
 						}
 					}
+
 					if (!allow) {
 						PlyVelocity.X = 0;
 						PlyVelocity.Z = 0;
@@ -343,7 +370,9 @@ namespace Voxelgine.Engine {
 					}
 				}
 			}
+
 			float VelLen = PlyVelocity.Length();
+
 			if (OnGroundGrace) {
 				if (!WasLastLegsOnFloor) {
 					WasLastLegsOnFloor = true;
@@ -354,18 +383,22 @@ namespace Voxelgine.Engine {
 			} else {
 				WasLastLegsOnFloor = false;
 			}
+
 			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
 				GroundGraceTimer = 0;
 			}
+
 			if (OnGroundGrace) {
 				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 				float speed = velH.Length();
+
 				if (speed > 0) {
 					float drop = speed * PhysicsData.GroundFriction * Dt;
 					float newSpeed = MathF.Max(speed - drop, 0);
+
 					if (newSpeed != speed) {
 						newSpeed /= speed;
 						PlyVelocity.X *= newSpeed;
@@ -376,27 +409,36 @@ namespace Voxelgine.Engine {
 				PlyVelocity.X *= (1.0f - PhysicsData.AirFriction * Dt);
 				PlyVelocity.Z *= (1.0f - PhysicsData.AirFriction * Dt);
 			}
+
 			if (!OnGroundGrace) {
 				PlyVelocity.Y -= PhysicsData.Gravity * Dt;
 			} else if (PlyVelocity.Y < 0) {
 				PlyVelocity.Y = 0;
 			}
+
 			float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
 			Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
-			if (newPos != Position)
+
+			if (newPos != Position) {
 				SetPosition(newPos);
-			else
+			} else {
 				PlyVelocity = Vector3.Zero;
+			}
+
 			if (wishdir != Vector3.Zero) {
 				Vector3 accelDir = wishdir;
+
 				if (!OnGroundGrace && LastWallNormal != Vector3.Zero) {
 					accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
+
 					if (accelDir.LengthSquared() > 1e-4f)
 						accelDir = Vector3.Normalize(accelDir);
 					else
 						accelDir = Vector3.Zero;
 				}
+
 				bool canApplyAirAccel = OnGroundGrace || accelDir != Vector3.Zero;
+
 				if (canApplyAirAccel) {
 					float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
 					float addSpeed, accel;
@@ -427,25 +469,30 @@ namespace Voxelgine.Engine {
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
 					headPos
 				};
+
 				foreach (var pt in headCheckPoints) {
-					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+					if (Map.IsSolid(pt)) {
 						PlyVelocity.Y = 0;
 						break;
 					}
 				}
 			}
+
 			Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
 			float horizSpeed2 = horizVel2.Length();
 			float maxSpeed2 = OnGroundGrace ? (InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
+
 			if (horizSpeed2 > maxSpeed2) {
 				float scale = maxSpeed2 / horizSpeed2;
 				PlyVelocity.X *= scale;
 				PlyVelocity.Z *= scale;
 			}
+
 			if (PlyVelocity.Y > 0) {
 				float headEpsilon = 0.02f;
 				Vector3 feetPos2 = FeetPosition;
 				Vector3 headPos = feetPos2 + new Vector3(0, playerHeight - headEpsilon, 0);
+
 				Vector3[] headCheckPoints = new Vector3[] {
 					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
@@ -453,13 +500,15 @@ namespace Voxelgine.Engine {
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
 					headPos
 				};
+
 				foreach (var pt in headCheckPoints) {
-					if (Map.GetBlock((int)MathF.Floor(pt.X), (int)MathF.Floor(pt.Y + 0.1f), (int)MathF.Floor(pt.Z)) != BlockType.None) {
+					if (Map.IsSolid(pt)) {
 						PlyVelocity.Y = 0;
 						break;
 					}
 				}
 			}
+
 			Utils.EndRaycastRecord();
 		}
 
@@ -600,12 +649,16 @@ namespace Voxelgine.Engine {
 			} else {
 				if (InMgr.IsInputPressed(InputKey.Q))
 					Inventory.SelectPrevious();
+
 				if (InMgr.IsInputPressed(InputKey.E)) {
 					Vector3 Start = Position;
 					Vector3 End = Map.RaycastPos(Start, 1.5f, GetForward(), out Vector3 Face);
+
 					if (Face.Y == 1)
 						End.Y -= 0.001f;
+
 					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
+
 					if (Blk.Type == BlockType.CraftingTable) {
 						Console.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
 						return;

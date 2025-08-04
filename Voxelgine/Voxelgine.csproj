@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Engine\Entities\VEntPlayer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="af.ico" />
     <Content Include="data\models\barrel\composter_bottom.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -401,6 +405,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Engine\Entities\VEntPlayer.cs" />
     <None Include="Engine\Entities\VEntPickup.cs" />
   </ItemGroup>
 

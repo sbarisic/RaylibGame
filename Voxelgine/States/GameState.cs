@@ -41,7 +41,7 @@ namespace RaylibGame.States {
 			BE.SetModel("orb_xp/orb_xp.obj");
 			EntMgr.Spawn(this, BE);
 
-			VEntNPC NPC = new VEntNPC();
+			VoxEntity NPC = new VEntNPC();
 			NPC.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			NPC.SetPosition(new Vector3(32, 66, 14));
 			NPC.SetModel("npc/humanoid.json");
@@ -132,9 +132,17 @@ namespace RaylibGame.States {
 
 		public Vector3 PlayerCollisionBoxPos;
 
+		void DrawTransparent() {
+			//Raylib.BeginBlendMode(BlendMode.Multiplied);
+
+			Map.DrawTransparent();
+
+			//Raylib.EndBlendMode();
+		}
+
 		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			Map.Draw();
-			Map.DrawTransparent();
+			DrawTransparent();
 
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
 

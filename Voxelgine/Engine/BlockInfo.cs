@@ -59,10 +59,10 @@ namespace Voxelgine.Engine {
 				case BlockType.Campfire:
 					return false;
 
-				/*case BlockType.Water:
+				case BlockType.Water:
 				case BlockType.Glass:
 				case BlockType.Ice:
-					return false;*/
+					return false;
 
 				default:
 					return true;

@@ -3,9 +3,11 @@
 * [ ] Graphics
   * [ ] Lighting system
 
-* [ ] Procedurally generated voxel world
+* [ ] Voxel world
+  * [ ] Procedurally generated island
   * [ ] Ability to create and destroy blocks in realtime
   * [ ] Procedurally generated buildings and structures
+  * [ ] Transparent blocks
 
 * [ ] Quake like player movement
 

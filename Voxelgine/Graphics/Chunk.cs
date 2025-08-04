@@ -337,7 +337,112 @@ namespace Voxelgine.Graphics {
 		Mesh GenMeshTransparent() {
 			MeshBuilder TranspVerts = new MeshBuilder();
 
-			// TODO: Implement rest of the method
+			for (int x = 0; x < ChunkSize; x++) {
+				for (int y = 0; y < ChunkSize; y++) {
+					for (int z = 0; z < ChunkSize; z++) {
+						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 GlobalBlockPos);
+
+						PlacedBlock CurBlock = GetBlock(x, y, z);
+						if (CurBlock.Type == BlockType.None || BlockInfo.IsOpaque(CurBlock.Type))
+							continue;
+
+						TranspVerts.SetPositionOffset(new Vector3(x, y, z) * BlockSize);
+
+						BlockType XPosType = GetBlock(x + 1, y, z).Type;
+						BlockType XNegType = GetBlock(x - 1, y, z).Type;
+						BlockType YPosType = GetBlock(x, y + 1, z).Type;
+						BlockType YNegType = GetBlock(x, y - 1, z).Type;
+						BlockType ZPosType = GetBlock(x, y, z + 1).Type;
+						BlockType ZNegType = GetBlock(x, y, z - 1).Type;
+
+						bool XPosSkipFace = BlockInfo.IsOpaque(XPosType);
+						bool XNegSkipFace = BlockInfo.IsOpaque(XNegType);
+						bool YPosSkipFace = BlockInfo.IsOpaque(YPosType);
+						bool YNegSkipFace = BlockInfo.IsOpaque(YNegType);
+						bool ZPosSkipFace = BlockInfo.IsOpaque(ZPosType);
+						bool ZNegSkipFace = BlockInfo.IsOpaque(ZNegType);
+
+						// Transparent blocks: always render faces against non-same-type or none
+						// TODO: skip faces against same transparent type for better visuals)
+
+						// X++
+						if (!XPosSkipFace) {
+							Vector3 CurDir = new Vector3(1, 0, 0);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 1), new Vector2(0, 1), new Vector3(1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 0), new Vector2(1, 0), new Vector3(1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
+						}
+
+						// X--
+						if (!XNegSkipFace) {
+							Vector3 CurDir = new Vector3(-1, 0, 0);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 0), new Vector2(0, 1), new Vector3(-1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 1), new Vector2(1, 0), new Vector3(-1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
+						}
+
+						// Y++
+						if (!YPosSkipFace) {
+							Vector3 CurDir = new Vector3(0, 1, 0);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(0, 1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 0), new Vector2(0, 1), new Vector3(0, 1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(0, 0), new Vector3(0, 1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 1), new Vector2(1, 0), new Vector3(0, 1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(0, 1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(0, 0), new Vector3(0, 1, 0), FaceClr);
+						}
+						// Y--
+						if (!YNegSkipFace) {
+							Vector3 CurDir = new Vector3(0, -1, 0);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 1), new Vector2(1, 0), new Vector3(0, -1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 0), new Vector2(0, 1), new Vector3(0, -1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
+						}
+
+						// Z++
+						if (!ZPosSkipFace) {
+							Vector3 CurDir = new Vector3(0, 0, 1);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 1), new Vector2(1, 1), new Vector3(0, 0, 1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 1), new Vector2(0, 0), new Vector3(0, 0, 1), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
+						}
+						// Z--
+						if (!ZNegSkipFace) {
+							Vector3 CurDir = new Vector3(0, 0, -1);
+							Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+							SetBlockTextureUV(CurBlock.Type, CurDir, TranspVerts);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(0, 1), new Vector3(0, 0, -1), FaceClr);
+							TranspVerts.Add(new Vector3(1, 0, 0), new Vector2(0, 0), new Vector3(0, 0, -1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(1, 0), new Vector3(0, 0, -1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 1, 0), new Vector2(1, 1), new Vector3(0, 0, -1), FaceClr);
+							TranspVerts.Add(new Vector3(1, 1, 0), new Vector2(0, 1), new Vector3(0, 0, -1), FaceClr);
+							TranspVerts.Add(new Vector3(0, 0, 0), new Vector2(1, 0), new Vector3(0, 0, -1), FaceClr);
+						}
+					}
+				}
+			}
 
 			return TranspVerts.ToMesh();
 		}
@@ -382,6 +487,9 @@ namespace Voxelgine.Graphics {
 							BlockType YNegType = GetBlock(x, y - 1, z).Type;
 							BlockType ZPosType = GetBlock(x, y, z + 1).Type;
 							BlockType ZNegType = GetBlock(x, y, z - 1).Type;
+
+							if (!BlockInfo.IsOpaque(CurBlock.Type))
+								continue;
 
 							bool XPosSkipFace = false;
 							bool XNegSkipFace = false;

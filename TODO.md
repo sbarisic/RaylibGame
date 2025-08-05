@@ -7,7 +7,7 @@
   * [ ] Procedurally generated island
   * [ ] Ability to create and destroy blocks in realtime
   * [ ] Procedurally generated buildings and structures
-  * [ ] Transparent blocks
+  * [x] Transparent blocks
 
 * [ ] Quake like player movement
 

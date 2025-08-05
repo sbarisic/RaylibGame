@@ -13,6 +13,7 @@ namespace Voxelgine.Engine {
 		public float LerpVal;
 
 		public bool Loop;
+		public bool Completed;
 
 		public EasingFunc Easing;
 
@@ -26,6 +27,17 @@ namespace Voxelgine.Engine {
 
 		public virtual void StartLerp(float Duration, object StartVal, object EndVal) {
 			TriggeredOnComplete = false;
+			Completed = false;
+			ElapsedTime = 0;
+			this.Duration = Duration;
+		}
+
+		public virtual void ContinueNew(float Duration, object EndVal) {
+			if (!Completed)
+				return;
+
+			this.Duration = Duration;
+			StartLerp(Duration, GetValue(), EndVal);
 		}
 
 		public abstract void SwapStartAndEnd();
@@ -45,6 +57,8 @@ namespace Voxelgine.Engine {
 
 				LerpVal = Easing(T);
 			} else {
+				LerpVal = Easing(1);
+
 				if (!TriggeredOnComplete) {
 					if (Loop) {
 						ElapsedTime = 0;
@@ -53,6 +67,7 @@ namespace Voxelgine.Engine {
 						SwapStartAndEnd();
 					} else {
 						TriggeredOnComplete = true;
+						Completed = true;
 						OnComplete?.Invoke(this);
 					}
 				}

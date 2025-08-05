@@ -15,8 +15,6 @@ namespace Voxelgine.Engine {
 
 			Start = (Vector3)StartVal;
 			End = (Vector3)EndVal;
-			this.Duration = Duration;
-			ElapsedTime = 0;
 		}
 
 		public virtual Vector3 GetVec3() {
@@ -29,6 +27,32 @@ namespace Voxelgine.Engine {
 
 		public override void SwapStartAndEnd() {
 			Vector3 Tmp = End;
+			End = Start;
+			Start = Tmp;
+		}
+	}
+
+	public class  LerpQuat : AnimLerp {
+		Quaternion Start;
+		Quaternion End;
+
+		public override void StartLerp(float Duration, object StartVal, object EndVal) {
+			base.StartLerp(Duration, StartVal, EndVal);
+
+			Start = (Quaternion)StartVal;
+			End = (Quaternion)EndVal;
+		}
+
+		public virtual Quaternion GetQuat() {
+			return Quaternion.Slerp(Start, End, LerpVal);
+		}
+
+		public override object GetValue() {
+			return GetQuat();
+		}
+
+		public override void SwapStartAndEnd() {
+			Quaternion Tmp = End;
 			End = Start;
 			Start = Tmp;
 		}

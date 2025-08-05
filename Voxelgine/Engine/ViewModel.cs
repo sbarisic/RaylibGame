@@ -35,6 +35,9 @@ namespace Voxelgine.Engine {
 
 		public bool IsActive;
 
+		LerpVec3 LrpPos;
+		LerpQuat LrpRot;
+
 		public ViewModel() {
 			SetModel(DefaultViewModelName);
 			IsActive = true;
@@ -43,6 +46,16 @@ namespace Voxelgine.Engine {
 				IsActive = false;
 				Console.WriteLine("======================== Warning! Zero meshes in model {0}", DefaultViewModelName);
 			}
+
+			LrpPos = new LerpVec3();
+			LrpPos.Easing = Easing.Linear;
+			LrpPos.Loop = false;
+			LrpPos.StartLerp(1, Vector3.Zero, Vector3.Zero);
+
+			LrpRot = new LerpQuat();
+			LrpRot.Easing = Easing.Linear;
+			LrpRot.Loop = false;
+			LrpRot.StartLerp(1, Quaternion.CreateFromYawPitchRoll(0, 0, 0), Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
 		}
 
 		public void SetModel(string ModelName) {
@@ -62,6 +75,8 @@ namespace Voxelgine.Engine {
 			}
 		}
 
+
+
 		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (!IsActive)
 				return;
@@ -76,24 +91,33 @@ namespace Voxelgine.Engine {
 			// Viewmodel position offset from camera
 			//Vector3 vmPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 
+
 			switch (ViewMdlRotMode) {
 				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
 					DesiredViewModelPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+					LrpPos.ContinueNew(0.5f, new Vector3(0, 0, 0));
+					LrpRot.ContinueNew(0.5f, Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
 					break;
 
 				case ViewModelRotationMode.Gun:
 					DesiredViewModelPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.3f;
+					LrpPos.ContinueNew(0.5f, new Vector3(0, -0.5f, 0));
+					LrpRot.ContinueNew(0.5f, Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0));
 					break;
 
 				case ViewModelRotationMode.GunIronsight: {
 					DesiredViewModelPos = cam.Position + camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+					LrpPos.ContinueNew(0.5f, new Vector3(0, 0, 0));
+					LrpRot.ContinueNew(0.5f, Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
 					break;
 				}
 
 				default:
 					throw new NotImplementedException();
 			}
+
+			DesiredViewModelPos += LrpPos.GetVec3();
 
 
 			Vector3 CamAngle = Ply.GetCamAngle();
@@ -146,12 +170,11 @@ namespace Voxelgine.Engine {
 			//ViewModelPos = Vector3.Lerp(ViewModelPos, DesiredViewModelPos, 0.1f);
 			//VMRot = Quaternion.Slerp(VMRot, DesiredVMRot, 0.1f);
 
+
+			Quaternion RotOffset = LrpRot.GetQuat();
+
 			ViewModelPos = DesiredViewModelPos;
-			VMRot = DesiredVMRot;
-
-
-			//CurFame.ViewModelPos = ViewModelPos = Vector3.Lerp(LastFrame.ViewModelPos, ViewModelPos, TimeAlpha);
-			//CurFame.ViewModelRot = VMRot = Quaternion.Slerp(LastFrame.ViewModelRot, VMRot, TimeAlpha);
+			VMRot = DesiredVMRot * RotOffset;
 
 			float angle = 2.0f * MathF.Acos(VMRot.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - VMRot.W * VMRot.W);

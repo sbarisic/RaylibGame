@@ -76,7 +76,7 @@ namespace Voxelgine.Engine {
 		}
 
 
-
+		// TODO: Make animation system for viewmodels better, lerp between rotations and positions instead of using a switch statement?
 		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (!IsActive)
 				return;

@@ -24,6 +24,8 @@ namespace Voxelgine.Graphics {
 		bool ModelValidOpaque;
 		bool ModelValidTransp;
 
+		public AABB ModelAABB;
+
 		Model CachedModelOpaque;
 		Mesh CachedMeshOpaque;
 
@@ -638,7 +640,7 @@ namespace Voxelgine.Graphics {
 			CachedModelOpaque = Raylib.LoadModelFromMesh(CachedMeshOpaque);
 			CachedModelOpaque.Materials[0].Maps[0].Texture = ResMgr.AtlasTexture;
 			CachedModelOpaque.Materials[0].Shader = ResMgr.GetShader("default");
-			ModelValidOpaque = true;
+			ModelValidOpaque = CachedMeshOpaque.VertexCount > 0;
 
 			if (ModelValidTransp) {
 				// Set texture ID to 1 to disable texture unloading? Does that even do anything?
@@ -650,9 +652,22 @@ namespace Voxelgine.Graphics {
 			CachedModelTransp = Raylib.LoadModelFromMesh(CachedMeshTransp);
 			CachedModelTransp.Materials[0].Maps[0].Texture = ResMgr.AtlasTexture;
 			CachedModelTransp.Materials[0].Shader = ResMgr.GetShader("default");
-			ModelValidTransp = true;
-		}
+			ModelValidTransp = CachedMeshTransp.VertexCount > 0;
 
+			if (!ModelValidOpaque && !ModelValidTransp) {
+				ModelAABB = AABB.Empty;
+			} else {
+				if (!ModelValidOpaque) {
+					ModelAABB = new AABB(Raylib.GetMeshBoundingBox(CachedMeshTransp));
+				} else if (!ModelValidTransp) {
+					ModelAABB = new AABB(Raylib.GetMeshBoundingBox(CachedMeshOpaque));
+				} else {
+					AABB BBOpaque = new AABB(Raylib.GetMeshBoundingBox(CachedMeshOpaque));
+					AABB BBTransp = new AABB(Raylib.GetMeshBoundingBox(CachedMeshTransp));
+					ModelAABB = AABB.Union(BBOpaque, BBTransp);
+				}
+			}
+		}
 
 		public RayCollision Collide(Vector3 ChunkPosition, Ray R) {
 			Matrix4x4 Transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation(ChunkPosition));
@@ -660,33 +675,35 @@ namespace Voxelgine.Graphics {
 		}
 
 		bool IsInsideFrustum(Vector3 ChunkPosition, ref Frustum Fr) {
-			//return true;
+			if (Fr.IsInside(ModelAABB.Offset(ChunkPosition))) {
+				return true;
+			}
 
-			// Check if any of the chunk's 8 corners are inside the frustum
-			for (int x = 0; x <= 1; x++)
-				for (int y = 0; y <= 1; y++)
-					for (int z = 0; z <= 1; z++) {
-						Vector3 corner = ChunkPosition + new Vector3(x * ChunkSize, y * ChunkSize, z * ChunkSize) * BlockSize;
-						if (Fr.IsInside(corner))
-							return true;
-					}
 			return false;
 		}
 
 		public void Draw(Vector3 ChunkPosition, ref Frustum Fr) {
+			RecalcModel();
+
 			if (!IsInsideFrustum(ChunkPosition, ref Fr))
 				return;
 
-			Program.ChunkDrawCalls++;
-			RecalcModel();
-			Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
+			if (Program.DebugMode)
+				Raylib.DrawBoundingBox(ModelAABB.Offset(ChunkPosition).ToBoundingBox(), Color.Yellow);
+
+			if (ModelValidOpaque) {
+				Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
+				Program.ChunkDrawCalls++;
+			}
 		}
 
 		public void DrawTransparent(Vector3 ChunkPosition, ref Frustum Fr) {
 			if (!IsInsideFrustum(ChunkPosition, ref Fr))
 				return;
 
-			Raylib.DrawModel(CachedModelTransp, ChunkPosition, BlockSize, ChunkColor);
+			if (ModelValidTransp) {
+				Raylib.DrawModel(CachedModelTransp, ChunkPosition, BlockSize, ChunkColor);
+			}
 		}
 	}
 }

@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Engine;
+
 namespace Voxelgine.Graphics {
 	public struct Frustum {
 		public Vector4 Left;
@@ -15,6 +17,10 @@ namespace Voxelgine.Graphics {
 		public Vector4 Bottom;
 		public Vector4 Near;
 		public Vector4 Far;
+		public float NearPlane = 0.01f;
+		public float FarPlane = 10;
+
+		public Vector3 CamPos;
 
 		public Vector3[] Corners;
 
@@ -23,14 +29,16 @@ namespace Voxelgine.Graphics {
 			Vector3 forward = Raylib.GetCameraForward(ref Cam);
 			Vector3 right = Raylib.GetCameraRight(ref Cam);
 
+			CamPos = Cam.Position;
+
 			//Matrix4x4 view = Matrix4x4.CreateLookAt(Cam.Position, Cam.Target, camUp);
 			Matrix4x4 view = Raylib.GetCameraMatrix(Cam);
 
 			// Build projection matrix
-			float fovYRad = Cam.FovY * MathF.PI / 180.0f;
-			float aspect = 16.0f / 9.0f; // TODO: Use actual aspect ratio if available
-			float near = 0.01f; // Near plane
-			float far = 1000.0f; // Far plane
+			float fovYRad = Utils.ToRad(Cam.FovY);
+			float aspect = Program.Window.AspectRatio;
+			//float near = NearPlane;
+			//float far = FarPlane;
 
 
 			if (Cam.Projection == CameraProjection.Perspective) {
@@ -82,14 +90,43 @@ namespace Voxelgine.Graphics {
 		public bool IsInside(Vector3 point) {
 			// Check if point is inside all 6 planes
 			Vector4[] planes = { Left, Right, Top, Bottom, Near, Far };
+
 			foreach (var plane in planes) {
 				Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
 				float d = plane.W;
 				float dist = Vector3.Dot(normal, point) + d;
+
 				if (dist < 0)
 					return false;
 			}
 			return true;
+		}
+
+		public bool IsInside(AABB box) {
+			if (box.IsEmpty)
+				return false;
+
+			if (box.Contains(CamPos))
+				return true; // Camera position is inside the AABB
+
+			// Check if AABB is inside the frustum
+			Vector3[] BoxCorners = box.GetCorners();
+
+			foreach (Vector3 Corner in BoxCorners) {
+				if (IsInside(Corner))
+					return true; // At least one corner is inside the frustum
+			}
+
+			Ray[] CornerRays = GetCornerRays();
+
+			foreach (Ray ray in CornerRays) {
+				RayCollision col = Raylib.GetRayCollisionBox(ray, box.ToBoundingBox());
+
+				if (col.Hit && col.Distance < FarPlane && col.Distance > NearPlane)
+					return true;
+			}
+
+			return false;
 		}
 
 		public override string ToString() {
@@ -134,6 +171,22 @@ namespace Voxelgine.Graphics {
 			Raylib.DrawLine3D(Corners[1], Corners[5], color);
 			Raylib.DrawLine3D(Corners[2], Corners[6], color);
 			Raylib.DrawLine3D(Corners[3], Corners[7], color);
+		}
+
+		Ray ToRay(Vector3 a, Vector3 b) {
+			Ray R = new Ray(a, Vector3.Normalize(b - a));
+			return R;
+		}
+
+		public Ray[] GetCornerRays() {
+			Ray[] Rays = new Ray[4];
+
+			Rays[0] = ToRay(Corners[0], Corners[4]);
+			Rays[1] = ToRay(Corners[1], Corners[5]);
+			Rays[2] = ToRay(Corners[2], Corners[6]);
+			Rays[3] = ToRay(Corners[3], Corners[7]);
+
+			return Rays;
 		}
 	}
 }

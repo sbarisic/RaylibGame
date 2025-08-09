@@ -87,14 +87,17 @@ namespace RaylibGame.States {
 
 		private void SaveGameState() {
 			Console.WriteLine("Saving map and player!");
+
 			using (MemoryStream ms = new()) {
 				Map.Write(ms);
 				File.WriteAllBytes(map_file, ms.ToArray());
 			}
+
 			using (FileStream fs = File.Open(player_file, FileMode.Create, FileAccess.Write))
 			using (BinaryWriter writer = new BinaryWriter(fs)) {
 				Ply.Write(writer);
 			}
+
 			Console.WriteLine("Done!");
 		}
 
@@ -153,7 +156,9 @@ namespace RaylibGame.States {
 		}
 
 		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			ViewFrustum = new Frustum(ref Ply.Cam);
+			if (!Ply.FreezeFrustum)
+				ViewFrustum = new Frustum(ref Ply.Cam);
+
 			Map.Draw(ref ViewFrustum);
 			DrawTransparent();
 
@@ -177,10 +182,13 @@ namespace RaylibGame.States {
 		private void DrawPlayerCollisionBox(Vector3 feetPos) {
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
+
 			Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
 			Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
+
 			Color color = Color.Red;
 			Vector3[] corners = new Vector3[8];
+
 			corners[0] = new Vector3(min.X, min.Y, min.Z);
 			corners[1] = new Vector3(max.X, min.Y, min.Z);
 			corners[2] = new Vector3(max.X, min.Y, max.Z);
@@ -189,6 +197,7 @@ namespace RaylibGame.States {
 			corners[5] = new Vector3(max.X, max.Y, min.Z);
 			corners[6] = new Vector3(max.X, max.Y, max.Z);
 			corners[7] = new Vector3(min.X, max.Y, max.Z);
+
 			Raylib.DrawLine3D(corners[0], corners[1], color);
 			Raylib.DrawLine3D(corners[1], corners[2], color);
 			Raylib.DrawLine3D(corners[2], corners[3], color);

@@ -27,6 +27,15 @@ namespace Voxelgine.Engine {
 			get; private set;
 		}
 
+		public float AspectRatio {
+			get {
+				if (Height == 0 || Width == 0)
+					return 1.0f;
+
+				return (float)Width / Height;
+			}
+		}
+
 		GameStateImpl State;
 
 		bool Open;

@@ -32,6 +32,7 @@ namespace Voxelgine.Engine {
 		bool MoveRt;
 
 		bool NoClip;
+		public bool FreezeFrustum = false;
 
 		Dictionary<InputKey, Action<OnKeyPressedEventArg>> OnKeyFuncs = new Dictionary<InputKey, Action<OnKeyPressedEventArg>>();
 
@@ -105,6 +106,12 @@ namespace Voxelgine.Engine {
 			AddOnKeyPressed(InputKey.Num2, (K) => { Inventory?.SetSelectedIndex(1); });
 			AddOnKeyPressed(InputKey.Num3, (K) => { Inventory?.SetSelectedIndex(2); });
 			AddOnKeyPressed(InputKey.Num4, (K) => { Inventory?.SetSelectedIndex(3); });
+
+			AddOnKeyPressed(InputKey.I, (K) => {
+				if (Program.DebugMode) {
+					FreezeFrustum = !FreezeFrustum;
+				}
+			});
 		}
 
 		public void ToggleMouse(bool? Enable = null) {

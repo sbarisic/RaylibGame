@@ -659,12 +659,24 @@ namespace Voxelgine.Graphics {
 			return Raylib.GetRayCollisionMesh(R, CachedMeshOpaque, Transform);
 		}
 
-		public void Draw(Vector3 ChunkPosition) {
+		bool IsInsideFrustum(Vector3 ChunkPosition, ref Frustum Fr) {
+			// TODO: Implement proper frustum culling
+
+			return false;
+		}
+
+		public void Draw(Vector3 ChunkPosition, ref Frustum Fr) {
+			if (!IsInsideFrustum(ChunkPosition, ref Fr))
+				return;
+
 			RecalcModel();
 			Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
 		}
 
-		public void DrawTransparent(Vector3 ChunkPosition) {
+		public void DrawTransparent(Vector3 ChunkPosition, ref Frustum Fr) {
+			if (!IsInsideFrustum(ChunkPosition, ref Fr))
+				return;
+
 			Raylib.DrawModel(CachedModelTransp, ChunkPosition, BlockSize, ChunkColor);
 		}
 	}

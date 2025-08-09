@@ -80,9 +80,16 @@ namespace Voxelgine.Graphics {
 		}
 
 		public bool IsInside(Vector3 point) {
-			// TODO: Implement point-in-frustum check
-
-			return false;
+			// Check if point is inside all 6 planes
+			Vector4[] planes = { Left, Right, Top, Bottom, Near, Far };
+			foreach (var plane in planes) {
+				Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
+				float d = plane.W;
+				float dist = Vector3.Dot(normal, point) + d;
+				if (dist < 0)
+					return false;
+			}
+			return true;
 		}
 
 		public override string ToString() {

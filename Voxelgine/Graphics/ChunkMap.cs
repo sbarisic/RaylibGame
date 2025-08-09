@@ -192,19 +192,19 @@ namespace Voxelgine.Graphics {
 		public void Tick() {
 		}
 
-		public void Draw() {
+		public void Draw(ref Frustum Fr) {
 			foreach (var KV in Chunks.Items) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
-				KV.Value.Draw(ChunkPos);
+				KV.Value.Draw(ChunkPos, ref Fr);
 			}
 
 			Utils.DrawRaycastRecord();
 		}
 
-		public void DrawTransparent() {
+		public void DrawTransparent(ref Frustum Fr) {
 			foreach (var KV in Chunks.Items) {
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
-				KV.Value.DrawTransparent(ChunkPos);
+				KV.Value.DrawTransparent(ChunkPos, ref Fr);
 			}
 		}
 

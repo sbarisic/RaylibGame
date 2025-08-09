@@ -66,8 +66,8 @@ namespace Voxelgine.Engine {
 			Cam.Position = Position;
 			Cam.Target = Position + (Forward * FocusDist);
 
-			Frustum F = new Frustum(ref Cam);
-			Console.WriteLine(F.ToString());
+			//Frustum F = new Frustum(ref Cam);
+			//Console.WriteLine(F.ToString());
 		}
 
 		public static Matrix4x4 GetRotationMatrix() {

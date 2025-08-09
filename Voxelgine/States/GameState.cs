@@ -146,14 +146,15 @@ namespace RaylibGame.States {
 			Raylib.BeginBlendMode(BlendMode.Alpha);
 			Rlgl.DisableDepthMask();
 
-			Map.DrawTransparent();
+			Map.DrawTransparent(ref ViewFrustum);
 
 			Rlgl.EnableDepthMask();
 			Raylib.EndBlendMode();
 		}
 
 		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			Map.Draw();
+			ViewFrustum = new Frustum(ref Ply.Cam);
+			Map.Draw(ref ViewFrustum);
 			DrawTransparent();
 
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
@@ -163,7 +164,6 @@ namespace RaylibGame.States {
 			if (Program.DebugMode)
 				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
 
-			ViewFrustum = new Frustum(ref Ply.Cam);
 			ViewFrustum.Draw();
 
 			foreach (var L in MarkerList)

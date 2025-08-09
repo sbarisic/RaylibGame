@@ -607,6 +607,7 @@ namespace Voxelgine.Engine {
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(GetVelocity().Length(), 3));
 				InfoLbl.WriteLine("NoClip (C): {0}", NoClip ? "ON" : "OFF");
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
+				InfoLbl.WriteLine("ChunkDraws: {0}", Program.ChunkDrawCalls.ToString());
 			}
 		}
 

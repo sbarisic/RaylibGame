@@ -13,6 +13,9 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine {
 	internal class Program {
+		// Fancy info
+		public static int ChunkDrawCalls;
+
 		public static GameConfig Cfg;
 
 		public static bool DebugMode;
@@ -98,6 +101,7 @@ namespace Voxelgine {
 
 				// TODO: Interpolation for rendering?
 				// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
+				ChunkDrawCalls = 0;
 				LastFrame = Window.Draw(TimeAlpha, LastFrame);
 			}
 		}

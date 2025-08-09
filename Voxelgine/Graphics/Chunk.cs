@@ -660,8 +660,16 @@ namespace Voxelgine.Graphics {
 		}
 
 		bool IsInsideFrustum(Vector3 ChunkPosition, ref Frustum Fr) {
-			// TODO: Implement proper frustum culling
+			//return true;
 
+			// Check if any of the chunk's 8 corners are inside the frustum
+			for (int x = 0; x <= 1; x++)
+				for (int y = 0; y <= 1; y++)
+					for (int z = 0; z <= 1; z++) {
+						Vector3 corner = ChunkPosition + new Vector3(x * ChunkSize, y * ChunkSize, z * ChunkSize) * BlockSize;
+						if (Fr.IsInside(corner))
+							return true;
+					}
 			return false;
 		}
 
@@ -669,6 +677,7 @@ namespace Voxelgine.Graphics {
 			if (!IsInsideFrustum(ChunkPosition, ref Fr))
 				return;
 
+			Program.ChunkDrawCalls++;
 			RecalcModel();
 			Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
 		}

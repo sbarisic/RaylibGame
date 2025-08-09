@@ -219,7 +219,7 @@ namespace Voxelgine.Engine {
 			FInfo.Cam = GState.Ply.Cam;
 			FInfo.CamAngle = GState.Ply.GetCamAngle();
 			FInfo.FeetPosition = GState.Ply.FeetPosition;
-			//FInfo.Pos = FPSCamera.Position;
+			FInfo.Frustum = new Frustum(ref FInfo.Cam);
 
 			FInfo.ViewModelPos = GState.Ply.ViewMdl.ViewModelPos;
 			FInfo.ViewModelRot = GState.Ply.ViewMdl.VMRot;

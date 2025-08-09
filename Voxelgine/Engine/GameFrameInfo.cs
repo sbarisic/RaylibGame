@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Graphics;
+
 namespace Voxelgine.Engine {
 	public struct GameFrameInfo {
 		public bool Empty;
@@ -16,6 +18,7 @@ namespace Voxelgine.Engine {
 		public Quaternion ViewModelRot;
 		public Vector3 ViewModelPos;
 		public Vector3 FeetPosition;
+		public Frustum Frustum;
 
 		public GameFrameInfo() {
 			Empty = true;
@@ -36,6 +39,7 @@ namespace Voxelgine.Engine {
 			New.ViewModelPos = Vector3.Lerp(Old.ViewModelPos, ViewModelPos, T);
 			New.ViewModelRot = Quaternion.Slerp(Old.ViewModelRot, ViewModelRot, T);
 			New.FeetPosition = Vector3.Lerp(Old.FeetPosition, FeetPosition, T);
+			New.Frustum = Frustum;
 
 			return New;
 		}

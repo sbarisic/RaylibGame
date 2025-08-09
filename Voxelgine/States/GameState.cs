@@ -23,6 +23,8 @@ namespace RaylibGame.States {
 
 		EntityManager EntMgr;
 
+		Frustum ViewFrustum;
+
 		const string map_file = "data/map.bin";
 		const string player_file = "data/player.bin";
 
@@ -160,6 +162,9 @@ namespace RaylibGame.States {
 
 			if (Program.DebugMode)
 				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
+
+			ViewFrustum = new Frustum(ref Ply.Cam);
+			ViewFrustum.Draw();
 
 			foreach (var L in MarkerList)
 				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);

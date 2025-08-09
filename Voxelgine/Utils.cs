@@ -724,5 +724,12 @@ namespace Voxelgine {
 			Process.Start(FileName, Args);
 			Environment.Exit(0);
 		}
+
+		// Helper to normalize a Vector4 plane (only xyz part)
+		public static Vector4 NormalizePlane(Vector4 plane) {
+			Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
+			float length = normal.Length();
+			return plane / length;
+		}
 	}
 }

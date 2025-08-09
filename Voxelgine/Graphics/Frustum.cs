@@ -13,5 +13,12 @@ namespace Voxelgine.Graphics {
 		public Vector4 Bottom;
 		public Vector4 Near;
 		public Vector4 Far;
+
+		public override string ToString() {
+			return $"(L: {Left}; R: {Right}; T: {Top}; B: {Bottom}; N: {Near}; F: {Far};)";
+		}
+
+		public void Draw() {
+		}
 	}
 }

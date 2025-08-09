@@ -123,7 +123,15 @@ namespace RaylibGame.States {
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
+
+			Shader DefaultShader = ResMgr.GetShader("default");
+			Raylib.BeginShaderMode(DefaultShader);
+
+
 			Draw3D(TimeAlpha, ref LastFrame, ref FInfo);
+
+			Raylib.EndShaderMode();
+
 			Raylib.EndMode3D();
 
 			//FInfo.Cam = Ply.Cam;

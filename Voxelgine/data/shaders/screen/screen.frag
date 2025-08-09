@@ -74,7 +74,7 @@ void main()
     vec4 out_clr = calc_fxaa(fragTexCoord);
 
     finalColor = vec4(color_palette(out_clr.rgb), out_clr.a);
-
+    gl_FragDepth = 1.0 - finalColor.z;
     
     // Pixelate filter
     /*vec2 inverse_resolution = vec2(1.0 / resolution.x, 1.0 / resolution.y);

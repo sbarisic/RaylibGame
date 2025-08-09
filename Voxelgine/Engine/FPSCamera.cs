@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Graphics;
+
 namespace Voxelgine.Engine {
 	static class FPSCamera {
 		//const bool UseCameraMove = false;
@@ -28,6 +30,16 @@ namespace Voxelgine.Engine {
 		public static Vector2 GetPreviousMousePos() {
 			return MousePrev;
 		}
+
+
+		static Frustum CalcViewFrustum(ref Camera3D Cam) {
+			Frustum F = new Frustum();
+
+			// TODO: Implement view frustum calculation
+
+			return F;
+		}
+
 
 		public static void Update(bool HandleRotation, ref Camera3D Cam) {
 			Vector2 MousePos = new Vector2(Raylib.GetMouseX(), Raylib.GetMouseY());

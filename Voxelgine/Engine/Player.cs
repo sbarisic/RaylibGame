@@ -671,12 +671,14 @@ namespace Voxelgine.Engine {
 
 		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (LocalPlayer) {
+				Raylib_cs.
+
 				Rlgl.DisableDepthTest();
-				Rlgl.DisableDepthMask();
+				//Rlgl.DisableDepthMask();
 
 				ViewMdl.DrawViewModel(this, TimeAlpha, ref LastFrame, ref CurFame);
 
-				Rlgl.EnableDepthMask();
+				//Rlgl.EnableDepthMask();
 				Rlgl.EnableDepthTest();
 			}
 

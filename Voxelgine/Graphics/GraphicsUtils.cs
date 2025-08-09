@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace Voxelgine.Graphics {
 	static class GraphicsUtils {
@@ -96,6 +97,17 @@ namespace Voxelgine.Graphics {
 
 		public static Vector3 GetNormal(Vector3 A, Vector3 B, Vector3 C) {
 			return Vector3.Normalize(Vector3.Cross(C - B, A - B));
+		}
+
+		public static unsafe void SetUniform(Shader S, string Name, int Value) {
+			byte[] nameBytes = Encoding.ASCII.GetBytes(Name);
+			int Loc = 0;
+
+			fixed (byte* namePtr = nameBytes) {
+				Loc = Rlgl.GetLocationUniform(S.Id, (sbyte*)namePtr);
+			}
+
+			Rlgl.SetUniform(Loc, &Value, 4, 1);
 		}
 	}
 }

@@ -5,10 +5,12 @@ using RaylibGame.States;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
 using Windows.Storage.Pickers;
@@ -29,10 +31,12 @@ namespace Voxelgine.Engine {
 
 		bool Open;
 		bool HasWindowRT;
-		RenderTexture2D WindowRT;
+		GBuffer WindowG;
 
 		// SSAA has a screen space rendering bug, scale UI accordingly?
 		bool Enable_SSAA = false;
+
+		Shader DefaultShader;
 
 		public GameWindow(int W, int H, string Title) {
 			Open = true;
@@ -121,13 +125,16 @@ namespace Voxelgine.Engine {
 
 			InMgr = new InputMgr();
 
-			HasWindowRT = false;
+			HasWindowRT = true;
 			ReloadRT();
+
+			DefaultShader = ResMgr.GetShader("default");
 		}
 
 		void ReloadRT() {
 			if (HasWindowRT) {
-				Raylib.UnloadRenderTexture(WindowRT);
+				WindowG?.Dispose();
+				WindowG = null;
 			}
 
 			float Factor = 1;
@@ -135,9 +142,12 @@ namespace Voxelgine.Engine {
 			if (Enable_SSAA)
 				Factor = 2;
 
-			WindowRT = Raylib.LoadRenderTexture((int)(Width * Factor), (int)(Height * Factor));
-			Raylib.SetTextureFilter(WindowRT.Texture, TextureFilter.Bilinear);
-			Raylib.SetTextureWrap(WindowRT.Texture, TextureWrap.Clamp);
+			//WindowRT = Raylib.LoadRenderTexture((int)(Width * Factor), (int)(Height * Factor));
+			//WindowRT = LoadRenderTextureDepthTex((int)(Width * Factor), (int)(Height * Factor));
+			WindowG = new GBuffer((int)(Width * Factor), (int)(Height * Factor));
+
+			Raylib.SetTextureFilter(WindowG.Target.Texture, TextureFilter.Bilinear);
+			Raylib.SetTextureWrap(WindowG.Target.Texture, TextureWrap.Clamp);
 
 			HasWindowRT = true;
 		}
@@ -169,7 +179,7 @@ namespace Voxelgine.Engine {
 			if (!HasWindowRT)
 				return;
 
-			Raylib.BeginTextureMode(WindowRT);
+			Raylib.BeginTextureMode(WindowG.Target);
 			Raylib.ClearBackground(new Color(0, 0, 0, 0));
 		}
 
@@ -179,7 +189,7 @@ namespace Voxelgine.Engine {
 
 			Raylib.EndTextureMode();
 
-			Rectangle Src = new Rectangle(0, 0, WindowRT.Texture.Width, -WindowRT.Texture.Height);
+			Rectangle Src = new Rectangle(0, 0, WindowG.Target.Texture.Width, -WindowG.Target.Texture.Height);
 			Rectangle Dst = new Rectangle(0, 0, Width, Height);
 
 			Shader ScreenShader = ResMgr.GetShader(ShaderName);
@@ -195,7 +205,7 @@ namespace Voxelgine.Engine {
 				Raylib.SetShaderValue(ScreenShader, Loc_Time, Program.TotalTime, ShaderUniformDataType.Float);
 			}
 
-			Raylib.DrawTexturePro(WindowRT.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
+			Raylib.DrawTexturePro(WindowG.Target.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
 
 			Raylib.EndShaderMode();
 		}
@@ -246,11 +256,16 @@ namespace Voxelgine.Engine {
 			Raylib.ClearBackground(new Color(200, 150, 100, 255));
 
 			BeginScreenShader();
-			State.Draw(TimeAlpha, ref LastFrame, ref FInfo);
+			{
+				State.Draw(TimeAlpha, ref LastFrame, ref FInfo);
+			}
 			EndScreenShader("screen");
 
 			BeginScreenShader();
-			State.Draw2D();
+			{
+				State.Draw2D();
+
+			}
 			EndScreenShader("screen_gui");
 
 			Raylib.EndDrawing();

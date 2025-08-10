@@ -556,6 +556,7 @@ namespace Voxelgine.Engine {
 			//InfoLbl.Size = new Vector2(300, 250);
 
 			//Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
+			GUI.Tick();
 		}
 
 		public void InitGUI(GameWindow Window) {

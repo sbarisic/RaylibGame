@@ -77,6 +77,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public void CalculateFlexbox() {
+			RootNode.StyleSetWidth(Window.Width);
+			RootNode.StyleSetHeight(Window.Height);
 			Flexbox.Flex.CalculateLayout(RootNode, Window.Width, Window.Height, Flexbox.Direction.LTR);
 
 			/*foreach (GUIElement element in Elements) {

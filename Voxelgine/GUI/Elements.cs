@@ -66,6 +66,9 @@ namespace Voxelgine.GUI {
 		}
 
 		public virtual void OnFlexUpdated() {
+			/*if (Parent != null)
+				FlexNode.CalculateLayout(Parent.Size.X, Parent.Size.Y, Direction.RTL);*/
+
 			Pos = new Vector2(FlexNode.layout.x, FlexNode.layout.y);
 			Size = new Vector2(FlexNode.layout.width, FlexNode.layout.height);
 		}

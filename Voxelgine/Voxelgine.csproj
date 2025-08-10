@@ -402,7 +402,6 @@
     <Folder Include="data\models\meat\" />
     <Folder Include="data\models\pickaxe\" />
     <Folder Include="data\textures\items\" />
-    <Folder Include="Engine\Flexbox\" />
   </ItemGroup>
 
   <ItemGroup>

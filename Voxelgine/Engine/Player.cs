@@ -550,30 +550,30 @@ namespace Voxelgine.Engine {
 		InventoryItem ActiveSelection;
 
 		public void RecalcGUI(GameWindow Window) {
-			Box_Health.Pos = new Vector2(64, Window.Height - 128);
+			//Box_Health.Pos = new Vector2(64, Window.Height - 128);
 
-			InfoLbl.Pos = new Vector2(16, 40);
-			InfoLbl.Size = new Vector2(300, 250);
+			//InfoLbl.Pos = new Vector2(16, 40);
+			//InfoLbl.Size = new Vector2(300, 250);
 
-			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
+			//Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
 		}
 
 		public void InitGUI(GameWindow Window) {
 			Box_Health = new GUIItemBox(GUI, null);
-			Box_Health.Pos = new Vector2(64, Window.Height - 128);
 			Box_Health.Text = "100";
 			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
+			Box_Health.FlexNode.nodeStyle.Set("position: absolute; left: 100; bottom: 100; width: 64; height: 64;");
 			GUI.AddElement(Box_Health);
 
 			InfoLbl = new GUILabel(GUI, null);
-			InfoLbl.Pos = new Vector2(16, 40);
-			InfoLbl.Size = new Vector2(300, 250);
 			InfoLbl.Clear();
 			InfoLbl.WriteLine("Hello World!");
+			InfoLbl.FlexNode.nodeStyle.Set("position: absolute; width: 300; height: 250; left: 20; top: 40;");
 			GUI.AddElement(InfoLbl);
 
 			Inventory = new GUIInventory(GUI, null);
 			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
+			Inventory.FlexNode.nodeStyle.Set("width: 650; height: 64;");
 			GUI.AddElement(Inventory);
 
 			Inventory.OnActiveSelectionChanged = (E) => {
@@ -599,7 +599,6 @@ namespace Voxelgine.Engine {
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
-
 			Inventory.SetSelectedIndex(0);
 		}
 

@@ -27,6 +27,7 @@ namespace Voxelgine.GUI {
 			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Point);
 
 			Flexbox.Config Cfg = Flexbox.Flex.CreateDefaultConfig();
+			Cfg.UseWebDefaults = false;
 			RootNode = Flexbox.Flex.CreateDefaultNode(Cfg);
 		}
 
@@ -78,23 +79,24 @@ namespace Voxelgine.GUI {
 		public void CalculateFlexbox() {
 			Flexbox.Flex.CalculateLayout(RootNode, Window.Width, Window.Height, Flexbox.Direction.LTR);
 
-			foreach (GUIElement element in Elements) {
+			/*foreach (GUIElement element in Elements) {
 				element.OnFlexUpdated();
-			}
+			}*/
 		}
 
 		public void Tick() {
 			MousePos = Window.InMgr.GetMousePos();
 
+			CalculateFlexbox();
+
 			// Sort elements by ZOrder before updating
 			var sortedElements = Elements.OrderByDescending(e => e.ZOrder).ToList();
 			foreach (GUIElement E in sortedElements) {
 				E.MousePos = MousePos;
+
 				if (E.Update() == GUIUpdateResult.ConsumedInput)
 					break;
 			}
-
-			CalculateFlexbox();
 		}
 
 		public void Draw() {

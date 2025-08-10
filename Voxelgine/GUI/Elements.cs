@@ -51,6 +51,7 @@ namespace Voxelgine.GUI {
 		public GUIElement(GUIManager Mgr, GUIElement Parent) {
 			this.Mgr = Mgr;
 			this.Parent = Parent;
+
 			CreateFlexbox();
 		}
 
@@ -65,9 +66,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public virtual void OnFlexUpdated() {
-			Pos = new Vector2(FlexNode.layout.left, FlexNode.layout.top);
-
-			Size = new Vector2(500, 500);
+			Pos = new Vector2(FlexNode.layout.x, FlexNode.layout.y);
+			Size = new Vector2(FlexNode.layout.width, FlexNode.layout.height);
 		}
 
 		public virtual void SetFlexbox() {
@@ -91,6 +91,7 @@ namespace Voxelgine.GUI {
 
 		public virtual GUIUpdateResult Update() {
 			GUIUpdateResult Res = GUIUpdateResult.OK;
+			OnFlexUpdated();
 
 			if (!Enabled) {
 				ButtonHeldDown = false;

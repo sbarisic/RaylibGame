@@ -40,6 +40,7 @@ namespace Voxelgine.GUI {
 
 			// Initialize item boxes  
 			ItemBoxes = new List<GUIItemBox>();
+
 			for (int i = 0; i < MaxItems; i++) {
 				GUIItemBox itemBox = new GUIItemBox(Mgr, this);
 				itemBox.ParentInv = this;
@@ -50,6 +51,7 @@ namespace Voxelgine.GUI {
 					ths.ParentInv.SetSelectedIndexObject(ths);
 				};
 
+				itemBox.FlexNode.nodeStyle.Set("width: 64; height: 64;");
 				ItemBoxes.Add(itemBox);
 			}
 
@@ -60,6 +62,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public override GUIUpdateResult Update() {
+
+
 			base.Update();
 
 			// Handle scrolling input (using A/D keys since mouse wheel isn't in InputMgr)  
@@ -93,7 +97,7 @@ namespace Voxelgine.GUI {
 			SelectPrevPressed = currentSelectPrev;*/
 
 			// Update positions of visible item boxes  
-			UpdateItemPositions();
+			//UpdateItemPositions();
 
 			// Update each visible item box  
 			for (int i = 0; i < VisibleItems && (i + ScrollOffset) < ItemBoxes.Count; i++) {
@@ -219,7 +223,20 @@ namespace Voxelgine.GUI {
 			return GetSelectedItem();
 		}
 
+		public override void OnFlexUpdated() {
+			base.OnFlexUpdated();
+
+			Pos = new Vector2(FlexNode.layout.x, FlexNode.layout.y);
+			Size = new Vector2(FlexNode.layout.width, FlexNode.layout.height);
+
+			for (int i = 0; i < ItemBoxes.Count; i++) {
+				ItemBoxes[i].OnFlexUpdated();
+			}
+		}
+
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
+			Raylib.DrawRectangleV(Pos, Size, Color.Pink);
+
 			// Draw only visible item boxes  
 			for (int i = 0; i < VisibleItems && (i + ScrollOffset) < ItemBoxes.Count; i++) {
 				int itemIndex = i + ScrollOffset;

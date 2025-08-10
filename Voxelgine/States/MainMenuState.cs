@@ -1,18 +1,26 @@
-﻿using Raylib_cs;
-using Voxelgine.Engine;
-using Voxelgine;
-using Voxelgine.GUI;
+﻿using Flexbox;
+
+using Raylib_cs;
 
 using System;
-using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Runtime.InteropServices;
+
+using Voxelgine;
+using Voxelgine.Engine;
+using Voxelgine.Engine.Flexbox;
+using Voxelgine.GUI;
 
 namespace RaylibGame.States {
 	class MainMenuState : GameStateImpl {
+		const string BtnStyle = "width: 100%; height: 76; padding: 10; margin-bottom: 5;";
+		const string WindowStyle = "width: 400; height: 500; padding-top: 15; padding-left: 20; padding-right: 20; flex-direction: column;";
+		const string TitleImageStyle = "left: 50%; top: 20%;";
+
 		Camera2D Cam = new Camera2D();
 		GUIManager GUI;
 
@@ -25,37 +33,33 @@ namespace RaylibGame.States {
 
 		private void CreateMenuButtons(GUIElement MenuWindow, List<GUIElement> IB, Vector2 BtnSize) {
 			GUIButton Btn_NewGame = new GUIButton(GUI, MenuWindow);
-			Btn_NewGame.Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
-			Btn_NewGame.Size = BtnSize;
 			Btn_NewGame.Text = "New Game";
 			Btn_NewGame.OnClickedFunc = (E) => {
 				Program.Window.SetState(Program.GameState);
 			};
+			Btn_NewGame.FlexNode.nodeStyle.Apply(BtnStyle);
 
 			GUIButton Btn_Options = new GUIButton(GUI, MenuWindow);
-			Btn_Options.Pos = GUI.WindowScale(new Vector2(0.3f, 0.35f));
-			Btn_Options.Size = BtnSize;
 			Btn_Options.Text = "Options";
 			Btn_Options.OnClickedFunc = (E) => {
 				Console.WriteLine("Options clicked");
 				OptionsWnd.Show();
 			};
+			Btn_Options.FlexNode.nodeStyle.Apply(BtnStyle);
 
 			GUIButton Btn_Quit = new GUIButton(GUI, MenuWindow);
-			Btn_Quit.Pos = GUI.WindowScale(new Vector2(0.3f, 0.4f));
-			Btn_Quit.Size = BtnSize;
 			Btn_Quit.Text = "Quit";
 			Btn_Quit.OnClickedFunc = (E) => {
 				Program.Window.Close();
 			};
+			Btn_Quit.FlexNode.nodeStyle.Apply(BtnStyle);
 
 			GUIButton Btn_Wat = new GUIButton(GUI, MenuWindow);
-			Btn_Wat.Pos = GUI.WindowScale(new Vector2(0.5f, 0.4f));
-			Btn_Wat.Size = BtnSize;
 			Btn_Wat.Text = "OS: " + Utils.GetOSName();
 			Btn_Wat.OnClickedFunc = (E) => {
 				Console.WriteLine("Running on {0}", Utils.GetOSName());
 			};
+			Btn_Wat.FlexNode.nodeStyle.Apply(BtnStyle);
 
 			IB.Add(Btn_NewGame);
 			IB.Add(Btn_Options);
@@ -100,6 +104,7 @@ namespace RaylibGame.States {
 
 			GUIImage TitleImage = new GUIImage(GUI, null, "title.png", 10);
 			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
+			TitleImage.FlexNode.nodeStyle.Apply(TitleImageStyle);
 			GUI.AddElement(TitleImage);
 
 			Vector2 CenterSize = new Vector2(400, 500);
@@ -113,7 +118,7 @@ namespace RaylibGame.States {
 			GWnd.Title = "Main Menu";
 			GWnd.Size = DbgRect.Size;
 			GWnd.Pos = DbgRect.Position;
-			//GWnd.FlexNode.nodeStyle.Apply("width: 250; height: 300; padding: 0;");
+			GWnd.FlexNode.nodeStyle.Apply(WindowStyle);
 			GUI.AddElement(GWnd);
 
 			// Create the options window, same size/pos as GWnd, but disabled by default
@@ -125,7 +130,7 @@ namespace RaylibGame.States {
 			OptionsWnd.Title = "Options";
 			OptionsWnd.Resizable = true;
 			//OptionsWnd.CenterVertical();
-			//OptionsWnd.FlexNode.nodeStyle.Apply("width: 250; height: 300; padding: 0;");
+			OptionsWnd.FlexNode.nodeStyle.Apply(WindowStyle);
 			GUI.AddElement(OptionsWnd);
 
 			List<GUIElement> IB = new List<GUIElement>();
@@ -141,7 +146,7 @@ namespace RaylibGame.States {
 			}
 
 			//GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
-
+			NodePrinter.Print(GUI.RootNode);
 		}
 
 		public override void SwapTo() {

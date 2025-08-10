@@ -11,6 +11,8 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
+		const string LabelStyle = "width: 100%; height: 24; padding: 0;";
+
 		public string Label = "DefaultLabel";
 		string Value = "";
 		string OriginalValue;
@@ -37,11 +39,14 @@ namespace Voxelgine.GUI {
 				OnValueChanged?.Invoke(val);
 			};
 
+			InputLabel.FlexNode.nodeStyle.Set(LabelStyle);
 			InputLabel.DrawTextColor = new Color(130, 172, 209);
 
-			SetValue(Value, Value);
 
-			UpdateLayout();
+			SetValue(Value, Value);
+			InputLabel.FlexNode.nodeStyle.Set("width: 100; height: 32;");
+
+			//UpdateLayout();
 			WasEdited = false;
 		}
 

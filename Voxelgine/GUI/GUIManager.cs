@@ -19,10 +19,15 @@ namespace Voxelgine.GUI {
 		List<GUIElement> Elements = new List<GUIElement>();
 		Vector2 MousePos = Vector2.Zero;
 
+		public Flexbox.Node RootNode;
+
 		public GUIManager(GameWindow Window) {
 			this.Window = Window;
 			TxtFont = Raylib.LoadFontEx("data/fonts/medodica.otf", FntSize, null, 128);
 			Raylib.SetTextureFilter(TxtFont.Texture, TextureFilter.Point);
+
+			Flexbox.Config Cfg = Flexbox.Flex.CreateDefaultConfig();
+			RootNode = Flexbox.Flex.CreateDefaultNode(Cfg);
 		}
 
 		public Vector2 CenterWindow(Vector2 Pos) {
@@ -68,6 +73,14 @@ namespace Voxelgine.GUI {
 			}
 
 			return null;
+		}
+
+		public void CalculateFlexbox() {
+			Flexbox.Flex.CalculateLayout(RootNode, Window.Width, Window.Height, Flexbox.Direction.LTR);
+
+			foreach (GUIElement element in Elements) {
+				element.OnFlexUpdated();
+			}
 		}
 
 		public void Tick() {
@@ -157,8 +170,8 @@ namespace Voxelgine.GUI {
 			float W = window.Width;
 			float H = window.Height;
 
-			Lbl = new GUILabel(this, 80);
-			OutLbl = new GUILabel(this);
+			Lbl = new GUILabel(this, null, 80);
+			OutLbl = new GUILabel(this, null);
 
 			OutLbl.Size = new Vector2(Lbl.Size.X, 500);
 			OutLbl.Pos = new Vector2(W / 2 - OutLbl.Size.X / 2, H - (H / 2 + OutLbl.Size.Y / 2 + H * 0.05f));

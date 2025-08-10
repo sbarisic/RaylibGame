@@ -23,8 +23,8 @@ namespace RaylibGame.States {
 		Rectangle DbgRect = new Rectangle();
 		GUIWindow OptionsWnd;
 
-		private void CreateMenuButtons(List<GUIElement> IB, Vector2 BtnSize) {
-			GUIButton Btn_NewGame = new GUIButton(GUI);
+		private void CreateMenuButtons(GUIElement MenuWindow, List<GUIElement> IB, Vector2 BtnSize) {
+			GUIButton Btn_NewGame = new GUIButton(GUI, MenuWindow);
 			Btn_NewGame.Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
 			Btn_NewGame.Size = BtnSize;
 			Btn_NewGame.Text = "New Game";
@@ -32,7 +32,7 @@ namespace RaylibGame.States {
 				Program.Window.SetState(Program.GameState);
 			};
 
-			GUIButton Btn_Options = new GUIButton(GUI);
+			GUIButton Btn_Options = new GUIButton(GUI, MenuWindow);
 			Btn_Options.Pos = GUI.WindowScale(new Vector2(0.3f, 0.35f));
 			Btn_Options.Size = BtnSize;
 			Btn_Options.Text = "Options";
@@ -41,7 +41,7 @@ namespace RaylibGame.States {
 				OptionsWnd.Show();
 			};
 
-			GUIButton Btn_Quit = new GUIButton(GUI);
+			GUIButton Btn_Quit = new GUIButton(GUI, MenuWindow);
 			Btn_Quit.Pos = GUI.WindowScale(new Vector2(0.3f, 0.4f));
 			Btn_Quit.Size = BtnSize;
 			Btn_Quit.Text = "Quit";
@@ -49,7 +49,7 @@ namespace RaylibGame.States {
 				Program.Window.Close();
 			};
 
-			GUIButton Btn_Wat = new GUIButton(GUI);
+			GUIButton Btn_Wat = new GUIButton(GUI, MenuWindow);
 			Btn_Wat.Pos = GUI.WindowScale(new Vector2(0.5f, 0.4f));
 			Btn_Wat.Size = BtnSize;
 			Btn_Wat.Text = "OS: " + Utils.GetOSName();
@@ -76,8 +76,8 @@ namespace RaylibGame.States {
 			IB.Add(Btn_Wat);
 		}
 
-		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {
-			GUIItemBox IBox = new GUIItemBox(GUI);
+		GUIItemBox AddItmBox(GUIElement MenuWindow, Vector2 Pos, Texture2D Icn) {
+			GUIItemBox IBox = new GUIItemBox(GUI, MenuWindow);
 			IBox.Pos = Pos;
 			IBox.Size = new Vector2(64, 64);
 			IBox.IsSelected = false;
@@ -98,7 +98,7 @@ namespace RaylibGame.States {
 			Vector2 BtnSize = GUI.WindowScale(new Vector2(0.2f, 0.07f));
 			Vector2 Pos = GUI.WindowScale(new Vector2(0.3f, 0.3f));
 
-			GUIImage TitleImage = new GUIImage(GUI, "title.png", 10);
+			GUIImage TitleImage = new GUIImage(GUI, null, "title.png", 10);
 			TitleImage.Pos = GUI.WindowScale(new Vector2(0.5f, 0.2f));
 			GUI.AddElement(TitleImage);
 
@@ -109,14 +109,14 @@ namespace RaylibGame.States {
 					(Window.Height / 1.65f) - (CenterSize.Y / 2)
 				), CenterSize);
 
-			GUIWindow GWnd = new GUIWindow(GUI);
+			GUIWindow GWnd = new GUIWindow(GUI, null);
 			GWnd.Title = "Main Menu";
 			GWnd.Size = DbgRect.Size;
 			GWnd.Pos = DbgRect.Position;
 			GUI.AddElement(GWnd);
 
 			// Create the options window, same size/pos as GWnd, but disabled by default
-			OptionsWnd = new GUISettingsWindow(GUI, Window);
+			OptionsWnd = new GUISettingsWindow(Window, GUI, null);
 			OptionsWnd.Size = DbgRect.Size;
 			OptionsWnd.Pos = DbgRect.Position;
 			((GUISettingsWindow)OptionsWnd).RestoreSizePos();
@@ -127,7 +127,7 @@ namespace RaylibGame.States {
 			GUI.AddElement(OptionsWnd);
 
 			List<GUIElement> IB = new List<GUIElement>();
-			CreateMenuButtons(IB, BtnSize);
+			CreateMenuButtons(GWnd, IB, BtnSize);
 			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
 			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
 			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));

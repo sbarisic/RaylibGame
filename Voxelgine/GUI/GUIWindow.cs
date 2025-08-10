@@ -12,8 +12,6 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIWindow : GUIElement {
-		protected GUIManager Mgr;
-
 		private List<GUIElement> Children = new List<GUIElement>();
 		private bool IsDragging = false;
 		private Vector2 DragOffset = Vector2.Zero;
@@ -33,8 +31,7 @@ namespace Voxelgine.GUI {
 		private float CenterIconMargin = 5f;
 
 		public bool Resizable = false;
-		public GUIWindow(GUIManager Mgr) {
-			this.Mgr = Mgr;
+		public GUIWindow(GUIManager Mgr, GUIElement Parent) : base(Mgr,Parent) {
 			Size = new Vector2(300, 200);
 			// Use the same panel texture as buttons for 9-patch
 			PanelTex = ResMgr.GetTexture("gui/btn.png");

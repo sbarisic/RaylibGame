@@ -28,7 +28,6 @@ namespace Voxelgine.GUI {
 		public Color DrawTextColor = Color.White;
 
 		string Text;
-		GUIManager Mgr;
 
 		int SelectionStart;
 		int SelectionLen;
@@ -36,11 +35,10 @@ namespace Voxelgine.GUI {
 
 		GUIUpdateResult UpdateResult;
 
-		public GUILabel(GUIManager Mgr) {
-			this.Mgr = Mgr;
+		public GUILabel(GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
 		}
 
-		public GUILabel(GUIManager Mgr, int InputCharCount) : this(Mgr) {
+		public GUILabel(GUIManager Mgr, GUIElement Parent, int InputCharCount) : this(Mgr, Parent) {
 			IsInput = true;
 			Size = Raylib.MeasureTextEx(Mgr.TxtFont, "#", Mgr.FntSize, 1);
 			Size.X = Size.X * (InputCharCount + 1);

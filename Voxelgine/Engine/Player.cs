@@ -559,20 +559,20 @@ namespace Voxelgine.Engine {
 		}
 
 		public void InitGUI(GameWindow Window) {
-			Box_Health = new GUIItemBox(GUI);
+			Box_Health = new GUIItemBox(GUI, null);
 			Box_Health.Pos = new Vector2(64, Window.Height - 128);
 			Box_Health.Text = "100";
 			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
 			GUI.AddElement(Box_Health);
 
-			InfoLbl = new GUILabel(GUI);
+			InfoLbl = new GUILabel(GUI, null);
 			InfoLbl.Pos = new Vector2(16, 40);
 			InfoLbl.Size = new Vector2(300, 250);
 			InfoLbl.Clear();
 			InfoLbl.WriteLine("Hello World!");
 			GUI.AddElement(InfoLbl);
 
-			Inventory = new GUIInventory(GUI);
+			Inventory = new GUIInventory(GUI, null);
 			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
 			GUI.AddElement(Inventory);
 

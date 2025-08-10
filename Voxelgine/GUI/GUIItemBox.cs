@@ -13,7 +13,7 @@ namespace Voxelgine.GUI {
 	class GUIItemBox : GUIElement {
 		public bool IsSelected = false;
 
-		public GUIInventory Parent;
+		public GUIInventory ParentInv;
 		public InventoryItem Item;
 
 		public bool UpdateTextFromItem;
@@ -30,11 +30,7 @@ namespace Voxelgine.GUI {
 		Vector2 TextureCoords;
 		Vector2 TextureSize;
 
-		GUIManager Mgr;
-
-		public GUIItemBox(GUIManager Mgr) {
-			this.Mgr = Mgr;
-
+		public GUIItemBox(GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
 			Size = new Vector2(64, 64);
 
 			Tex = ResMgr.GetTexture("gui/itembox.png");
@@ -45,7 +41,7 @@ namespace Voxelgine.GUI {
 		}
 
 		public void SetItem(GUIInventory Parent, InventoryItem Item) {
-			this.Parent = Parent;
+			this.ParentInv = Parent;
 			this.Item = Item;
 			Item.SetupItemBox(this);
 		}

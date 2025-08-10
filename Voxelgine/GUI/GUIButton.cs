@@ -19,12 +19,9 @@ namespace Voxelgine.GUI {
 		float IconScale = 3;
 		bool HasIcon = false;
 
-		GUIManager Mgr;
-
 		public string Text;
 
-		public GUIButton(GUIManager Mgr) {
-			this.Mgr = Mgr;
+		public GUIButton(GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
 			Size = new Vector2(140, 60);
 
 			BtnTex = ResMgr.GetTexture("gui/btn.png");

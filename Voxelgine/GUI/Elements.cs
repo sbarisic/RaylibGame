@@ -26,6 +26,8 @@ namespace Voxelgine.GUI {
 	}
 
 	public abstract class GUIElement {
+		public GUIElement Parent;
+
 		public Vector2 Pos;
 		public Vector2 Size;
 		public Vector2 MousePos;
@@ -34,14 +36,22 @@ namespace Voxelgine.GUI {
 		public bool IsHoveredOn;
 
 		public bool Enabled = true;
+		public int ZOrder = 0;
 
 		public OnMouseClickedFunc OnClickedFunc;
+		public float? OriginalWidth = null;
+
+		public Flexbox.Node FlexNode;
+		public GUIManager Mgr;
 
 		protected bool MouseDown_Left = false;
 
-		public int ZOrder = 0;
+		public GUIElement(GUIManager Mgr, GUIElement Parent) {
+			this.Mgr = Mgr;
+			this.Parent = Parent;
+			CreateFlexbox();
+		}
 
-		public float? OriginalWidth = null;
 
 		public virtual bool IsInside(Vector2 Pos2) {
 			Rectangle Rect = new Rectangle(Pos, Size);
@@ -50,6 +60,23 @@ namespace Voxelgine.GUI {
 
 		public virtual void OnMouseClick() {
 			OnClickedFunc?.Invoke(this);
+		}
+
+		public virtual void OnFlexUpdated() {
+
+		}
+
+		public virtual void SetFlexbox() {
+
+		}
+
+		public virtual void CreateFlexbox() {
+			FlexNode = Flexbox.Flex.CreateDefaultNode();
+
+			if (Parent != null)
+				Parent.FlexNode.AddChild(FlexNode);
+			else
+				Mgr.RootNode.AddChild(FlexNode);
 		}
 
 		bool ButtonHeldDown = false;

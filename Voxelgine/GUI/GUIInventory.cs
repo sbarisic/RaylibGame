@@ -21,7 +21,6 @@ namespace Voxelgine.GUI {
 		private float ItemSpacing = 4f;
 		private float ItemBoxSize = 64f;
 
-		private GUIManager Mgr;
 		private bool ScrollLeftPressed = false;
 		private bool ScrollRightPressed = false;
 		private bool SelectNextPressed = false;
@@ -29,8 +28,7 @@ namespace Voxelgine.GUI {
 
 		public Action<InventoryChangeEventArgs> OnActiveSelectionChanged;
 
-		public GUIInventory(GUIManager Mgr, int maxItems = 10, int visibleItems = 10) {
-			this.Mgr = Mgr;
+		public GUIInventory(GUIManager Mgr, GUIElement Parent, int maxItems = 10, int visibleItems = 10) : base(Mgr, Parent) {
 			this.MaxItems = maxItems;
 			this.VisibleItems = visibleItems;
 
@@ -43,13 +41,13 @@ namespace Voxelgine.GUI {
 			// Initialize item boxes  
 			ItemBoxes = new List<GUIItemBox>();
 			for (int i = 0; i < MaxItems; i++) {
-				GUIItemBox itemBox = new GUIItemBox(Mgr);
-				itemBox.Parent = this;
+				GUIItemBox itemBox = new GUIItemBox(Mgr, this);
+				itemBox.ParentInv = this;
 				itemBox.Size = new Vector2(ItemBoxSize, ItemBoxSize);
 
 				itemBox.OnClickedFunc = (E) => {
 					GUIItemBox ths = E as GUIItemBox;
-					ths.Parent.SetSelectedIndexObject(ths);
+					ths.ParentInv.SetSelectedIndexObject(ths);
 				};
 
 				ItemBoxes.Add(itemBox);

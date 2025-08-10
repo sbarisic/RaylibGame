@@ -11,8 +11,6 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
-		GUIManager Mgr;
-
 		public string Label = "DefaultLabel";
 		string Value = "";
 		string OriginalValue;
@@ -25,13 +23,12 @@ namespace Voxelgine.GUI {
 		float LabelSpacing = 8f;
 		float Padding = 6f;
 
-		public GUIInputBox(GUIManager Mgr, string Label, string Value) {
-			this.Mgr = Mgr;
+		public GUIInputBox(GUIManager Mgr, GUIElement Parent, string Label, string Value) : base(Mgr, Parent) {
 			this.Label = Label;
 			this.Value = Value;
 
 			// Create a GUILabel for the input field (single-line, 24 chars by default)
-			InputLabel = new GUILabel(Mgr, 24);
+			InputLabel = new GUILabel(Mgr, this, 24);
 			InputLabel.IsInput = true;
 			InputLabel.IsReading = false;
 			InputLabel.ClearOnEnter = false;

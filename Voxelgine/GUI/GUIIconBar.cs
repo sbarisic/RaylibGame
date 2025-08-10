@@ -33,11 +33,7 @@ namespace Voxelgine.GUI {
 		Texture2D Icon;
 		float IconScale = 3.0f;
 
-		GUIManager Mgr;
-
-
-		public GUIIconBar(GUIManager Mgr, IconBarStyle Style, int NumIcons = 10, float IconScale = 3.0f) {
-			this.Mgr = Mgr;
+		public GUIIconBar(GUIManager Mgr, GUIElement Parent, IconBarStyle Style, int NumIcons = 10, float IconScale = 3.0f) : base(Mgr, Parent) {
 			this.IconScale = IconScale;
 
 			this.NumIcons = NumIcons;

@@ -14,11 +14,7 @@ namespace Voxelgine.GUI {
 		Texture2D Img;
 		float ImgScale = 1.0f;
 
-		GUIManager Mgr;
-
-
-		public GUIImage(GUIManager Mgr, string ImageName, float ImgScale = 1.0f) {
-			this.Mgr = Mgr;
+		public GUIImage(GUIManager Mgr, GUIElement Parent, string ImageName, float ImgScale = 1.0f) : base(Mgr, Parent) {
 			this.ImgScale = ImgScale;
 
 			Img = ResMgr.GetTexture(ImageName);

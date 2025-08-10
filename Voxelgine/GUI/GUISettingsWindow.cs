@@ -18,7 +18,7 @@ using static System.Net.Mime.MediaTypeNames;
 namespace Voxelgine.GUI {
 	class GUISettingsWindow : GUIWindow {
 
-		public GUISettingsWindow(GUIManager Mgr, GameWindow Window) : base(Mgr) {
+		public GUISettingsWindow(GameWindow Window, GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
 			Vector2 BtnSize = Mgr.WindowScale(new Vector2(0.2f, 0.07f));
 			List<GUIElement> OptIB = new List<GUIElement>();
 
@@ -29,7 +29,7 @@ namespace Voxelgine.GUI {
 					(Window.Height / 1.65f) - (CenterSize.Y / 2)
 				), CenterSize);
 
-			CreateOptionsButtons(OptIB, BtnSize * new Vector2(1, 0.6f));
+			CreateOptionsButtons(this, OptIB, BtnSize * new Vector2(1, 0.6f));
 			foreach (var el in OptIB) {
 				el.Pos -= DbgRect.Position;
 				AddChild(el);
@@ -62,13 +62,13 @@ namespace Voxelgine.GUI {
 			StoreSizePos();
 		}
 
-		void CreateOptionsButtons(List<GUIElement> IB, Vector2 BtnSize) {
+		void CreateOptionsButtons(GUIElement Wnd, List<GUIElement> IB, Vector2 BtnSize) {
 			ConfigValueRef[] Vars = Program.Cfg.GetVariables().ToArray();
 
 			for (int i = 0; i < Vars.Length; i++) {
 				ConfigValueRef VRef = Vars[i];
 
-				GUIInputBox IBx = new GUIInputBox(Mgr, VRef.FieldName, VRef.GetValueString());
+				GUIInputBox IBx = new GUIInputBox(Mgr, Wnd, VRef.FieldName, VRef.GetValueString());
 				IBx.OnValueChanged = (V) => {
 					try {
 						VRef.SetValueString(V);
@@ -82,7 +82,7 @@ namespace Voxelgine.GUI {
 				IB.Add(IBx);
 			}
 
-			GUIButton Btn_ResetConfig = new GUIButton(Mgr);
+			GUIButton Btn_ResetConfig = new GUIButton(Mgr, Wnd);
 			Btn_ResetConfig.Size = BtnSize;
 			Btn_ResetConfig.Text = "Reset Cfg";
 			Btn_ResetConfig.OnClickedFunc = (E) => {
@@ -92,7 +92,7 @@ namespace Voxelgine.GUI {
 			};
 			IB.Add(Btn_ResetConfig);
 
-			GUIButton Btn_Save = new GUIButton(Mgr);
+			GUIButton Btn_Save = new GUIButton(Mgr, Wnd);
 			Btn_Save.Size = BtnSize;
 			Btn_Save.Text = "Save & Restart";
 			Btn_Save.OnClickedFunc = (E) => {
@@ -101,7 +101,7 @@ namespace Voxelgine.GUI {
 			};
 			IB.Add(Btn_Save);
 
-			GUIButton Btn_Close = new GUIButton(Mgr);
+			GUIButton Btn_Close = new GUIButton(Mgr, Wnd);
 			Btn_Close.Size = BtnSize;
 			Btn_Close.Text = "Close";
 			Btn_Close.OnClickedFunc = (E) => {

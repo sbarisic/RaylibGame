@@ -226,6 +226,7 @@ namespace Voxelgine.GUI {
 		public override void OnFlexUpdated() {
 			base.OnFlexUpdated();
 
+			// Pull position and size from FlexNode.layout like GUIWindow
 			Pos = new Vector2(FlexNode.layout.x, FlexNode.layout.y);
 			Size = new Vector2(FlexNode.layout.width, FlexNode.layout.height);
 

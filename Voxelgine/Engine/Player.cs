@@ -573,7 +573,7 @@ namespace Voxelgine.Engine {
 
 			Inventory = new GUIInventory(GUI, null);
 			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
-			Inventory.FlexNode.nodeStyle.Set("width: 650; height: 64;");
+			Inventory.FlexNode.nodeStyle.Set("position: absolute; width: 650; height: 64;");
 			GUI.AddElement(Inventory);
 
 			Inventory.OnActiveSelectionChanged = (E) => {

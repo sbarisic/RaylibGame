@@ -29,8 +29,6 @@ namespace Voxelgine.GUI {
 		public Action<InventoryChangeEventArgs> OnActiveSelectionChanged;
 
 		public GUIInventory(GUIManager Mgr, GUIElement Parent, int maxItems = 10, int visibleItems = 10) : base(Mgr, Parent) {
-			FlexNode.nodeStyle.Set("position: absolute; width: 650; height: 64;");
-
 			this.MaxItems = maxItems;
 			this.VisibleItems = visibleItems;
 

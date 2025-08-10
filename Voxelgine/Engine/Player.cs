@@ -599,6 +599,8 @@ namespace Voxelgine.Engine {
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
 			Inventory.SetSelectedIndex(0);
+
+			GUI.Tick();
 		}
 
 		public void UpdateGUI() {

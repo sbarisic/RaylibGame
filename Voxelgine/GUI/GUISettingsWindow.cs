@@ -17,7 +17,7 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace Voxelgine.GUI {
 	class GUISettingsWindow : GUIWindow {
-		const string InBoxStyle = "width: 100%; height: 70; padding: 0;";
+		const string InBoxStyle = "width: 600; left: 0; height: 120; padding: 0; flex-direction: column;";
 		const string BtnStyle = "width: 100%; height: 70; padding: 0;";
 		const string WindowStyle = "width: 400; height: 500; padding: 10; flex-direction: column;";
 		const string TitleImageStyle = "left: 50%; top: 20%;";
@@ -37,7 +37,7 @@ namespace Voxelgine.GUI {
 			CreateOptionsButtons(this, OptIB, BtnSize * new Vector2(1, 0.6f));
 
 			foreach (var el in OptIB) {
-				el.Pos -= DbgRect.Position;
+				//el.Pos -= DbgRect.Position;
 				AddChild(el);
 			}
 
@@ -90,7 +90,7 @@ namespace Voxelgine.GUI {
 			}
 
 			GUIButton Btn_ResetConfig = new GUIButton(Mgr, Wnd);
-			Btn_ResetConfig.Size = BtnSize;
+			//Btn_ResetConfig.Size = BtnSize;
 			Btn_ResetConfig.Text = "Reset Cfg";
 			Btn_ResetConfig.OnClickedFunc = (E) => {
 				Program.Cfg.SetDefaults();
@@ -101,7 +101,7 @@ namespace Voxelgine.GUI {
 			IB.Add(Btn_ResetConfig);
 
 			GUIButton Btn_Save = new GUIButton(Mgr, Wnd);
-			Btn_Save.Size = BtnSize;
+			//Btn_Save.Size = BtnSize;
 			Btn_Save.Text = "Save & Restart";
 			Btn_Save.OnClickedFunc = (E) => {
 				Program.Cfg.SaveToJson();
@@ -111,7 +111,7 @@ namespace Voxelgine.GUI {
 			IB.Add(Btn_Save);
 
 			GUIButton Btn_Close = new GUIButton(Mgr, Wnd);
-			Btn_Close.Size = BtnSize;
+			//Btn_Close.Size = BtnSize;
 			Btn_Close.Text = "Close";
 			Btn_Close.OnClickedFunc = (E) => {
 				this.Enabled = false;

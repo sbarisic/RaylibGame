@@ -11,7 +11,7 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
-		const string LabelStyle = "width: 100%; height: 24; padding: 0;";
+		const string LabelStyle = "width: 300; height: 32;";
 
 		public string Label = "DefaultLabel";
 		string Value = "";
@@ -44,7 +44,7 @@ namespace Voxelgine.GUI {
 
 
 			SetValue(Value, Value);
-			InputLabel.FlexNode.nodeStyle.Set("width: 100; height: 32;");
+			InputLabel.FlexNode.nodeStyle.Set("width: 50; height: 32;");
 
 			//UpdateLayout();
 			WasEdited = false;
@@ -74,6 +74,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public override GUIUpdateResult Update() {
+			OnFlexUpdated();
+
 			if (!Enabled)
 				return GUIUpdateResult.Disabled;
 

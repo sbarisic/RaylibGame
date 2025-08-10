@@ -39,6 +39,7 @@ namespace Voxelgine.GUI {
 
 		public void AddChild(GUIElement child) {
 			Children.Add(child);
+			child.SetFlexbox();
 		}
 
 		public GUIElement[] GetChildren() {
@@ -46,11 +47,11 @@ namespace Voxelgine.GUI {
 		}
 
 		public void CenterVertical() {
-			Mgr.CenterVertical(Vector2.Zero, new Vector2(Size.X, Size.Y - TitleBarHeight), CenterMargin, CenterIconMargin, Children.ToArray());
+			//Mgr.CenterVertical(Vector2.Zero, new Vector2(Size.X, Size.Y - TitleBarHeight), CenterMargin, CenterIconMargin, Children.ToArray());
 		}
 
 		public virtual void OnResize() {
-			CenterVertical();
+			//CenterVertical();
 		}
 
 		public override GUIUpdateResult Update() {

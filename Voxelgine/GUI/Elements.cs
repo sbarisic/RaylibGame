@@ -1,4 +1,6 @@
-﻿using MoonSharp.Interpreter.Interop.LuaStateInterop;
+﻿using Flexbox;
+
+using MoonSharp.Interpreter.Interop.LuaStateInterop;
 
 using Raylib_cs;
 
@@ -63,11 +65,17 @@ namespace Voxelgine.GUI {
 		}
 
 		public virtual void OnFlexUpdated() {
+			Pos = new Vector2(FlexNode.layout.left, FlexNode.layout.top);
 
+			Size = new Vector2(500, 500);
 		}
 
 		public virtual void SetFlexbox() {
-
+			/*FlexNode.StyleSetFlexDirection(Flexbox.FlexDirection.Row);
+			FlexNode.StyleSetPosition(Edge.Left, Pos.X);
+			FlexNode.StyleSetPosition(Edge.Top, Pos.Y);
+			FlexNode.StyleSetWidth(Size.X);
+			FlexNode.StyleSetHeight(Size.Y);*/
 		}
 
 		public virtual void CreateFlexbox() {

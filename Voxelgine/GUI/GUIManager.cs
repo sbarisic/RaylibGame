@@ -93,6 +93,8 @@ namespace Voxelgine.GUI {
 				if (E.Update() == GUIUpdateResult.ConsumedInput)
 					break;
 			}
+
+			CalculateFlexbox();
 		}
 
 		public void Draw() {

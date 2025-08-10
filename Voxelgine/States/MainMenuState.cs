@@ -113,6 +113,7 @@ namespace RaylibGame.States {
 			GWnd.Title = "Main Menu";
 			GWnd.Size = DbgRect.Size;
 			GWnd.Pos = DbgRect.Position;
+			//GWnd.FlexNode.nodeStyle.Apply("width: 250; height: 300; padding: 0;");
 			GUI.AddElement(GWnd);
 
 			// Create the options window, same size/pos as GWnd, but disabled by default
@@ -123,7 +124,8 @@ namespace RaylibGame.States {
 			OptionsWnd.Enabled = false;
 			OptionsWnd.Title = "Options";
 			OptionsWnd.Resizable = true;
-			OptionsWnd.CenterVertical();
+			//OptionsWnd.CenterVertical();
+			//OptionsWnd.FlexNode.nodeStyle.Apply("width: 250; height: 300; padding: 0;");
 			GUI.AddElement(OptionsWnd);
 
 			List<GUIElement> IB = new List<GUIElement>();
@@ -138,7 +140,7 @@ namespace RaylibGame.States {
 				GWnd.AddChild(el);
 			}
 
-			GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
+			//GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
 
 		}
 

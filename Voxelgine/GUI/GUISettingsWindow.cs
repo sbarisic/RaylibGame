@@ -35,7 +35,7 @@ namespace Voxelgine.GUI {
 				AddChild(el);
 			}
 
-			Mgr.CenterVertical(Vector2.Zero, Size, new Vector2(15, 10), 5, GetChildren());
+			//Mgr.CenterVertical(Vector2.Zero, Size, new Vector2(15, 10), 5, GetChildren());
 		}
 
 		public void StoreSizePos() {

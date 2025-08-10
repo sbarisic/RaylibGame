@@ -11,7 +11,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
-using Windows.ApplicationModel.Appointments.DataProvider;
 
 namespace Voxelgine.Engine {
 	public delegate void OnKeyPressedFunc();

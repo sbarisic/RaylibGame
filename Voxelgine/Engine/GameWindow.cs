@@ -13,8 +13,6 @@ using System.Threading.Tasks;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
-using Windows.Storage.Pickers;
-
 namespace Voxelgine.Engine {
 	public unsafe class GameWindow {
 		public InputMgr InMgr;

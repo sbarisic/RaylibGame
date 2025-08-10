@@ -29,6 +29,8 @@ namespace Voxelgine.GUI {
 		public Action<InventoryChangeEventArgs> OnActiveSelectionChanged;
 
 		public GUIInventory(GUIManager Mgr, GUIElement Parent, int maxItems = 10, int visibleItems = 10) : base(Mgr, Parent) {
+			FlexNode.nodeStyle.Set("position: absolute; width: 650; height: 64;");
+
 			this.MaxItems = maxItems;
 			this.VisibleItems = visibleItems;
 
@@ -51,7 +53,7 @@ namespace Voxelgine.GUI {
 					ths.ParentInv.SetSelectedIndexObject(ths);
 				};
 
-				itemBox.FlexNode.nodeStyle.Set("width: 64; height: 64;");
+				itemBox.FlexNode.nodeStyle.Set("width: 64; height: 64; margin-left: 2; margin-right: 2;");
 				ItemBoxes.Add(itemBox);
 			}
 
@@ -226,6 +228,8 @@ namespace Voxelgine.GUI {
 		public override void OnFlexUpdated() {
 			base.OnFlexUpdated();
 
+			FlexNode.CalculateLayout(Mgr.Window.Width, Mgr.Window.Height, Flexbox.Direction.LTR);
+
 			// Pull position and size from FlexNode.layout like GUIWindow
 			Pos = new Vector2(FlexNode.layout.x, FlexNode.layout.y);
 			Size = new Vector2(FlexNode.layout.width, FlexNode.layout.height);
@@ -236,7 +240,7 @@ namespace Voxelgine.GUI {
 		}
 
 		public override void Draw(bool Hovered, bool MouseClicked, bool MouseDown) {
-			Raylib.DrawRectangleV(Pos, Size, Color.Pink);
+			//Raylib.DrawRectangleV(Pos, Size, Color.Pink);
 
 			// Draw only visible item boxes  
 			for (int i = 0; i < VisibleItems && (i + ScrollOffset) < ItemBoxes.Count; i++) {

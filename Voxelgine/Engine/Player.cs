@@ -572,8 +572,7 @@ namespace Voxelgine.Engine {
 			GUI.AddElement(InfoLbl);
 
 			Inventory = new GUIInventory(GUI, null);
-			Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
-			Inventory.FlexNode.nodeStyle.Set("position: absolute; width: 650; height: 64;");
+			Inventory.FlexNode.nodeStyle.Set("width: 40%; height: 64; left: 30%; top: 87%; justify-content: center;");
 			GUI.AddElement(Inventory);
 
 			Inventory.OnActiveSelectionChanged = (E) => {
@@ -652,6 +651,7 @@ namespace Voxelgine.Engine {
 
 			if (!CursorDisabled) {
 				GUI.Tick();
+				//Inventory.Update();
 			} else {
 				if (InMgr.IsInputPressed(InputKey.Q))
 					Inventory.SelectPrevious();
@@ -677,7 +677,6 @@ namespace Voxelgine.Engine {
 
 		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (LocalPlayer) {
-				Raylib_cs.
 
 				Rlgl.DisableDepthTest();
 				//Rlgl.DisableDepthMask();

@@ -14,7 +14,7 @@ namespace Voxelgine.GUI {
 		public int FntSize = 32;
 		public Font TxtFont;
 
-		GameWindow Window;
+		public GameWindow Window;
 
 		List<GUIElement> Elements = new List<GUIElement>();
 		Vector2 MousePos = Vector2.Zero;

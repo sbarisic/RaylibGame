@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace RaylibGame.States {
 	class MainMenuState : GameStateImpl {
@@ -48,13 +49,13 @@ namespace RaylibGame.States {
 				Program.Window.Close();
 			};
 
-			/*GUIButton Btn_Wat = new GUIButton(GUI);
+			GUIButton Btn_Wat = new GUIButton(GUI);
 			Btn_Wat.Pos = GUI.WindowScale(new Vector2(0.5f, 0.4f));
 			Btn_Wat.Size = BtnSize;
-			Btn_Wat.Text = "Wat";
+			Btn_Wat.Text = "OS: " + Utils.GetOSName();
 			Btn_Wat.OnClickedFunc = (E) => {
-				Console.WriteLine("Wat");
-			};*/
+				Console.WriteLine("Running on {0}", Utils.GetOSName());
+			};
 
 			IB.Add(Btn_NewGame);
 			IB.Add(Btn_Options);
@@ -72,7 +73,7 @@ namespace RaylibGame.States {
 			Raylib.SetTextureFilter(Icon2, TextureFilter.Point);
 			Btn_Quit.SetIcon(Icon2);
 
-			//IB.Add(Btn_Wat);
+			IB.Add(Btn_Wat);
 		}
 
 		GUIItemBox AddItmBox(Vector2 Pos, Texture2D Icn) {

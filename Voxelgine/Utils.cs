@@ -6,8 +6,11 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+
+using Voxelgine.GUI;
 
 namespace Voxelgine {
 	delegate bool RaycastCallbackFunc(int X, int Y, int Z, Vector3 FaceNormal);
@@ -730,6 +733,19 @@ namespace Voxelgine {
 			Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
 			float length = normal.Length();
 			return plane / length;
+		}
+
+		public static string GetOSName() {
+			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+				return "Windows";
+			else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+				return "Linux";
+			else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+				return "MacOS";
+			else if (RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD))
+				return "FreeBSD";
+
+			return RuntimeInformation.OSDescription;
 		}
 	}
 }

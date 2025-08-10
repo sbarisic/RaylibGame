@@ -34,6 +34,9 @@ namespace Voxelgine {
 		static void Main(string[] args) {
 			DebugMode = Debugger.IsAttached;
 
+			Console.WriteLine("Aurora Falls - Voxelgine Engine");
+			Console.WriteLine("Running on {0}", Utils.GetOSName());
+
 			Cfg = new GameConfig();
 			Cfg.LoadFromJson();
 

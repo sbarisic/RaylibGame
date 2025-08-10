@@ -16,9 +16,6 @@ using TextCopy;
 
 using Voxelgine.Engine;
 
-using Windows.Graphics.Printing3D;
-using Windows.Media.Core;
-
 namespace Voxelgine.GUI {
 	public delegate void OnMouseClickedFunc(GUIElement El);
 

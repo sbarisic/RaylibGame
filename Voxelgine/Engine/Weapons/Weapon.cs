@@ -14,7 +14,6 @@ using System.Threading.Tasks;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
-using Windows.Web.UI;
 
 namespace Voxelgine.Engine {
 	record struct InventoryClickEventArgs(ChunkMap Map, Vector3 Start, Vector3 Dir, float MaxLen);

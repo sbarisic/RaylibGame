@@ -8,7 +8,6 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Graphics;
-using Windows.Management.Deployment;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {

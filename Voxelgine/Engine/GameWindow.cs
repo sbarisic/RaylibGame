@@ -188,7 +188,7 @@ namespace Voxelgine.Engine {
 
 		public void Tick(float GameTime) {
 			InMgr.Tick(GameTime);
-			State.Tick();
+			State.Tick(GameTime);
 		}
 
 		public void UpdateLockstep(float TotalTime, float Dt) {

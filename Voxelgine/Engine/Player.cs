@@ -541,6 +541,8 @@ namespace Voxelgine.Engine {
 
 			Position = FPSCamera.Position;
 			Rotation = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI / 2, 0);
+
+			ViewMdl.Update(this);
 		}
 
 		GUIItemBox Box_Health;
@@ -591,7 +593,7 @@ namespace Voxelgine.Engine {
 
 			int ItmIdx = 0;
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Gun", IconType.Gun).SetViewModelInfo(ViewModelRotationMode.Gun).SetupModel("gun/gun.obj"));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Hammer", IconType.Hammer).SetViewModelInfo(ViewModelRotationMode.Tool).SetupModel("hammer/hammer.obj"));
+			SetInvItem(Inventory, ItmIdx++, new WeaponPicker(this, "Hammer"));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));

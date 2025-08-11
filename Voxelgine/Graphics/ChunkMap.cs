@@ -6,6 +6,7 @@ using System.Linq;
 using Raylib_cs;
 using Voxelgine.Engine;
 using RaylibGame.States;
+using System.Data;
 
 namespace Voxelgine.Graphics {
 	public unsafe class ChunkMap {
@@ -233,7 +234,12 @@ namespace Voxelgine.Graphics {
 			Vector3 probe = Pos + ProbeDir * 0.1f;
 
 			if (BlockInfo.IsSolid(GetBlock((int)MathF.Floor(probe.X), (int)MathF.Floor(probe.Y), (int)MathF.Floor(probe.Z)))) {
-				PickNormal = -Vector3.Normalize(ProbeDir);
+
+				if (ProbeDir != Vector3.Zero)
+					PickNormal = -Vector3.Normalize(ProbeDir);
+				else
+					PickNormal = Vector3.Zero;
+
 				return true;
 			}
 
@@ -280,6 +286,26 @@ namespace Voxelgine.Graphics {
 						}
 					}
 			return false;
+		}
+
+		public RayCollision RaycastRay(Ray R, float MaxLen) {
+			List<RayCollision> Cols = new List<RayCollision>();
+
+			foreach (var KV in Chunks.Items) {
+				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+
+				RayCollision Col = KV.Value.Collide(ChunkPos, R);
+				if (Col.Hit) {
+					Cols.Add(Col);
+				}
+			}
+
+			Cols = Cols.Where(c => c.Distance <= MaxLen).ToList();
+
+			if (Cols.Count == 0)
+				return new RayCollision() { Hit = false };
+
+			return Cols.OrderBy(c => c.Distance).FirstOrDefault();
 		}
 	}
 }

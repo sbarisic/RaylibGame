@@ -160,7 +160,7 @@ namespace RaylibGame.States {
 			Cam.Target = Vector2.Zero;
 		}
 
-		public override void Tick() {
+		public override void Tick(float GameTime) {
 			GUI.Tick();
 		}
 

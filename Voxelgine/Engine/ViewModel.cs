@@ -75,12 +75,7 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-
-		// TODO: Make animation system for viewmodels better, lerp between rotations and positions instead of using a switch statement?
-		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			if (!IsActive)
-				return;
-
+		public void Update(Player Ply) {
 			// Camera basis
 			var cam = Ply.Cam;
 			Vector3 worldUp = Vector3.UnitY;
@@ -98,7 +93,7 @@ namespace Voxelgine.Engine {
 					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
 					break;
 				case ViewModelRotationMode.Gun:
-					newDesiredPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.3f;
+					newDesiredPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
 					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0);
 					break;
 				case ViewModelRotationMode.GunIronsight:
@@ -153,12 +148,23 @@ namespace Voxelgine.Engine {
 
 			// Lerp rotation
 			VMRot = Quaternion.Slerp(VMRot, DesiredVMRot * LrpRot.GetQuat(), 0.2f);
+		}
 
-			float angle = 2.0f * MathF.Acos(VMRot.W) * 180f / MathF.PI;
-			float s = MathF.Sqrt(1 - VMRot.W * VMRot.W);
-			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(VMRot.X / s, VMRot.Y / s, VMRot.Z / s);
 
-			Raylib.DrawModelEx(VModel, ViewModelPos, axis, angle, new Vector3(1, 1, 1), Color.White);
+		// TODO: Make animation system for viewmodels better, lerp between rotations and positions instead of using a switch statement?
+		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
+			if (!IsActive)
+				return;
+
+			GameFrameInfo GFI = CurFame.Interpolate(LastFrame, TimeAlpha);
+			Quaternion R = GFI.ViewModelRot;
+			Vector3 P = GFI.ViewModelPos;
+
+			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;
+			float s = MathF.Sqrt(1 - R.W * R.W);
+			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(R.X / s, R.Y / s, R.Z / s);
+
+			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), Color.White);
 		}
 	}
 }

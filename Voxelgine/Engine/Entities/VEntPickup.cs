@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -19,6 +20,8 @@ namespace Voxelgine.Engine {
 		public float BobSpeed = 2;
 		LerpVec3 BobbingLerp;
 
+		Stopwatch SWatch = Stopwatch.StartNew();
+
 		public VEntPickup() : base() {
 			IsRotating = true;
 
@@ -27,13 +30,26 @@ namespace Voxelgine.Engine {
 			BobbingLerp.Easing = Easing.EaseInOutQuart;
 			BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));
 			IsBobbing = true;
+
+			NextMs = 400;
 		}
+
+		long NextMs;
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
 			if (IsBobbing) {
 				ModelOffset = new Vector3(0, BobbingLerp.GetVec3().Y, 0);
+			}
+
+			if (SWatch.ElapsedMilliseconds > NextMs) {
+				SWatch.Restart();
+				NextMs = Random.Shared.Next(300, 700);
+
+				ParticleSystem Part = ((GameState)Program.GameState).Particle;
+
+				Part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
 			}
 		}
 	}

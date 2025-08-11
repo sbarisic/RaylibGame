@@ -17,6 +17,8 @@ namespace RaylibGame.States {
 		public Player Ply;
 		public SoundMgr Snd;
 
+		public ParticleSystem Particle;
+
 		List<Tuple<Vector3, Vector3>> MarkerList = new();
 		GUIManager GUI;
 		PhysData PhysicsData;
@@ -31,6 +33,11 @@ namespace RaylibGame.States {
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
 			EntMgr = new EntityManager();
+
+			Particle = new ParticleSystem();
+			Particle.Init((Pt) => {
+				return Map.Collide(Pt, Vector3.Zero, out Vector3 _);
+			});
 
 			Snd = new SoundMgr();
 			Snd.Init();
@@ -71,6 +78,11 @@ namespace RaylibGame.States {
 
 		}
 
+		public override void SwapTo() {
+			base.SwapTo();
+			Raylib.DisableCursor();
+		}
+
 		public override void OnResize(GameWindow Window) {
 			base.OnResize(Window);
 			Ply.RecalcGUI(Window);
@@ -101,7 +113,9 @@ namespace RaylibGame.States {
 			Console.WriteLine("Done!");
 		}
 
-		public override void Tick() {
+		public override void Tick(float GameTime) {
+			Particle.Tick(GameTime);
+
 			if (Window.InMgr.IsInputPressed(InputKey.Esc)) {
 				Window.SetState(Program.MainMenuState);
 				return;
@@ -163,8 +177,10 @@ namespace RaylibGame.States {
 			DrawTransparent();
 
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
+			Particle.Draw(Ply, ref ViewFrustum);
 
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurFame);
+
 
 			if (Program.DebugMode)
 				DrawPlayerCollisionBox(PlayerCollisionBoxPos);

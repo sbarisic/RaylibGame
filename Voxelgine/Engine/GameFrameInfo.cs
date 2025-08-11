@@ -29,10 +29,12 @@ namespace Voxelgine.Engine {
 
 			GameFrameInfo New = new GameFrameInfo();
 
+			
+
 			New.Cam.FovY = float.Lerp(Old.Cam.FovY, Cam.FovY, T);
 			New.Cam.Position = Vector3.Lerp(Old.Cam.Position, Cam.Position, T);
 			New.Cam.Target = Vector3.Lerp(Old.Cam.Target, Cam.Target, T);
-			New.Cam.Up = Cam.Up;
+			New.Cam.Up = Vector3.Lerp(Old.Cam.Up, Cam.Up, T);
 			New.Cam.Projection = Cam.Projection;
 			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
 			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);

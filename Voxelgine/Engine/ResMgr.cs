@@ -113,6 +113,25 @@ namespace Voxelgine.Engine {
 			ResourceList.Add(Res);
 		}
 
+		static Dictionary<string, Texture2D[]> TexCollections = new Dictionary<string, Texture2D[]>();
+
+		public static void CreateCollection(string Name, params Texture2D[] Textures) {
+			if (TexCollections.ContainsKey(Name))
+				TexCollections.Remove(Name);
+
+			TexCollections.Add(Name, Textures);
+		}
+
+		public static Texture2D GetFromCollection(string Name) {
+			if (TexCollections.ContainsKey(Name)) {
+				Texture2D[] Tex = TexCollections[Name];
+				int Idx = Random.Shared.Next(0, Tex.Length);
+				return Tex[Idx];
+			}
+
+			throw new FileNotFoundException();
+		}
+
 		public static Texture2D GetTexture(string FilePath, TextureFilter TexFilt = TextureFilter.Anisotropic16X) {
 			FilePath = Path.GetFullPath(Path.Combine("data/textures", FilePath)).Replace("\\", "/");
 

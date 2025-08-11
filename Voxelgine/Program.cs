@@ -47,6 +47,12 @@ namespace Voxelgine {
 			ResMgr.InitResources();
 			ResMgr.InitHotReload();
 
+			List<Texture2D> TexList = new List<Texture2D>();
+			for (int i = 1; i < 12; i++) {
+				TexList.Add(ResMgr.GetTexture($"smoke/{i}.png"));
+			}
+			ResMgr.CreateCollection("smoke", TexList.ToArray());
+
 			GraphicsUtils.Init();
 			Scripting.Init();
 

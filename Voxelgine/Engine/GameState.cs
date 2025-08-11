@@ -20,7 +20,7 @@ namespace Voxelgine.Engine {
 		public virtual void OnResize(GameWindow Window) {
 		}
 
-		public virtual void Tick() {
+		public virtual void Tick(float GameTime) {
 			// Once per frame
 		}
 

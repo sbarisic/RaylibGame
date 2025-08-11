@@ -115,30 +115,15 @@ namespace RaylibGame.States {
 					(Window.Height / 1.65f) - (CenterSize.Y / 2)
 				), CenterSize);
 
+			List<GUIElement> IB = new List<GUIElement>();
+
 			GUIWindow GWnd = new GUIWindow(GUI, null);
+			CreateMenuButtons(GWnd, IB, BtnSize);
 			GWnd.Title = "Main Menu";
 			GWnd.Size = DbgRect.Size;
 			GWnd.Pos = DbgRect.Position;
 			GWnd.FlexNode.nodeStyle.Apply(WindowStyle);
 			GUI.AddElement(GWnd);
-
-			// Create the options window, same size/pos as GWnd, but disabled by default
-			OptionsWnd = new GUISettingsWindow(Window, GUI, null);
-			OptionsWnd.Size = new Vector2(700, 1000);
-			OptionsWnd.Pos = new Vector2(10, 10);
-			((GUISettingsWindow)OptionsWnd).RestoreSizePos();
-			OptionsWnd.Enabled = false;
-			OptionsWnd.Title = "Options";
-			OptionsWnd.Resizable = true;
-			//OptionsWnd.CenterVertical();
-			OptionsWnd.FlexNode.nodeStyle.Apply(OptWindowStyle);
-			GUI.AddElement(OptionsWnd);
-
-			List<GUIElement> IB = new List<GUIElement>();
-			CreateMenuButtons(GWnd, IB, BtnSize);
-			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
-			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
-			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
 
 			// Adjust all element positions to be relative to the window
 			foreach (var el in IB) {
@@ -146,8 +131,26 @@ namespace RaylibGame.States {
 				GWnd.AddChild(el);
 			}
 
+			// Create the options window, same size/pos as GWnd, but disabled by default
+			OptionsWnd = new GUISettingsWindow(Window, GUI, null, new Vector2(700, 1000), new Vector2(10, 10));
+			OptionsWnd.Title = "Options";
+			OptionsWnd.Enabled = true;
+			OptionsWnd.Resizable = true;
+			//OptionsWnd.CenterVertical();
+			OptionsWnd.FlexNode.nodeStyle.Apply(OptWindowStyle);
+			GUI.AddElement(OptionsWnd);
+
+
+
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.5f)), ResMgr.GetTexture("items/heart_empty.png")));
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.6f)), ResMgr.GetTexture("items/heart_half.png")));
+			//IB.Add(AddItmBox(GUI.WindowScale(new Vector2(0.3f, 0.7f)), ResMgr.GetTexture("items/heart_full.png")));
+
+
+
 			//GUI.CenterVertical(Vector2.Zero, GWnd.Size, new Vector2(15, 10), 5, IB.ToArray());
 			NodePrinter.Print(GUI.RootNode);
+			//OptionsWnd.Show();
 		}
 
 		public override void SwapTo() {

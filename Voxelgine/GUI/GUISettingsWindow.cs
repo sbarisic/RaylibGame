@@ -17,12 +17,24 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace Voxelgine.GUI {
 	class GUISettingsWindow : GUIWindow {
-		const string InBoxStyle = "width: 100%; height: 64; padding: 0; margin-bottom: 5;";
-		const string BtnStyle = "width: 100%; height: 56; padding: 10; margin-bottom: 5;";
+		const string InBoxStyle = "width: 100%; height: 64; padding: 0; margin-bottom: 5; left: -400;";
+		const string BtnStyle = "width: 100%; height: 56; padding: 10; margin-bottom: 5; left: -400;";
 
-		public GUISettingsWindow(GameWindow Window, GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
+		Rectangle DbgRect;
+
+		public GUISettingsWindow(GameWindow Window, GUIManager Mgr, GUIElement Parent, Vector2 Size, Vector2 Pos) : base(Mgr, Parent) {
 			List<GUIElement> OptIB = new List<GUIElement>();
+			this.Size = Size;
+			this.Pos = Pos;
+
 			CreateOptionsButtons(this, OptIB);
+
+			Vector2 CenterSize = Size;
+			DbgRect = new Rectangle(
+				new Vector2(
+					(Window.Width / 2) - (CenterSize.X / 2),
+					(Window.Height / 1.65f) - (CenterSize.Y / 2)
+				), CenterSize);
 
 			foreach (var el in OptIB) {
 				//el.Pos -= DbgRect.Position;
@@ -30,30 +42,6 @@ namespace Voxelgine.GUI {
 			}
 
 			//Mgr.CenterVertical(Vector2.Zero, Size, new Vector2(15, 10), 5, GetChildren());
-		}
-
-		public void StoreSizePos() {
-			Program.Cfg.LastOptWnd_X = (int)Pos.X;
-			Program.Cfg.LastOptWnd_Y = (int)Pos.Y;
-			Program.Cfg.LastOptWnd_W = (int)Size.X;
-			Program.Cfg.LastOptWnd_H = (int)Size.Y;
-		}
-
-		public void RestoreSizePos() {
-			int X = Program.Cfg.LastOptWnd_X;
-			int Y = Program.Cfg.LastOptWnd_Y;
-			int W = Program.Cfg.LastOptWnd_W;
-			int H = Program.Cfg.LastOptWnd_H;
-
-			if (!(X == 0 && Y == 0 && W == 0 && H == 0)) {
-				Pos = new Vector2(X, Y);
-				Size = new Vector2(W, H);
-			}
-		}
-
-		public override void OnResize() {
-			base.OnResize();
-			StoreSizePos();
 		}
 
 		void CreateOptionsButtons(GUIElement Wnd, List<GUIElement> IB) {

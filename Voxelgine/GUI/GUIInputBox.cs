@@ -41,13 +41,13 @@ namespace Voxelgine.GUI {
 
 			//InputLabel.FlexNode.nodeStyle.Set(LabelStyle);
 			InputLabel.DrawTextColor = new Color(130, 172, 209);
-
-
+			
 			SetValue(Value, Value);
-			InputLabel.FlexNode.nodeStyle.Set("left: 60%; top: 10%; width: 100%; height: 32;");
 
 			//UpdateLayout();
 			WasEdited = false;
+
+			//InputLabel.FlexNode.nodeStyle.Set("left: 300; top: -10; width: 300; height: 64;");
 		}
 
 		public void SetValue(string Value, string OriginalValue = null) {
@@ -74,8 +74,11 @@ namespace Voxelgine.GUI {
 		}*/
 
 		public override GUIUpdateResult Update() {
+			//FlexNode.CalculateLayout(Parent.Size.X, Parent.Size.Y, Flexbox.Direction.LTR);
 			OnFlexUpdated();
-			InputLabel.OnFlexUpdated();
+
+			//InputLabel.FlexNode.CalculateLayout(Size.X, Size.Y, Flexbox.Direction.LTR);
+			//InputLabel.OnFlexUpdated();
 
 			if (!Enabled)
 				return GUIUpdateResult.Disabled;
@@ -127,12 +130,15 @@ namespace Voxelgine.GUI {
 			Mgr.Draw9Patch(tex, new Rectangle(Pos, Size), bg);
 
 			// Enable scissor mode to clip drawing inside the input box
-			ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
+			//ScissorManager.BeginScissor(Pos.X, Pos.Y, Size.X, Size.Y);
 
 			// Draw label to the left, vertically centered
 			Vector2 labelSize = Mgr.MeasureText(Label);
 			float labelY = Pos.Y + Padding + (Size.Y - Padding * 2 - labelSize.Y) / 2;
 			Mgr.DrawText(Label, new Vector2(Pos.X + Padding, labelY), Color.White);
+
+			InputLabel.Size = new Vector2(300, 48);
+			InputLabel.Pos = Pos + new Vector2(300, Padding);
 
 			// Draw input field (delegated to GUILabel)
 			//var oldPos = InputLabel.Pos;
@@ -140,7 +146,7 @@ namespace Voxelgine.GUI {
 			InputLabel.Draw(IsActive, MouseClicked, MouseDown);
 			//InputLabel.Pos = oldPos;
 
-			ScissorManager.EndScissor();
+			//ScissorManager.EndScissor();
 		}
 	}
 }

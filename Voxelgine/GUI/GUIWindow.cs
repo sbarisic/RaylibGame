@@ -52,6 +52,12 @@ namespace Voxelgine.GUI {
 
 		public virtual void OnResize() {
 			//CenterVertical();
+
+			FlexNode.StyleSetPosition(Flexbox.Edge.Left, Pos.X);
+			FlexNode.StyleSetPosition(Flexbox.Edge.Top, Pos.Y);
+
+			FlexNode.StyleSetWidth(Size.X);
+			FlexNode.StyleSetHeight(Size.Y);
 		}
 
 		public override GUIUpdateResult Update() {

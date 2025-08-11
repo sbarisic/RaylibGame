@@ -19,7 +19,7 @@ namespace RaylibGame.States {
 	class MainMenuState : GameStateImpl {
 		const string BtnStyle = "width: 100%; height: 76; padding: 10; margin-bottom: 5;";
 		const string WindowStyle = "width: 400; height: 500; padding-top: 15; padding-left: 20; padding-right: 20; flex-direction: column;";
-		const string OptWindowStyle = "width: 800; height: 900; padding-top: 15; padding-left: 20; padding-right: 20; flex-direction: column;";
+		const string OptWindowStyle = "width: 700; height: 1000; padding-top: 15; padding-left: 20; padding-right: 20; flex-direction: column;";
 		const string TitleImageStyle = "left: 50%; top: 20%;";
 
 		Camera2D Cam = new Camera2D();
@@ -124,8 +124,8 @@ namespace RaylibGame.States {
 
 			// Create the options window, same size/pos as GWnd, but disabled by default
 			OptionsWnd = new GUISettingsWindow(Window, GUI, null);
-			OptionsWnd.Size = DbgRect.Size;
-			OptionsWnd.Pos = DbgRect.Position;
+			OptionsWnd.Size = new Vector2(700, 1000);
+			OptionsWnd.Pos = new Vector2(10, 10);
 			((GUISettingsWindow)OptionsWnd).RestoreSizePos();
 			OptionsWnd.Enabled = false;
 			OptionsWnd.Title = "Options";

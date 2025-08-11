@@ -39,7 +39,7 @@ namespace Voxelgine.GUI {
 
 		public void AddChild(GUIElement child) {
 			Children.Add(child);
-			child.SetFlexbox();
+			//child.SetFlexbox();
 		}
 
 		public GUIElement[] GetChildren() {

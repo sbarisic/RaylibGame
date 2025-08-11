@@ -17,24 +17,12 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace Voxelgine.GUI {
 	class GUISettingsWindow : GUIWindow {
-		const string InBoxStyle = "width: 600; left: 0; height: 120; padding: 0; flex-direction: column;";
-		const string BtnStyle = "width: 100%; height: 70; padding: 0;";
-		const string WindowStyle = "width: 400; height: 500; padding: 10; flex-direction: column;";
-		const string TitleImageStyle = "left: 50%; top: 20%;";
+		const string InBoxStyle = "width: 100%; height: 64; padding: 0; margin-bottom: 5;";
+		const string BtnStyle = "width: 100%; height: 56; padding: 10; margin-bottom: 5;";
 
 		public GUISettingsWindow(GameWindow Window, GUIManager Mgr, GUIElement Parent) : base(Mgr, Parent) {
-			Vector2 BtnSize = Mgr.WindowScale(new Vector2(0.2f, 0.07f));
 			List<GUIElement> OptIB = new List<GUIElement>();
-
-			Vector2 CenterSize = new Vector2(400, 500);
-			Rectangle DbgRect = new Rectangle(
-				new Vector2(
-					(Window.Width / 2) - (CenterSize.X / 2),
-					(Window.Height / 1.65f) - (CenterSize.Y / 2)
-				), CenterSize);
-
-
-			CreateOptionsButtons(this, OptIB, BtnSize * new Vector2(1, 0.6f));
+			CreateOptionsButtons(this, OptIB);
 
 			foreach (var el in OptIB) {
 				//el.Pos -= DbgRect.Position;
@@ -68,7 +56,7 @@ namespace Voxelgine.GUI {
 			StoreSizePos();
 		}
 
-		void CreateOptionsButtons(GUIElement Wnd, List<GUIElement> IB, Vector2 BtnSize) {
+		void CreateOptionsButtons(GUIElement Wnd, List<GUIElement> IB) {
 			ConfigValueRef[] Vars = Program.Cfg.GetVariables().ToArray();
 
 			for (int i = 0; i < Vars.Length; i++) {

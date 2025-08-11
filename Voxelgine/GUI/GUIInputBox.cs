@@ -11,7 +11,7 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.GUI {
 	class GUIInputBox : GUIElement {
-		const string LabelStyle = "width: 300; height: 32;";
+		//const string LabelStyle = "left: 0%; width: 100%; height: 32;";
 
 		public string Label = "DefaultLabel";
 		string Value = "";
@@ -39,12 +39,12 @@ namespace Voxelgine.GUI {
 				OnValueChanged?.Invoke(val);
 			};
 
-			InputLabel.FlexNode.nodeStyle.Set(LabelStyle);
+			//InputLabel.FlexNode.nodeStyle.Set(LabelStyle);
 			InputLabel.DrawTextColor = new Color(130, 172, 209);
 
 
 			SetValue(Value, Value);
-			InputLabel.FlexNode.nodeStyle.Set("width: 50; height: 32;");
+			InputLabel.FlexNode.nodeStyle.Set("left: 60%; top: 10%; width: 100%; height: 32;");
 
 			//UpdateLayout();
 			WasEdited = false;
@@ -61,7 +61,7 @@ namespace Voxelgine.GUI {
 			WasEdited = true;
 		}
 
-		private void UpdateLayout() {
+		/*private void UpdateLayout() {
 			// Arrange label and input in a single row
 			Vector2 labelSize = Mgr.MeasureText(Label);
 			Vector2 inputSize = InputLabel.Size;
@@ -71,10 +71,11 @@ namespace Voxelgine.GUI {
 			// Label at (Padding, center vertically)
 			// InputLabel at (Padding + labelSize.X + LabelSpacing, center vertically)
 			InputLabel.Pos = new Vector2(Padding + labelSize.X + LabelSpacing, Padding + (height - Padding * 2 - inputSize.Y) / 2);
-		}
+		}*/
 
 		public override GUIUpdateResult Update() {
 			OnFlexUpdated();
+			InputLabel.OnFlexUpdated();
 
 			if (!Enabled)
 				return GUIUpdateResult.Disabled;
@@ -134,10 +135,10 @@ namespace Voxelgine.GUI {
 			Mgr.DrawText(Label, new Vector2(Pos.X + Padding, labelY), Color.White);
 
 			// Draw input field (delegated to GUILabel)
-			var oldPos = InputLabel.Pos;
-			InputLabel.Pos = Pos + InputLabel.Pos;
+			//var oldPos = InputLabel.Pos;
+			//InputLabel.Pos = Pos + InputLabel.Pos;
 			InputLabel.Draw(IsActive, MouseClicked, MouseDown);
-			InputLabel.Pos = oldPos;
+			//InputLabel.Pos = oldPos;
 
 			ScissorManager.EndScissor();
 		}

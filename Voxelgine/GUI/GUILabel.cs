@@ -302,6 +302,8 @@ namespace Voxelgine.GUI {
 		}
 
 		public override GUIUpdateResult Update() {
+			OnFlexUpdated();
+
 			int KeyPressed = 0;
 			UpdateResult = GUIUpdateResult.OK;
 

@@ -134,7 +134,7 @@ namespace RaylibGame.States {
 			// Create the options window, same size/pos as GWnd, but disabled by default
 			OptionsWnd = new GUISettingsWindow(Window, GUI, null, new Vector2(700, 1000), new Vector2(10, 10));
 			OptionsWnd.Title = "Options";
-			OptionsWnd.Enabled = true;
+			OptionsWnd.Enabled = false;
 			OptionsWnd.Resizable = true;
 			//OptionsWnd.CenterVertical();
 			OptionsWnd.FlexNode.nodeStyle.Apply(OptWindowStyle);

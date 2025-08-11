@@ -38,7 +38,10 @@ namespace Voxelgine.Engine {
 
 		bool Open;
 		bool HasWindowRT;
-		GBuffer WindowG;
+		public GBuffer WindowG;
+
+		public RenderTexture2D ViewmodelRT;
+		bool HasViewmodelRT = false;
 
 		// SSAA has a screen space rendering bug, scale UI accordingly?
 		bool Enable_SSAA = false;
@@ -142,6 +145,16 @@ namespace Voxelgine.Engine {
 			if (HasWindowRT) {
 				WindowG?.Dispose();
 				WindowG = null;
+			}
+
+			if (HasViewmodelRT) {
+				Raylib.UnloadRenderTexture(ViewmodelRT);
+				HasViewmodelRT = false;
+			}
+
+			if (!HasViewmodelRT) {
+				ViewmodelRT = Raylib.LoadRenderTexture(Width, Height);
+				HasViewmodelRT = true;
 			}
 
 			float Factor = 1;

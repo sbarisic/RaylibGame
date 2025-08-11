@@ -681,13 +681,27 @@ namespace Voxelgine.Engine {
 		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (LocalPlayer) {
 
-				Rlgl.DisableDepthTest();
-				//Rlgl.DisableDepthMask();
+				RenderTexture2D RT = GUI.Window.ViewmodelRT;
+				Raylib.BeginTextureMode(RT);
+				{
+					Raylib.ClearBackground(new Color(0, 0, 0, 0));
 
-				ViewMdl.DrawViewModel(this, TimeAlpha, ref LastFrame, ref CurFame);
+					Raylib.BeginMode3D(Cam);
+					{
+						Shader DefaultShader = ResMgr.GetShader("default");
+						Raylib.BeginShaderMode(DefaultShader);
+						ViewMdl.DrawViewModel(this, TimeAlpha, ref LastFrame, ref CurFame);
+						Raylib.EndShaderMode();
+					}
+					Raylib.EndMode3D();
 
-				//Rlgl.EnableDepthMask();
-				Rlgl.EnableDepthTest();
+				}
+				Raylib.EndTextureMode();
+				Raylib.BeginTextureMode(GUI.Window.WindowG.Target);
+
+				Rectangle Src = new Rectangle(0, 0, RT.Texture.Width, -RT.Texture.Height);
+				Rectangle Dst = new Rectangle(0, 0, RT.Texture.Width, RT.Texture.Height);
+				Raylib.DrawTexturePro(RT.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
 			}
 
 			if (!DEBUG_PLAYER && LocalPlayer)

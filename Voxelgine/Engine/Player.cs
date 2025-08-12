@@ -1,4 +1,4 @@
-﻿using RaylibGame.Engine;
+using RaylibGame.Engine;
 
 using Raylib_cs;
 
@@ -13,8 +13,6 @@ using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
 namespace Voxelgine.Engine {
-	public delegate void OnKeyPressedFunc();
-
 	// TODO: Implement player as VEntity in class VEntPlayer
 	public unsafe class Player {
 		const bool DEBUG_PLAYER = true;
@@ -24,11 +22,6 @@ namespace Voxelgine.Engine {
 		GUIManager GUI;
 
 		public ViewModel ViewMdl;
-
-		bool MoveFd;
-		bool MoveBk;
-		bool MoveLt;
-		bool MoveRt;
 
 		bool NoClip;
 		public bool FreezeFrustum = false;
@@ -47,15 +40,11 @@ namespace Voxelgine.Engine {
 		public const float PlayerHeight = 1.7f;
 		public const float PlayerEyeOffset = 1.6f;
 		public const float PlayerRadius = 0.4f;
-
 		// TODO Implement bounding box calculation
 		public BoundingBox BBox;
 
 		public Vector3 Position;
-		public Matrix4x4 Rotation;
-		public Matrix4x4 UpperBodyRotation;
 		public bool CursorDisabled = false;
-
 
 		public Vector3 FeetPosition => Position - new Vector3(0, PlayerEyeOffset, 0);
 
@@ -75,9 +64,6 @@ namespace Voxelgine.Engine {
 			ViewMdl = new ViewModel();
 
 			Position = Vector3.Zero;
-			Rotation = Matrix4x4.Identity;
-			UpperBodyRotation = Matrix4x4.Identity;
-
 			ToggleMouse(false);
 		}
 
@@ -519,12 +505,6 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Tick(InputMgr InMgr) {
-			// Use InputMgr for movement keys
-			MoveFd = InMgr.IsInputDown(InputKey.W);
-			MoveLt = InMgr.IsInputDown(InputKey.A);
-			MoveRt = InMgr.IsInputDown(InputKey.D);
-			MoveBk = InMgr.IsInputDown(InputKey.S);
-
 			// ViewMdl.SetRotationMode(InMgr.IsInputDown(InputKey.Click_Right) ? ViewModelRotationMode.GunIronsight : ViewModelRotationMode.Gun);
 			ActiveSelection?.Tick(ViewMdl, InMgr);
 			FPSCamera.Update(CursorDisabled, ref Cam);
@@ -540,7 +520,6 @@ namespace Voxelgine.Engine {
 			}
 
 			Position = FPSCamera.Position;
-			Rotation = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI / 2, 0);
 
 			ViewMdl.Update(this);
 		}
@@ -728,14 +707,6 @@ namespace Voxelgine.Engine {
 			writer.Write(CamAngle.X);
 			writer.Write(CamAngle.Y);
 			writer.Write(CamAngle.Z);
-			// Write rotation (Matrix4x4 as 16 floats)
-			for (int row = 0; row < 4; row++)
-				for (int col = 0; col < 4; col++)
-					writer.Write(Rotation[row, col]);
-			// Write upper body rotation
-			for (int row = 0; row < 4; row++)
-				for (int col = 0; col < 4; col++)
-					writer.Write(UpperBodyRotation[row, col]);
 			// Write camera (just position and target for now)
 			writer.Write(Cam.Position.X);
 			writer.Write(Cam.Position.Y);
@@ -758,14 +729,6 @@ namespace Voxelgine.Engine {
 			Vector3 CamAngle = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
 			SetCamAngle(CamAngle);
 
-			// Read rotation
-			for (int row = 0; row < 4; row++)
-				for (int col = 0; col < 4; col++)
-					Rotation[row, col] = reader.ReadSingle();
-			// Read upper body rotation
-			for (int row = 0; row < 4; row++)
-				for (int col = 0; col < 4; col++)
-					UpperBodyRotation[row, col] = reader.ReadSingle();
 			// Read camera
 			Cam.Position.X = reader.ReadSingle();
 			Cam.Position.Y = reader.ReadSingle();
@@ -780,7 +743,6 @@ namespace Voxelgine.Engine {
 			// Read cursor state
 			CursorDisabled = reader.ReadBoolean();
 		}
-
 
 		Vector3 Fwd;
 		Vector3 Left;

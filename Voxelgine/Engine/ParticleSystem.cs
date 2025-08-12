@@ -35,6 +35,11 @@ namespace Voxelgine.Engine {
 
 		public TestFunc Test;
 
+		// Debug variables
+		int OnScreen;
+		int Drawn;
+		int Max;
+
 		public void Init(TestFunc Test) {
 			this.Test = Test;
 
@@ -42,6 +47,12 @@ namespace Voxelgine.Engine {
 				Particles[i] = new Particle();
 				Particles[i].Draw = false;
 			}
+		}
+
+		public void GetStats(out int OnScreen, out int Drawn, out int Max) {
+			OnScreen = this.OnScreen;
+			Drawn = this.Drawn;
+			Max = this.Max;
 		}
 
 		public void SpawnSmoke(Vector3 Pos, Vector3 Vel, Color Clr) {
@@ -55,13 +66,13 @@ namespace Voxelgine.Engine {
 					P.Vel = Vel;
 					P.SpawnedAt = lastGameTime;
 					P.LifeTime = 23.0f;
-					P.MovePhysics = true; 
+					P.MovePhysics = true;
 					P.Tex = ResMgr.GetFromCollection("smoke");
 					P.Scaler = 0.4f;
-					P.Scale = 1.0f; 
+					P.Scale = 1.0f;
 					P.Rnd = Random.Shared.NextSingle();
 
-					return; 
+					return;
 				}
 			}
 		}
@@ -100,15 +111,21 @@ namespace Voxelgine.Engine {
 		}
 
 		public void Draw(Player Ply, ref Frustum Frust) {
+			Max = 0;
+			Drawn = 0;
+			OnScreen = 0;
+
 			Rlgl.DisableDepthMask();
 			Raylib.BeginBlendMode(BlendMode.AlphaPremultiply);
 
 			for (int i = 0; i < Particles.Length; i++) {
 				ref Particle P = ref Particles[i];
+				Max++;
 
 				if (P.Draw) {
+					Drawn++;
 
-					if (Vector3.Distance(Ply.Position, P.Pos) > 4) {
+					if (Vector3.Distance(Ply.Position, P.Pos) > 2) {
 
 						if (!Frust.IsInside(P.Pos)) {
 							// Particle is outside the frustum, skip drawing
@@ -116,6 +133,7 @@ namespace Voxelgine.Engine {
 						}
 					}
 
+					OnScreen++;
 					Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, P.Color);
 				}
 			}

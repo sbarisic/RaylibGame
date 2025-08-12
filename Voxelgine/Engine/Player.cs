@@ -617,6 +617,9 @@ namespace Voxelgine.Engine {
 				InfoLbl.WriteLine("NoClip (C): {0}", NoClip ? "ON" : "OFF");
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
 				InfoLbl.WriteLine("ChunkDraws: {0}", Program.ChunkDrawCalls.ToString());
+
+				Program.GameState.Particle.GetStats(out int OnScreen, out int Drawn, out int Max);
+				InfoLbl.WriteLine("Particles: {0}/{1}/{2}", OnScreen, Drawn, Max);
 			}
 		}
 

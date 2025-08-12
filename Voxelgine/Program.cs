@@ -22,9 +22,9 @@ namespace Voxelgine {
 
 		public static GameWindow Window;
 
-		public static GameStateImpl MainMenuState;
-		public static GameStateImpl GameState;
-		public static GameStateImpl OptionsState;
+		public static MainMenuState MainMenuState;
+		public static GameState GameState;
+		//public static GameStateImpl OptionsState;
 
 		public static Clipboard Clipb;
 
@@ -58,7 +58,7 @@ namespace Voxelgine {
 
 			MainMenuState = new MainMenuState(Window);
 			GameState = new GameState(Window);
-			OptionsState = new OptionsState(Window);
+			//OptionsState = new OptionsState(Window);
 
 			Window.SetState(MainMenuState);
 

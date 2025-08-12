@@ -36,6 +36,8 @@
   * [ ] NPC entity
 
 * [ ] Particle system
+  * [ ] Fix depth ordering
+  * [ ] Make it work underwater
 
 * [ ] Mod system
   * [ ] Expose all required functionality

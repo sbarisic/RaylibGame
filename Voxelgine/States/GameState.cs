@@ -13,70 +13,89 @@ using Voxelgine.GUI;
 
 namespace RaylibGame.States {
 	public unsafe class GameState : GameStateImpl {
-		public ChunkMap Map;
-		public Player Ply;
-		public SoundMgr Snd;
+		private const string MAP_FILE = "data/map.bin";
+		private const string PLAYER_FILE = "data/player.bin";
+		private const int ISLAND_SIZE = 64;
 
-		public ParticleSystem Particle;
+		Vector3 PickupPos = new Vector3(37, 66, 15);
+		Vector3 NPCPos = new Vector3(32, 66, 14);
+		Vector3 PlayerPos = new Vector3(32, 73, 19);
 
-		List<Tuple<Vector3, Vector3>> MarkerList = new();
-		GUIManager GUI;
-		PhysData PhysicsData;
+		public ChunkMap Map {
+			get; private set;
+		}
 
-		EntityManager EntMgr;
+		public Player Ply {
+			get; private set;
+		}
 
-		Frustum ViewFrustum;
+		public SoundMgr Snd {
+			get; private set;
+		}
 
-		const string map_file = "data/map.bin";
-		const string player_file = "data/player.bin";
+		public ParticleSystem Particle {
+			get; private set;
+		}
+
+		public Vector3 PlayerCollisionBoxPos;
+
+		private readonly List<Tuple<Vector3, Vector3>> MarkerList = new();
+		private readonly GUIManager GUI;
+		private readonly PhysData PhysicsData;
+		private readonly EntityManager EntMgr;
+		private Frustum ViewFrustum;
 
 		public GameState(GameWindow window) : base(window) {
 			GUI = new GUIManager(window);
 			EntMgr = new EntityManager();
-
-			Particle = new ParticleSystem();
-			Particle.Init((Pt) => {
-				return Map.Collide(Pt, Vector3.Zero, out Vector3 _);
-			});
-
 			Snd = new SoundMgr();
-			Snd.Init();
 			PhysicsData = new PhysData();
+
+			// =========================================== Init Systems ==============================================
+			Snd.Init();
 			Map = new ChunkMap(this);
 
-			VoxEntity BE = new VEntPickup();
-			BE.SetPosition(new Vector3(37, 66, 15));
-			BE.SetSize(new Vector3(1, 1, 1));
-			BE.SetModel("orb_xp/orb_xp.obj");
-			EntMgr.Spawn(this, BE);
+			Particle = new ParticleSystem();
+			Particle.Init((Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _));
 
-			VoxEntity NPC = new VEntNPC();
-			NPC.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-			NPC.SetPosition(new Vector3(32, 66, 14));
-			NPC.SetModel("npc/humanoid.json");
-			EntMgr.Spawn(this, NPC);
+			// =========================================== Create entities ===========================================
+			// Create pickup entity
+			VEntPickup pickup = new VEntPickup();
+			pickup.SetPosition(PickupPos);
+			pickup.SetSize(Vector3.One);
+			pickup.SetModel("orb_xp/orb_xp.obj");
+			EntMgr.Spawn(this, pickup);
 
-			if (File.Exists(map_file)) {
-				using FileStream FS = File.OpenRead(map_file);
-				Map.Read(FS);
+			// Create NPC entity  
+			VEntNPC npc = new VEntNPC();
+			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
+			npc.SetPosition(NPCPos);
+			npc.SetModel("npc/humanoid.json");
+			EntMgr.Spawn(this, npc);
+
+			// ======================================= Create rest of the world ======================================
+			if (File.Exists(MAP_FILE)) {
+				using var fileStream = File.OpenRead(MAP_FILE);
+				Map.Read(fileStream);
 			} else {
-				Map.GenerateFloatingIsland(64, 64);
+				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
 			}
 
+
+			// ====================================== Init player ====================================================
 			Ply = new Player(GUI, "snoutx10k", true, Snd);
 			Ply.InitGUI(window);
 			Ply.Init(Map);
 
-			if (File.Exists(player_file)) {
-				using (FileStream fs = File.OpenRead(player_file))
-				using (BinaryReader reader = new BinaryReader(fs)) {
-					Ply.Read(reader);
-				}
+			if (File.Exists(PLAYER_FILE)) {
+				using var fileStream = File.OpenRead(PLAYER_FILE);
+				using var reader = new BinaryReader(fileStream);
+				Ply.Read(reader);
 			} else {
-				Ply.SetPosition(32, 73, 19);
+				Ply.SetPosition(PlayerPos);
 			}
-
 		}
+
 
 		public override void SwapTo() {
 			base.SwapTo();
@@ -88,52 +107,28 @@ namespace RaylibGame.States {
 			Ply.RecalcGUI(Window);
 		}
 
-		bool HasBlocksInBounds(Vector3 min, Vector3 max) {
-			for (int x = (int)min.X; x <= (int)max.X; x++)
-				for (int y = (int)min.Y; y <= (int)max.Y; y++)
-					for (int z = (int)min.Z; z <= (int)max.Z; z++)
-						if (Map.GetBlock(x, y, z) != BlockType.None)
-							return true;
-			return false;
-		}
-
-		private void SaveGameState() {
-			Console.WriteLine("Saving map and player!");
-
-			using (MemoryStream ms = new()) {
-				Map.Write(ms);
-				File.WriteAllBytes(map_file, ms.ToArray());
-			}
-
-			using (FileStream fs = File.Open(player_file, FileMode.Create, FileAccess.Write))
-			using (BinaryWriter writer = new BinaryWriter(fs)) {
-				Ply.Write(writer);
-			}
-
-			Console.WriteLine("Done!");
-		}
-
 		public override void Tick(float GameTime) {
 			Particle.Tick(GameTime);
 
+			// Handle input
 			if (Window.InMgr.IsInputPressed(InputKey.Esc)) {
 				Window.SetState(Program.MainMenuState);
 				return;
 			}
-			Map.Tick();
-			Ply.Tick(Window.InMgr);
-			Ply.TickGUI(Window.InMgr, Map);
 
 			if (Window.InMgr.IsInputPressed(InputKey.F5)) {
 				SaveGameState();
 			}
 
+			// Update game systems
+			Map.Tick();
+			Ply.Tick(Window.InMgr);
+			Ply.TickGUI(Window.InMgr, Map);
 			Ply.UpdateGUI();
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
 			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
-
 			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
@@ -143,23 +138,44 @@ namespace RaylibGame.States {
 			Raylib.ClearBackground(new Color(200, 200, 200));
 			Raylib.BeginMode3D(Ply.Cam);
 
-			Shader DefaultShader = ResMgr.GetShader("default");
-			Raylib.BeginShaderMode(DefaultShader);
-
+			Shader defaultShader = ResMgr.GetShader("default");
+			Raylib.BeginShaderMode(defaultShader);
 
 			Draw3D(TimeAlpha, ref LastFrame, ref FInfo);
 
 			Raylib.EndShaderMode();
-
 			Raylib.EndMode3D();
-
-			//FInfo.Cam = Ply.Cam;
-			//FInfo.Pos = FPSCamera.Position;
 		}
 
-		public Vector3 PlayerCollisionBoxPos;
+		public override void Draw2D() {
+			GUI.Draw();
+			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
+			Raylib.DrawFPS(10, 10);
+		}
 
-		void DrawTransparent() {
+		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame) {
+			if (!Ply.FreezeFrustum)
+				ViewFrustum = new Frustum(ref Ply.Cam);
+
+			// Draw world geometry
+			Map.Draw(ref ViewFrustum);
+			DrawTransparent();
+
+			// Draw entities and effects
+			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
+			Particle.Draw(Ply, ref ViewFrustum);
+			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
+
+			// Draw debug information
+			if (Program.DebugMode) {
+				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
+				ViewFrustum.Draw();
+				DrawDebugLines();
+				Utils.DrawRaycastRecord();
+			}
+		}
+
+		private void DrawTransparent() {
 			Raylib.BeginBlendMode(BlendMode.Alpha);
 			Rlgl.DisableDepthMask();
 
@@ -169,69 +185,59 @@ namespace RaylibGame.States {
 			Raylib.EndBlendMode();
 		}
 
-		void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			if (!Ply.FreezeFrustum)
-				ViewFrustum = new Frustum(ref Ply.Cam);
+		private void DrawDebugLines() {
+			// Draw marker lines
+			foreach (var marker in MarkerList)
+				Raylib.DrawLine3D(marker.Item1, marker.Item2, Color.Blue);
 
-			Map.Draw(ref ViewFrustum);
-			DrawTransparent();
-
-			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
-			Particle.Draw(Ply, ref ViewFrustum);
-
-			Ply.Draw(TimeAlpha, ref LastFrame, ref CurFame);
-
-
-			if (Program.DebugMode)
-				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
-
-			ViewFrustum.Draw();
-
-			foreach (var L in MarkerList)
-				Raylib.DrawLine3D(L.Item1, L.Item2, Color.Blue);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(100, 0, 0), Color.Red);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 100, 0), Color.Green);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 100), Color.Blue);
-			Utils.DrawRaycastRecord();
+			// Draw world axes
+			Vector3 origin = Vector3.Zero;
+			Raylib.DrawLine3D(origin, new Vector3(100, 0, 0), Color.Red);   // X-axis
+			Raylib.DrawLine3D(origin, new Vector3(0, 100, 0), Color.Green); // Y-axis  
+			Raylib.DrawLine3D(origin, new Vector3(0, 0, 100), Color.Blue);  // Z-axis
 		}
 
 		private void DrawPlayerCollisionBox(Vector3 feetPos) {
-			float playerRadius = Player.PlayerRadius;
-			float playerHeight = Player.PlayerHeight;
+			Vector3 min = new Vector3(feetPos.X - Player.PlayerRadius, feetPos.Y, feetPos.Z - Player.PlayerRadius);
+			Vector3 max = new Vector3(feetPos.X + Player.PlayerRadius, feetPos.Y + Player.PlayerHeight, feetPos.Z + Player.PlayerRadius);
 
-			Vector3 min = new Vector3(feetPos.X - playerRadius, feetPos.Y, feetPos.Z - playerRadius);
-			Vector3 max = new Vector3(feetPos.X + playerRadius, feetPos.Y + playerHeight, feetPos.Z + playerRadius);
-
-			Color color = Color.Red;
-			Vector3[] corners = new Vector3[8];
-
-			corners[0] = new Vector3(min.X, min.Y, min.Z);
-			corners[1] = new Vector3(max.X, min.Y, min.Z);
-			corners[2] = new Vector3(max.X, min.Y, max.Z);
-			corners[3] = new Vector3(min.X, min.Y, max.Z);
-			corners[4] = new Vector3(min.X, max.Y, min.Z);
-			corners[5] = new Vector3(max.X, max.Y, min.Z);
-			corners[6] = new Vector3(max.X, max.Y, max.Z);
-			corners[7] = new Vector3(min.X, max.Y, max.Z);
-
-			Raylib.DrawLine3D(corners[0], corners[1], color);
-			Raylib.DrawLine3D(corners[1], corners[2], color);
-			Raylib.DrawLine3D(corners[2], corners[3], color);
-			Raylib.DrawLine3D(corners[3], corners[0], color);
-			Raylib.DrawLine3D(corners[4], corners[5], color);
-			Raylib.DrawLine3D(corners[5], corners[6], color);
-			Raylib.DrawLine3D(corners[6], corners[7], color);
-			Raylib.DrawLine3D(corners[7], corners[4], color);
-			Raylib.DrawLine3D(corners[0], corners[4], color);
-			Raylib.DrawLine3D(corners[1], corners[5], color);
-			Raylib.DrawLine3D(corners[2], corners[6], color);
-			Raylib.DrawLine3D(corners[3], corners[7], color);
+			DrawWireframeCube(min, max, Color.Red);
 		}
 
-		public override void Draw2D() {
-			GUI.Draw();
-			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
-			Raylib.DrawFPS(10, 10);
+		private static void DrawWireframeCube(Vector3 min, Vector3 max, Color color) {
+			// Bottom face
+			Raylib.DrawLine3D(new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, min.Y, min.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, min.Y, max.Z), new Vector3(min.X, min.Y, max.Z), color);
+			Raylib.DrawLine3D(new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, min.Y, min.Z), color);
+
+			// Top face
+			Raylib.DrawLine3D(new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, max.Y, min.Z), new Vector3(max.X, max.Y, max.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, max.Y, max.Z), new Vector3(min.X, max.Y, max.Z), color);
+			Raylib.DrawLine3D(new Vector3(min.X, max.Y, max.Z), new Vector3(min.X, max.Y, min.Z), color);
+
+			// Vertical edges
+			Raylib.DrawLine3D(new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, max.Y, min.Z), color);
+			Raylib.DrawLine3D(new Vector3(max.X, min.Y, max.Z), new Vector3(max.X, max.Y, max.Z), color);
+			Raylib.DrawLine3D(new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, max.Y, max.Z), color);
+		}
+
+		private void SaveGameState() {
+			Console.WriteLine("Saving map and player!");
+
+			// Save map
+			using MemoryStream memoryStream = new MemoryStream();
+			Map.Write(memoryStream);
+			File.WriteAllBytes(MAP_FILE, memoryStream.ToArray());
+
+			// Save player
+			using FileStream fileStream = File.Open(PLAYER_FILE, FileMode.Create, FileAccess.Write);
+			using BinaryWriter writer = new BinaryWriter(fileStream);
+			Ply.Write(writer);
+
+			Console.WriteLine("Save complete!");
 		}
 	}
 }

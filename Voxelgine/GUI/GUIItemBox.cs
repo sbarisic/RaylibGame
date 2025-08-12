@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Voxelgine.Engine;
 
 namespace Voxelgine.GUI {
-	class GUIItemBox : GUIElement {
+	public class GUIItemBox : GUIElement {
 		public bool IsSelected = false;
 
 		public GUIInventory ParentInv;

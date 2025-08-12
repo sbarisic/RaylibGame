@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 using Voxelgine.Engine;
 
 namespace Voxelgine.GUI {
-	record struct InventoryChangeEventArgs(GUIItemBox ItmBox);
+	public record struct InventoryChangeEventArgs(GUIItemBox ItmBox);
 
-	class GUIInventory : GUIElement {
+	public class GUIInventory : GUIElement {
 		private List<GUIItemBox> ItemBoxes;
 		private int SelectedIndex = 0;
 		private int ScrollOffset = 0;

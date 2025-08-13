@@ -2,6 +2,7 @@
 
 * [ ] Graphics
   * [ ] Lighting system
+  * [ ] Fullbright and debug modes which can be enabled from settings?
 
 * [ ] Voxel world
   * [ ] Procedurally generated island

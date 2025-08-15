@@ -571,7 +571,7 @@ namespace Voxelgine.Engine {
 			};
 
 			int ItmIdx = 0;
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, "Gun", IconType.Gun).SetViewModelInfo(ViewModelRotationMode.Gun).SetupModel("gun/gun.obj"));
+			SetInvItem(Inventory, ItmIdx++, new WeaponGun(this, "Gun"));
 			SetInvItem(Inventory, ItmIdx++, new WeaponPicker(this, "Hammer"));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
 			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));

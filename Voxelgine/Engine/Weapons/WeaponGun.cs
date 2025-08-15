@@ -10,15 +10,14 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	public class WeaponPicker : Weapon {
+	public class WeaponGun : Weapon {
 
-		public WeaponPicker(Player ParentPlayer, string Name) : base(ParentPlayer, Name, IconType.Hammer) {
-			SetViewModelInfo(ViewModelRotationMode.Tool);
-			SetupModel("hammer/hammer.obj");
+		public WeaponGun(Player ParentPlayer, string Name) : base(ParentPlayer, Name, IconType.Gun) {
+			SetViewModelInfo(ViewModelRotationMode.Gun);
+			SetupModel("gun/gun.obj");
 		}
 
 		public override void OnLeftClick(InventoryClickEventArgs E) {
-			return;
 
 			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
 

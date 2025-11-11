@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sbarisic/RaylibGame)
+
 # Voxelgine
 
 Voxelgine is a voxel-based sandbox engine and game written in modern C# (.NET 9),

@@ -54,6 +54,7 @@ namespace Voxelgine.Engine {
 		float GroundGraceTimer = 0f; // Coyote time for ground detection
 		Vector3 LastWallNormal = Vector3.Zero;
 		Stopwatch JumpCounter = Stopwatch.StartNew();
+		float HeadBumpCooldown = 0f; // Cooldown applied when hitting head shortly after jumping
 
 		public Player(GUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd) {
 			this.GUI = GUI;
@@ -196,6 +197,7 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Finds the collision normal for an AABB at the given position.
 		/// Returns the primary axis of penetration.
+		/// Prioritizes horizontal (wall) collisions over vertical to preserve jump velocity.
 		/// </summary>
 		Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight) {
 			// Test each axis to find which one is blocked
@@ -213,19 +215,24 @@ namespace Voxelgine.Engine {
 				testZ - new Vector3(playerRadius, 0, playerRadius),
 				testZ + new Vector3(playerRadius, playerHeight, playerRadius));
 
-			// Return the normal pointing against the movement direction for each blocked axis
-			Vector3 normal = Vector3.Zero;
-			if (blockedX && MathF.Abs(move.X) > 0.0001f)
-				normal.X = -MathF.Sign(move.X);
-			if (blockedY && MathF.Abs(move.Y) > 0.0001f)
-				normal.Y = -MathF.Sign(move.Y);
-			if (blockedZ && MathF.Abs(move.Z) > 0.0001f)
-				normal.Z = -MathF.Sign(move.Z);
+			// Prioritize horizontal collisions (walls) to preserve vertical velocity during jumps
+			// Only return one axis at a time to prevent multi-axis clipping that kills jump velocity
 
-			// Normalize if we have a normal
-			float len = normal.Length();
-			if (len > 0.0001f)
-				return normal / len;
+			// First, handle horizontal (wall) collisions - these should NOT affect Y velocity
+			if (blockedX && MathF.Abs(move.X) > MathF.Abs(move.Z) && MathF.Abs(move.X) > 0.0001f) {
+				return new Vector3(-MathF.Sign(move.X), 0, 0);
+			}
+			if (blockedZ && MathF.Abs(move.Z) > 0.0001f) {
+				return new Vector3(0, 0, -MathF.Sign(move.Z));
+			}
+			if (blockedX && MathF.Abs(move.X) > 0.0001f) {
+				return new Vector3(-MathF.Sign(move.X), 0, 0);
+			}
+
+			// Only return Y normal if no horizontal collision and Y is actually blocked
+			if (blockedY && MathF.Abs(move.Y) > 0.0001f) {
+				return new Vector3(0, -MathF.Sign(move.Y), 0);
+			}
 
 			return Vector3.Zero;
 		}
@@ -459,9 +466,20 @@ namespace Voxelgine.Engine {
 
 			bool OnGroundGrace = GroundGraceTimer > 0f;
 			Vector3 wishdir = Vector3.Zero;
-			Vector3 fwd2 = Vector3.Normalize(GetForward());
 
+			// Flatten forward direction to horizontal plane for movement (prevents climbing walls by looking up)
+			Vector3 fwd2 = GetForward();
+			fwd2.Y = 0;
+			if (fwd2.LengthSquared() > 0.0001f)
+				fwd2 = Vector3.Normalize(fwd2);
+			else
+				fwd2 = Vector3.UnitX; // Fallback when looking straight up/down
+
+			// Left is already horizontal (perpendicular to up vector)
 			Vector3 lft2 = GetLeft();
+			lft2.Y = 0;
+			if (lft2.LengthSquared() > 0.0001f)
+				lft2 = Vector3.Normalize(lft2);
 
 			if (InMgr.IsInputDown(InputKey.W))
 				wishdir += fwd2;
@@ -532,8 +550,13 @@ namespace Voxelgine.Engine {
 			// --- Apply friction BEFORE acceleration (Quake order) ---
 			ApplyFriction(ref PlyVelocity, PhysicsData.GroundFriction, Dt, OnGroundGrace);
 
+			// --- Update head bump cooldown ---
+			if (HeadBumpCooldown > 0)
+				HeadBumpCooldown -= Dt;
+
 			// --- Jumping (before movement for bunny hop) ---
-			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
+			bool canJump = HeadBumpCooldown <= 0 && JumpCounter.ElapsedMilliseconds > 50;
+			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && canJump) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
@@ -586,6 +609,7 @@ namespace Voxelgine.Engine {
 
 			// --- Move and collide ---
 			float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
+			float preMovePlyVelocityY = PlyVelocity.Y; // Save Y velocity before collision may clip it
 			Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
 
 			if (newPos != Position) {
@@ -593,23 +617,12 @@ namespace Voxelgine.Engine {
 			}
 			// Note: PlyVelocity is now updated inside QuakeMoveWithCollision via ClipVelocity
 
-			// --- Head collision check ---
-			if (PlyVelocity.Y > 0) {
-				float headEpsilon = 0.02f;
-				Vector3 headPos = feetPos + new Vector3(0, playerHeight - headEpsilon, 0);
-				Vector3[] headCheckPoints = new Vector3[] {
-					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
-					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
-					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
-					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
-					headPos
-				};
-
-				foreach (var pt in headCheckPoints) {
-					if (Map.IsSolid(pt)) {
-						PlyVelocity.Y = 0;
-						break;
-					}
+			// --- Head collision detection ---
+			// If player was moving upward and velocity was clipped to 0 or less, they hit a ceiling
+			if (preMovePlyVelocityY > 0.1f && PlyVelocity.Y <= 0) {
+				// Apply 0.5s jump cooldown if head was hit within 0.6s of jumping
+				if (JumpCounter.ElapsedMilliseconds < 600) {
+					HeadBumpCooldown = 0.5f;
 				}
 			}
 

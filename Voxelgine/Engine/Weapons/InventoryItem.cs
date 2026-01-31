@@ -192,6 +192,29 @@ namespace Voxelgine.Engine {
 			});
 		}
 
+		/// <summary>
+		/// Gets the position where a block would be placed without actually placing it.
+		/// Returns null if no valid placement position is found.
+		/// </summary>
+		public virtual Vector3? GetBlockPlacementPosition(ChunkMap Map, Vector3 Start, Vector3 Dir, float MaxLen) {
+			Vector3? result = null;
+			Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
+				if (Map.GetBlock(X, Y, Z) != BlockType.None) {
+					result = new Vector3(X + (int)Face.X, Y + (int)Face.Y, Z + (int)Face.Z);
+					return true;
+				}
+				return false;
+			});
+			return result;
+		}
+
+		/// <summary>
+		/// Returns true if this item is a placeable block that should show a placement preview.
+		/// </summary>
+		public virtual bool IsPlaceableBlock() {
+			return UseViewmodel && UseBlockIcon && BlockIcon != BlockType.None && (Count > 0 || Count == -1);
+		}
+
 		public virtual void OnMiddleClick(InventoryClickEventArgs E) {
 			Console.WriteLine("Middle click '{0}'", Name);
 		}

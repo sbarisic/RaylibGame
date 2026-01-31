@@ -656,6 +656,11 @@ namespace Voxelgine.Engine {
 
 		InventoryItem ActiveSelection;
 
+		/// <summary>
+		/// Gets the currently selected inventory item, or null if none selected.
+		/// </summary>
+		public InventoryItem GetActiveItem() => ActiveSelection;
+
 		public void RecalcGUI(GameWindow Window) {
 			//Box_Health.Pos = new Vector2(64, Window.Height - 128);
 

@@ -61,7 +61,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Lower Priority
 
-- [ ] **Block Placement Preview** — Render wireframe outline showing where block would be placed when holding a block item **[CPX: 2]**
 - [ ] **Graphics: Lighting system enhancements** — Improve the existing `ComputeLighting` with dynamic lights, shadows **[CPX: 4]**
 - [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
 - [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
@@ -130,6 +129,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Voxel World: Real-time block creation/destruction** — Left-click destroy, right-click place with automatic mesh rebuilding
 - [x] **Collision: Quake-style clip velocity** — ClipVelocity slides along surfaces preserving momentum, multi-plane clipping for corners
 - [x] **Rendering: Frame interpolation** — Interpolated camera, position, and view model between physics frames for smooth rendering
+- [x] **Block Placement Preview** — Wireframe outline showing where block would be placed when holding a block item
 
 ### Improvements
 

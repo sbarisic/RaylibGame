@@ -11,8 +11,10 @@ using System.Linq;
 using System.Numerics;
 using Voxelgine.GUI;
 
-namespace RaylibGame.States {
-	public unsafe class GameState : GameStateImpl {
+namespace RaylibGame.States
+{
+	public unsafe class GameState : GameStateImpl
+	{
 		private const string MAP_FILE = "data/map.bin";
 		private const string PLAYER_FILE = "data/player.bin";
 		private const int ISLAND_SIZE = 64;
@@ -21,19 +23,23 @@ namespace RaylibGame.States {
 		Vector3 NPCPos = new Vector3(32, 66, 14);
 		Vector3 PlayerPos = new Vector3(32, 73, 19);
 
-		public ChunkMap Map {
+		public ChunkMap Map
+		{
 			get; private set;
 		}
 
-		public Player Ply {
+		public Player Ply
+		{
 			get; private set;
 		}
 
-		public SoundMgr Snd {
+		public SoundMgr Snd
+		{
 			get; private set;
 		}
 
-		public ParticleSystem Particle {
+		public ParticleSystem Particle
+		{
 			get; private set;
 		}
 
@@ -45,7 +51,8 @@ namespace RaylibGame.States {
 		private readonly EntityManager EntMgr;
 		private Frustum ViewFrustum;
 
-		public GameState(GameWindow window) : base(window) {
+		public GameState(GameWindow window) : base(window)
+		{
 			GUI = new GUIManager(window);
 			EntMgr = new EntityManager();
 			Snd = new SoundMgr();
@@ -77,10 +84,13 @@ namespace RaylibGame.States {
 			EntMgr.Spawn(this, npc);
 
 			// ======================================= Create rest of the world ======================================
-			if (File.Exists(MAP_FILE)) {
+			if (File.Exists(MAP_FILE))
+			{
 				using var fileStream = File.OpenRead(MAP_FILE);
 				Map.Read(fileStream);
-			} else {
+			}
+			else
+			{
 				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
 			}
 
@@ -90,36 +100,44 @@ namespace RaylibGame.States {
 			Ply.InitGUI(window);
 			Ply.Init(Map);
 
-			if (File.Exists(PLAYER_FILE)) {
+			if (File.Exists(PLAYER_FILE))
+			{
 				using var fileStream = File.OpenRead(PLAYER_FILE);
 				using var reader = new BinaryReader(fileStream);
 				Ply.Read(reader);
-			} else {
+			}
+			else
+			{
 				Ply.SetPosition(PlayerPos);
 			}
 		}
 
 
-		public override void SwapTo() {
+		public override void SwapTo()
+		{
 			base.SwapTo();
 			Raylib.DisableCursor();
 		}
 
-		public override void OnResize(GameWindow Window) {
+		public override void OnResize(GameWindow Window)
+		{
 			base.OnResize(Window);
 			Ply.RecalcGUI(Window);
 		}
 
-		public override void Tick(float GameTime) {
+		public override void Tick(float GameTime)
+		{
 			Particle.Tick(GameTime);
 
 			// Handle input
-			if (Window.InMgr.IsInputPressed(InputKey.Esc)) {
+			if (Window.InMgr.IsInputPressed(InputKey.Esc))
+			{
 				Window.SetState(Program.MainMenuState);
 				return;
 			}
 
-			if (Window.InMgr.IsInputPressed(InputKey.F5)) {
+			if (Window.InMgr.IsInputPressed(InputKey.F5))
+			{
 				SaveGameState();
 			}
 
@@ -130,12 +148,14 @@ namespace RaylibGame.States {
 			Ply.UpdateGUI();
 		}
 
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+		{
 			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
 			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
-		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo) {
+		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
+		{
 			Ply.UpdateFPSCamera(ref FInfo);
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
@@ -145,18 +165,32 @@ namespace RaylibGame.States {
 			Raylib.BeginShaderMode(defaultShader);
 
 			Draw3D(TimeAlpha, ref LastFrame, ref FInfo);
+			//DrawBlockPlacementPreview();
 
 			Raylib.EndShaderMode();
+
+
+			// Draw wireframe elements without shader (lines don't work well with textured shader)
+
+			/*if (Program.DebugMode) {
+				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
+				ViewFrustum.Draw();
+				DrawDebugLines();
+				Utils.DrawRaycastRecord();
+			}*/
+
 			Raylib.EndMode3D();
 		}
 
-		public override void Draw2D() {
+		public override void Draw2D()
+		{
 			GUI.Draw();
 			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
 			Raylib.DrawFPS(10, 10);
 		}
 
-		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame) {
+		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
+		{
 			if (!Ply.FreezeFrustum)
 				ViewFrustum = new Frustum(ref Ply.Cam);
 
@@ -166,24 +200,22 @@ namespace RaylibGame.States {
 
 			// Draw entities and effects
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
+			
+			DrawBlockPlacementPreview();
+
 			Particle.Draw(Ply, ref ViewFrustum);
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
 
-			// Draw debug information
-			if (Program.DebugMode) {
-				DrawPlayerCollisionBox(PlayerCollisionBoxPos);
-				ViewFrustum.Draw();
-				DrawDebugLines();
-				Utils.DrawRaycastRecord();
-			}
 		}
 
-		private void DrawTransparent() {
+		private void DrawTransparent()
+		{
 			// Transparent rendering now handled inside ChunkMap with depth sorting
 			Map.DrawTransparent(ref ViewFrustum, Ply.Position);
 		}
 
-		private void DrawDebugLines() {
+		private void DrawDebugLines()
+		{
 			// Draw marker lines
 			foreach (var marker in MarkerList)
 				Raylib.DrawLine3D(marker.Item1, marker.Item2, Color.Blue);
@@ -195,14 +227,16 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(origin, new Vector3(0, 0, 100), Color.Blue);  // Z-axis
 		}
 
-		private void DrawPlayerCollisionBox(Vector3 feetPos) {
+		private void DrawPlayerCollisionBox(Vector3 feetPos)
+		{
 			Vector3 min = new Vector3(feetPos.X - Player.PlayerRadius, feetPos.Y, feetPos.Z - Player.PlayerRadius);
 			Vector3 max = new Vector3(feetPos.X + Player.PlayerRadius, feetPos.Y + Player.PlayerHeight, feetPos.Z + Player.PlayerRadius);
 
 			DrawWireframeCube(min, max, Color.Red);
 		}
 
-		private static void DrawWireframeCube(Vector3 min, Vector3 max, Color color) {
+		private static void DrawWireframeCube(Vector3 min, Vector3 max, Color color)
+		{
 			// Bottom face
 			Raylib.DrawLine3D(new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, min.Y, min.Z), color);
 			Raylib.DrawLine3D(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z), color);
@@ -222,7 +256,37 @@ namespace RaylibGame.States {
 			Raylib.DrawLine3D(new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, max.Y, max.Z), color);
 		}
 
-		private void SaveGameState() {
+		private void DrawBlockPlacementPreview()
+		{
+			// Get the active inventory item
+			InventoryItem activeItem = Ply.GetActiveItem();
+			if (activeItem == null)
+				return;
+
+			if (!activeItem.IsPlaceableBlock())
+				return;
+
+			// Calculate where the block would be placed
+			Vector3 start = Ply.Position;
+			Vector3 dir = Ply.GetForward();
+			const float maxLen = 20f;
+
+			Vector3? placementPos = activeItem.GetBlockPlacementPosition(Map, start, dir, maxLen);
+			if (placementPos == null)
+				return;
+
+			// Draw wireframe cube at placement position using Raylib's built-in function
+			Vector3 blockPos = placementPos.Value;
+			Vector3 center = blockPos + new Vector3(0.5f, 0.5f, 0.5f);
+
+			// Use DrawCubeWiresV for wireframe - position is center, size is dimensions
+			Raylib.DrawCubeWiresV(center, Vector3.One, Color.White);
+
+			//DrawWireframeCube(blockPos + new Vector3(0.1f, 0.1f, 0.1f), Vector3.One, Color.White);
+		}
+
+		private void SaveGameState()
+		{
 			Console.WriteLine("Saving map and player!");
 
 			// Save map

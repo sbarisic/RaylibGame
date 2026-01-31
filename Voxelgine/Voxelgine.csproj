@@ -91,6 +91,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FishUI" Version="1.1.1" />
     <PackageReference Include="MoonSharp" Version="2.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Raylib-cs" Version="7.0.1" />

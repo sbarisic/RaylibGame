@@ -49,11 +49,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Collision: Quake-style clip velocity** — Replace axis-separated collision in `QuakeMoveWithCollision` with proper Quake `PM_ClipVelocity` to slide along surfaces without losing speed, fix edge/corner sticking **[CPX: 3]**
+- [ ] **Rendering: Frame interpolation** — Implement position interpolation between physics frames using existing `TimeAlpha` and `GameFrameInfo` for smooth rendering at any framerate **[CPX: 3]**
 
 ### Medium Priority
 
-- [ ] **Voxel World: Real-time block creation/destruction** — Add ability to place and destroy blocks at runtime with mesh rebuilding **[CPX: 3]**
 - [ ] **Voxel World: Procedural buildings/structures** — Generate structures on the island using prefabs or procedural rules **[CPX: 4]**
 - [ ] **Centralized Physics System** — Consolidate collision detection from `Player` and `EntityManager` into a unified physics system **[CPX: 4]**
 - [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
@@ -101,8 +101,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Analyze collision detection and how it interacts with quake movement, see if improvements can be made to avoid sticking on edges or corners or resetting speed when hitting a plane
-- Analyze update time steps and interpolation for rendering, what's incomplete, what can be improved?
+*No uncategorized items*
 
 ---
 
@@ -129,6 +128,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Animation System: Base lerp system** — `AnimLerp`, `LerpManager` with easing functions
 - [x] **Unit Testing** — Tests for AABB, Easing, Utils, Noise (made Easing class public)
 - [x] **Quake-like player movement** — Strafe-jumping, bunny-hopping, air control via proper Quake acceleration model
+- [x] **Voxel World: Real-time block creation/destruction** — Left-click destroy, right-click place with automatic mesh rebuilding
 
 ### Improvements
 

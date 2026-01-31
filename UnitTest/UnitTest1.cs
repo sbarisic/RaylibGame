@@ -242,11 +242,12 @@ namespace UnitTest {
 
 		[Fact]
 		public void DifferentSeeds_ProduceDifferentResults() {
+			// Use larger coordinates to ensure seed difference is visible
 			Noise.Seed = 111;
-			var result1 = Noise.CalcPixel2D(10, 10, 0.1f);
+			var result1 = Noise.CalcPixel2D(100, 100, 0.5f);
 
 			Noise.Seed = 222;
-			var result2 = Noise.CalcPixel2D(10, 10, 0.1f);
+			var result2 = Noise.CalcPixel2D(100, 100, 0.5f);
 
 			Assert.NotEqual(result1, result2);
 		}

@@ -101,19 +101,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- UnitTest.NoiseTests.DifferentSeeds_ProduceDifferentResults
--    Source: UnitTest1.cs line 244
--    Duration: 3 ms
-- 
--   Message: 
-- Assert.NotEqual() Failure: Values are equal
-- Expected: Not 29.5963058
-- Actual:       29.5963058
-- 
--   Stack Trace: 
-- NoiseTests.DifferentSeeds_ProduceDifferentResults() line 251
-- RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-- MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+- Non opaque blocks like water and glass need to be depth sorted. Analyze architectural changes that need to be done to support this
 
 ---
 
@@ -147,6 +135,4 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 - [x] **Particle System: Depth ordering** — Sorted particles back-to-front for proper alpha blending
 - [x] **Particle System: Underwater rendering** — Particles now detect water, apply physics resistance and blue tint
-
-
-
+- [x] **Unit Test: Noise seed test** — Fixed test using larger coordinates for seed differentiation

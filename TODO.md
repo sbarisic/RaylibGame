@@ -112,6 +112,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - Do not be afraid to break backwards compatibility if new changes will simplify or improve the project
 - Do not use powershell commands unless absolutely necessary
 - If you encounter features in systems which are required when working on a current improvement/bugfix, extend that system with the required features as part of the current task instead of creating separate TODO entries
+- Problem solutions need to be optimized, performant and well thought out before implementation, avoid quick fixes
 
 ---
 

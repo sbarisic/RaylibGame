@@ -19,10 +19,15 @@ namespace Voxelgine.Graphics {
 		float[] DistanceBuffer = new float[4096];
 		int[] IndexBuffer = new int[4096];
 
-		// Cached transparent mesh and model for sorted rendering
-		Mesh SortedTransparentMesh;
-		Model SortedTransparentModel;
-		bool SortedMeshInitialized = false;
+		// Persistent mesh buffers for sorted transparent rendering (avoid per-frame allocations)
+		int TransparentMeshCapacity = 0;
+		Vector3[] TransparentVertices;
+		Vector3[] TransparentNormals;
+		Vector2[] TransparentTexCoords;
+		Color[] TransparentColors;
+		Mesh TransparentMesh;
+		Material TransparentMaterial;
+		bool TransparentMeshInitialized = false;
 
 		public ChunkMap(GameState GS) {
 			Chunks = new SpatialHashGrid<Chunk>(1);
@@ -227,68 +232,95 @@ namespace Voxelgine.Graphics {
 			if (TransparentFaceBuffer.Count == 0)
 				return;
 
-			// Ensure buffers are large enough
-			if (DistanceBuffer.Length < TransparentFaceBuffer.Count) {
-				DistanceBuffer = new float[TransparentFaceBuffer.Count * 2];
-				IndexBuffer = new int[TransparentFaceBuffer.Count * 2];
+			int faceCount = TransparentFaceBuffer.Count;
+			int vertexCount = faceCount * 6;
+
+			// Ensure sorting buffers are large enough
+			if (DistanceBuffer.Length < faceCount) {
+				int newSize = faceCount * 2;
+				DistanceBuffer = new float[newSize];
+				IndexBuffer = new int[newSize];
+			}
+
+			// Ensure mesh buffers are large enough (only reallocate when capacity exceeded)
+			if (vertexCount > TransparentMeshCapacity) {
+				int newCapacity = Math.Max(vertexCount * 2, 6144); // Start with reasonable size
+				TransparentMeshCapacity = newCapacity;
+				TransparentVertices = new Vector3[newCapacity];
+				TransparentNormals = new Vector3[newCapacity];
+				TransparentTexCoords = new Vector2[newCapacity];
+				TransparentColors = new Color[newCapacity];
+
+				// Recreate mesh with new capacity
+				if (TransparentMeshInitialized) {
+					Raylib.UnloadMesh(TransparentMesh);
+				}
+				TransparentMesh = CreateTransparentMesh(newCapacity);
+				TransparentMaterial = Raylib.LoadMaterialDefault();
+				Raylib.SetMaterialTexture(ref TransparentMaterial, MaterialMapIndex.Albedo, ResMgr.AtlasTexture);
+				TransparentMeshInitialized = true;
 			}
 
 			// Calculate distances and build index array
-			for (int i = 0; i < TransparentFaceBuffer.Count; i++) {
+			for (int i = 0; i < faceCount; i++) {
 				DistanceBuffer[i] = Vector3.DistanceSquared(cameraPos, TransparentFaceBuffer[i].Center);
 				IndexBuffer[i] = i;
 			}
 
 			// Sort indices by distance (back-to-front)
-			Array.Sort(IndexBuffer, 0, TransparentFaceBuffer.Count, 
+			Array.Sort(IndexBuffer, 0, faceCount,
 				Comparer<int>.Create((a, b) => DistanceBuffer[b].CompareTo(DistanceBuffer[a])));
 
-			// Build mesh from sorted faces
-			int vertexCount = TransparentFaceBuffer.Count * 6;
-
-			// Allocate mesh data
-			Vector3* vertices = (Vector3*)NativeMemory.Alloc((nuint)(sizeof(Vector3) * vertexCount));
-			Vector3* normals = (Vector3*)NativeMemory.Alloc((nuint)(sizeof(Vector3) * vertexCount));
-			Vector2* texcoords = (Vector2*)NativeMemory.Alloc((nuint)(sizeof(Vector2) * vertexCount));
-			Color* colors = (Color*)NativeMemory.Alloc((nuint)(sizeof(Color) * vertexCount));
-
+			// Fill buffers with sorted face data
 			int vIdx = 0;
-			for (int i = 0; i < TransparentFaceBuffer.Count; i++) {
+			for (int i = 0; i < faceCount; i++) {
 				var face = TransparentFaceBuffer[IndexBuffer[i]];
 				for (int j = 0; j < 6; j++) {
 					var v = face.Vertices[j];
-					vertices[vIdx] = v.Position;
-					normals[vIdx] = v.Normal;
-					texcoords[vIdx] = v.UV;
-					colors[vIdx] = v.Color;
+					TransparentVertices[vIdx] = v.Position;
+					TransparentNormals[vIdx] = v.Normal;
+					TransparentTexCoords[vIdx] = v.UV;
+					TransparentColors[vIdx] = v.Color;
 					vIdx++;
 				}
 			}
 
-			// Create and upload mesh
-			Mesh mesh = new Mesh();
-			mesh.VertexCount = vertexCount;
-			mesh.TriangleCount = vertexCount / 3;
-			mesh.Vertices = (float*)vertices;
-			mesh.Normals = (float*)normals;
-			mesh.TexCoords = (float*)texcoords;
-			mesh.Colors = (byte*)colors;
+			// Update mesh buffers on GPU (much faster than recreating mesh)
+			fixed (Vector3* verts = TransparentVertices)
+			fixed (Vector3* norms = TransparentNormals)
+			fixed (Vector2* uvs = TransparentTexCoords)
+			fixed (Color* cols = TransparentColors) {
+				Raylib.UpdateMeshBuffer(TransparentMesh, 0, verts, vertexCount * sizeof(Vector3), 0); // vertices
+				Raylib.UpdateMeshBuffer(TransparentMesh, 1, uvs, vertexCount * sizeof(Vector2), 0);   // texcoords
+				Raylib.UpdateMeshBuffer(TransparentMesh, 2, norms, vertexCount * sizeof(Vector3), 0); // normals
+				Raylib.UpdateMeshBuffer(TransparentMesh, 3, cols, vertexCount * sizeof(Color), 0);    // colors
+			}
 
-			Raylib.UploadMesh(ref mesh, false);
+			// Update vertex count for this frame's draw
+			TransparentMesh.VertexCount = vertexCount;
+			TransparentMesh.TriangleCount = vertexCount / 3;
 
-			// Draw with atlas texture
+			// Draw
 			Raylib.BeginBlendMode(BlendMode.Alpha);
 			Rlgl.DisableDepthMask();
-
-			Material mat = Raylib.LoadMaterialDefault();
-			Raylib.SetMaterialTexture(ref mat, MaterialMapIndex.Albedo, ResMgr.AtlasTexture);
-			Raylib.DrawMesh(mesh, mat, Matrix4x4.Identity);
-
+			Raylib.DrawMesh(TransparentMesh, TransparentMaterial, Matrix4x4.Identity);
 			Rlgl.EnableDepthMask();
 			Raylib.EndBlendMode();
+		}
 
-			// Cleanup
-			Raylib.UnloadMesh(mesh);
+		Mesh CreateTransparentMesh(int capacity) {
+			Mesh mesh = new Mesh();
+			mesh.VertexCount = capacity;
+			mesh.TriangleCount = capacity / 3;
+
+			// Allocate GPU-side buffers
+			mesh.Vertices = (float*)NativeMemory.AllocZeroed((nuint)(sizeof(Vector3) * capacity));
+			mesh.Normals = (float*)NativeMemory.AllocZeroed((nuint)(sizeof(Vector3) * capacity));
+			mesh.TexCoords = (float*)NativeMemory.AllocZeroed((nuint)(sizeof(Vector2) * capacity));
+			mesh.Colors = (byte*)NativeMemory.AllocZeroed((nuint)(sizeof(Color) * capacity));
+
+			Raylib.UploadMesh(ref mesh, true); // dynamic = true for frequent updates
+			return mesh;
 		}
 
 		// RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.

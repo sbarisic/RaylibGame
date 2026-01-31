@@ -177,42 +177,144 @@ namespace Voxelgine.Engine {
 			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
 		}
 
+		/// <summary>
+		/// Quake-style ClipVelocity - clips velocity against a surface normal while preserving speed along the surface.
+		/// This is the key to smooth wall sliding without losing momentum.
+		/// </summary>
+		Vector3 ClipVelocity(Vector3 velocity, Vector3 normal, float overbounce = 1.001f) {
+			float backoff = Vector3.Dot(velocity, normal) * overbounce;
+			Vector3 clipped = velocity - normal * backoff;
+
+			// Prevent tiny oscillations
+			if (MathF.Abs(clipped.X) < 0.001f) clipped.X = 0;
+			if (MathF.Abs(clipped.Y) < 0.001f) clipped.Y = 0;
+			if (MathF.Abs(clipped.Z) < 0.001f) clipped.Z = 0;
+
+			return clipped;
+		}
+
+		/// <summary>
+		/// Finds the collision normal for an AABB at the given position.
+		/// Returns the primary axis of penetration.
+		/// </summary>
+		Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight) {
+			// Test each axis to find which one is blocked
+			Vector3 testX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
+			Vector3 testY = new Vector3(feetPos.X, feetPos.Y + move.Y, feetPos.Z);
+			Vector3 testZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
+
+			bool blockedX = Map.HasBlocksInBoundsMinMax(
+				testX - new Vector3(playerRadius, 0, playerRadius),
+				testX + new Vector3(playerRadius, playerHeight, playerRadius));
+			bool blockedY = Map.HasBlocksInBoundsMinMax(
+				testY - new Vector3(playerRadius, 0, playerRadius),
+				testY + new Vector3(playerRadius, playerHeight, playerRadius));
+			bool blockedZ = Map.HasBlocksInBoundsMinMax(
+				testZ - new Vector3(playerRadius, 0, playerRadius),
+				testZ + new Vector3(playerRadius, playerHeight, playerRadius));
+
+			// Return the normal pointing against the movement direction for each blocked axis
+			Vector3 normal = Vector3.Zero;
+			if (blockedX && MathF.Abs(move.X) > 0.0001f)
+				normal.X = -MathF.Sign(move.X);
+			if (blockedY && MathF.Abs(move.Y) > 0.0001f)
+				normal.Y = -MathF.Sign(move.Y);
+			if (blockedZ && MathF.Abs(move.Z) > 0.0001f)
+				normal.Z = -MathF.Sign(move.Z);
+
+			// Normalize if we have a normal
+			float len = normal.Length();
+			if (len > 0.0001f)
+				return normal / len;
+
+			return Vector3.Zero;
+		}
+
 		private Vector3 QuakeMoveWithCollision(ChunkMap Map, Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false) {
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
 			Vector3 feetPos = FeetPosition;
+			Vector3 originalVelocity = velocity;
+			Vector3 primalVelocity = velocity;
 			Vector3 move = velocity * dt;
-			LastWallNormal = Vector3.Zero; // Reset before each move
-			for (int slide = 0; slide < maxSlides; slide++) {
-				Vector3 tryPos = feetPos + move;
-				if (!Map.HasBlocksInBoundsMinMax(tryPos - new Vector3(playerRadius, 0, playerRadius), tryPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
-					feetPos = tryPos;
-					break;
-				}
-				Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
-				Vector3 stepTry = stepUp + move;
-				if (!Map.HasBlocksInBoundsMinMax(stepTry - new Vector3(playerRadius, 0, playerRadius), stepTry + new Vector3(playerRadius, playerHeight, playerRadius))) {
-					feetPos = stepTry;
-					break;
-				}
-				Vector3 tryX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
-				if (!Map.HasBlocksInBoundsMinMax(tryX - new Vector3(playerRadius, 0, playerRadius), tryX + new Vector3(playerRadius, playerHeight, playerRadius))) {
-					feetPos = tryX;
-					move.Z = 0;
-					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(1, 0, 0), 1e-5f);
-					LastWallNormal = new Vector3(MathF.Sign(move.X), 0, 0); // Store wall normal
-					continue;
-				}
-				Vector3 tryZ = new Vector3(feetPos.X, feetPos.Y, feetPos.Z + move.Z);
-				if (!Map.HasBlocksInBoundsMinMax(tryZ - new Vector3(playerRadius, 0, playerRadius), tryZ + new Vector3(playerRadius, playerHeight, playerRadius))) {
-					feetPos = tryZ;
-					move.X = 0;
-					PlyVelocity = Utils.ProjectOnPlane(PlyVelocity, new Vector3(0, 0, 1), 1e-5f);
-					LastWallNormal = new Vector3(0, 0, MathF.Sign(move.Z)); // Store wall normal
-					continue;
-				}
-				break;
+			LastWallNormal = Vector3.Zero;
+
+			Vector3[] planes = new Vector3[5];
+			int numPlanes = 0;
+
+			// Only add ground plane if moving downward (not when jumping up)
+			if (onGround && velocity.Y <= 0) {
+				planes[numPlanes++] = Vector3.UnitY;
 			}
+
+			float timeLeft = dt;
+
+			for (int slide = 0; slide < maxSlides && timeLeft > 0; slide++) {
+				Vector3 endPos = feetPos + velocity * timeLeft;
+
+				// Check if move is clear
+				if (!Map.HasBlocksInBoundsMinMax(
+					endPos - new Vector3(playerRadius, 0, playerRadius),
+					endPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					feetPos = endPos;
+					break;
+				}
+
+				// Try step up if on ground
+				if (onGround && slide == 0) {
+					Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
+					Vector3 stepEnd = stepUp + velocity * timeLeft;
+					if (!Map.HasBlocksInBoundsMinMax(
+						stepEnd - new Vector3(playerRadius, 0, playerRadius),
+						stepEnd + new Vector3(playerRadius, playerHeight, playerRadius))) {
+						feetPos = stepEnd;
+						break;
+					}
+				}
+
+				// Find collision normal
+				Vector3 normal = FindCollisionNormal(Map, feetPos, velocity * timeLeft, playerRadius, playerHeight);
+
+				if (normal == Vector3.Zero) {
+					// Stuck - try to nudge out
+					break;
+				}
+
+				// Store wall normal for air control
+				if (MathF.Abs(normal.Y) < 0.5f) {
+					LastWallNormal = normal;
+				}
+
+				// Clip velocity against this plane
+				velocity = ClipVelocity(velocity, normal);
+
+				// Check if velocity is now moving into a previous plane
+				for (int i = 0; i < numPlanes; i++) {
+					if (Vector3.Dot(velocity, planes[i]) < 0) {
+						// Clip against the previous plane too
+						velocity = ClipVelocity(velocity, planes[i]);
+					}
+				}
+
+				// Add this plane to the list
+				if (numPlanes < planes.Length) {
+					planes[numPlanes++] = normal;
+				}
+
+				// Calculate how much of the move we completed (approximate)
+				float moveFraction = 0.1f; // Small step to avoid getting stuck
+				feetPos += velocity * timeLeft * moveFraction;
+				timeLeft *= (1.0f - moveFraction);
+
+				// Check if we're not moving anymore
+				if (velocity.LengthSquared() < 0.0001f) {
+					break;
+				}
+			}
+
+			// Update the player's velocity to the clipped version
+			PlyVelocity = velocity;
+
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
 
@@ -488,9 +590,8 @@ namespace Voxelgine.Engine {
 
 			if (newPos != Position) {
 				SetPosition(newPos);
-			} else {
-				PlyVelocity = Vector3.Zero;
 			}
+			// Note: PlyVelocity is now updated inside QuakeMoveWithCollision via ClipVelocity
 
 			// --- Head collision check ---
 			if (PlyVelocity.Y > 0) {

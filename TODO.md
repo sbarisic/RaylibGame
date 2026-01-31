@@ -49,7 +49,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Collision: Quake-style clip velocity** — Replace axis-separated collision in `QuakeMoveWithCollision` with proper Quake `PM_ClipVelocity` to slide along surfaces without losing speed, fix edge/corner sticking **[CPX: 3]**
 - [ ] **Rendering: Frame interpolation** — Implement position interpolation between physics frames using existing `TimeAlpha` and `GameFrameInfo` for smooth rendering at any framerate **[CPX: 3]**
 
 ### Medium Priority
@@ -129,6 +128,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Unit Testing** — Tests for AABB, Easing, Utils, Noise (made Easing class public)
 - [x] **Quake-like player movement** — Strafe-jumping, bunny-hopping, air control via proper Quake acceleration model
 - [x] **Voxel World: Real-time block creation/destruction** — Left-click destroy, right-click place with automatic mesh rebuilding
+- [x] **Collision: Quake-style clip velocity** — ClipVelocity slides along surfaces preserving momentum, multi-plane clipping for corners
 
 ### Improvements
 

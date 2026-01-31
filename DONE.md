@@ -35,4 +35,4 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Transparent Blocks** — Fixed depth sorting for water/glass overlap
 - **Unit Tests** — Fixed noise seed test with larger coordinates
 - **GUI: Main menu button clipping** — Fixed button borders being cut off by adding padding to StackLayout
-- **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel causing light to not propagate from sources
+- **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel; fixed opaque block face lighting to sample from adjacent air blocks instead of the opaque block itself

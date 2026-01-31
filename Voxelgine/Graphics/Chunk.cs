@@ -503,6 +503,25 @@ namespace Voxelgine.Graphics
 			return Utils.Color(1.0f);
 		}
 
+		/// <summary>
+		/// Gets the light color for an opaque block's face by reading from the adjacent block.
+		/// For opaque blocks, the light should come from the neighboring air/transparent block
+		/// that the face is exposed to, not from the opaque block itself.
+		/// </summary>
+		Color GetFaceLightColor(int x, int y, int z, Vector3 faceDir)
+		{
+			// Get the neighbor block in the direction of the face
+			int nx = x + (int)faceDir.X;
+			int ny = y + (int)faceDir.Y;
+			int nz = z + (int)faceDir.Z;
+
+			PlacedBlock neighbor = GetBlock(nx, ny, nz);
+
+			// Get the light from the neighbor (the air block facing this surface)
+			// Use the opposite direction since we want the light hitting this face
+			return neighbor.GetBlockLight(-faceDir).ToColor();
+		}
+
 		void SetBlockTextureUV(BlockType BlockType, Vector3 FaceNormal, MeshBuilder Verts)
 		{
 			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
@@ -964,7 +983,7 @@ namespace Voxelgine.Graphics
 								if (!XPosSkipFace)
 								{
 									Vector3 CurDir = new Vector3(1, 0, 0);
-									Color FaceClr = Utils.ColorMul(CurBlock.GetBlockLight(CurDir).ToColor(), ChunkColor);
+									Color FaceClr = Utils.ColorMul(GetFaceLightColor(x, y, z, CurDir), ChunkColor);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(1, 0, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0), useApproxAO)));
@@ -979,8 +998,7 @@ namespace Voxelgine.Graphics
 								if (!XNegSkipFace)
 								{
 									Vector3 CurDir = new Vector3(-1, 0, 0);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									Color FaceClr = GetFaceLightColor(x, y, z, CurDir);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(-1, 1, 0), new Vector3(-1, 1, 1), new Vector3(-1, 0, 1), useApproxAO)));
@@ -995,8 +1013,7 @@ namespace Voxelgine.Graphics
 								if (!YPosSkipFace)
 								{
 									Vector3 CurDir = new Vector3(0, 1, 0);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									Color FaceClr = GetFaceLightColor(x, y, z, CurDir);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(0, 1, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 1, 0), useApproxAO)));
@@ -1011,8 +1028,7 @@ namespace Voxelgine.Graphics
 								if (!YNegSkipFace)
 								{
 									Vector3 CurDir = new Vector3(0, -1, 0);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									Color FaceClr = GetFaceLightColor(x, y, z, CurDir);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, -1, 0), useApproxAO)));
@@ -1027,8 +1043,7 @@ namespace Voxelgine.Graphics
 								if (!ZPosSkipFace)
 								{
 									Vector3 CurDir = new Vector3(0, 0, 1);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									Color FaceClr = GetFaceLightColor(x, y, z, CurDir);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, 0, 1), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(0, -1, 1), new Vector3(1, -1, 1), new Vector3(1, 0, 1), useApproxAO)));
@@ -1043,8 +1058,7 @@ namespace Voxelgine.Graphics
 								if (!ZNegSkipFace)
 								{
 									Vector3 CurDir = new Vector3(0, 0, -1);
-									//Color FaceClr = Color.White; 
-									Color FaceClr = CurBlock.GetBlockLight(CurDir).ToColor();
+									Color FaceClr = GetFaceLightColor(x, y, z, CurDir);
 									SetBlockTextureUV(CurBlock.Type, CurDir, OpaqueVerts);
 
 									OpaqueVerts.Add(new Vector3(1, 1, 0), new Vector2(0, 1), new Vector3(0, 0, -1), Utils.ColorMul(FaceClr, CalcAOColor(GlobalBlockPos, new Vector3(0, 1, -1), new Vector3(1, 1, -1), new Vector3(1, 0, -1), useApproxAO)));

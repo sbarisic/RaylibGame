@@ -17,6 +17,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Graphics: Glowstone light emission** — Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.
 - **Audio: Block placement sounds** — Added sound effects for placing and breaking blocks.
 - **Physics: Jump height** — Increased player jump impulse by 10% (5.5 → 6.05).
+- **Graphics: Glass backface rendering** — Added double-sided rendering for glass/ice blocks, skipping backfaces between adjacent same-type blocks.
 - **Physics Utils** — Created `PhysicsUtils` class with shared collision functions (`ClipVelocity`, `MoveWithCollision`, `Accelerate`, `AirAccelerate`, `ApplyFriction`, `ApplyGravity`). Enhanced `AABB` with `Overlaps()` and helper properties. Refactored `EntityManager` and `Player` to use shared utilities.
 - **Animation System** — Lerp system with comprehensive easing functions (Quad, Cubic, Quart, Quint, Sine, Expo, Circ, Back, Elastic, Bounce)
 - **Player Movement** — Quake-style physics (strafe-jumping, bunny-hopping, air control, clip velocity)

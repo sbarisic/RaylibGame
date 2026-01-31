@@ -90,6 +90,21 @@ namespace Voxelgine.Engine {
 			}
 		}
 
+		/// <summary>
+		/// Returns true if the block type should render backfaces (double-sided).
+		/// This applies to glass-like blocks that should be visible from both sides.
+		/// </summary>
+		public static bool NeedsBackfaceRendering(BlockType T) {
+			switch (T) {
+				case BlockType.Glass:
+				case BlockType.Ice:
+					return true;
+
+				default:
+					return false;
+			}
+		}
+
 		public static void GetIconTexCoords(IconType Icon, out Texture2D Texture, out Vector2 UVSize, out Vector2 UVPos, out float Scale) {
 			UVSize = Vector2.One;
 			UVPos = Vector2.Zero;

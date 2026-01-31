@@ -57,6 +57,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Lower Priority
 
+- [ ] **Physics: Swimming movement** — Implement Quake-style swimming movement mode for water blocks **[CPX: 3]**
 - [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
 - [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
@@ -69,7 +70,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Improvements
 
-- [ ] **Graphics: Glass block backface rendering** — Render backfaces of glass blocks (double-sided) except between adjacent glass blocks (Minecraft-style) **[CPX: 2]**
+*No improvement items*
 
 ---
 
@@ -85,7 +86,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-- Add swimming move mode, also quake like
+*No Code Refactoring items*
 
 ---
 

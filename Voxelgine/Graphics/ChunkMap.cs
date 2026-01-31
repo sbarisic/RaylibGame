@@ -13,6 +13,10 @@ namespace Voxelgine.Graphics {
 		SpatialHashGrid<Chunk> Chunks;
 		Random Rnd = new Random();
 
+		// Reusable buffers for transparent face sorting (avoid allocations per frame)
+		List<TransparentFace> TransparentFaceBuffer = new List<TransparentFace>(1024);
+		MeshBuilder TransparentMeshBuilder = new MeshBuilder();
+
 		public ChunkMap(GameState GS) {
 			Chunks = new SpatialHashGrid<Chunk>(1);
 		}
@@ -202,11 +206,50 @@ namespace Voxelgine.Graphics {
 			Utils.DrawRaycastRecord();
 		}
 
-		public void DrawTransparent(ref Frustum Fr) {
+		public void DrawTransparent(ref Frustum Fr, Vector3 cameraPos) {
+			// Collect all transparent faces from all visible chunks
+			TransparentFaceBuffer.Clear();
+
 			foreach (var KV in Chunks.Items) {
-				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
-				KV.Value.DrawTransparent(ChunkPos, ref Fr);
+				if (KV.Value.HasTransparentFaces()) {
+					var faces = KV.Value.GetTransparentFaces(ref Fr);
+					TransparentFaceBuffer.AddRange(faces);
+				}
 			}
+
+			if (TransparentFaceBuffer.Count == 0)
+				return;
+
+			// Calculate distance for each face and sort back-to-front
+			for (int i = 0; i < TransparentFaceBuffer.Count; i++) {
+				var face = TransparentFaceBuffer[i];
+				face.CalcDistance(cameraPos);
+				TransparentFaceBuffer[i] = face;
+			}
+
+			// Sort back-to-front (furthest first)
+			TransparentFaceBuffer.Sort((a, b) => b.DistanceSquared.CompareTo(a.DistanceSquared));
+
+			// Draw sorted faces using immediate mode for now (simpler, still efficient for reasonable face counts)
+			Raylib.BeginBlendMode(BlendMode.Alpha);
+			Rlgl.DisableDepthMask();
+			Rlgl.SetTexture(ResMgr.AtlasTexture.Id);
+			Rlgl.Begin(DrawMode.Triangles);
+
+			foreach (var face in TransparentFaceBuffer) {
+				for (int i = 0; i < 6; i++) {
+					var v = face.Vertices[i];
+					Rlgl.Color4ub(v.Color.R, v.Color.G, v.Color.B, v.Color.A);
+					Rlgl.TexCoord2f(v.UV.X, v.UV.Y);
+					Rlgl.Normal3f(v.Normal.X, v.Normal.Y, v.Normal.Z);
+					Rlgl.Vertex3f(v.Position.X, v.Position.Y, v.Position.Z);
+				}
+			}
+
+			Rlgl.End();
+			Rlgl.SetTexture(0);
+			Rlgl.EnableDepthMask();
+			Raylib.EndBlendMode();
 		}
 
 		// RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.

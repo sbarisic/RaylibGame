@@ -101,7 +101,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Non opaque blocks like water and glass need to be depth sorted. Analyze architectural changes that need to be done to support this
+*No uncategorized items*
 
 ---
 
@@ -136,3 +136,4 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Particle System: Depth ordering** — Sorted particles back-to-front for proper alpha blending
 - [x] **Particle System: Underwater rendering** — Particles now detect water, apply physics resistance and blue tint
 - [x] **Unit Test: Noise seed test** — Fixed test using larger coordinates for seed differentiation
+- [x] **Transparent blocks: Depth sorting** — Water/glass now render correctly when overlapping via face-level depth sorting

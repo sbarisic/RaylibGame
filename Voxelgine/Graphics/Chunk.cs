@@ -13,6 +13,26 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Graphics {
+	/// <summary>
+	/// Represents a transparent block face for depth-sorted rendering.
+	/// Contains 6 vertices (2 triangles) and the center position for sorting.
+	/// </summary>
+	public struct TransparentFace {
+		public Vector3 Center;           // Center of face for distance calculation
+		public Vertex3[] Vertices;       // 6 vertices (2 triangles)
+		public float DistanceSquared;    // Cached distance for sorting
+
+		public TransparentFace(Vector3 center, Vertex3[] vertices) {
+			Center = center;
+			Vertices = vertices;
+			DistanceSquared = 0;
+		}
+
+		public void CalcDistance(Vector3 cameraPos) {
+			DistanceSquared = Vector3.DistanceSquared(cameraPos, Center);
+		}
+	}
+
 	public unsafe class Chunk {
 		public const int ChunkSize = 16;
 		public const float BlockSize = 1;
@@ -31,6 +51,10 @@ namespace Voxelgine.Graphics {
 
 		Model CachedModelTransp;
 		Mesh CachedMeshTransp;
+
+		// Cached transparent faces for depth-sorted rendering
+		List<TransparentFace> CachedTransparentFaces;
+		bool TransparentFacesValid;
 
 		public Color ChunkColor = Color.White;
 
@@ -52,6 +76,8 @@ namespace Voxelgine.Graphics {
 
 			Dirty = true;
 			ModelValidTransp = ModelValidOpaque = false;
+			TransparentFacesValid = false;
+			CachedTransparentFaces = new List<TransparentFace>();
 
 			//int TileTexSize = AtlasTex.width / 16;
 		}
@@ -444,6 +470,140 @@ namespace Voxelgine.Graphics {
 			return TranspVerts.ToMesh();
 		}
 
+		/// <summary>
+		/// Generates a list of transparent faces with world positions for depth-sorted rendering.
+		/// </summary>
+		List<TransparentFace> GenTransparentFaces(Vector3 chunkWorldPos) {
+			List<TransparentFace> faces = new List<TransparentFace>();
+
+			for (int x = 0; x < ChunkSize; x++) {
+				for (int y = 0; y < ChunkSize; y++) {
+					for (int z = 0; z < ChunkSize; z++) {
+						PlacedBlock CurBlock = GetBlock(x, y, z);
+						if (CurBlock.Type == BlockType.None || BlockInfo.IsOpaque(CurBlock.Type))
+							continue;
+
+						Vector3 blockWorldPos = chunkWorldPos + new Vector3(x, y, z) * BlockSize;
+
+						BlockType XPosType = GetBlock(x + 1, y, z).Type;
+						BlockType XNegType = GetBlock(x - 1, y, z).Type;
+						BlockType YPosType = GetBlock(x, y + 1, z).Type;
+						BlockType YNegType = GetBlock(x, y - 1, z).Type;
+						BlockType ZPosType = GetBlock(x, y, z + 1).Type;
+						BlockType ZNegType = GetBlock(x, y, z - 1).Type;
+
+						bool XPosSkipFace = (XPosType == CurBlock.Type);
+						bool XNegSkipFace = (XNegType == CurBlock.Type);
+						bool YPosSkipFace = (YPosType == CurBlock.Type);
+						bool YNegSkipFace = (YNegType == CurBlock.Type);
+						bool ZPosSkipFace = (ZPosType == CurBlock.Type);
+						bool ZNegSkipFace = (ZNegType == CurBlock.Type);
+
+						BlockInfo.GetBlockTexCoords(CurBlock.Type, Vector3.UnitX, out Vector2 uvSize, out Vector2 uvPos);
+
+						// X++
+						if (!XPosSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(1, 0.5f, 0.5f);
+							Color clr = CurBlock.GetBlockLight(new Vector3(1, 0, 0)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(1, 0, 0), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(1, 0, 0), clr, uvPos, uvSize));
+						}
+						// X--
+						if (!XNegSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(0, 0.5f, 0.5f);
+							Color clr = CurBlock.GetBlockLight(new Vector3(-1, 0, 0)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(-1, 0, 0), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(-1, 0, 0), clr, uvPos, uvSize));
+						}
+						// Y++
+						if (!YPosSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(0.5f, 1, 0.5f);
+							Color clr = CurBlock.GetBlockLight(new Vector3(0, 1, 0)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(0, 1, 0), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(0, 1, 0), clr, uvPos, uvSize));
+						}
+						// Y--
+						if (!YNegSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(0.5f, 0, 0.5f);
+							Color clr = CurBlock.GetBlockLight(new Vector3(0, -1, 0)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(0, -1, 0), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(0, -1, 0), clr, uvPos, uvSize));
+						}
+						// Z++
+						if (!ZPosSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(0.5f, 0.5f, 1);
+							Color clr = CurBlock.GetBlockLight(new Vector3(0, 0, 1)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(0, 0, 1), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(0, 0, 1), clr, uvPos, uvSize));
+						}
+						// Z--
+						if (!ZNegSkipFace) {
+							Vector3 faceCenter = blockWorldPos + new Vector3(0.5f, 0.5f, 0);
+							Color clr = CurBlock.GetBlockLight(new Vector3(0, 0, -1)).ToColor();
+							BlockInfo.GetBlockTexCoords(CurBlock.Type, new Vector3(0, 0, -1), out uvSize, out uvPos);
+							faces.Add(CreateFace(faceCenter, blockWorldPos, new Vector3(0, 0, -1), clr, uvPos, uvSize));
+						}
+					}
+				}
+			}
+
+			return faces;
+		}
+
+		TransparentFace CreateFace(Vector3 center, Vector3 blockPos, Vector3 normal, Color clr, Vector2 uvPos, Vector2 uvSize) {
+			Vertex3[] verts = new Vertex3[6];
+			Vector2 uv0 = uvPos;
+			Vector2 uv1 = uvPos + new Vector2(uvSize.X, 0);
+			Vector2 uv2 = uvPos + uvSize;
+			Vector2 uv3 = uvPos + new Vector2(0, uvSize.Y);
+
+			if (normal.X > 0) { // X++
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv3, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv1, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
+			} else if (normal.X < 0) { // X--
+				verts[0] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv2, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv3, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv0, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv1, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv2, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv0, normal, clr);
+			} else if (normal.Y > 0) { // Y++
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv3, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv0, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv1, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv0, normal, clr);
+			} else if (normal.Y < 0) { // Y--
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv1, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv2, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv3, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv2, normal, clr);
+			} else if (normal.Z > 0) { // Z++
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv1, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv2, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv3, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv0, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv1, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv3, normal, clr);
+			} else { // Z--
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv3, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv0, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv1, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv2, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv3, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv1, normal, clr);
+			}
+
+			return new TransparentFace(center, verts);
+		}
+
 		Mesh GenMesh(Vector3? cameraChunkIndex = null, float aoApproxDistance = 6f) {
 			MeshBuilder OpaqueVerts = new MeshBuilder();
 
@@ -654,6 +814,11 @@ namespace Voxelgine.Graphics {
 			CachedModelTransp.Materials[0].Shader = ResMgr.GetShader("default");
 			ModelValidTransp = CachedMeshTransp.VertexCount > 0;
 
+			// Generate transparent faces for depth-sorted rendering
+			Vector3 chunkWorldPos = GlobalChunkIndex * ChunkSize;
+			CachedTransparentFaces = GenTransparentFaces(chunkWorldPos);
+			TransparentFacesValid = CachedTransparentFaces.Count > 0;
+
 			if (!ModelValidOpaque && !ModelValidTransp) {
 				ModelAABB = AABB.Empty;
 			} else {
@@ -704,6 +869,23 @@ namespace Voxelgine.Graphics {
 			if (ModelValidTransp) {
 				Raylib.DrawModel(CachedModelTransp, ChunkPosition, BlockSize, ChunkColor);
 			}
+		}
+
+		/// <summary>
+		/// Returns the cached transparent faces for this chunk for depth-sorted rendering.
+		/// Call RecalcModel first if dirty.
+		/// </summary>
+		public List<TransparentFace> GetTransparentFaces(ref Frustum Fr) {
+			RecalcModel();
+			Vector3 chunkWorldPos = GlobalChunkIndex * ChunkSize;
+			if (!IsInsideFrustum(chunkWorldPos, ref Fr))
+				return new List<TransparentFace>();
+			return CachedTransparentFaces;
+		}
+
+		public bool HasTransparentFaces() {
+			RecalcModel();
+			return TransparentFacesValid;
 		}
 	}
 }

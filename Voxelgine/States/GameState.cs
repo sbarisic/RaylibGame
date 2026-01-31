@@ -179,13 +179,8 @@ namespace RaylibGame.States {
 		}
 
 		private void DrawTransparent() {
-			Raylib.BeginBlendMode(BlendMode.Alpha);
-			Rlgl.DisableDepthMask();
-
-			Map.DrawTransparent(ref ViewFrustum);
-
-			Rlgl.EnableDepthMask();
-			Raylib.EndBlendMode();
+			// Transparent rendering now handled inside ChunkMap with depth sorting
+			Map.DrawTransparent(ref ViewFrustum, Ply.Position);
 		}
 
 		private void DrawDebugLines() {

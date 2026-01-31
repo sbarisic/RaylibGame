@@ -22,12 +22,14 @@ namespace Voxelgine.Engine {
 		public float Rnd;
 
 		public bool MovePhysics;
+		public bool IsUnderwater;
 
 		public float SpawnedAt;
 		public float LifeTime;
 	}
 
 	public delegate bool TestFunc(Vector3 Point);
+	public delegate BlockType GetBlockFunc(Vector3 Point);
 
 	public class ParticleSystem {
 		Particle[] Particles = new Particle[256];
@@ -36,14 +38,16 @@ namespace Voxelgine.Engine {
 		float lastGameTime = 0;
 
 		public TestFunc Test;
+		public GetBlockFunc GetBlock;
 
 		// Debug variables
 		int OnScreen;
 		int Drawn;
 		int Max;
 
-		public void Init(TestFunc Test) {
+		public void Init(TestFunc Test, GetBlockFunc GetBlock) {
 			this.Test = Test;
+			this.GetBlock = GetBlock;
 
 			for (int i = 0; i < Particles.Length; i++) {
 				Particles[i] = new Particle();
@@ -98,6 +102,15 @@ namespace Voxelgine.Engine {
 
 						float Wind = Math.Max(0, P.Pos.Y - WindHeight) * WindHeightScale;
 						Vector3 WindAccel = new Vector3(Wind, 0, Wind) * (P.Rnd + 0.5f) * Dt;
+
+						// Check if particle is underwater
+						P.IsUnderwater = GetBlock(P.Pos) == BlockType.Water;
+
+						// Apply underwater physics: slower movement, reduced velocity
+						if (P.IsUnderwater) {
+							P.Vel *= 0.95f; // Water resistance
+							WindAccel = Vector3.Zero; // No wind underwater
+						}
 
 						P.Pos += (P.Vel * Dt) + WindAccel;
 						P.Scale = P.Scale + (P.Scaler * (P.Rnd + 0.5f)) * Dt;
@@ -156,7 +169,19 @@ namespace Voxelgine.Engine {
 			for (int i = 0; i < visibleCount; i++) {
 				ref Particle P = ref Particles[SortedIndices[i]];
 				OnScreen++;
-				Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, P.Color);
+
+				// Apply underwater tint for particles in water
+				Color drawColor = P.Color;
+				if (P.IsUnderwater) {
+					drawColor = new Color(
+						(byte)(P.Color.R * 0.6f),
+						(byte)(P.Color.G * 0.8f),
+						(byte)Math.Min(255, P.Color.B * 1.1f),
+						(byte)(P.Color.A * 0.7f)
+					);
+				}
+
+				Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, drawColor);
 			}
 
 			Raylib.EndBlendMode();

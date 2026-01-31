@@ -56,7 +56,10 @@ namespace RaylibGame.States {
 			Map = new ChunkMap(this);
 
 			Particle = new ParticleSystem();
-			Particle.Init((Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _));
+			Particle.Init(
+				(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
+				(Pt) => Map.GetBlock(Pt)
+			);
 
 			// =========================================== Create entities ===========================================
 			// Create pickup entity

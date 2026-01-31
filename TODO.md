@@ -98,7 +98,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-- [ ] **Particle System: Underwater rendering** — Particles don't render correctly underwater **[CPX: 2]**
+*No active bugs*
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
@@ -112,6 +112,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - Maintain the "dependency-free" philosophy - keep the core library minimal
 - Do not be afraid to break backwards compatibility if new changes will simplify or improve the project
 - Do not use powershell commands unless absolutely necessary
+- If you encounter features in systems which are required when working on a current improvement/bugfix, extend that system with the required features as part of the current task instead of creating separate TODO entries
 
 ---
 
@@ -133,6 +134,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Fixed Bugs
 
 - [x] **Particle System: Depth ordering** — Sorted particles back-to-front for proper alpha blending
+- [x] **Particle System: Underwater rendering** — Particles now detect water, apply physics resistance and blue tint
 
 
 

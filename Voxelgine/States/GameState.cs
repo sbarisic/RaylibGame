@@ -294,6 +294,9 @@ namespace RaylibGame.States
 			// Calculate half size for the preview cube
 			float half = scale * 0.8f;
 
+			// Disable backface culling for preview (we want to see all faces)
+			Rlgl.DisableBackfaceCulling();
+
 			// Draw each face of the cube with the appropriate texture from the atlas
 			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 1, 0));  // Top
 			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, -1, 0)); // Bottom
@@ -301,6 +304,9 @@ namespace RaylibGame.States
 			DrawBlockFace(atlas, blockType, center, half, new Vector3(-1, 0, 0)); // Left
 			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 0, 1));  // Front
 			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 0, -1)); // Back
+
+			// Re-enable backface culling
+			Rlgl.EnableBackfaceCulling();
 		}
 
 		private void DrawBlockFace(Texture2D atlas, BlockType blockType, Vector3 center, float half, Vector3 faceNormal)
@@ -308,55 +314,59 @@ namespace RaylibGame.States
 			// Get UV coordinates for this block face
 			BlockInfo.GetBlockTexCoords(blockType, faceNormal, out Vector2 uvSize, out Vector2 uvPos);
 
-			// Calculate pixel coordinates in the atlas
-			int texWidth = atlas.Width;
-			int texHeight = atlas.Height;
-			Rectangle sourceRect = new Rectangle(
-				uvPos.X * texWidth,
-				uvPos.Y * texHeight,
-				uvSize.X * texWidth,
-				uvSize.Y * texHeight
-			);
-
-			// Calculate the 4 corners of this face
+			// Calculate the 4 corners of this face with correct winding order
 			Vector3[] corners = new Vector3[4];
 			Vector3 right, up;
 
-			if (MathF.Abs(faceNormal.Y) > 0.5f)
+			if (faceNormal.Y > 0.5f)
 			{
-				// Horizontal face (top/bottom)
+				// Top face
+				right = new Vector3(1, 0, 0);
+				up = new Vector3(0, 0, -1);
+			}
+			else if (faceNormal.Y < -0.5f)
+			{
+				// Bottom face
 				right = new Vector3(1, 0, 0);
 				up = new Vector3(0, 0, 1);
 			}
-			else if (MathF.Abs(faceNormal.X) > 0.5f)
+			else if (faceNormal.X > 0.5f)
 			{
-				// Side face (left/right)
+				// Right face (+X)
+				right = new Vector3(0, 0, -1);
+				up = new Vector3(0, 1, 0);
+			}
+			else if (faceNormal.X < -0.5f)
+			{
+				// Left face (-X)
 				right = new Vector3(0, 0, 1);
+				up = new Vector3(0, 1, 0);
+			}
+			else if (faceNormal.Z > 0.5f)
+			{
+				// Front face (+Z)
+				right = new Vector3(1, 0, 0);
 				up = new Vector3(0, 1, 0);
 			}
 			else
 			{
-				// Front/back face
-				right = new Vector3(1, 0, 0);
+				// Back face (-Z)
+				right = new Vector3(-1, 0, 0);
 				up = new Vector3(0, 1, 0);
 			}
 
 			Vector3 faceCenter = center + faceNormal * half;
-			corners[0] = faceCenter - right * half - up * half;
-			corners[1] = faceCenter + right * half - up * half;
-			corners[2] = faceCenter + right * half + up * half;
-			corners[3] = faceCenter - right * half + up * half;
-
-			// Draw textured quad using DrawBillboardRec or manual triangles
-			// Since Raylib doesn't have a direct textured quad function, we use DrawTexturePro in 3D
-			// Alternative: Draw as two triangles
+			corners[0] = faceCenter - right * half - up * half; // Bottom-left
+			corners[1] = faceCenter + right * half - up * half; // Bottom-right
+			corners[2] = faceCenter + right * half + up * half; // Top-right
+			corners[3] = faceCenter - right * half + up * half; // Top-left
 
 			// Use Rlgl to draw a textured quad
 			Rlgl.SetTexture(atlas.Id);
 			Rlgl.Begin(DrawMode.Quads);
 
-			// Set color to white (full texture color)
-			Rlgl.Color4ub(255, 255, 255, 200); // Slight transparency for preview effect
+			// Set color with slight transparency for preview effect
+			Rlgl.Color4ub(255, 255, 255, 200);
 
 			// UV coordinates (normalized 0-1)
 			float u0 = uvPos.X;
@@ -364,7 +374,7 @@ namespace RaylibGame.States
 			float u1 = uvPos.X + uvSize.X;
 			float v1 = uvPos.Y + uvSize.Y;
 
-			// Quad vertices with texture coordinates
+			// Quad vertices with texture coordinates (counter-clockwise winding)
 			Rlgl.TexCoord2f(u0, v1); Rlgl.Vertex3f(corners[0].X, corners[0].Y, corners[0].Z);
 			Rlgl.TexCoord2f(u1, v1); Rlgl.Vertex3f(corners[1].X, corners[1].Y, corners[1].Z);
 			Rlgl.TexCoord2f(u1, v0); Rlgl.Vertex3f(corners[2].X, corners[2].Y, corners[2].Z);

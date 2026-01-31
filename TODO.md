@@ -61,10 +61,10 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Lower Priority
 
+- [ ] **Block Placement Preview** — Render wireframe outline showing where block would be placed when holding a block item **[CPX: 2]**
 - [ ] **Graphics: Lighting system enhancements** — Improve the existing `ComputeLighting` with dynamic lights, shadows **[CPX: 4]**
 - [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
 - [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
-- [ ] **Animation: Easing functions expansion** — Extend `AnimLerp` with more easing types **[CPX: 1]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 
@@ -133,7 +133,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Improvements
 
-*No completed improvements yet*
+- [x] **Animation: Easing functions expansion** — Extended `Easing` with Quad, Cubic, Quart, Quint, Sine, Expo, Circ, Back, Elastic, Bounce (In/Out/InOut)
 
 ### Fixed Bugs
 

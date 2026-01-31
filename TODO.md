@@ -49,6 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
+- [ ] **Unit Testing: Implement tests** — Create unit tests in UnitTest project, expose required engine internals (make classes/methods public or use InternalsVisibleTo) **[CPX: 3]**
 - [ ] **Quake-like player movement** — Implement strafe-jumping, bunny-hopping, air control mechanics in `Player.cs` **[CPX: 3]**
 
 ### Medium Priority
@@ -97,12 +98,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-- [ ] **Particle System: Depth ordering** — Particles render with incorrect depth sorting **[CPX: 2]**
 - [ ] **Particle System: Underwater rendering** — Particles don't render correctly underwater **[CPX: 2]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Implement unit test in UnitTest project, make required parts of the game engine public to implement the tests **TOP PRIORITY**
+*No uncategorized items*
 
 ---
 
@@ -132,7 +132,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Fixed Bugs
 
-*No fixed bugs yet*
+- [x] **Particle System: Depth ordering** — Sorted particles back-to-front for proper alpha blending
 
 
 

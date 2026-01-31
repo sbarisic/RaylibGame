@@ -31,6 +31,8 @@ namespace Voxelgine.Engine {
 
 	public class ParticleSystem {
 		Particle[] Particles = new Particle[256];
+		int[] SortedIndices = new int[256];
+		float[] DistanceCache = new float[256];
 		float lastGameTime = 0;
 
 		public TestFunc Test;
@@ -115,8 +117,9 @@ namespace Voxelgine.Engine {
 			Drawn = 0;
 			OnScreen = 0;
 
-			Rlgl.DisableDepthMask();
-			Raylib.BeginBlendMode(BlendMode.AlphaPremultiply);
+			// Build list of visible particles with distance from camera
+			int visibleCount = 0;
+			Vector3 camPos = Ply.Position;
 
 			for (int i = 0; i < Particles.Length; i++) {
 				ref Particle P = ref Particles[i];
@@ -125,17 +128,35 @@ namespace Voxelgine.Engine {
 				if (P.Draw) {
 					Drawn++;
 
-					if (Vector3.Distance(Ply.Position, P.Pos) > 2) {
-
+					if (Vector3.Distance(camPos, P.Pos) > 2) {
 						if (!Frust.IsInside(P.Pos)) {
-							// Particle is outside the frustum, skip drawing
 							continue;
 						}
 					}
 
-					OnScreen++;
-					Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, P.Color);
+					SortedIndices[visibleCount] = i;
+					DistanceCache[visibleCount] = Vector3.DistanceSquared(camPos, P.Pos);
+					visibleCount++;
 				}
+			}
+
+			// Sort by distance (back-to-front for proper alpha blending)
+			for (int i = 0; i < visibleCount - 1; i++) {
+				for (int j = i + 1; j < visibleCount; j++) {
+					if (DistanceCache[i] < DistanceCache[j]) {
+						(SortedIndices[i], SortedIndices[j]) = (SortedIndices[j], SortedIndices[i]);
+						(DistanceCache[i], DistanceCache[j]) = (DistanceCache[j], DistanceCache[i]);
+					}
+				}
+			}
+
+			Rlgl.DisableDepthMask();
+			Raylib.BeginBlendMode(BlendMode.AlphaPremultiply);
+
+			for (int i = 0; i < visibleCount; i++) {
+				ref Particle P = ref Particles[SortedIndices[i]];
+				OnScreen++;
+				Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, P.Color);
 			}
 
 			Raylib.EndBlendMode();

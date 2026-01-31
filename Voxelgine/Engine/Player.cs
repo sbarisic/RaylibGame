@@ -384,6 +384,97 @@ namespace Voxelgine.Engine
 			}
 		}
 
+		/// <summary>
+		/// Quake-style swimming physics. Player can move in all directions while in water.
+		/// Space to swim up, Shift to swim down, WASD moves in look direction.
+		/// Reduced gravity, water friction applied.
+		/// </summary>
+		void UpdateSwimmingPhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr, bool headInWater)
+		{
+			float playerRadius = Player.PlayerRadius;
+			float playerHeight = Player.PlayerHeight;
+			Vector3 feetPos = FeetPosition;
+
+			ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
+
+			// Get movement direction in 3D (swimming allows vertical movement based on look direction)
+			Vector3 wishdir = Vector3.Zero;
+			Vector3 fwd = GetForward(); // Full 3D forward (includes pitch)
+			Vector3 lft = GetLeft();
+
+			if (InMgr.IsInputDown(InputKey.W))
+				wishdir += fwd;
+
+			if (InMgr.IsInputDown(InputKey.S))
+				wishdir -= fwd;
+
+			if (InMgr.IsInputDown(InputKey.A))
+				wishdir += lft;
+
+			if (InMgr.IsInputDown(InputKey.D))
+				wishdir -= lft;
+
+			// Vertical swimming controls
+			if (InMgr.IsInputDown(InputKey.Space))
+				wishdir += Vector3.UnitY;
+
+			if (InMgr.IsInputDown(InputKey.Shift))
+				wishdir -= Vector3.UnitY;
+
+			if (wishdir != Vector3.Zero)
+				wishdir = Vector3.Normalize(wishdir);
+
+			// --- Apply water friction ---
+			PhysicsUtils.ApplyFriction(ref PlyVelocity, PhysicsData.WaterFriction, Dt);
+
+			// --- Apply swimming acceleration ---
+			if (wishdir != Vector3.Zero)
+			{
+				PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, PhysicsData.MaxWaterSpeed, PhysicsData.WaterAccel, Dt);
+			}
+
+			// --- Apply reduced gravity (sink slowly if not actively swimming) ---
+			bool activelySwimming = wishdir != Vector3.Zero;
+			if (!activelySwimming && headInWater)
+			{
+				// Player sinks slowly when not moving in water
+				PlyVelocity.Y -= PhysicsData.WaterSinkSpeed * Dt;
+			}
+			else if (!headInWater)
+			{
+				// Head above water - apply normal gravity but reduced
+				PhysicsUtils.ApplyGravity(ref PlyVelocity, PhysicsData.WaterGravity, Dt);
+			}
+
+			// --- Check if player can jump out of water (head near surface) ---
+			Vector3 surfaceCheck = Position + new Vector3(0, 0.5f, 0);
+			bool nearSurface = !Map.IsWaterAt(surfaceCheck);
+			if (nearSurface && InMgr.IsInputDown(InputKey.Space))
+			{
+				// Jump out of water
+				PlyVelocity.Y = MathF.Max(PlyVelocity.Y, PhysicsData.WaterJumpImpulse);
+			}
+
+			// --- Cap swimming speed ---
+			float currentSpeed = PlyVelocity.Length();
+			if (currentSpeed > PhysicsData.MaxWaterSpeed * 1.5f)
+			{
+				PlyVelocity = Vector3.Normalize(PlyVelocity) * PhysicsData.MaxWaterSpeed * 1.5f;
+			}
+
+			// --- Move and collide (no step-up in water) ---
+			Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, 0f, 4, false);
+
+			if (newPos != Position)
+			{
+				SetPosition(newPos);
+			}
+
+			// Reset ground state when in water
+			WasLastLegsOnFloor = false;
+			GroundGraceTimer = 0;
+		}
+
 		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr)
 		{
 			const float GroundHitBelowFeet = -0.075f;
@@ -401,6 +492,16 @@ namespace Voxelgine.Engine
 
 			ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
 			Vector3 feetPos = FeetPosition;
+
+			// --- Check if player is in water (check at eye level and feet level) ---
+			bool inWater = Map.IsWaterAt(Position) || Map.IsWaterAt(feetPos + new Vector3(0, playerHeight * 0.5f, 0));
+			bool headInWater = Map.IsWaterAt(Position);
+
+			if (inWater)
+			{
+				UpdateSwimmingPhysics(Map, PhysicsData, Dt, InMgr, headInWater);
+				return;
+			}
 
 			Vector3[] groundCheckPoints = new Vector3[] {
 				new Vector3(feetPos.X - playerRadius, feetPos.Y + PhysicsData.GroundEpsilon, feetPos.Z - playerRadius),

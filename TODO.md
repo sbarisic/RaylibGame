@@ -49,16 +49,17 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Physics: Swimming movement** — Implement Quake-style swimming movement mode for water blocks **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **NPC Animation System** — Add animation support for NPCs (walking, attacking, crouching, lying down) **[CPX: 3]**
 - [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
 
 ### Lower Priority
 
 - [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
-- [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
@@ -96,8 +97,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- NPC entities need to be completed
-- NPC entities need animation support, like walking, attacking, crouching, lying down
+- When inside water, make the player camera draw an overlay data/textures/overlay_water.png
 
 ---
 

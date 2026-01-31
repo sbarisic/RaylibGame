@@ -208,6 +208,12 @@ namespace Voxelgine.Graphics {
 		public BlockType GetBlock(int X, int Y, int Z) => GetPlacedBlock(X, Y, Z, out _).Type;
 		public BlockType GetBlock(Vector3 Pos) => GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z);
 
+		/// <summary>
+		/// Returns true if the block at the given position is water.
+		/// </summary>
+		public bool IsWaterAt(Vector3 Pos) => BlockInfo.IsWater(GetBlock(Pos));
+		public bool IsWaterAt(int X, int Y, int Z) => BlockInfo.IsWater(GetBlock(X, Y, Z));
+
 		void TranslateChunkPos(int X, int Y, int Z, out Vector3 ChunkIndex, out Vector3 BlockPos) {
 			TransPosScalar(X, out int ChkX, out int BlkX);
 			TransPosScalar(Y, out int ChkY, out int BlkY);

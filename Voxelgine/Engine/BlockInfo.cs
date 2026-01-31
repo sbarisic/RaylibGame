@@ -79,6 +79,13 @@ namespace Voxelgine.Engine {
 			return true;
 		}
 
+		/// <summary>
+		/// Returns true if the block is a swimmable liquid (water).
+		/// </summary>
+		public static bool IsWater(BlockType T) {
+			return T == BlockType.Water;
+		}
+
 		public static bool EmitsLight(BlockType T) {
 			switch (T) {
 				case BlockType.Campfire:

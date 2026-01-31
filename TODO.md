@@ -58,11 +58,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Lower Priority
 
-- [ ] - [ ] **Voxel World: Procedural buildings/structures** — Generate structures on the island using prefabs or procedural rules **[CPX: 4]**
+- [ ] **Voxel World: Procedural buildings/structures**
 - [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
-- [ ] **Pathfinding: Air navigation** — 3D pathfinding for flying entities **[CPX: 3
-- [ ] **Graphics: Lighting system enhancements** — Improve the existing `ComputeLighting` with dynamic lights, shadows **[CPX: 4]**
+**[CPX: 3]**
+- [ ] **Graphics: Lighting
 - [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**

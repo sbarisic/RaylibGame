@@ -12,50 +12,59 @@ using System.Threading.Tasks;
 
 using Voxelgine.GUI;
 
-namespace Voxelgine {
-	delegate bool RaycastCallbackFunc(int X, int Y, int Z, Vector3 FaceNormal);
-	delegate bool Raycast2CallbackFunc(Vector3 Pos, Vector3 FaceNormal);
+namespace Voxelgine
+{
+	public delegate bool RaycastCallbackFunc(int X, int Y, int Z, Vector3 FaceNormal);
+	public delegate bool Raycast2CallbackFunc(Vector3 Pos, Vector3 FaceNormal);
 
-	static class Utils {
+	public static class Utils
+	{
 		public static Random Rnd = new Random();
 		static Dictionary<int, Vector3[]> SphereDirections = new Dictionary<int, Vector3[]>();
 
 		public static readonly Vector3[] MainDirs = new[] { new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1) };
 		public static readonly Vector3[] VoxelSphere8 = GenerateVoxelSphere(8, true);
 
-		public static float ParseFloat(this string Str, float Default) {
+		public static float ParseFloat(this string Str, float Default)
+		{
 			if (string.IsNullOrWhiteSpace(Str))
 				return Default;
 
 			return Str.ParseFloat();
 		}
 
-		public static float ParseFloat(this string Str) {
+		public static float ParseFloat(this string Str)
+		{
 			return float.Parse(Str, CultureInfo.InvariantCulture);
 		}
 
-		public static int ParseInt(this string Str, int Default) {
+		public static int ParseInt(this string Str, int Default)
+		{
 			if (string.IsNullOrWhiteSpace(Str))
 				return Default;
 
 			return Str.ParseInt();
 		}
 
-		public static int ParseInt(this string Str) {
+		public static int ParseInt(this string Str)
+		{
 			return int.Parse(Str, CultureInfo.InvariantCulture);
 		}
 
-		public static int Mod(int A, int B) {
+		public static int Mod(int A, int B)
+		{
 			return A - B * (int)Math.Floor((float)A / (float)B);
 		}
 
-		public static void Swap<T>(ref T A, ref T B) {
+		public static void Swap<T>(ref T A, ref T B)
+		{
 			T Tmp = A;
 			A = B;
 			B = Tmp;
 		}
 
-		public static float Clamp(float Num, float Min, float Max) {
+		public static float Clamp(float Num, float Min, float Max)
+		{
 			if (Num < Min)
 				return Min;
 
@@ -65,7 +74,8 @@ namespace Voxelgine {
 			return Num;
 		}
 
-		public static int Clamp(int Num, int Min, int Max) {
+		public static int Clamp(int Num, int Min, int Max)
+		{
 			if (Num < Min)
 				return Min;
 
@@ -75,15 +85,18 @@ namespace Voxelgine {
 			return Num;
 		}
 
-		public static int Random(int InclusiveMin, int ExclusiveMax) {
+		public static int Random(int InclusiveMin, int ExclusiveMax)
+		{
 			return Rnd.Next(InclusiveMin, ExclusiveMax);
 		}
 
-		public static void Deconstruct(Quaternion Q, out float Pitch, out float Yaw, out float Roll) {
+		public static void Deconstruct(Quaternion Q, out float Pitch, out float Yaw, out float Roll)
+		{
 			GetEulerAngles(Q, out Pitch, out Yaw, out Roll);
 		}
 
-		public static void GetEulerAngles(Quaternion Quat, out float Pitch, out float Yaw, out float Roll) {
+		public static void GetEulerAngles(Quaternion Quat, out float Pitch, out float Yaw, out float Roll)
+		{
 			double SqW = Quat.W * Quat.W;
 			double SqX = Quat.X * Quat.X;
 			double SqY = Quat.Y * Quat.Y;
@@ -114,7 +127,8 @@ namespace Voxelgine {
 			Roll = 0;
 		}
 
-		public static byte DirToByte(Vector3 Normal) {
+		public static byte DirToByte(Vector3 Normal)
+		{
 			int X = (int)Normal.X;
 			int Y = (int)Normal.Y;
 			int Z = (int)Normal.Z;
@@ -140,13 +154,15 @@ namespace Voxelgine {
 			throw new Exception("Invalid direction");
 		}
 
-		public static double NormalizeLoop(double Val, double Start, double End) {
+		public static double NormalizeLoop(double Val, double Start, double End)
+		{
 			double Width = End - Start;
 			double OffsetVal = Val - Start;
 			return (OffsetVal - (Math.Floor(OffsetVal / Width) * Width)) + Start;
 		}
 
-		public static Vector3 EulerBetweenVectors(Vector3 A, Vector3 B) {
+		public static Vector3 EulerBetweenVectors(Vector3 A, Vector3 B)
+		{
 			Vector3 NormalA = Vector3.Normalize(B - A);
 			Vector3 NormalB = Vector3.Normalize(new Vector3(A.X, 0, A.Z));
 
@@ -161,7 +177,8 @@ namespace Voxelgine {
 			return ToEuler(Axis.X, Axis.Y, Axis.Z, Angle) * (180.0f / (float)Math.PI);
 		}
 
-		public static Vector3 ToEuler(double X, double Y, double Z, double Angle) {
+		public static Vector3 ToEuler(double X, double Y, double Z, double Angle)
+		{
 			double s = Math.Sin(Angle);
 			double c = Math.Cos(Angle);
 			double t = 1 - c;
@@ -170,13 +187,15 @@ namespace Voxelgine {
 			double Pitch;
 			double Roll;
 
-			if ((X * Y * t + Z * s) > 0.998) { // north pole singularity detected
+			if ((X * Y * t + Z * s) > 0.998)
+			{ // north pole singularity detected
 				Yaw = 2 * Math.Atan2(X * Math.Sin(Angle / 2), Math.Cos(Angle / 2));
 				Pitch = Math.PI / 2;
 				Roll = 0;
 				return new Vector3((float)Yaw, (float)Pitch, (float)Roll);
 			}
-			if ((X * Y * t + Z * s) < -0.998) { // south pole singularity detected
+			if ((X * Y * t + Z * s) < -0.998)
+			{ // south pole singularity detected
 				Yaw = -2 * Math.Atan2(X * Math.Sin(Angle / 2), Math.Cos(Angle / 2));
 				Pitch = -Math.PI / 2;
 				Roll = 0;
@@ -189,27 +208,34 @@ namespace Voxelgine {
 			return new Vector3((float)Yaw, (float)Pitch, (float)Roll);
 		}
 
-		static bool IsOnVoxelSphereEdge(float Radius, int X, int Y, int Z) {
+		static bool IsOnVoxelSphereEdge(float Radius, int X, int Y, int Z)
+		{
 			float Dist = X * X + Y * Y + Z * Z;
 			return Dist <= (Radius * Radius) && Dist >= ((Radius - 1) * (Radius - 1));
 		}
 
-		static bool IsInsideVoxelSphere(float Radius, int X, int Y, int Z) {
+		static bool IsInsideVoxelSphere(float Radius, int X, int Y, int Z)
+		{
 			float Dist = X * X + Y * Y + Z * Z;
 			return Dist <= (Radius * Radius);
 		}
 
-		public static Vector3[] GenerateVoxelSphere(int Radius, bool Hollow) {
+		public static Vector3[] GenerateVoxelSphere(int Radius, bool Hollow)
+		{
 			List<Vector3> Voxels = new List<Vector3>();
 			int Diameter = Radius * 2;
 
 			for (int x = 0; x < Diameter; x++)
 				for (int y = 0; y < Diameter; y++)
-					for (int z = 0; z < Diameter; z++) {
-						if (Hollow) {
+					for (int z = 0; z < Diameter; z++)
+					{
+						if (Hollow)
+						{
 							if (IsOnVoxelSphereEdge(Radius, x - Radius, y - Radius, z - Radius))
 								Voxels.Add(new Vector3(x - Radius, y - Radius, z - Radius));
-						} else {
+						}
+						else
+						{
 							if (IsInsideVoxelSphere(Radius, x - Radius, y - Radius, z - Radius))
 								Voxels.Add(new Vector3(x - Radius, y - Radius, z - Radius));
 						}
@@ -218,7 +244,8 @@ namespace Voxelgine {
 			return Voxels.ToArray();
 		}
 
-		static Vector3[] CalculateSphereDirections(int Slices) {
+		static Vector3[] CalculateSphereDirections(int Slices)
+		{
 			if (SphereDirections.ContainsKey(Slices))
 				return SphereDirections[Slices];
 
@@ -228,18 +255,21 @@ namespace Voxelgine {
 			double a = -0.5 * Math.PI;
 			int Hits = 0;
 
-			for (int ia = 0; ia < Slices; ia++, a += da) {
+			for (int ia = 0; ia < Slices; ia++, a += da)
+			{
 				double r = Math.Cos(a);
 				int nb = (int)Math.Ceiling(2.0 * Math.PI * r / da);
 				double db = 2.0 * Math.PI / (nb);
 
-				if ((ia == 0) || (ia == Slices - 1)) {
+				if ((ia == 0) || (ia == Slices - 1))
+				{
 					nb = 1;
 					db = 0.0;
 				}
 
 				double b = 0;
-				for (int ib = 0; ib < nb; ib++, b += db) {
+				for (int ib = 0; ib < nb; ib++, b += db)
+				{
 					float x = (float)(r * Math.Cos(b));
 					float y = (float)(r * Math.Sin(b));
 					float z = (float)Math.Sin(a);
@@ -255,7 +285,8 @@ namespace Voxelgine {
 			return DirectionsArray;
 		}
 
-		public static bool Raycast(Vector3 Origin, Vector3 Direction, float Length, RaycastCallbackFunc Callback) {
+		public static bool Raycast(Vector3 Origin, Vector3 Direction, float Length, RaycastCallbackFunc Callback)
+		{
 			// Cube containing origin point.
 			float X = (float)Math.Floor(Origin.X);
 			float Y = (float)Math.Floor(Origin.Y);
@@ -299,7 +330,8 @@ namespace Voxelgine {
 			// compare with 't'.
 			Length /= (float)Math.Sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
 
-			while (true) {
+			while (true)
+			{
 				if (Callback((int)X, (int)Y, (int)Z, face))
 					return true;
 
@@ -307,8 +339,10 @@ namespace Voxelgine {
 				// X axis, and similarly for Y and Z. Therefore, choosing the least tMax
 				// chooses the closest cube boundary. Only the first case of the four
 				// has been commented in detail.
-				if (tMaxX < tMaxY) {
-					if (tMaxX < tMaxZ) {
+				if (tMaxX < tMaxY)
+				{
+					if (tMaxX < tMaxZ)
+					{
 						if (tMaxX > Length)
 							break;
 						// Update which cube we are now in.
@@ -319,7 +353,9 @@ namespace Voxelgine {
 						face.X = -StepX;
 						face.Y = 0;
 						face.Z = 0;
-					} else {
+					}
+					else
+					{
 						if (tMaxZ > Length)
 							break;
 						Z += StepZ;
@@ -328,8 +364,11 @@ namespace Voxelgine {
 						face.Y = 0;
 						face.Z = -StepZ;
 					}
-				} else {
-					if (tMaxY < tMaxZ) {
+				}
+				else
+				{
+					if (tMaxY < tMaxZ)
+					{
 						if (tMaxY > Length)
 							break;
 						Y += StepY;
@@ -337,7 +376,9 @@ namespace Voxelgine {
 						face.X = 0;
 						face.Y = -StepY;
 						face.Z = 0;
-					} else {
+					}
+					else
+					{
 						// Identical to the second case, repeated for simplicity in
 						// the conditionals.
 						if (tMaxZ > Length)
@@ -357,34 +398,44 @@ namespace Voxelgine {
 		static bool IsRecording = false;
 		static List<Tuple<Vector3, Vector3, Color>> RaycastDrawList = new List<Tuple<Vector3, Vector3, Color>>();
 
-		public static void ClearRaycastRecord() {
+		public static void ClearRaycastRecord()
+		{
 			RaycastDrawList.Clear();
 		}
 
-		public static void BeginRaycastRecord() {
+		public static void BeginRaycastRecord()
+		{
 			ClearRaycastRecord();
 			IsRecording = true;
 		}
 
-		public static void EndRaycastRecord() {
+		public static void EndRaycastRecord()
+		{
 			IsRecording = false;
 		}
 
-		public static void DrawRaycastRecord() {
-			foreach (var Tupl in RaycastDrawList) {
-				if (Tupl.Item1 == Tupl.Item2) {
+		public static void DrawRaycastRecord()
+		{
+			foreach (var Tupl in RaycastDrawList)
+			{
+				if (Tupl.Item1 == Tupl.Item2)
+				{
 					Raylib.DrawSphereEx(Tupl.Item1, 0.05f, 10, 10, Tupl.Item3);
-				} else {
+				}
+				else
+				{
 					Raylib.DrawLine3D(Tupl.Item1, Tupl.Item2, Tupl.Item3);
 				}
 			}
 		}
 
-		public static bool HasRecord() {
+		public static bool HasRecord()
+		{
 			return RaycastDrawList.Count > 0;
 		}
 
-		public static void AddRaycastRecord(Vector3 Start, Vector3 End, Color Clr) {
+		public static void AddRaycastRecord(Vector3 Start, Vector3 End, Color Clr)
+		{
 			if (!IsRecording)
 				return;
 
@@ -392,7 +443,8 @@ namespace Voxelgine {
 		}
 
 		// --- BEGIN MOVED FROM VoxCollision ---
-		public static IEnumerable<Vector3> Bresenham(Vector3 Start, Vector3 End) {
+		public static IEnumerable<Vector3> Bresenham(Vector3 Start, Vector3 End)
+		{
 			int startX = (int)Start.X, startY = (int)Start.Y, startZ = (int)Start.Z;
 			int endX = (int)End.X, endY = (int)End.Y, endZ = (int)End.Z;
 
@@ -416,39 +468,49 @@ namespace Voxelgine {
 			endY += sy;
 			endZ += sz;
 
-			if (dx > dy) {
-				if (dx > dz) {
+			if (dx > dy)
+			{
+				if (dx > dz)
+				{
 					accum = dx >> 1;
 					accum2 = accum;
-					do {
+					do
+					{
 						yield return (new Vector3(startX, startY, startZ));
 
 						accum -= dy;
 						accum2 -= dz;
-						if (accum < 0) {
+						if (accum < 0)
+						{
 							accum += dx;
 							startY += sy;
 						}
-						if (accum2 < 0) {
+						if (accum2 < 0)
+						{
 							accum2 += dx;
 							startZ += sz;
 						}
 						startX += sx;
 					}
 					while (startX != endX);
-				} else {
+				}
+				else
+				{
 					accum = dz >> 1;
 					accum2 = accum;
-					do {
+					do
+					{
 						yield return (new Vector3(startX, startY, startZ));
 
 						accum -= dy;
 						accum2 -= dx;
-						if (accum < 0) {
+						if (accum < 0)
+						{
 							accum += dz;
 							startY += sy;
 						}
-						if (accum2 < 0) {
+						if (accum2 < 0)
+						{
 							accum2 += dz;
 							startX += sx;
 						}
@@ -456,39 +518,50 @@ namespace Voxelgine {
 					}
 					while (startZ != endZ);
 				}
-			} else {
-				if (dy > dz) {
+			}
+			else
+			{
+				if (dy > dz)
+				{
 					accum = dy >> 1;
 					accum2 = accum;
-					do {
+					do
+					{
 						yield return (new Vector3(startX, startY, startZ));
 
 						accum -= dx;
 						accum2 -= dz;
-						if (accum < 0) {
+						if (accum < 0)
+						{
 							accum += dx;
 							startX += sx;
 						}
-						if (accum2 < 0) {
+						if (accum2 < 0)
+						{
 							accum2 += dx;
 							startZ += sz;
 						}
 						startY += sy;
 					}
 					while (startY != endY);
-				} else {
+				}
+				else
+				{
 					accum = dz >> 1;
 					accum2 = accum;
-					do {
+					do
+					{
 						yield return (new Vector3(startX, startY, startZ));
 
 						accum -= dx;
 						accum2 -= dy;
-						if (accum < 0) {
+						if (accum < 0)
+						{
 							accum += dx;
 							startX += sx;
 						}
-						if (accum2 < 0) {
+						if (accum2 < 0)
+						{
 							accum2 += dx;
 							startY += sy;
 						}
@@ -499,20 +572,24 @@ namespace Voxelgine {
 			}
 		}
 
-		public static IEnumerable<Vector3> BresenhamDir(Vector3 Start, Vector3 Dir, float Len) {
+		public static IEnumerable<Vector3> BresenhamDir(Vector3 Start, Vector3 Dir, float Len)
+		{
 			return Bresenham(Start, Start + Dir * Len);
 		}
 
-		public static bool Trace(Vector3 Start, Vector3 End, Func<Vector3, bool> Trace) {
+		public static bool Trace(Vector3 Start, Vector3 End, Func<Vector3, bool> Trace)
+		{
 			Vector3 TraceDir = Vector3.Normalize(End - Start);
-			foreach (var Point in Bresenham(Start, End)) {
+			foreach (var Point in Bresenham(Start, End))
+			{
 				if (Trace(Point))
 					return true;
 			}
 			return false;
 		}
 
-		public static void RaycastVoxel(Vector3 origin, Vector3 direction, float radius, Func<float, float, float, int, Vector3, bool> callback) {
+		public static void RaycastVoxel(Vector3 origin, Vector3 direction, float radius, Func<float, float, float, int, Vector3, bool> callback)
+		{
 			// Cube containing origin point.
 			var x = MathF.Floor(origin[0]);
 			var y = MathF.Floor(origin[1]);
@@ -547,11 +624,14 @@ namespace Voxelgine {
 
 			int counter = 0;
 
-			while (true) {
+			while (true)
+			{
 				if (callback(x, y, z, counter++, face))
 					break;
-				if (tMaxX < tMaxY) {
-					if (tMaxX < tMaxZ) {
+				if (tMaxX < tMaxY)
+				{
+					if (tMaxX < tMaxZ)
+					{
 						if (tMaxX > radius)
 							break;
 						x += stepX;
@@ -559,7 +639,9 @@ namespace Voxelgine {
 						face[0] = -stepX;
 						face[1] = 0;
 						face[2] = 0;
-					} else {
+					}
+					else
+					{
 						if (tMaxZ > radius)
 							break;
 						z += stepZ;
@@ -568,8 +650,11 @@ namespace Voxelgine {
 						face[1] = 0;
 						face[2] = -stepZ;
 					}
-				} else {
-					if (tMaxY < tMaxZ) {
+				}
+				else
+				{
+					if (tMaxY < tMaxZ)
+					{
 						if (tMaxY > radius)
 							break;
 						y += stepY;
@@ -577,7 +662,9 @@ namespace Voxelgine {
 						face[0] = 0;
 						face[1] = -stepY;
 						face[2] = 0;
-					} else {
+					}
+					else
+					{
 						if (tMaxZ > radius)
 							break;
 						z += stepZ;
@@ -590,25 +677,32 @@ namespace Voxelgine {
 			}
 		}
 
-		public static float IntBound(float s, float ds) {
-			if (ds < 0) {
+		public static float IntBound(float s, float ds)
+		{
+			if (ds < 0)
+			{
 				return IntBound(-s, -ds);
-			} else {
+			}
+			else
+			{
 				s = Mod(s, 1);
 				return (1 - s) / ds;
 			}
 		}
 
-		public static float Signum(float x) {
+		public static float Signum(float x)
+		{
 			return x > 0 ? 1 : x < 0 ? -1 : 0;
 		}
 
-		public static float Mod(float value, float modulus) {
+		public static float Mod(float value, float modulus)
+		{
 			return (value % modulus + modulus) % modulus;
 		}
 		// --- END MOVED FROM VoxCollision ---
 
-		public static string ToString(float F) {
+		public static string ToString(float F)
+		{
 			string Str = string.Format(CultureInfo.InvariantCulture, "{0}", F);
 
 			if (Str.Contains("."))
@@ -617,61 +711,75 @@ namespace Voxelgine {
 			return Str;
 		}
 
-		public static string ToString(Vector3 V) {
+		public static string ToString(Vector3 V)
+		{
 			return string.Format(CultureInfo.InvariantCulture, "new Vector3({0}, {1}, {2})", ToString(V.X), ToString(V.Y), ToString(V.Z));
 		}
 
-		public static string ToString(Vector2 V) {
+		public static string ToString(Vector2 V)
+		{
 			return string.Format(CultureInfo.InvariantCulture, "new Vector2({0}, {1})", ToString(V.X), ToString(V.Y));
 		}
 
-		public static string ToString(Color C) {
+		public static string ToString(Color C)
+		{
 			return string.Format(CultureInfo.InvariantCulture, "new Color({0}, {1}, {2})", C.R, C.G, C.B, C.A);
 		}
 
-		public static string ToString(Vertex3 V) {
+		public static string ToString(Vertex3 V)
+		{
 			return string.Format("new Vertex3({0}, {1}, {2})", ToString(V.Position), ToString(V.UV), ToString(V.Color));
 		}
 
-		public static T Random<T>(this IEnumerable<T> Collection) {
+		public static T Random<T>(this IEnumerable<T> Collection)
+		{
 			T[] Elements = Collection.ToArray();
 			return Elements[Random(0, Elements.Length)];
 		}
 
-		public static float ToDeg(float Rad) {
+		public static float ToDeg(float Rad)
+		{
 			return (float)((Rad * 180) / Math.PI);
 		}
 
-		public static float ToRad(float Deg) {
+		public static float ToRad(float Deg)
+		{
 			return (float)(Deg * (Math.PI / 180));
 		}
 
-		public static Color Color(float B) {
+		public static Color Color(float B)
+		{
 			return new Color(B, B, B);
 		}
 
-		public static Color ColorMul(Color A, Color B) {
+		public static Color ColorMul(Color A, Color B)
+		{
 			Vector4 AA = new Vector4(A.R / 255.0f, A.G / 255.0f, A.B / 255.0f, A.A / 255.0f);
 			Vector4 BB = new Vector4(B.R / 255.0f, B.G / 255.0f, B.B / 255.0f, B.A / 255.0f);
 			Vector4 Res = AA * BB;
 			return new Color(Res.X, Res.Y, Res.Z, Res.W);
 		}
 
-		public static Vector4 ColorVec(Color C) {
+		public static Vector4 ColorVec(Color C)
+		{
 			return new Vector4(C.R / 255.0f, C.G / 255.0f, C.B / 255.0f, C.A / 255.0f);
 		}
 
-		public static IEnumerable<Vector2> ToVec2(float[] F) {
-			for (int i = 0; i < F.Length; i += 2) {
+		public static IEnumerable<Vector2> ToVec2(float[] F)
+		{
+			for (int i = 0; i < F.Length; i += 2)
+			{
 				yield return new Vector2(F[i + 0], F[i + 1]);
 			}
 		}
 
-		public static Vector3 ToVec3(float[] F) {
+		public static Vector3 ToVec3(float[] F)
+		{
 			return new Vector3(F[0], F[1], F[2]);
 		}
 
-		public static Vector3 ProjectOnPlane(Vector3 Vec, Vector3 Normal, float Eps) {
+		public static Vector3 ProjectOnPlane(Vector3 Vec, Vector3 Normal, float Eps)
+		{
 			if (Vec.X == 0 && Vec.Y == 0 && Normal.X == 0 && Normal.Y == 0)
 				return Vec;
 
@@ -683,9 +791,12 @@ namespace Voxelgine {
 
 			float SqrMag = Vector3.Dot(Normal, Normal);
 
-			if (SqrMag < Eps) {
+			if (SqrMag < Eps)
+			{
 				return Vec;
-			} else {
+			}
+			else
+			{
 				float Dot = Vector3.Dot(Vec, Normal);
 				return new Vector3(Vec.X - Normal.X * Dot / SqrMag, Vec.Y - Normal.Y * Dot / SqrMag, Vec.Z - Normal.Z * Dot / SqrMag);
 			}
@@ -693,7 +804,8 @@ namespace Voxelgine {
 
 		// If F = 0, then it's A, as F approaches 1, then it returns lerp towards B.
 		// If < 0, return A, if > 1, return B.
-		public static Vector3 Lerp(Vector3 A, Vector3 B, float F) {
+		public static Vector3 Lerp(Vector3 A, Vector3 B, float F)
+		{
 			if (F <= 0)
 				return A;
 			if (F >= 1)
@@ -705,7 +817,8 @@ namespace Voxelgine {
 			);
 		}
 
-		public static Quaternion Lerp(Quaternion A, Quaternion B, float F) {
+		public static Quaternion Lerp(Quaternion A, Quaternion B, float F)
+		{
 			if (F <= 0)
 				return A;
 			if (F >= 1)
@@ -721,7 +834,8 @@ namespace Voxelgine {
 			return Quaternion.Normalize(result);
 		}
 
-		public static void RestartGame() {
+		public static void RestartGame()
+		{
 			string[] Args = Environment.GetCommandLineArgs().Skip(1).ToArray();
 			string FileName = Process.GetCurrentProcess().MainModule.FileName;
 			Process.Start(FileName, Args);
@@ -729,13 +843,15 @@ namespace Voxelgine {
 		}
 
 		// Helper to normalize a Vector4 plane (only xyz part)
-		public static Vector4 NormalizePlane(Vector4 plane) {
+		public static Vector4 NormalizePlane(Vector4 plane)
+		{
 			Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
 			float length = normal.Length();
 			return plane / length;
 		}
 
-		public static string GetOSName() {
+		public static string GetOSName()
+		{
 			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 				return "Windows";
 			else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

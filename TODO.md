@@ -1,4 +1,4 @@
-# Project Name - TODO
+# Aurora Falls - Voxelgine Engine TODO
 
 A list of planned features, improvements, and tasks for this project.
 
@@ -19,25 +19,61 @@ A list of planned features, improvements, and tasks for this project.
 
 ---
 
+## Project Overview
+
+**Aurora Falls** is a voxel-based 3D game engine built with **Raylib-cs** targeting **.NET 9**.
+
+### Current Architecture
+
+| System | Status | Description |
+|--------|--------|-------------|
+| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr` |
+| **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
+| **Voxel World** | 🔶 | Procedural island generation via simplex noise, block types, lighting system |
+| **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
+| **Player** | ✅ | `Player`, `FPSCamera`, `ViewModel`, inventory system |
+| **Weapons** | ✅ | `Weapon`, `WeaponGun`, `WeaponPicker`, `InventoryItem` |
+| **GUI** | 🔶 | `GUIManager`, `GUIWindow`, `GUIButton`, `GUILabel`, `GUIInputBox`, `GUIImage`, Flexbox layout |
+| **Particles** | 🔶 | `ParticleSystem` with smoke effects |
+| **Animation** | 🔶 | `AnimLerp`, `LerpManager`, easing functions |
+| **Physics** | 🔶 | `AABB`, `PhysData`, collision in `EntityManager` and `Player` |
+| **NPC/AI** | ⬜ | Basic `VEntNPC` exists, no AI/pathfinding |
+| **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
+| **Mod System** | ⬜ | Not implemented |
+
+Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
+
+---
+
 ## Features
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Quake-like player movement** — Implement strafe-jumping, bunny-hopping, air control mechanics in `Player.cs` **[CPX: 3]**
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **Voxel World: Real-time block creation/destruction** — Add ability to place and destroy blocks at runtime with mesh rebuilding **[CPX: 3]**
+- [ ] **Voxel World: Procedural buildings/structures** — Generate structures on the island using prefabs or procedural rules **[CPX: 4]**
+- [ ] **Centralized Physics System** — Consolidate collision detection from `Player` and `EntityManager` into a unified physics system **[CPX: 4]**
+- [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
+- [ ] **Pathfinding: Air navigation** — 3D pathfinding for flying entities **[CPX: 3]**
 
 ### Lower Priority
 
-*No lower priority items*
+- [ ] **Graphics: Lighting system enhancements** — Improve the existing `ComputeLighting` with dynamic lights, shadows **[CPX: 4]**
+- [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
+- [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
+- [ ] **Animation: Easing functions expansion** — Extend `AnimLerp` with more easing types **[CPX: 1]**
+- [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
+- [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 
 ---
 
 ## Improvements
 
-*No improvements pending*
+- [ ] **GUI: Complete element set** — Ensure all standard elements (Window, Button, Label, Input, Image) are fully functional and styled consistently **[CPX: 2]**
 
 ---
 
@@ -61,58 +97,12 @@ A list of planned features, improvements, and tasks for this project.
 
 ### Active Bugs
 
-*No active bugs*
+- [ ] **Particle System: Depth ordering** — Particles render with incorrect depth sorting **[CPX: 2]**
+- [ ] **Particle System: Underwater rendering** — Particles don't render correctly underwater **[CPX: 2]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-* Go trough the existing project code, add a small section outlining it
-
-* [ ] Graphics
-  * [ ] Lighting system
-  * [ ] Fullbright and debug modes which can be enabled from settings?
-
-* [ ] Voxel world
-  * [ ] Procedurally generated island
-  * [ ] Ability to create and destroy blocks in realtime
-  * [ ] Procedurally generated buildings and structures
-  * [x] Transparent blocks
-
-* [ ] Quake like player movement
-
-* [ ] GUI System
-  * [ ] Window elements
-  * [ ] Input elements
-  * [ ] Label elements
-  * [ ] Button elements
-  * [ ] Image elements
-
-* [ ] Centralized physics system
-  * [ ] Move collision detection into physic
-  * [ ] Move all logic from player and entity into physics
-
-* [ ] NPC AI System
-  * [ ] Use pathfinding
-  * [ ] AI Goals system
-
-* [ ] Pathfinding
-  * [ ] Voxel pathfinding
-  * [ ] Air pathfinding for flying entities
-
-* [ ] Entity system
-  * [ ] Pickup entity (wapons, ammo, armor...)
-  * [ ] Sliding door entity (slides into wall only when player approaches, simple, toggles collision mesh)
-  * [ ] NPC entity
-
-* [ ] Particle system
-  * [ ] Fix depth ordering
-  * [ ] Make it work underwater
-
-* [ ] Mod system
-  * [ ] Expose all required functionality
-  * [ ] Implement an example mod
-  
-* [ ] Animation system
-  * [ ] Easings
+- Implement unit test in UnitTest project, make required parts of the game engine public to implement the tests **TOP PRIORITY**
 
 ---
 
@@ -129,7 +119,12 @@ A list of planned features, improvements, and tasks for this project.
 
 ### Features
 
-*No completed features yet*
+- [x] **Voxel World: Procedurally generated island** — Simplex noise based terrain generation
+- [x] **Voxel World: Transparent blocks** — Support for transparent block rendering
+- [x] **GUI System: Core elements** — Window, Button, Label, Input, Image elements implemented
+- [x] **Entity System: Pickup entity** — `VEntPickup` for weapons, ammo, armor pickups
+- [x] **Entity System: NPC entity** — `VEntNPC` base class exists
+- [x] **Animation System: Base lerp system** — `AnimLerp`, `LerpManager` with easing functions
 
 ### Improvements
 

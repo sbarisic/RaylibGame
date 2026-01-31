@@ -40,6 +40,9 @@ namespace Voxelgine {
 			Cfg = new GameConfig();
 			Cfg.LoadFromJson();
 
+			// Apply mouse sensitivity from config
+			FPSCamera.MouseMoveSen = Cfg.MouseSensitivity;
+
 			Clipb = new Clipboard();
 			LerpMgr = new LerpManager();
 

@@ -15,7 +15,7 @@ namespace Voxelgine.Engine {
 	static class FPSCamera {
 		//const bool UseCameraMove = false;
 
-		const float MouseMoveSen = 0.5f;
+		public static float MouseMoveSen = 0.35f; // Default sensitivity (can be modified at runtime)
 		const float PlyMoveSen = 0.2f;
 		const float FocusDist = 25.0f;
 

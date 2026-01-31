@@ -139,7 +139,7 @@ namespace RaylibGame.States {
 			Ply.UpdateFPSCamera(ref FInfo);
 
 			Raylib.ClearBackground(new Color(200, 200, 200));
-			Raylib.BeginMode3D(Ply.Cam);
+			Raylib.BeginMode3D(Ply.RenderCam); // Use interpolated render camera
 
 			Shader defaultShader = ResMgr.GetShader("default");
 			Raylib.BeginShaderMode(defaultShader);

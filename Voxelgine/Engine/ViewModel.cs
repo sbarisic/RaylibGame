@@ -161,9 +161,8 @@ namespace Voxelgine.Engine {
 			if (!IsActive)
 				return;
 
-			// Calculate final position using interpolated camera position + offset
-			// The camera (Ply.Cam) is already interpolated in GameWindow.Draw()
-			Vector3 P = Ply.Cam.Position + ViewModelOffset;
+			// Calculate final position using interpolated render camera position + offset
+			Vector3 P = Ply.RenderCam.Position + ViewModelOffset;
 			Quaternion R = VMRot;
 
 			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;

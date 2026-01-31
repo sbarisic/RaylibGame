@@ -24,12 +24,23 @@ namespace Voxelgine.Engine {
 			Empty = true;
 		}
 
+		/// <summary>
+		/// Interpolates an angle handling wrapping (for angles in degrees)
+		/// </summary>
+		static float LerpAngle(float from, float to, float t) {
+			float diff = to - from;
+
+			// Handle angle wrapping - take the shortest path
+			while (diff > 180f) diff -= 360f;
+			while (diff < -180f) diff += 360f;
+
+			return from + diff * t;
+		}
+
 		public GameFrameInfo Interpolate(GameFrameInfo Old, float T) {
 			// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
 
 			GameFrameInfo New = new GameFrameInfo();
-
-
 
 			New.Cam.FovY = float.Lerp(Old.Cam.FovY, Cam.FovY, T);
 			New.Cam.Position = Vector3.Lerp(Old.Cam.Position, Cam.Position, T);
@@ -37,7 +48,14 @@ namespace Voxelgine.Engine {
 			New.Cam.Up = Vector3.Lerp(Old.Cam.Up, Cam.Up, T);
 			New.Cam.Projection = Cam.Projection;
 			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
-			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);
+
+			// Use angle-aware interpolation for camera angles to handle wrapping
+			New.CamAngle = new Vector3(
+				LerpAngle(Old.CamAngle.X, CamAngle.X, T),
+				LerpAngle(Old.CamAngle.Y, CamAngle.Y, T),
+				LerpAngle(Old.CamAngle.Z, CamAngle.Z, T)
+			);
+
 			New.ViewModelOffset = Vector3.Lerp(Old.ViewModelOffset, ViewModelOffset, T);
 			New.ViewModelRot = Quaternion.Slerp(Old.ViewModelRot, ViewModelRot, T);
 			New.FeetPosition = Vector3.Lerp(Old.FeetPosition, FeetPosition, T);

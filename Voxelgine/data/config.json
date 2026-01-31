@@ -1,249 +1,250 @@
 ﻿{
-  "Monitor": -1,
-  "WindowWidth": 1920,
-  "WindowHeight": 1080,
-  "Fullscreen": false,
-  "UseFSDesktopRes": true,
-  "Borderless": false,
-  "SetFocused": true,
-  "TargetFPS": -1,
-  "HighDpiWindow": true,
-  "VSync": true,
-  "Msaa": false,
-  "LastOptWnd_X": 0,
-  "LastOptWnd_Y": 0,
-  "LastOptWnd_W": 0,
-  "LastOptWnd_H": 0,
-  "MouseButtonDown": [
-	{
-	  "Key": "Click_Left",
-	  "Value": "Left"
-	},
-	{
-	  "Key": "Click_Right",
-	  "Value": "Right"
-	},
-	{
-	  "Key": "Click_Middle",
-	  "Value": "Middle"
-	}
-  ],
-  "KeyDown": [
-	{
-	  "Key": "W",
-	  "Value": "W"
-	},
-	{
-	  "Key": "A",
-	  "Value": "A"
-	},
-	{
-	  "Key": "S",
-	  "Value": "S"
-	},
-	{
-	  "Key": "D",
-	  "Value": "D"
-	},
-	{
-	  "Key": "Q",
-	  "Value": "Q"
-	},
-	{
-	  "Key": "E",
-	  "Value": "E"
-	},
-	{
-	  "Key": "R",
-	  "Value": "R"
-	},
-	{
-	  "Key": "F",
-	  "Value": "F"
-	},
-	{
-	  "Key": "G",
-	  "Value": "G"
-	},
-	{
-	  "Key": "C",
-	  "Value": "C"
-	},
-	{
-	  "Key": "V",
-	  "Value": "V"
-	},
-	{
-	  "Key": "T",
-	  "Value": "T"
-	},
-	{
-	  "Key": "M",
-	  "Value": "M"
-	},
-	{
-	  "Key": "K",
-	  "Value": "K"
-	},
-	{
-	  "Key": "I",
-	  "Value": "I"
-	},
-	{
-	  "Key": "O",
-	  "Value": "O"
-	},
-	{
-	  "Key": "P",
-	  "Value": "P"
-	},
-	{
-	  "Key": "Tab",
-	  "Value": "Tab"
-	},
-	{
-	  "Key": "Space",
-	  "Value": "Space"
-	},
-	{
-	  "Key": "F1",
-	  "Value": "F1"
-	},
-	{
-	  "Key": "F2",
-	  "Value": "F2"
-	},
-	{
-	  "Key": "F3",
-	  "Value": "F3"
-	},
-	{
-	  "Key": "F4",
-	  "Value": "F4"
-	},
-	{
-	  "Key": "F5",
-	  "Value": "F5"
-	},
-	{
-	  "Key": "Up",
-	  "Value": "Up"
-	},
-	{
-	  "Key": "Down",
-	  "Value": "Down"
-	},
-	{
-	  "Key": "Left",
-	  "Value": "Left"
-	},
-	{
-	  "Key": "Right",
-	  "Value": "Right"
-	},
-	{
-	  "Key": "Esc",
-	  "Value": "Escape"
-	}
-  ],
-  "TwoKeysDown": [
-	{
-	  "Key": "Num0",
-	  "Value": {
-		"Key": "Zero",
-		"Value": "Kp0"
-	  }
-	},
-	{
-	  "Key": "Num1",
-	  "Value": {
-		"Key": "One",
-		"Value": "Kp1"
-	  }
-	},
-	{
-	  "Key": "Num2",
-	  "Value": {
-		"Key": "Two",
-		"Value": "Kp2"
-	  }
-	},
-	{
-	  "Key": "Num3",
-	  "Value": {
-		"Key": "Three",
-		"Value": "Kp3"
-	  }
-	},
-	{
-	  "Key": "Num4",
-	  "Value": {
-		"Key": "Four",
-		"Value": "Kp4"
-	  }
-	},
-	{
-	  "Key": "Num5",
-	  "Value": {
-		"Key": "Five",
-		"Value": "Kp5"
-	  }
-	},
-	{
-	  "Key": "Num6",
-	  "Value": {
-		"Key": "Six",
-		"Value": "Kp6"
-	  }
-	},
-	{
-	  "Key": "Num7",
-	  "Value": {
-		"Key": "Seven",
-		"Value": "Kp7"
-	  }
-	},
-	{
-	  "Key": "Num8",
-	  "Value": {
-		"Key": "Eight",
-		"Value": "Kp8"
-	  }
-	},
-	{
-	  "Key": "Num9",
-	  "Value": {
-		"Key": "Nine",
-		"Value": "Kp9"
-	  }
-	},
-	{
-	  "Key": "Enter",
-	  "Value": {
-		"Key": "Enter",
-		"Value": "KpEnter"
-	  }
-	},
-	{
-	  "Key": "Ctrl",
-	  "Value": {
-		"Key": "LeftControl",
-		"Value": "RightControl"
-	  }
-	},
-	{
-	  "Key": "Alt",
-	  "Value": {
-		"Key": "LeftAlt",
-		"Value": "RightAlt"
-	  }
-	},
-	{
-	  "Key": "Shift",
-	  "Value": {
-		"Key": "LeftShift",
-		"Value": "RightShift"
-	  }
-	}
-  ]
+	"Monitor": -1,
+	"WindowWidth": 1920,
+	"WindowHeight": 1080,
+	"Fullscreen": false,
+	"UseFSDesktopRes": true,
+	"Borderless": false,
+	"SetFocused": true,
+	"TargetFPS": -1,
+	"HighDpiWindow": true,
+	"VSync": true,
+	"Msaa": false,
+	"LastOptWnd_X": 0,
+	"LastOptWnd_Y": 0,
+	"LastOptWnd_W": 0,
+	"LastOptWnd_H": 0,
+	"MouseSensitivity": 0.2,
+	"MouseButtonDown": [
+		{
+			"Key": "Click_Left",
+			"Value": "Left"
+		},
+		{
+			"Key": "Click_Right",
+			"Value": "Right"
+		},
+		{
+			"Key": "Click_Middle",
+			"Value": "Middle"
+		}
+	],
+	"KeyDown": [
+		{
+			"Key": "W",
+			"Value": "W"
+		},
+		{
+			"Key": "A",
+			"Value": "A"
+		},
+		{
+			"Key": "S",
+			"Value": "S"
+		},
+		{
+			"Key": "D",
+			"Value": "D"
+		},
+		{
+			"Key": "Q",
+			"Value": "Q"
+		},
+		{
+			"Key": "E",
+			"Value": "E"
+		},
+		{
+			"Key": "R",
+			"Value": "R"
+		},
+		{
+			"Key": "F",
+			"Value": "F"
+		},
+		{
+			"Key": "G",
+			"Value": "G"
+		},
+		{
+			"Key": "C",
+			"Value": "C"
+		},
+		{
+			"Key": "V",
+			"Value": "V"
+		},
+		{
+			"Key": "T",
+			"Value": "T"
+		},
+		{
+			"Key": "M",
+			"Value": "M"
+		},
+		{
+			"Key": "K",
+			"Value": "K"
+		},
+		{
+			"Key": "I",
+			"Value": "I"
+		},
+		{
+			"Key": "O",
+			"Value": "O"
+		},
+		{
+			"Key": "P",
+			"Value": "P"
+		},
+		{
+			"Key": "Tab",
+			"Value": "Tab"
+		},
+		{
+			"Key": "Space",
+			"Value": "Space"
+		},
+		{
+			"Key": "F1",
+			"Value": "F1"
+		},
+		{
+			"Key": "F2",
+			"Value": "F2"
+		},
+		{
+			"Key": "F3",
+			"Value": "F3"
+		},
+		{
+			"Key": "F4",
+			"Value": "F4"
+		},
+		{
+			"Key": "F5",
+			"Value": "F5"
+		},
+		{
+			"Key": "Up",
+			"Value": "Up"
+		},
+		{
+			"Key": "Down",
+			"Value": "Down"
+		},
+		{
+			"Key": "Left",
+			"Value": "Left"
+		},
+		{
+			"Key": "Right",
+			"Value": "Right"
+		},
+		{
+			"Key": "Esc",
+			"Value": "Escape"
+		}
+	],
+	"TwoKeysDown": [
+		{
+			"Key": "Num0",
+			"Value": {
+				"Key": "Zero",
+				"Value": "Kp0"
+			}
+		},
+		{
+			"Key": "Num1",
+			"Value": {
+				"Key": "One",
+				"Value": "Kp1"
+			}
+		},
+		{
+			"Key": "Num2",
+			"Value": {
+				"Key": "Two",
+				"Value": "Kp2"
+			}
+		},
+		{
+			"Key": "Num3",
+			"Value": {
+				"Key": "Three",
+				"Value": "Kp3"
+			}
+		},
+		{
+			"Key": "Num4",
+			"Value": {
+				"Key": "Four",
+				"Value": "Kp4"
+			}
+		},
+		{
+			"Key": "Num5",
+			"Value": {
+				"Key": "Five",
+				"Value": "Kp5"
+			}
+		},
+		{
+			"Key": "Num6",
+			"Value": {
+				"Key": "Six",
+				"Value": "Kp6"
+			}
+		},
+		{
+			"Key": "Num7",
+			"Value": {
+				"Key": "Seven",
+				"Value": "Kp7"
+			}
+		},
+		{
+			"Key": "Num8",
+			"Value": {
+				"Key": "Eight",
+				"Value": "Kp8"
+			}
+		},
+		{
+			"Key": "Num9",
+			"Value": {
+				"Key": "Nine",
+				"Value": "Kp9"
+			}
+		},
+		{
+			"Key": "Enter",
+			"Value": {
+				"Key": "Enter",
+				"Value": "KpEnter"
+			}
+		},
+		{
+			"Key": "Ctrl",
+			"Value": {
+				"Key": "LeftControl",
+				"Value": "RightControl"
+			}
+		},
+		{
+			"Key": "Alt",
+			"Value": {
+				"Key": "LeftAlt",
+				"Value": "RightAlt"
+			}
+		},
+		{
+			"Key": "Shift",
+			"Value": {
+				"Key": "LeftShift",
+				"Value": "RightShift"
+			}
+		}
+	]
 }

@@ -18,6 +18,7 @@ namespace Voxelgine.Engine {
 		const bool DEBUG_PLAYER = true;
 
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
+		public Camera3D RenderCam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective); // Interpolated camera for rendering only
 
 		GUIManager GUI;
 
@@ -795,7 +796,7 @@ namespace Voxelgine.Engine {
 				{
 					Raylib.ClearBackground(new Color(0, 0, 0, 0));
 
-					Raylib.BeginMode3D(Cam);
+					Raylib.BeginMode3D(RenderCam); // Use interpolated render camera
 					{
 						Shader DefaultShader = ResMgr.GetShader("default");
 						Raylib.BeginShaderMode(DefaultShader);

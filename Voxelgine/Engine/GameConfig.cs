@@ -68,6 +68,7 @@ namespace Voxelgine.Engine {
 		public bool Resizable;
 
 		public int TargetFPS;
+		public float MouseSensitivity;
 
 		[SettingsHidden]
 		public bool HighDpiWindow;
@@ -105,6 +106,7 @@ namespace Voxelgine.Engine {
 			Borderless = false;
 			SetFocused = true;
 			TargetFPS = -1;
+			MouseSensitivity = 0.35f;
 			HighDpiWindow = true;
 			VSync = true;
 			Msaa = false;

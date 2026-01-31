@@ -256,14 +256,18 @@ namespace Voxelgine.Engine {
 			if (State is GameState GS && !LastFrame.Empty) {
 				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
 
-				// Apply interpolated camera for smooth rendering
-				GS.Ply.Cam = Interp.Cam;
-				GS.Ply.SetCamAngle(Interp.CamAngle);
+				// Apply interpolated camera to RenderCam only (don't modify physics Cam)
+				GS.Ply.RenderCam = Interp.Cam;
 				GS.PlayerCollisionBoxPos = Interp.FeetPosition;
 
 				// Apply interpolated view model offset (position calculated at draw time from camera + offset)
 				GS.Ply.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
 				GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
+			} else {
+				// First frame - use physics camera as render camera
+				if (State is GameState GS2) {
+					GS2.Ply.RenderCam = GS2.Ply.Cam;
+				}
 			}
 
 			if (Raylib.IsWindowResized()) {

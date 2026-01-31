@@ -53,7 +53,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Graphics: Underwater overlay** — Draw water overlay texture when player camera is submerged in water **[CPX: 2]**
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **NPC Animation System** — Add animation support for NPCs (walking, attacking, crouching, lying down) **[CPX: 3]**
 - [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
@@ -98,7 +97,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Add a sound effect for swimming swim1
 
 ---
 

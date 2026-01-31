@@ -12,6 +12,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **GUI: Main menu title logo** — Added `ImageBox` displaying game logo at top of main menu.
 - **GUI: In-game debug menu** — Added FishUI debug window (F1 key) with debug toggle, save/load game, regenerate world, and main menu buttons.
 - **Graphics: Fullbright mode** — Added toggleable fullbright rendering via debug menu. Uses `BlockLight.FullbrightMode` flag.
+- **Graphics: Underwater overlay** — Added water overlay when player camera is submerged (texture-based or fallback blue tint).
 - **Graphics: Lighting calculation fix** — Fixed sunlight propagation (opaque blocks don't emit), cross-chunk light propagation, and early termination logic.
 - **GUI: Inventory item box textures** — Added state-based textures (normal, selected, hover, pressed) for `FishUIItemBox` from `data/textures/gui/`.
 - **Graphics: Glowstone light emission** — Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.

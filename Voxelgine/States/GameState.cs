@@ -53,6 +53,10 @@ namespace RaylibGame.States
 		private Frustum ViewFrustum;
 		private float _totalTime;
 
+		// Water overlay
+		private Texture2D? _waterOverlayTexture;
+		private bool _waterOverlayLoaded;
+
 		// Debug menu
 		private Window _debugMenu;
 		private CheckBox _debugModeCheckbox;
@@ -378,9 +382,54 @@ namespace RaylibGame.States
 		{
 			float deltaTime = Raylib.GetFrameTime();
 			_totalTime += deltaTime;
+
+			// Draw water overlay if player camera is submerged
+			DrawUnderwaterOverlay();
+
 			GUI.Tick(deltaTime, _totalTime);
 			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
 			Raylib.DrawFPS(10, 10);
+		}
+
+		private void DrawUnderwaterOverlay()
+		{
+			// Check if player's eye position is inside a water block
+			BlockType blockAtCamera = Map.GetBlock(Ply.Position);
+			if (blockAtCamera != BlockType.Water)
+				return;
+
+			// Try to load the water overlay texture once
+			if (!_waterOverlayLoaded)
+			{
+				_waterOverlayLoaded = true;
+				try
+				{
+					_waterOverlayTexture = ResMgr.GetTexture("overlay_water.png", TextureFilter.Bilinear);
+				}
+				catch
+				{
+					// Texture not found, will use fallback color overlay
+					_waterOverlayTexture = null;
+				}
+			}
+
+			int screenWidth = Program.Window.Width;
+			int screenHeight = Program.Window.Height;
+
+			if (_waterOverlayTexture.HasValue && _waterOverlayTexture.Value.Id != 0)
+			{
+				// Draw the water overlay texture scaled to fill the screen
+				Texture2D tex = _waterOverlayTexture.Value;
+				Rectangle srcRect = new Rectangle(0, 0, tex.Width, tex.Height);
+				Rectangle destRect = new Rectangle(0, 0, screenWidth, screenHeight);
+				Raylib.DrawTexturePro(tex, srcRect, destRect, Vector2.Zero, 0f, Color.White);
+			}
+			else
+			{
+				// Fallback: draw a semi-transparent blue overlay
+				Color waterColor = new Color(30, 80, 150, 120);
+				Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, waterColor);
+			}
 		}
 
 		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)

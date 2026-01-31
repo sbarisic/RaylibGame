@@ -20,6 +20,8 @@ namespace Voxelgine.GUI {
         private ImageRef _icon;
         private ImageRef _backgroundNormal;
         private ImageRef _backgroundSelected;
+        private ImageRef _backgroundHover;
+        private ImageRef _backgroundPressed;
         private float _iconScale = 2.0f;
         private bool _hasIcon;
 
@@ -38,10 +40,14 @@ namespace Voxelgine.GUI {
 
         public void LoadTextures(global::FishUI.FishUI ui) {
             var gfx = ui.Graphics;
-            _backgroundNormal = gfx.LoadImage("data/gui/itembox.png");
-            _backgroundSelected = gfx.LoadImage("data/gui/itembox_sel.png");
+            _backgroundNormal = gfx.LoadImage("data/textures/gui/itembox.png");
+            _backgroundSelected = gfx.LoadImage("data/textures/gui/itembox_sel.png");
+            _backgroundHover = gfx.LoadImage("data/textures/gui/itembox_hover.png");
+            _backgroundPressed = gfx.LoadImage("data/textures/gui/itembox_pressed.png");
             gfx.SetImageFilter(_backgroundNormal, true);
             gfx.SetImageFilter(_backgroundSelected, true);
+            gfx.SetImageFilter(_backgroundHover, true);
+            gfx.SetImageFilter(_backgroundPressed, true);
         }
 
         public void SetIcon(global::FishUI.FishUI ui, string texturePath, float scale) {
@@ -87,8 +93,24 @@ namespace Voxelgine.GUI {
             var size = GetAbsoluteSize();
             var gfx = UI.Graphics;
 
+            // Check if mouse is over this control
+            var mousePos = UI.Input.GetMousePosition();
+            bool isHovered = mousePos.X >= pos.X && mousePos.X <= pos.X + size.X &&
+                             mousePos.Y >= pos.Y && mousePos.Y <= pos.Y + size.Y;
+
+            // Determine which background to use based on state
+            ImageRef bgImage;
+            if (IsMousePressed && _backgroundPressed.Userdata != null) {
+                bgImage = _backgroundPressed;
+            } else if (IsSelected && _backgroundSelected.Userdata != null) {
+                bgImage = _backgroundSelected;
+            } else if (isHovered && _backgroundHover.Userdata != null) {
+                bgImage = _backgroundHover;
+            } else {
+                bgImage = _backgroundNormal;
+            }
+
             // Draw background
-            var bgImage = IsSelected ? _backgroundSelected : _backgroundNormal;
             if (bgImage.Userdata != null) {
                 gfx.DrawImage(bgImage, pos, size, 0, 1, FishColor.White);
             } else {

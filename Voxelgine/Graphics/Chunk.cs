@@ -552,53 +552,60 @@ namespace Voxelgine.Graphics {
 
 		TransparentFace CreateFace(Vector3 center, Vector3 blockPos, Vector3 normal, Color clr, Vector2 uvPos, Vector2 uvSize) {
 			Vertex3[] verts = new Vertex3[6];
-			Vector2 uv0 = uvPos;
-			Vector2 uv1 = uvPos + new Vector2(uvSize.X, 0);
-			Vector2 uv2 = uvPos + uvSize;
-			Vector2 uv3 = uvPos + new Vector2(0, uvSize.Y);
+
+			// Apply the same UV transformation as SetBlockTextureUV/MeshBuilder
+			// Original: UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1)
+			Vector2 transformedUVPos = uvPos + new Vector2(0, uvSize.Y);
+			Vector2 transformedUVSize = uvSize * new Vector2(1, -1);
+
+			// UV corners after transformation (matching how MeshBuilder.Add works: UVPos + UV * UVSize)
+			Vector2 uv00 = transformedUVPos + new Vector2(0, 0) * transformedUVSize;  // bottom-left
+			Vector2 uv10 = transformedUVPos + new Vector2(1, 0) * transformedUVSize;  // bottom-right
+			Vector2 uv11 = transformedUVPos + new Vector2(1, 1) * transformedUVSize;  // top-right
+			Vector2 uv01 = transformedUVPos + new Vector2(0, 1) * transformedUVSize;  // top-left
 
 			if (normal.X > 0) { // X++
-				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv3, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv1, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv11, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv01, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv00, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv10, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv11, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv00, normal, clr);
 			} else if (normal.X < 0) { // X--
-				verts[0] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv2, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv3, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv0, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv1, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv2, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv0, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv11, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv01, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv00, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv10, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv11, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv00, normal, clr);
 			} else if (normal.Y > 0) { // Y++
-				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv3, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv0, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv1, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv2, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv0, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv11, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv01, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv00, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv10, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv11, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv00, normal, clr);
 			} else if (normal.Y < 0) { // Y--
-				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv1, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv2, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv3, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv0, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv2, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv00, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv10, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv11, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv01, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv00, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv11, normal, clr);
 			} else if (normal.Z > 0) { // Z++
-				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv1, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv2, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv3, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv0, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv1, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv3, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv10, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 1, 1), uv11, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv01, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 0, 1), uv00, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 0, 1), uv10, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 1, 1), uv01, normal, clr);
 			} else { // Z--
-				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv3, normal, clr);
-				verts[1] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv0, normal, clr);
-				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv1, normal, clr);
-				verts[3] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv2, normal, clr);
-				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv3, normal, clr);
-				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv1, normal, clr);
+				verts[0] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv01, normal, clr);
+				verts[1] = new Vertex3(blockPos + new Vector3(1, 0, 0), uv00, normal, clr);
+				verts[2] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv10, normal, clr);
+				verts[3] = new Vertex3(blockPos + new Vector3(0, 1, 0), uv11, normal, clr);
+				verts[4] = new Vertex3(blockPos + new Vector3(1, 1, 0), uv01, normal, clr);
+				verts[5] = new Vertex3(blockPos + new Vector3(0, 0, 0), uv10, normal, clr);
 			}
 
 			return new TransparentFace(center, verts);

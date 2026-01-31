@@ -36,6 +36,7 @@ namespace Voxelgine.Engine
 		long LastWalkSound = 0;
 		long LastJumpSound = 0;
 		long LastCrashSound = 0;
+		long LastSwimSound = 0;
 
 		Vector3 PreviousPosition;
 		bool LocalPlayer;
@@ -428,14 +429,23 @@ namespace Voxelgine.Engine
 			PhysicsUtils.ApplyFriction(ref PlyVelocity, PhysicsData.WaterFriction, Dt);
 
 			// --- Apply swimming acceleration ---
-			if (wishdir != Vector3.Zero)
-			{
-				PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, PhysicsData.MaxWaterSpeed, PhysicsData.WaterAccel, Dt);
-			}
+				if (wishdir != Vector3.Zero)
+				{
+					PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, PhysicsData.MaxWaterSpeed, PhysicsData.WaterAccel, Dt);
+				}
 
-			// --- Apply reduced gravity (sink slowly if not actively swimming) ---
-			bool activelySwimming = wishdir != Vector3.Zero;
-			if (!activelySwimming && headInWater)
+				// --- Apply reduced gravity (sink slowly if not actively swimming) ---
+				bool activelySwimming = wishdir != Vector3.Zero;
+
+				// --- Play swimming sound when actively moving in water ---
+				if (activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
+				{
+					LastSwimSound = LegTimer.ElapsedMilliseconds;
+					Vector3 Fwd = FPSCamera.GetForward();
+					Snd.PlayCombo("swim", FPSCamera.Position, Fwd, Position);
+				}
+
+				if (!activelySwimming && headInWater)
 			{
 				// Player sinks slowly when not moving in water
 				PlyVelocity.Y -= PhysicsData.WaterSinkSpeed * Dt;

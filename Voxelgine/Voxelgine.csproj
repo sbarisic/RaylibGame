@@ -207,6 +207,9 @@
     <None Update="data\shaders\screen\screen.vert">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="data\sound\swim\swim1.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="data\textures\door\door.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

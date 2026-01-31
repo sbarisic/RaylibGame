@@ -17,6 +17,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **GUI: Inventory item box textures** — Added state-based textures (normal, selected, hover, pressed) for `FishUIItemBox` from `data/textures/gui/`.
 - **Graphics: Glowstone light emission** — Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.
 - **Audio: Block placement sounds** — Added sound effects for placing and breaking blocks.
+- **Audio: Swimming sound effect** — Added swim sound when player is actively swimming in water.
 - **Physics: Jump height** — Increased player jump impulse by 10% (5.5 → 6.05).
 - **Graphics: Glass backface rendering** — Added double-sided rendering for glass/ice blocks, skipping backfaces between adjacent same-type blocks.
 - **Physics Utils** — Created `PhysicsUtils` class with shared collision functions (`ClipVelocity`, `MoveWithCollision`, `Accelerate`, `AirAccelerate`, `ApplyFriction`, `ApplyGravity`). Enhanced `AABB` with `Overlaps()` and helper properties. Refactored `EntityManager` and `Player` to use shared utilities.

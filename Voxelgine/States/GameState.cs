@@ -275,14 +275,103 @@ namespace RaylibGame.States
 			if (placementPos == null)
 				return;
 
-			// Draw wireframe cube at placement position using Raylib's built-in function
 			Vector3 blockPos = placementPos.Value;
 			Vector3 center = blockPos + new Vector3(0.5f, 0.5f, 0.5f);
 
-			// Use DrawCubeWiresV for wireframe - position is center, size is dimensions
-			Raylib.DrawCubeWiresV(center, Vector3.One, Color.White);
+			// Draw smaller textured preview cube inside
+			const float previewScale = 0.4f;
+			DrawTexturedBlockPreview(center, previewScale, activeItem.BlockIcon);
 
-			//DrawWireframeCube(blockPos + new Vector3(0.1f, 0.1f, 0.1f), Vector3.One, Color.White);
+			// Draw wireframe outline
+			Raylib.DrawCubeWiresV(center, Vector3.One, Color.White);
+		}
+
+		private void DrawTexturedBlockPreview(Vector3 center, float scale, BlockType blockType)
+		{
+			// Get the atlas texture
+			Texture2D atlas = ResMgr.AtlasTexture;
+
+			// Calculate half size for the preview cube
+			float half = scale * 0.8f;
+
+			// Draw each face of the cube with the appropriate texture from the atlas
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 1, 0));  // Top
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, -1, 0)); // Bottom
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(1, 0, 0));  // Right
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(-1, 0, 0)); // Left
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 0, 1));  // Front
+			DrawBlockFace(atlas, blockType, center, half, new Vector3(0, 0, -1)); // Back
+		}
+
+		private void DrawBlockFace(Texture2D atlas, BlockType blockType, Vector3 center, float half, Vector3 faceNormal)
+		{
+			// Get UV coordinates for this block face
+			BlockInfo.GetBlockTexCoords(blockType, faceNormal, out Vector2 uvSize, out Vector2 uvPos);
+
+			// Calculate pixel coordinates in the atlas
+			int texWidth = atlas.Width;
+			int texHeight = atlas.Height;
+			Rectangle sourceRect = new Rectangle(
+				uvPos.X * texWidth,
+				uvPos.Y * texHeight,
+				uvSize.X * texWidth,
+				uvSize.Y * texHeight
+			);
+
+			// Calculate the 4 corners of this face
+			Vector3[] corners = new Vector3[4];
+			Vector3 right, up;
+
+			if (MathF.Abs(faceNormal.Y) > 0.5f)
+			{
+				// Horizontal face (top/bottom)
+				right = new Vector3(1, 0, 0);
+				up = new Vector3(0, 0, 1);
+			}
+			else if (MathF.Abs(faceNormal.X) > 0.5f)
+			{
+				// Side face (left/right)
+				right = new Vector3(0, 0, 1);
+				up = new Vector3(0, 1, 0);
+			}
+			else
+			{
+				// Front/back face
+				right = new Vector3(1, 0, 0);
+				up = new Vector3(0, 1, 0);
+			}
+
+			Vector3 faceCenter = center + faceNormal * half;
+			corners[0] = faceCenter - right * half - up * half;
+			corners[1] = faceCenter + right * half - up * half;
+			corners[2] = faceCenter + right * half + up * half;
+			corners[3] = faceCenter - right * half + up * half;
+
+			// Draw textured quad using DrawBillboardRec or manual triangles
+			// Since Raylib doesn't have a direct textured quad function, we use DrawTexturePro in 3D
+			// Alternative: Draw as two triangles
+
+			// Use Rlgl to draw a textured quad
+			Rlgl.SetTexture(atlas.Id);
+			Rlgl.Begin(DrawMode.Quads);
+
+			// Set color to white (full texture color)
+			Rlgl.Color4ub(255, 255, 255, 200); // Slight transparency for preview effect
+
+			// UV coordinates (normalized 0-1)
+			float u0 = uvPos.X;
+			float v0 = uvPos.Y;
+			float u1 = uvPos.X + uvSize.X;
+			float v1 = uvPos.Y + uvSize.Y;
+
+			// Quad vertices with texture coordinates
+			Rlgl.TexCoord2f(u0, v1); Rlgl.Vertex3f(corners[0].X, corners[0].Y, corners[0].Z);
+			Rlgl.TexCoord2f(u1, v1); Rlgl.Vertex3f(corners[1].X, corners[1].Y, corners[1].Z);
+			Rlgl.TexCoord2f(u1, v0); Rlgl.Vertex3f(corners[2].X, corners[2].Y, corners[2].Z);
+			Rlgl.TexCoord2f(u0, v0); Rlgl.Vertex3f(corners[3].X, corners[3].Y, corners[3].Z);
+
+			Rlgl.End();
+			Rlgl.SetTexture(0);
 		}
 
 		private void SaveGameState()

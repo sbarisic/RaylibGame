@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Voxelgine.Engine {
 	public class PhysData {
 		// Ground movement
-		public float GroundFriction { get; set; } = 6.0f;
+		public float GroundFriction { get; set; } = 8.0f;
 		public float GroundAccel { get; set; } = 10.0f;
 		public float MaxGroundSpeed { get; set; } = 6.4f;
 		public float MaxWalkSpeed { get; set; } = 2.8f;
@@ -18,7 +18,7 @@ namespace Voxelgine.Engine {
 		public float MaxAirWishSpeed { get; set; } = 0.7f;  // Key for strafe jumping - low wish speed allows acceleration
 
 		// Jumping
-		public float JumpImpulse { get; set; } = 5.5f;
+		public float JumpImpulse { get; set; } = 6.0f;  // Increased 10% from 5.5
 		public float Gravity { get; set; } = 15.0f;
 
 		// Misc

@@ -14,13 +14,38 @@ namespace RaylibGame.States {
         private FishUIManager _gui;
         private Window _mainWindow;
         private Window _optionsWindow;
+        private ImageBox _titleLogo;
         private float _totalTime;
 
         public MainMenuStateFishUI(GameWindow window) : base(window) {
             _gui = new FishUIManager(window);
-            
+
+            CreateTitleLogo();
             CreateMainMenu();
             CreateOptionsWindow();
+        }
+
+        private void CreateTitleLogo() {
+            // Load and display game title logo at top of screen
+            var logoImage = _gui.UI.Graphics.LoadImage("data/textures/title.png");
+
+            if (logoImage.Userdata != null) {
+                // Use full image size (no scaling)
+                var logoSize = new Vector2(logoImage.Width, logoImage.Height) * 10;
+                var logoPos = new Vector2(
+                    (Window.Width / 2f) - (logoSize.X / 2f),
+                    Window.Height * 0.05f
+                );
+
+                _titleLogo = new ImageBox {
+                    Position = logoPos,
+                    Size = logoSize,
+                    ScaleMode = ImageScaleMode.Stretch,
+                    FilterMode = ImageFilterMode.Pixelated
+                };
+                _titleLogo.Image = logoImage;
+                _gui.AddControl(_titleLogo);
+            }
         }
 
         private void CreateMainMenu() {
@@ -42,11 +67,12 @@ namespace RaylibGame.States {
 
             // Create buttons using StackLayout for automatic positioning
             float buttonWidth = 200;
+            float stackPadding = 10; // Extra padding for button borders
             var buttonStack = new StackLayout {
                 Orientation = StackOrientation.Vertical,
                 Spacing = 8,
-                Position = new Vector2((windowSize.X - buttonWidth - 40) / 2, 10),
-                Size = new Vector2(buttonWidth, windowSize.Y - 80),
+                Position = new Vector2((windowSize.X - buttonWidth - 40) / 2 - stackPadding, 10),
+                Size = new Vector2(buttonWidth + stackPadding * 2, windowSize.Y - 20),
                 IsTransparent = true
             };
 

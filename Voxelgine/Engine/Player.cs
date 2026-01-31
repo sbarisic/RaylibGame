@@ -48,6 +48,11 @@ namespace Voxelgine.Engine {
 		public Vector3 Position;
 		public bool CursorDisabled = false;
 
+		/// <summary>
+		/// Called when F1 toggles the menu/cursor state. Parameter is true when cursor is now visible (menu open).
+		/// </summary>
+		public Action<bool> OnMenuToggled;
+
 		public Vector3 FeetPosition => Position - new Vector3(0, PlayerEyeOffset, 0);
 
 		// --- Player movement/physics fields ---
@@ -178,30 +183,14 @@ namespace Voxelgine.Engine {
 			}
 			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
 			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
-		}
+			}
 
-		/// <summary>
-		/// Quake-style ClipVelocity - clips velocity against a surface normal while preserving speed along the surface.
-		/// This is the key to smooth wall sliding without losing momentum.
-		/// </summary>
-		Vector3 ClipVelocity(Vector3 velocity, Vector3 normal, float overbounce = 1.001f) {
-			float backoff = Vector3.Dot(velocity, normal) * overbounce;
-			Vector3 clipped = velocity - normal * backoff;
-
-			// Prevent tiny oscillations
-			if (MathF.Abs(clipped.X) < 0.001f) clipped.X = 0;
-			if (MathF.Abs(clipped.Y) < 0.001f) clipped.Y = 0;
-			if (MathF.Abs(clipped.Z) < 0.001f) clipped.Z = 0;
-
-			return clipped;
-		}
-
-		/// <summary>
-		/// Finds the collision normal for an AABB at the given position.
-		/// Returns the primary axis of penetration.
-		/// Prioritizes horizontal (wall) collisions over vertical to preserve jump velocity.
-		/// </summary>
-		Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight) {
+			/// <summary>
+			/// Finds the collision normal for an AABB at the given position.
+			/// Returns the primary axis of penetration.
+			/// Prioritizes horizontal (wall) collisions over vertical to preserve jump velocity.
+			/// </summary>
+			Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight) {
 			// Test each axis to find which one is blocked
 			Vector3 testX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
 			Vector3 testY = new Vector3(feetPos.X, feetPos.Y + move.Y, feetPos.Z);
@@ -294,14 +283,14 @@ namespace Voxelgine.Engine {
 					LastWallNormal = normal;
 				}
 
-				// Clip velocity against this plane
-				velocity = ClipVelocity(velocity, normal);
+				// Clip velocity against this plane using shared PhysicsUtils
+				velocity = PhysicsUtils.ClipVelocity(velocity, normal);
 
 				// Check if velocity is now moving into a previous plane
 				for (int i = 0; i < numPlanes; i++) {
 					if (Vector3.Dot(velocity, planes[i]) < 0) {
 						// Clip against the previous plane too
-						velocity = ClipVelocity(velocity, planes[i]);
+						velocity = PhysicsUtils.ClipVelocity(velocity, planes[i]);
 					}
 				}
 
@@ -325,57 +314,6 @@ namespace Voxelgine.Engine {
 			PlyVelocity = velocity;
 
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
-		}
-
-		// --- Quake-style acceleration (ground) ---
-		void Accelerate(ref Vector3 velocity, Vector3 wishdir, float wishspeed, float accel, float dt) {
-			float currentspeed = Vector3.Dot(velocity, wishdir);
-			float addspeed = wishspeed - currentspeed;
-			if (addspeed <= 0)
-				return;
-			float accelspeed = accel * dt * wishspeed;
-			if (accelspeed > addspeed)
-				accelspeed = addspeed;
-			velocity += accelspeed * wishdir;
-		}
-
-		// --- Quake-style air acceleration (key for strafe jumping) ---
-		void AirAccelerate(ref Vector3 velocity, Vector3 wishdir, float wishspeed, float accel, float dt) {
-			// Cap wishspeed for air acceleration - this is what makes strafe jumping work
-			float wishspd = wishspeed;
-			if (wishspd > 0.7f) // Quake uses 30 units, but we're scaled differently
-				wishspd = 0.7f;
-
-			float currentspeed = Vector3.Dot(velocity, wishdir);
-			float addspeed = wishspd - currentspeed;
-			if (addspeed <= 0)
-				return;
-			float accelspeed = accel * dt * wishspeed;
-			if (accelspeed > addspeed)
-				accelspeed = addspeed;
-			velocity += accelspeed * wishdir;
-		}
-
-		// --- Quake-style friction ---
-		void ApplyFriction(ref Vector3 velocity, float friction, float dt, bool onGround) {
-			if (!onGround)
-				return;
-
-			float speed = MathF.Sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z);
-			if (speed < 0.1f) {
-				velocity.X = 0;
-				velocity.Z = 0;
-				return;
-			}
-
-			float drop = speed * friction * dt;
-			float newspeed = speed - drop;
-			if (newspeed < 0)
-				newspeed = 0;
-			newspeed /= speed;
-
-			velocity.X *= newspeed;
-			velocity.Z *= newspeed;
 		}
 
 		void NoclipMove(PhysData PhysicsData, float Dt, InputMgr InMgr) {
@@ -550,7 +488,9 @@ namespace Voxelgine.Engine {
 			}
 
 			// --- Apply friction BEFORE acceleration (Quake order) ---
-			ApplyFriction(ref PlyVelocity, PhysicsData.GroundFriction, Dt, OnGroundGrace);
+			if (OnGroundGrace) {
+				PhysicsUtils.ApplyFriction(ref PlyVelocity, PhysicsData.GroundFriction, Dt);
+			}
 
 			// --- Update head bump cooldown ---
 			if (HeadBumpCooldown > 0)
@@ -571,9 +511,9 @@ namespace Voxelgine.Engine {
 				float wishspeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 
 				if (OnGroundGrace) {
-					// Ground acceleration - standard Quake ground move
-					Accelerate(ref PlyVelocity, wishdir, wishspeed, PhysicsData.GroundAccel, Dt);
-				} else {
+						// Ground acceleration - standard Quake ground move
+						PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, wishspeed, PhysicsData.GroundAccel, Dt);
+					} else {
 					// Air acceleration - key for strafe jumping
 					// Wall sliding adjustment
 					Vector3 accelDir = wishdir;
@@ -585,18 +525,18 @@ namespace Voxelgine.Engine {
 							accelDir = Vector3.Zero;
 					}
 
-					if (accelDir != Vector3.Zero) {
-						AirAccelerate(ref PlyVelocity, accelDir, wishspeed, PhysicsData.AirAccel, Dt);
+						if (accelDir != Vector3.Zero) {
+								PhysicsUtils.AirAccelerate(ref PlyVelocity, accelDir, wishspeed, PhysicsData.AirAccel, Dt);
+							}
+						}
 					}
-				}
-			}
 
-			// --- Gravity ---
-			if (!OnGroundGrace) {
-				PlyVelocity.Y -= PhysicsData.Gravity * Dt;
-			} else if (PlyVelocity.Y < 0) {
-				PlyVelocity.Y = 0;
-			}
+					// --- Gravity ---
+					if (!OnGroundGrace) {
+						PhysicsUtils.ApplyGravity(ref PlyVelocity, PhysicsData.Gravity, Dt);
+					} else if (PlyVelocity.Y < 0) {
+						PlyVelocity.Y = 0;
+					}
 
 			// --- Cap ground speed only (NOT air speed - allows bunny hopping) ---
 			if (OnGroundGrace) {
@@ -637,8 +577,10 @@ namespace Voxelgine.Engine {
 			FPSCamera.Update(CursorDisabled, ref Cam);
 
 			// Use InputMgr for F1
-			if (InMgr.IsInputPressed(InputKey.F1))
+			if (InMgr.IsInputPressed(InputKey.F1)) {
 				ToggleMouse();
+				OnMenuToggled?.Invoke(CursorDisabled); // Notify when cursor state changes
+			}
 
 			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
 			foreach (var KV in OnKeyFuncs) {

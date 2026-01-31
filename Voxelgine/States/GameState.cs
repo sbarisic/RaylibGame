@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using Voxelgine.GUI;
+using FishUI.Controls;
 
 namespace RaylibGame.States
 {
@@ -51,6 +52,10 @@ namespace RaylibGame.States
 		private readonly EntityManager EntMgr;
 		private Frustum ViewFrustum;
 		private float _totalTime;
+
+		// Debug menu
+		private Window _debugMenu;
+		private CheckBox _debugModeCheckbox;
 
 		public GameState(GameWindow window) : base(window)
 		{
@@ -97,9 +102,25 @@ namespace RaylibGame.States
 
 
 			// ====================================== Init player ====================================================
-				Ply = new Player(GUI, "snoutx10k", true, Snd);
-				Ply.InitGUI(window, GUI);
-				Ply.Init(Map);
+			Ply = new Player(GUI, "snoutx10k", true, Snd);
+			Ply.InitGUI(window, GUI);
+			Ply.Init(Map);
+
+			// Connect menu toggle event
+			Ply.OnMenuToggled = (cursorDisabled) =>
+			{
+				//Console.WriteLine($"OnMenuToggled - {cursorDisabled}");
+
+				if (cursorDisabled)
+				{
+					_debugMenu.Visible = true;
+					ToggleDebugMenu();
+				}
+				else if (!_debugMenu.Visible)
+				{
+					_debugMenu.Visible = true;
+				}
+			};
 
 			if (File.Exists(PLAYER_FILE))
 			{
@@ -110,6 +131,154 @@ namespace RaylibGame.States
 			else
 			{
 				Ply.SetPosition(PlayerPos);
+			}
+
+			CreateDebugMenu();
+		}
+
+		private void CreateDebugMenu()
+		{
+			var menuSize = new Vector2(280, 320);
+			var menuPos = new Vector2(20, 80);
+
+			_debugMenu = new Window
+			{
+				Title = "Debug Menu (F1 to close)",
+				Position = menuPos,
+				Size = menuSize,
+				IsResizable = false,
+				ShowCloseButton = true,
+				Visible = false
+			};
+
+			_debugMenu.OnClosed += (w) =>
+			{
+				_debugMenu.Visible = false;
+				Ply.ToggleMouse(false); // Re-lock cursor
+			};
+
+			var stack = new StackLayout
+			{
+				Orientation = StackOrientation.Vertical,
+				Spacing = 10,
+				Position = new Vector2(10, 10),
+				Size = new Vector2(menuSize.X - 40, menuSize.Y - 80),
+				IsTransparent = true
+			};
+
+			// Debug mode toggle with label
+			var debugLabel = new Label
+			{
+				Text = "Debug Mode (F3)",
+				Size = new Vector2(150, 24)
+			};
+			stack.AddChild(debugLabel);
+
+			_debugModeCheckbox = new CheckBox
+			{
+				IsChecked = Program.DebugMode,
+				Size = new Vector2(24, 24)
+			};
+			_debugModeCheckbox.OnCheckedChanged += (sender, isChecked) =>
+			{
+				Program.DebugMode = isChecked;
+			};
+			stack.AddChild(_debugModeCheckbox);
+
+			// Save game button
+			var btnSave = new Button
+			{
+				Text = "Save Game",
+				Size = new Vector2(200, 40)
+			};
+			btnSave.Clicked += (sender, args) =>
+			{
+				SaveGame();
+				Console.WriteLine("Game saved!");
+			};
+			stack.AddChild(btnSave);
+
+			// Load game button
+			var btnLoad = new Button
+			{
+				Text = "Load Game",
+				Size = new Vector2(200, 40)
+			};
+			btnLoad.Clicked += (sender, args) =>
+			{
+				LoadGame();
+				Console.WriteLine("Game loaded!");
+			};
+			stack.AddChild(btnLoad);
+
+			// Regenerate world button
+			var btnRegen = new Button
+			{
+				Text = "Regenerate World",
+				Size = new Vector2(200, 40)
+			};
+			btnRegen.Clicked += (sender, args) =>
+			{
+				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
+				Ply.SetPosition(PlayerPos);
+				Console.WriteLine("World regenerated!");
+			};
+			stack.AddChild(btnRegen);
+
+			// Return to main menu button
+			var btnMainMenu = new Button
+			{
+				Text = "Main Menu",
+				Size = new Vector2(200, 40)
+			};
+			btnMainMenu.Clicked += (sender, args) =>
+			{
+				_debugMenu.Visible = false;
+				Program.Window.SetState(Program.MainMenuState);
+			};
+			stack.AddChild(btnMainMenu);
+
+			_debugMenu.AddChild(stack);
+			GUI.AddControl(_debugMenu);
+		}
+
+		private void SaveGame()
+		{
+			// Save map
+			using (var fileStream = File.Create(MAP_FILE))
+			{
+				Map.Write(fileStream);
+			}
+			// Save player
+			using (var fileStream = File.Create(PLAYER_FILE))
+			using (var writer = new BinaryWriter(fileStream))
+			{
+				Ply.Write(writer);
+			}
+		}
+
+		private void LoadGame()
+		{
+			if (File.Exists(MAP_FILE))
+			{
+				using var fileStream = File.OpenRead(MAP_FILE);
+				Map.Read(fileStream);
+			}
+			if (File.Exists(PLAYER_FILE))
+			{
+				using var fileStream = File.OpenRead(PLAYER_FILE);
+				using var reader = new BinaryReader(fileStream);
+				Ply.Read(reader);
+			}
+		}
+
+		public void ToggleDebugMenu()
+		{
+			_debugMenu.Visible = !_debugMenu.Visible;
+			if (_debugMenu.Visible)
+			{
+				_debugModeCheckbox.IsChecked = Program.DebugMode;
+				_debugMenu.BringToFront();
 			}
 		}
 
@@ -181,16 +350,16 @@ namespace RaylibGame.States
 			}*/
 
 			Raylib.EndMode3D();
-			}
+		}
 
-			public override void Draw2D()
-			{
-				float deltaTime = Raylib.GetFrameTime();
-				_totalTime += deltaTime;
-				GUI.Tick(deltaTime, _totalTime);
-				Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
-				Raylib.DrawFPS(10, 10);
-			}
+		public override void Draw2D()
+		{
+			float deltaTime = Raylib.GetFrameTime();
+			_totalTime += deltaTime;
+			GUI.Tick(deltaTime, _totalTime);
+			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
+			Raylib.DrawFPS(10, 10);
+		}
 
 		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
 		{
@@ -203,7 +372,7 @@ namespace RaylibGame.States
 
 			// Draw entities and effects
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
-			
+
 			DrawBlockPlacementPreview();
 
 			Particle.Draw(Ply, ref ViewFrustum);

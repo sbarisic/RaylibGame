@@ -36,7 +36,7 @@ A list of planned features, improvements, and tasks for this project.
 | **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls (`FishUIItemBox`, `FishUIInventory`, `FishUIInfoLabel`) |
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
 | **Animation** | 🔶 | `AnimLerp`, `LerpManager`, easing functions |
-| **Physics** | 🔶 | `AABB`, `PhysData`, `PhysicsUtils` with shared collision utilities; used by `EntityManager` and `Player` |
+| **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` with shared collision/movement utilities; used by `EntityManager` and `Player` |
 | **NPC/AI** | ⬜ | Basic `VEntNPC` exists, no AI/pathfinding |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented |
@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Centralized Physics System** — Migrate Player to use `PhysicsUtils` for shared collision functions **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
@@ -97,8 +97,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Buttons on the main menu do not have the right border, clipping issue?
-- Main menu should display the game logo, a big image
+- Glass blocks should render the backside of the glass, too, except the panes between two glass blocks. So minecraft like.
 
 ---
 

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Raylib_cs;
 using Voxelgine.Engine;
 using RaylibGame.States;
@@ -12,6 +13,16 @@ namespace Voxelgine.Graphics {
 	public unsafe class ChunkMap {
 		SpatialHashGrid<Chunk> Chunks;
 		Random Rnd = new Random();
+
+		// Reusable buffer for transparent face sorting
+		List<TransparentFace> TransparentFaceBuffer = new List<TransparentFace>(4096);
+		float[] DistanceBuffer = new float[4096];
+		int[] IndexBuffer = new int[4096];
+
+		// Cached transparent mesh and model for sorted rendering
+		Mesh SortedTransparentMesh;
+		Model SortedTransparentModel;
+		bool SortedMeshInitialized = false;
 
 		public ChunkMap(GameState GS) {
 			Chunks = new SpatialHashGrid<Chunk>(1);
@@ -203,27 +214,81 @@ namespace Voxelgine.Graphics {
 		}
 
 		public void DrawTransparent(ref Frustum Fr, Vector3 cameraPos) {
-			// Sort chunks by distance from camera (back-to-front) for better transparency
-			var sortedChunks = Chunks.Items
-				.Where(kv => kv.Value.HasTransparentFaces())
-				.Select(kv => new {
-					Key = kv.Key,
-					Value = kv.Value,
-					Distance = Vector3.DistanceSquared(kv.Key * Chunk.ChunkSize + new Vector3(Chunk.ChunkSize / 2), cameraPos)
-				})
-				.OrderByDescending(x => x.Distance)
-				.ToList();
+			// Collect all transparent faces from all visible chunks
+			TransparentFaceBuffer.Clear();
 
+			foreach (var KV in Chunks.Items) {
+				if (KV.Value.HasTransparentFaces()) {
+					var faces = KV.Value.GetTransparentFaces(ref Fr);
+					TransparentFaceBuffer.AddRange(faces);
+				}
+			}
+
+			if (TransparentFaceBuffer.Count == 0)
+				return;
+
+			// Ensure buffers are large enough
+			if (DistanceBuffer.Length < TransparentFaceBuffer.Count) {
+				DistanceBuffer = new float[TransparentFaceBuffer.Count * 2];
+				IndexBuffer = new int[TransparentFaceBuffer.Count * 2];
+			}
+
+			// Calculate distances and build index array
+			for (int i = 0; i < TransparentFaceBuffer.Count; i++) {
+				DistanceBuffer[i] = Vector3.DistanceSquared(cameraPos, TransparentFaceBuffer[i].Center);
+				IndexBuffer[i] = i;
+			}
+
+			// Sort indices by distance (back-to-front)
+			Array.Sort(IndexBuffer, 0, TransparentFaceBuffer.Count, 
+				Comparer<int>.Create((a, b) => DistanceBuffer[b].CompareTo(DistanceBuffer[a])));
+
+			// Build mesh from sorted faces
+			int vertexCount = TransparentFaceBuffer.Count * 6;
+
+			// Allocate mesh data
+			Vector3* vertices = (Vector3*)NativeMemory.Alloc((nuint)(sizeof(Vector3) * vertexCount));
+			Vector3* normals = (Vector3*)NativeMemory.Alloc((nuint)(sizeof(Vector3) * vertexCount));
+			Vector2* texcoords = (Vector2*)NativeMemory.Alloc((nuint)(sizeof(Vector2) * vertexCount));
+			Color* colors = (Color*)NativeMemory.Alloc((nuint)(sizeof(Color) * vertexCount));
+
+			int vIdx = 0;
+			for (int i = 0; i < TransparentFaceBuffer.Count; i++) {
+				var face = TransparentFaceBuffer[IndexBuffer[i]];
+				for (int j = 0; j < 6; j++) {
+					var v = face.Vertices[j];
+					vertices[vIdx] = v.Position;
+					normals[vIdx] = v.Normal;
+					texcoords[vIdx] = v.UV;
+					colors[vIdx] = v.Color;
+					vIdx++;
+				}
+			}
+
+			// Create and upload mesh
+			Mesh mesh = new Mesh();
+			mesh.VertexCount = vertexCount;
+			mesh.TriangleCount = vertexCount / 3;
+			mesh.Vertices = (float*)vertices;
+			mesh.Normals = (float*)normals;
+			mesh.TexCoords = (float*)texcoords;
+			mesh.Colors = (byte*)colors;
+
+			Raylib.UploadMesh(ref mesh, false);
+
+			// Draw with atlas texture
 			Raylib.BeginBlendMode(BlendMode.Alpha);
 			Rlgl.DisableDepthMask();
 
-			foreach (var chunk in sortedChunks) {
-				Vector3 ChunkPos = chunk.Key * new Vector3(Chunk.ChunkSize);
-				chunk.Value.DrawTransparent(ChunkPos, ref Fr);
-			}
+			Material mat = Raylib.LoadMaterialDefault();
+			Raylib.SetMaterialTexture(ref mat, MaterialMapIndex.Albedo, ResMgr.AtlasTexture);
+			Raylib.DrawMesh(mesh, mat, Matrix4x4.Identity);
 
 			Rlgl.EnableDepthMask();
 			Raylib.EndBlendMode();
+
+			// Cleanup
+			Raylib.UnloadMesh(mesh);
 		}
 
 		// RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.

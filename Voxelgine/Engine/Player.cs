@@ -13,9 +13,11 @@ using Voxelgine.Graphics;
 using Voxelgine.GUI;
 using FishUI.Controls;
 
-namespace Voxelgine.Engine {
+namespace Voxelgine.Engine
+{
 	// TODO: Implement player as VEntity in class VEntPlayer
-	public unsafe class Player {
+	public unsafe class Player
+	{
 		const bool DEBUG_PLAYER = true;
 
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
@@ -63,7 +65,8 @@ namespace Voxelgine.Engine {
 		Stopwatch JumpCounter = Stopwatch.StartNew();
 		float HeadBumpCooldown = 0f; // Cooldown applied when hitting head shortly after jumping
 
-		public Player(FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd) {
+		public Player(FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
+		{
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
@@ -75,10 +78,12 @@ namespace Voxelgine.Engine {
 			ToggleMouse(false);
 		}
 
-		public void Init(ChunkMap Map) {
+		public void Init(ChunkMap Map)
+		{
 			Stopwatch SWatch = Stopwatch.StartNew();
 
-			AddOnKeyPressed(InputKey.F2, (E) => {
+			AddOnKeyPressed(InputKey.F2, (E) =>
+			{
 				Console.WriteLine("Compute light!");
 				SWatch.Restart();
 				Map.ComputeLighting();
@@ -90,7 +95,8 @@ namespace Voxelgine.Engine {
 
 			AddOnKeyPressed(InputKey.F4, (E) => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
 
-			AddOnKeyPressed(InputKey.C, (E) => {
+			AddOnKeyPressed(InputKey.C, (E) =>
+			{
 				NoClip = !NoClip;
 				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
 			});
@@ -100,20 +106,24 @@ namespace Voxelgine.Engine {
 			AddOnKeyPressed(InputKey.Num3, (K) => { Inventory?.SetSelectedIndex(2); });
 			AddOnKeyPressed(InputKey.Num4, (K) => { Inventory?.SetSelectedIndex(3); });
 
-			AddOnKeyPressed(InputKey.I, (K) => {
-				if (Program.DebugMode) {
+			AddOnKeyPressed(InputKey.I, (K) =>
+			{
+				if (Program.DebugMode)
+				{
 					FreezeFrustum = !FreezeFrustum;
 				}
 			});
 		}
 
-		public void ToggleMouse(bool? Enable = null) {
+		public void ToggleMouse(bool? Enable = null)
+		{
 			if (Enable != null)
 				CursorDisabled = !Enable.Value;
 
 			if (CursorDisabled)
 				Raylib.EnableCursor();
-			else {
+			else
+			{
 				Raylib.DisableCursor();
 
 				Vector2 MPos = FPSCamera.GetPreviousMousePos();
@@ -123,11 +133,13 @@ namespace Voxelgine.Engine {
 			CursorDisabled = !CursorDisabled;
 		}
 
-		public void SetPosition(int X, int Y, int Z) {
+		public void SetPosition(int X, int Y, int Z)
+		{
 			Position = FPSCamera.Position = new Vector3(X, Y, Z);
 		}
 
-		public void SetPosition(Vector3 Pos) {
+		public void SetPosition(Vector3 Pos)
+		{
 			if (float.IsNaN(Pos.X) || float.IsNaN(Pos.Y) || float.IsNaN(Pos.Z))
 				return;
 
@@ -135,11 +147,13 @@ namespace Voxelgine.Engine {
 			Position = FPSCamera.Position = Pos;
 		}
 
-		public Vector3 GetPreviousPosition() {
+		public Vector3 GetPreviousPosition()
+		{
 			return PreviousPosition;
 		}
 
-		float ClampToZero(float Num, float ClampHyst) {
+		float ClampToZero(float Num, float ClampHyst)
+		{
 			if (Num < 0 && Num > -ClampHyst)
 				return 0;
 			if (Num > 0 && Num < ClampHyst)
@@ -147,7 +161,8 @@ namespace Voxelgine.Engine {
 			return Num;
 		}
 
-		void ClampToZero(ref Vector3 Vec, float ClampHyst) {
+		void ClampToZero(ref Vector3 Vec, float ClampHyst)
+		{
 			if (float.IsNaN(Vec.X))
 				Vec.X = 0;
 			if (float.IsNaN(Vec.Y))
@@ -159,38 +174,43 @@ namespace Voxelgine.Engine {
 			Vec.Z = ClampToZero(Vec.Z, ClampHyst);
 		}
 
-		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = -1, float Height = -1) {
+		IEnumerable<Vector3> Phys_PlayerCollisionPointsImproved(Vector3 feetPos, float Radius = -1, float Height = -1)
+		{
 			if (Radius < 0)
 				Radius = Player.PlayerRadius;
 			if (Height < 0)
 				Height = Player.PlayerHeight;
 			int RadialDivs = 12;
 			int HeightDivs = 4;
-			for (int h = 0; h < HeightDivs; h++) {
+			for (int h = 0; h < HeightDivs; h++)
+			{
 				float heightRatio = (float)h / (HeightDivs - 1);
 				float currentHeight = heightRatio * Height;
-				for (int i = 0; i < RadialDivs; i++) {
+				for (int i = 0; i < RadialDivs; i++)
+				{
 					float angle = (float)i / RadialDivs * 2.0f * MathF.PI;
 					float x = MathF.Cos(angle) * Radius;
 					float z = MathF.Sin(angle) * Radius;
 					yield return new Vector3(feetPos.X + x, feetPos.Y + currentHeight, feetPos.Z + z);
 				}
 			}
-			for (int h = 0; h < HeightDivs; h++) {
+			for (int h = 0; h < HeightDivs; h++)
+			{
 				float heightRatio = (float)h / (HeightDivs - 1);
 				float currentHeight = heightRatio * Height;
 				yield return new Vector3(feetPos.X, feetPos.Y + currentHeight, feetPos.Z);
 			}
 			yield return new Vector3(feetPos.X, feetPos.Y + Height, feetPos.Z);
 			yield return new Vector3(feetPos.X, feetPos.Y, feetPos.Z);
-			}
+		}
 
-			/// <summary>
-			/// Finds the collision normal for an AABB at the given position.
-			/// Returns the primary axis of penetration.
-			/// Prioritizes horizontal (wall) collisions over vertical to preserve jump velocity.
-			/// </summary>
-			Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight) {
+		/// <summary>
+		/// Finds the collision normal for an AABB at the given position.
+		/// Returns the primary axis of penetration.
+		/// Prioritizes horizontal (wall) collisions over vertical to preserve jump velocity.
+		/// </summary>
+		Vector3 FindCollisionNormal(ChunkMap Map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight)
+		{
 			// Test each axis to find which one is blocked
 			Vector3 testX = new Vector3(feetPos.X + move.X, feetPos.Y, feetPos.Z);
 			Vector3 testY = new Vector3(feetPos.X, feetPos.Y + move.Y, feetPos.Z);
@@ -210,25 +230,30 @@ namespace Voxelgine.Engine {
 			// Only return one axis at a time to prevent multi-axis clipping that kills jump velocity
 
 			// First, handle horizontal (wall) collisions - these should NOT affect Y velocity
-			if (blockedX && MathF.Abs(move.X) > MathF.Abs(move.Z) && MathF.Abs(move.X) > 0.0001f) {
+			if (blockedX && MathF.Abs(move.X) > MathF.Abs(move.Z) && MathF.Abs(move.X) > 0.0001f)
+			{
 				return new Vector3(-MathF.Sign(move.X), 0, 0);
 			}
-			if (blockedZ && MathF.Abs(move.Z) > 0.0001f) {
+			if (blockedZ && MathF.Abs(move.Z) > 0.0001f)
+			{
 				return new Vector3(0, 0, -MathF.Sign(move.Z));
 			}
-			if (blockedX && MathF.Abs(move.X) > 0.0001f) {
+			if (blockedX && MathF.Abs(move.X) > 0.0001f)
+			{
 				return new Vector3(-MathF.Sign(move.X), 0, 0);
 			}
 
 			// Only return Y normal if no horizontal collision and Y is actually blocked
-			if (blockedY && MathF.Abs(move.Y) > 0.0001f) {
+			if (blockedY && MathF.Abs(move.Y) > 0.0001f)
+			{
 				return new Vector3(0, -MathF.Sign(move.Y), 0);
 			}
 
 			return Vector3.Zero;
 		}
 
-		private Vector3 QuakeMoveWithCollision(ChunkMap Map, Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false) {
+		private Vector3 QuakeMoveWithCollision(ChunkMap Map, Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false)
+		{
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
 			Vector3 feetPos = FeetPosition;
@@ -241,30 +266,35 @@ namespace Voxelgine.Engine {
 			int numPlanes = 0;
 
 			// Only add ground plane if moving downward (not when jumping up)
-			if (onGround && velocity.Y <= 0) {
+			if (onGround && velocity.Y <= 0)
+			{
 				planes[numPlanes++] = Vector3.UnitY;
 			}
 
 			float timeLeft = dt;
 
-			for (int slide = 0; slide < maxSlides && timeLeft > 0; slide++) {
+			for (int slide = 0; slide < maxSlides && timeLeft > 0; slide++)
+			{
 				Vector3 endPos = feetPos + velocity * timeLeft;
 
 				// Check if move is clear
 				if (!Map.HasBlocksInBoundsMinMax(
 					endPos - new Vector3(playerRadius, 0, playerRadius),
-					endPos + new Vector3(playerRadius, playerHeight, playerRadius))) {
+					endPos + new Vector3(playerRadius, playerHeight, playerRadius)))
+				{
 					feetPos = endPos;
 					break;
 				}
 
 				// Try step up if on ground
-				if (onGround && slide == 0) {
+				if (onGround && slide == 0)
+				{
 					Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
 					Vector3 stepEnd = stepUp + velocity * timeLeft;
 					if (!Map.HasBlocksInBoundsMinMax(
 						stepEnd - new Vector3(playerRadius, 0, playerRadius),
-						stepEnd + new Vector3(playerRadius, playerHeight, playerRadius))) {
+						stepEnd + new Vector3(playerRadius, playerHeight, playerRadius)))
+					{
 						feetPos = stepEnd;
 						break;
 					}
@@ -273,13 +303,15 @@ namespace Voxelgine.Engine {
 				// Find collision normal
 				Vector3 normal = FindCollisionNormal(Map, feetPos, velocity * timeLeft, playerRadius, playerHeight);
 
-				if (normal == Vector3.Zero) {
+				if (normal == Vector3.Zero)
+				{
 					// Stuck - try to nudge out
 					break;
 				}
 
 				// Store wall normal for air control
-				if (MathF.Abs(normal.Y) < 0.5f) {
+				if (MathF.Abs(normal.Y) < 0.5f)
+				{
 					LastWallNormal = normal;
 				}
 
@@ -287,15 +319,18 @@ namespace Voxelgine.Engine {
 				velocity = PhysicsUtils.ClipVelocity(velocity, normal);
 
 				// Check if velocity is now moving into a previous plane
-				for (int i = 0; i < numPlanes; i++) {
-					if (Vector3.Dot(velocity, planes[i]) < 0) {
+				for (int i = 0; i < numPlanes; i++)
+				{
+					if (Vector3.Dot(velocity, planes[i]) < 0)
+					{
 						// Clip against the previous plane too
 						velocity = PhysicsUtils.ClipVelocity(velocity, planes[i]);
 					}
 				}
 
 				// Add this plane to the list
-				if (numPlanes < planes.Length) {
+				if (numPlanes < planes.Length)
+				{
 					planes[numPlanes++] = normal;
 				}
 
@@ -305,7 +340,8 @@ namespace Voxelgine.Engine {
 				timeLeft *= (1.0f - moveFraction);
 
 				// Check if we're not moving anymore
-				if (velocity.LengthSquared() < 0.0001f) {
+				if (velocity.LengthSquared() < 0.0001f)
+				{
 					break;
 				}
 			}
@@ -316,7 +352,8 @@ namespace Voxelgine.Engine {
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
 
-		void NoclipMove(PhysData PhysicsData, float Dt, InputMgr InMgr) {
+		void NoclipMove(PhysData PhysicsData, float Dt, InputMgr InMgr)
+		{
 			Vector3 move = Vector3.Zero;
 			Vector3 fwd = GetForward();
 			Vector3 lft = GetLeft();
@@ -340,18 +377,21 @@ namespace Voxelgine.Engine {
 			if (InMgr.IsInputDown(InputKey.Shift))
 				move -= up;
 
-			if (move != Vector3.Zero) {
+			if (move != Vector3.Zero)
+			{
 				move = Vector3.Normalize(move) * PhysicsData.NoClipMoveSpeed * Dt;
 				SetPosition(Position + move);
 			}
 		}
 
-		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr) {
+		public void UpdatePhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr)
+		{
 			const float GroundHitBelowFeet = -0.075f;
 			float playerHeight = Player.PlayerHeight;
 			float playerRadius = Player.PlayerRadius;
 
-			if (NoClip) {
+			if (NoClip)
+			{
 				NoclipMove(PhysicsData, Dt, InMgr);
 				return;
 			}
@@ -373,22 +413,28 @@ namespace Voxelgine.Engine {
 			bool OnGround = false;
 			Vector3 HitFloor = Vector3.Zero;
 
-			foreach (var pt in groundCheckPoints) {
+			foreach (var pt in groundCheckPoints)
+			{
 				Vector3 localFace;
 				Vector3 hit = Map.RaycastPos(pt, PhysicsData.GroundCheckDist, new Vector3(0, -1f, 0), out localFace);
 
-				if (hit != Vector3.Zero && localFace.Y > 0.99f && Math.Abs(localFace.X) < 0.05f && Math.Abs(localFace.Z) < 0.05f && PlyVelocity.Y <= 0 && hit.Y < feetPos.Y + GroundHitBelowFeet) {
+				if (hit != Vector3.Zero && localFace.Y > 0.99f && Math.Abs(localFace.X) < 0.05f && Math.Abs(localFace.Z) < 0.05f && PlyVelocity.Y <= 0 && hit.Y < feetPos.Y + GroundHitBelowFeet)
+				{
 					OnGround = true;
 					HitFloor = hit;
 					break;
 				}
 			}
-			if (!OnGround) {
-				foreach (var pt in groundCheckPoints) {
+			if (!OnGround)
+			{
+				foreach (var pt in groundCheckPoints)
+				{
 					Vector3 TestPoint = pt + PlyVelocity * Dt;
 
-					if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm)) {
-						if (PicNorm.Y > 0.99f && Math.Abs(PicNorm.X) < 0.05f && Math.Abs(PicNorm.Z) < 0.05f && PlyVelocity.Y <= 0 && TestPoint.Y < feetPos.Y + GroundHitBelowFeet) {
+					if (Map.Collide(TestPoint, new Vector3(0, -1, 0), out Vector3 PicNorm))
+					{
+						if (PicNorm.Y > 0.99f && Math.Abs(PicNorm.X) < 0.05f && Math.Abs(PicNorm.Z) < 0.05f && PlyVelocity.Y <= 0 && TestPoint.Y < feetPos.Y + GroundHitBelowFeet)
+						{
 							OnGround = true;
 							HitFloor = TestPoint;
 							break;
@@ -396,9 +442,12 @@ namespace Voxelgine.Engine {
 					}
 				}
 			}
-			if (OnGround) {
+			if (OnGround)
+			{
 				GroundGraceTimer = 0.1f;
-			} else {
+			}
+			else
+			{
 				GroundGraceTimer -= Dt;
 				if (GroundGraceTimer < 0)
 					GroundGraceTimer = 0;
@@ -437,36 +486,45 @@ namespace Voxelgine.Engine {
 				wishdir = Vector3.Normalize(wishdir);
 
 			bool ledgeSafety = OnGroundGrace && InMgr.IsInputDown(InputKey.Shift);
-			if (ledgeSafety && wishdir != Vector3.Zero) {
+			if (ledgeSafety && wishdir != Vector3.Zero)
+			{
 				float innerRadius = 0.4f;
 				var points = Phys_PlayerCollisionPointsImproved(feetPos, innerRadius, Player.PlayerHeight).ToArray();
 				float minY = points.Min(p => p.Y);
 				var feetPoints = points.Where(p => Math.Abs(p.Y - minY) < 0.01f).ToArray();
 
 				List<Vector3> supportedPoints = new();
-				foreach (var pt in feetPoints) {
+				foreach (var pt in feetPoints)
+				{
 					Vector3 groundCheck = pt + new Vector3(0, -0.15f, 0);
-					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None) {
+					if (Map.GetBlock((int)MathF.Floor(groundCheck.X), (int)MathF.Floor(groundCheck.Y), (int)MathF.Floor(groundCheck.Z)) != BlockType.None)
+					{
 						supportedPoints.Add(pt);
 					}
 				}
 
-				if (supportedPoints.Count == 0) {
+				if (supportedPoints.Count == 0)
+				{
 					PlyVelocity.X = 0;
 					PlyVelocity.Z = 0;
 					wishdir = Vector3.Zero;
-				} else {
+				}
+				else
+				{
 					bool allow = false;
 
-					foreach (var spt in supportedPoints) {
+					foreach (var spt in supportedPoints)
+					{
 						Vector3 toSupport = Vector3.Normalize(spt - feetPos);
-						if (Vector3.Dot(wishdir, toSupport) > 0) {
+						if (Vector3.Dot(wishdir, toSupport) > 0)
+						{
 							allow = true;
 							break;
 						}
 					}
 
-					if (!allow) {
+					if (!allow)
+					{
 						PlyVelocity.X = 0;
 						PlyVelocity.Z = 0;
 						wishdir = Vector3.Zero;
@@ -476,19 +534,26 @@ namespace Voxelgine.Engine {
 
 			float VelLen = PlyVelocity.Length();
 
-			if (OnGroundGrace) {
-				if (!WasLastLegsOnFloor) {
+			if (OnGroundGrace)
+			{
+				if (!WasLastLegsOnFloor)
+				{
 					WasLastLegsOnFloor = true;
 					this.PhysicsHit(Position, VelLen, false, true, false, false);
-				} else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2)) {
+				}
+				else if (VelLen >= (PhysicsData.MaxGroundSpeed / 2))
+				{
 					this.PhysicsHit(HitFloor, VelLen, false, true, true, false);
 				}
-			} else {
+			}
+			else
+			{
 				WasLastLegsOnFloor = false;
 			}
 
 			// --- Apply friction BEFORE acceleration (Quake order) ---
-			if (OnGroundGrace) {
+			if (OnGroundGrace)
+			{
 				PhysicsUtils.ApplyFriction(ref PlyVelocity, PhysicsData.GroundFriction, Dt);
 			}
 
@@ -498,7 +563,8 @@ namespace Voxelgine.Engine {
 
 			// --- Jumping (before movement for bunny hop) ---
 			bool canJump = HeadBumpCooldown <= 0 && JumpCounter.ElapsedMilliseconds > 50;
-			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && canJump) {
+			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && canJump)
+			{
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
@@ -507,17 +573,22 @@ namespace Voxelgine.Engine {
 			}
 
 			// --- Apply acceleration ---
-			if (wishdir != Vector3.Zero) {
+			if (wishdir != Vector3.Zero)
+			{
 				float wishspeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 
-				if (OnGroundGrace) {
-						// Ground acceleration - standard Quake ground move
-						PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, wishspeed, PhysicsData.GroundAccel, Dt);
-					} else {
+				if (OnGroundGrace)
+				{
+					// Ground acceleration - standard Quake ground move
+					PhysicsUtils.Accelerate(ref PlyVelocity, wishdir, wishspeed, PhysicsData.GroundAccel, Dt);
+				}
+				else
+				{
 					// Air acceleration - key for strafe jumping
 					// Wall sliding adjustment
 					Vector3 accelDir = wishdir;
-					if (LastWallNormal != Vector3.Zero) {
+					if (LastWallNormal != Vector3.Zero)
+					{
 						accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
 						if (accelDir.LengthSquared() > 1e-4f)
 							accelDir = Vector3.Normalize(accelDir);
@@ -525,24 +596,30 @@ namespace Voxelgine.Engine {
 							accelDir = Vector3.Zero;
 					}
 
-						if (accelDir != Vector3.Zero) {
-								PhysicsUtils.AirAccelerate(ref PlyVelocity, accelDir, wishspeed, PhysicsData.AirAccel, Dt);
-							}
-						}
+					if (accelDir != Vector3.Zero)
+					{
+						PhysicsUtils.AirAccelerate(ref PlyVelocity, accelDir, wishspeed, PhysicsData.AirAccel, Dt);
 					}
+				}
+			}
 
-					// --- Gravity ---
-					if (!OnGroundGrace) {
-						PhysicsUtils.ApplyGravity(ref PlyVelocity, PhysicsData.Gravity, Dt);
-					} else if (PlyVelocity.Y < 0) {
-						PlyVelocity.Y = 0;
-					}
+			// --- Gravity ---
+			if (!OnGroundGrace)
+			{
+				PhysicsUtils.ApplyGravity(ref PlyVelocity, PhysicsData.Gravity, Dt);
+			}
+			else if (PlyVelocity.Y < 0)
+			{
+				PlyVelocity.Y = 0;
+			}
 
 			// --- Cap ground speed only (NOT air speed - allows bunny hopping) ---
-			if (OnGroundGrace) {
+			if (OnGroundGrace)
+			{
 				float maxSpeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 				float horizSpeed = MathF.Sqrt(PlyVelocity.X * PlyVelocity.X + PlyVelocity.Z * PlyVelocity.Z);
-				if (horizSpeed > maxSpeed) {
+				if (horizSpeed > maxSpeed)
+				{
 					float scale = maxSpeed / horizSpeed;
 					PlyVelocity.X *= scale;
 					PlyVelocity.Z *= scale;
@@ -554,16 +631,19 @@ namespace Voxelgine.Engine {
 			float preMovePlyVelocityY = PlyVelocity.Y; // Save Y velocity before collision may clip it
 			Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
 
-			if (newPos != Position) {
+			if (newPos != Position)
+			{
 				SetPosition(newPos);
 			}
 			// Note: PlyVelocity is now updated inside QuakeMoveWithCollision via ClipVelocity
 
 			// --- Head collision detection ---
 			// If player was moving upward and velocity was clipped to 0 or less, they hit a ceiling
-			if (preMovePlyVelocityY > 0.1f && PlyVelocity.Y <= 0) {
+			if (preMovePlyVelocityY > 0.1f && PlyVelocity.Y <= 0)
+			{
 				// Apply 0.5s jump cooldown if head was hit within 0.6s of jumping
-				if (JumpCounter.ElapsedMilliseconds < 600) {
+				if (JumpCounter.ElapsedMilliseconds < 600)
+				{
 					HeadBumpCooldown = 0.5f;
 				}
 			}
@@ -571,19 +651,22 @@ namespace Voxelgine.Engine {
 			Utils.EndRaycastRecord();
 		}
 
-		public void Tick(InputMgr InMgr) {
+		public void Tick(InputMgr InMgr)
+		{
 			// ViewMdl.SetRotationMode(InMgr.IsInputDown(InputKey.Click_Right) ? ViewModelRotationMode.GunIronsight : ViewModelRotationMode.Gun);
 			ActiveSelection?.Tick(ViewMdl, InMgr);
 			FPSCamera.Update(CursorDisabled, ref Cam);
 
 			// Use InputMgr for F1
-			if (InMgr.IsInputPressed(InputKey.F1)) {
+			if (InMgr.IsInputPressed(InputKey.F1))
+			{
 				ToggleMouse();
 				OnMenuToggled?.Invoke(CursorDisabled); // Notify when cursor state changes
 			}
 
 			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
-			foreach (var KV in OnKeyFuncs) {
+			foreach (var KV in OnKeyFuncs)
+			{
 				if (InMgr.IsInputPressed(KV.Key))
 					KV.Value(new OnKeyPressedEventArg(KV.Key));
 			}
@@ -604,13 +687,16 @@ namespace Voxelgine.Engine {
 		/// </summary>
 		public InventoryItem GetActiveItem() => ActiveSelection;
 
-		public void RecalcGUI(GameWindow Window) {
+		public void RecalcGUI(GameWindow Window)
+		{
 			// FishUI handles positioning via control properties
 		}
 
-		public void InitGUI(GameWindow Window, FishUIManager gui) {
+		public void InitGUI(GameWindow Window, FishUIManager gui)
+		{
 			// Health box
-			Box_Health = new FishUIItemBox {
+			Box_Health = new FishUIItemBox
+			{
 				Position = new Vector2(100, Window.Height - 100),
 				Size = new Vector2(64, 64)
 			};
@@ -620,7 +706,8 @@ namespace Voxelgine.Engine {
 			gui.AddControl(Box_Health);
 
 			// Debug info label
-			InfoLbl = new FishUIInfoLabel {
+			InfoLbl = new FishUIInfoLabel
+			{
 				Position = new Vector2(20, 40),
 				Size = new Vector2(300, 250),
 				Visible = Program.DebugMode
@@ -636,15 +723,18 @@ namespace Voxelgine.Engine {
 			);
 			gui.AddControl(Inventory);
 
-			Inventory.OnActiveSelectionChanged = (E) => {
-				if (ActiveSelection != null) {
+			Inventory.OnActiveSelectionChanged = (E) =>
+			{
+				if (ActiveSelection != null)
+				{
 					ActiveSelection.OnDeselected(ViewMdl);
 					ActiveSelection = null;
 				}
 
 				ActiveSelection = E.ItemBox.Item;
 
-				if (ActiveSelection != null) {
+				if (ActiveSelection != null)
+				{
 					ActiveSelection.OnSelected(ViewMdl);
 				}
 			};
@@ -662,10 +752,12 @@ namespace Voxelgine.Engine {
 			Inventory.SetSelectedIndex(0);
 		}
 
-		public void UpdateGUI() {
+		public void UpdateGUI()
+		{
 			InfoLbl.Visible = false;
 
-			if (Program.DebugMode) {
+			if (Program.DebugMode)
+			{
 				InfoLbl.Visible = true;
 				InfoLbl.Clear();
 				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Position.X, 2), MathF.Round(Position.Y, 2), MathF.Round(Position.Z, 2));
@@ -679,7 +771,8 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		void SetInvItem(global::FishUI.FishUI ui, FishUIInventory Inventory, int Idx, InventoryItem InvItem) {
+		void SetInvItem(global::FishUI.FishUI ui, FishUIInventory Inventory, int Idx, InventoryItem InvItem)
+		{
 			FishUIItemBox Itm = Inventory.GetItem(Idx);
 			if (Itm == null) return;
 
@@ -690,7 +783,8 @@ namespace Voxelgine.Engine {
 			InvItem.SetupFishUIItemBox(Itm);
 		}
 
-		public void TickGUI(InputMgr InMgr, ChunkMap Map) {
+		public void TickGUI(InputMgr InMgr, ChunkMap Map)
+		{
 			bool Left = InMgr.IsInputPressed(InputKey.Click_Left);
 			bool Right = InMgr.IsInputPressed(InputKey.Click_Right);
 			bool Middle = InMgr.IsInputPressed(InputKey.Click_Middle);
@@ -701,8 +795,10 @@ namespace Voxelgine.Engine {
 				Inventory.SelectNext();
 			else if (Wheel <= -1)
 				Inventory.SelectPrevious();
-			if ((Left || Right || Middle) && CursorDisabled) {
-				if (ActiveSelection != null) {
+			if ((Left || Right || Middle) && CursorDisabled)
+			{
+				if (ActiveSelection != null)
+				{
 					Vector3 Start = Position;
 					Vector3 Dir = GetForward();
 					InventoryClickEventArgs E = new InventoryClickEventArgs(Map, Start, Dir, MaxLen);
@@ -718,13 +814,17 @@ namespace Voxelgine.Engine {
 				}
 			}
 
-			if (!CursorDisabled) {
+			if (!CursorDisabled)
+			{
 				// FishUI tick is called by GameState.Draw2D
-			} else {
+			}
+			else
+			{
 				if (InMgr.IsInputPressed(InputKey.Q))
 					Inventory.SelectPrevious();
 
-				if (InMgr.IsInputPressed(InputKey.E)) {
+				if (InMgr.IsInputPressed(InputKey.E))
+				{
 					Vector3 Start = Position;
 					Vector3 End = Map.RaycastPos(Start, 1.5f, GetForward(), out Vector3 Face);
 
@@ -733,7 +833,8 @@ namespace Voxelgine.Engine {
 
 					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
 
-					if (Blk.Type == BlockType.CraftingTable) {
+					if (Blk.Type == BlockType.CraftingTable)
+					{
 						Console.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
 						return;
 					}
@@ -743,8 +844,10 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
-			if (LocalPlayer) {
+		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame)
+		{
+			if (LocalPlayer)
+			{
 
 				RenderTexture2D RT = Program.Window.ViewmodelRT;
 				Raylib.BeginTextureMode(RT);
@@ -773,11 +876,13 @@ namespace Voxelgine.Engine {
 				return;
 		}
 
-		public void AddOnKeyPressed(InputKey K, Action<OnKeyPressedEventArg> Act) {
+		public void AddOnKeyPressed(InputKey K, Action<OnKeyPressedEventArg> Act)
+		{
 			OnKeyFuncs.Add(K, Act);
 		}
 
-		public void Write(System.IO.BinaryWriter writer) {
+		public void Write(System.IO.BinaryWriter writer)
+		{
 			// Write position
 			writer.Write(Position.X);
 			writer.Write(Position.Y);
@@ -803,7 +908,8 @@ namespace Voxelgine.Engine {
 			writer.Write(CursorDisabled);
 		}
 
-		public void Read(System.IO.BinaryReader reader) {
+		public void Read(System.IO.BinaryReader reader)
+		{
 			// Read position
 			SetPosition(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()));
 			// Read camera angle
@@ -833,15 +939,18 @@ namespace Voxelgine.Engine {
 		public Vector3 GetLeft() => Left;
 		public Vector3 GetUp() => Up;
 
-		public void SetCamAngle(Vector3 CamAngle) {
+		public void SetCamAngle(Vector3 CamAngle)
+		{
 			FPSCamera.CamAngle = CamAngle;
 		}
 
-		public Vector3 GetCamAngle() {
+		public Vector3 GetCamAngle()
+		{
 			return FPSCamera.CamAngle;
 		}
 
-		public void UpdateFPSCamera(ref GameFrameInfo FInfo) {
+		public void UpdateFPSCamera(ref GameFrameInfo FInfo)
+		{
 			//Cam = FInfo.Cam;
 			//FPSCamera.Position = FInfo.Pos;
 
@@ -857,32 +966,51 @@ namespace Voxelgine.Engine {
 		public bool GetWasLastLegsOnFloor() => WasLastLegsOnFloor;
 
 		// Add back the PhysicsHit method (was present in Player, but was return; previously)
-		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump) {
+		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump)
+		{
 			Vector3 Fwd = FPSCamera.GetForward();
-			if (Walk) {
-				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350) {
+			if (Walk)
+			{
+				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350)
+				{
 					LastWalkSound = LegTimer.ElapsedMilliseconds;
 					Snd.PlayCombo("walk", FPSCamera.Position, Fwd, Pos);
 				}
-			} else if (Jump) {
-				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350) {
+			}
+			else if (Jump)
+			{
+				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350)
+				{
 					LastJumpSound = LegTimer.ElapsedMilliseconds;
 					Snd.PlayCombo("jump", FPSCamera.Position, Fwd, Pos);
 				}
-			} else if (Feet && !Side) {
-				if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350) {
+			}
+			else if (Feet && !Side)
+			{
+				if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350)
+				{
 					LastCrashSound = LegTimer.ElapsedMilliseconds;
-					if (Force < 4) {
-						Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
-					} else if (Force >= 4 && Force < 8) {
+					//if (Force < 4) {
+					Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
+					/*} else if (Force >= 4 && Force < 8) {
 						Snd.PlayCombo("crash2", FPSCamera.Position, Fwd, Pos);
 					} else if (Force >= 8) {
 						Snd.PlayCombo("crash3", FPSCamera.Position, Fwd, Pos);
-					}
+					}*/
 				}
-			} else {
+			}
+			else
+			{
 				// Console.WriteLine("Sid: {0}, Ft: {1}, F: {2}, W: {3}", Side, Feet, Force, Walk);
 			}
+		}
+
+		/// <summary>
+		/// Plays a sound combo at the specified position.
+		/// </summary>
+		public void PlaySound(string comboName, Vector3 soundPos)
+		{
+			Snd.PlayCombo(comboName, Position, GetForward(), soundPos);
 		}
 	}
 }

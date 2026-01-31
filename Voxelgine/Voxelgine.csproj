@@ -11,6 +11,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="data\sound\crash2\**" />
+    <Compile Remove="data\sound\crash3\**" />
+    <EmbeddedResource Remove="data\sound\crash2\**" />
+    <EmbeddedResource Remove="data\sound\crash3\**" />
+    <None Remove="data\sound\crash2\**" />
+    <None Remove="data\sound\crash3\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Engine\Entities\VEntPlayer.cs" />
   </ItemGroup>
 
@@ -26,15 +35,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="data\sound\crash1\crash1.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="data\sound\crash2\crash1.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="data\sound\crash2\crash2.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="data\sound\crash3\crash1.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="data\sound\jump\jump1.wav">

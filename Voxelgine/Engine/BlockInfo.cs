@@ -81,6 +81,7 @@ namespace Voxelgine.Engine {
 
 		public static bool EmitsLight(BlockType T) {
 			switch (T) {
+				case BlockType.Campfire:
 				case BlockType.Glowstone:
 					return true;
 

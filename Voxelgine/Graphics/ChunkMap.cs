@@ -171,15 +171,29 @@ namespace Voxelgine.Graphics {
 						affectedChunks.Add(ChunkIndex + new Vector3(xOffset, yOffset, zOffset));
 
 			foreach (var chunkPos in affectedChunks)
-				if (Chunks.TryGetValue(chunkPos, out var chunk))
-					chunk.MarkDirty();
+					if (Chunks.TryGetValue(chunkPos, out var chunk))
+						chunk.MarkDirty();
 
-			if (!Chunks.ContainsKey(ChunkIndex))
-				Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
+				if (!Chunks.ContainsKey(ChunkIndex))
+					Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
 
-			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
-			targetChunk.SetBlock(XX, YY, ZZ, Block);
-		}
+				Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+				targetChunk.SetBlock(XX, YY, ZZ, Block);
+
+				// Recompute lighting if a light-emitting or light-blocking block was placed/removed
+				bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
+										   Block.Type == BlockType.None || // Block removed
+										   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
+
+				if (needsLightingUpdate) {
+					// Recompute lighting for affected chunks
+					foreach (var chunkPos in affectedChunks) {
+						if (Chunks.TryGetValue(chunkPos, out var chunk)) {
+							chunk.ComputeLighting();
+						}
+					}
+				}
+			}
 
 		public void SetBlock(int X, int Y, int Z, BlockType T) => SetPlacedBlock(X, Y, Z, new PlacedBlock(T));
 

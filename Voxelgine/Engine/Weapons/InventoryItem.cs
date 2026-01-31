@@ -160,7 +160,7 @@ namespace Voxelgine.Engine {
 		public virtual void DestroyBlock(ChunkMap Map, Vector3 Start, Vector3 Dir, float MaxLen) {
 			Utils.Raycast(Start, Dir, MaxLen, (X, Y, Z, Face) => {
 				if (Map.GetBlock(X, Y, Z) != BlockType.None) {
-					//Snd.PlayCombo("block_break", Start, Dir, new Vector3(X, Y, Z));
+					ParentPlayer.PlaySound("block_break", new Vector3(X, Y, Z));
 					Map.SetBlock(X, Y, Z, BlockType.None);
 					return true;
 				}
@@ -187,7 +187,7 @@ namespace Voxelgine.Engine {
 					X += (int)Face.X;
 					Y += (int)Face.Y;
 					Z += (int)Face.Z;
-					//Snd.PlayCombo("block_place", Start, Dir, new Vector3(X, Y, Z));
+					ParentPlayer.PlaySound("block_place", new Vector3(X, Y, Z));
 					Map.SetBlock(X, Y, Z, BlockType);
 					return true;
 				}

@@ -50,8 +50,8 @@ namespace RaylibGame.Engine {
 			LoadCombo("walk", "data/sound/walk/walk{0}.wav", 5, 0.1f);
 			LoadCombo("jump", "data/sound/jump/jump{0}.wav", 1, 0.5f);
 			LoadCombo("crash1", "data/sound/crash1/crash{0}.wav", 1, 0.4f);
-			LoadCombo("crash2", "data/sound/crash2/crash{0}.wav", 2, 0.6f);
-			LoadCombo("crash3", "data/sound/crash3/crash{0}.wav", 1, 0.8f);
+			//LoadCombo("crash2", "data/sound/crash2/crash{0}.wav", 2, 0.6f);
+			//LoadCombo("crash3", "data/sound/crash3/crash{0}.wav", 1, 0.8f);
 
 			LoadCombo("block_place", "data/sound/block/place{0}.wav", 1, 1.0f);
 			LoadCombo("block_break", "data/sound/block/break{0}.wav", 1, 1.0f);

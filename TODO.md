@@ -33,10 +33,10 @@ A list of planned features, improvements, and tasks for this project.
 | **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
 | **Player** | ✅ | `Player`, `FPSCamera`, `ViewModel`, inventory system |
 | **Weapons** | ✅ | `Weapon`, `WeaponGun`, `WeaponPicker`, `InventoryItem` |
-| **GUI** | 🔶 | FishUI: MainMenuState, GameState, Player HUD migrated. Old GUI code still present for removal. |
+| **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls (`FishUIItemBox`, `FishUIInventory`, `FishUIInfoLabel`) |
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
 | **Animation** | 🔶 | `AnimLerp`, `LerpManager`, easing functions |
-| **Physics** | 🔶 | `AABB`, `PhysData`, collision in `EntityManager` and `Player` |
+| **Physics** | 🔶 | `AABB`, `PhysData`, `PhysicsUtils` with shared collision utilities; used by `EntityManager` and `Player` |
 | **NPC/AI** | ⬜ | Basic `VEntNPC` exists, no AI/pathfinding |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented |
@@ -49,20 +49,18 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **GUI: Remove old GUI code** — Delete old GUIManager, GUIWindow, GUIButton, etc. files now that FishUI migration is complete **[CPX: 2]**
+- [ ] **Centralized Physics System** — Migrate Player to use `PhysicsUtils` for shared collision functions **[CPX: 3]**
 
 ### Medium Priority
 
-- [ ] **Centralized Physics System** — Consolidate collision detection from `Player` and `EntityManager` into a unified physics system **[CPX: 4]**
 - [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
 
 ### Lower Priority
 
-- [ ] **Voxel World: Procedural buildings/structures**
+- [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
 - [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
-**[CPX: 3]**
-- [ ] **Graphics: Lighting
+- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
 - [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
@@ -71,7 +69,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Improvements
 
-- [ ] **GUI: Complete element set** — Ensure all standard elements (Window, Button, Label, Input, Image) are fully functional and styled consistently **[CPX: 2]**
+*No improvement items*
 
 ---
 
@@ -99,7 +97,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Buttons on the main menu do not have the right border, clipping issue?
+- Main menu should display the game logo, a big image
 
 ---
 

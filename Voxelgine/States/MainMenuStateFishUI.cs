@@ -41,18 +41,19 @@ namespace RaylibGame.States {
             };
 
             // Create buttons using StackLayout for automatic positioning
+            float buttonWidth = 200;
             var buttonStack = new StackLayout {
                 Orientation = StackOrientation.Vertical,
                 Spacing = 8,
-                Position = new Vector2(20, 10),
-                Size = new Vector2(windowSize.X - 60, windowSize.Y - 80),
+                Position = new Vector2((windowSize.X - buttonWidth - 40) / 2, 10),
+                Size = new Vector2(buttonWidth, windowSize.Y - 80),
                 IsTransparent = true
             };
 
             // New Game button
             var btnNewGame = new Button {
                 Text = "New Game",
-                Size = new Vector2(windowSize.X - 60, 50)
+                Size = new Vector2(buttonWidth, 50)
             };
             btnNewGame.Clicked += (sender, args) => {
                 Program.Window.SetState(Program.GameState);
@@ -61,7 +62,7 @@ namespace RaylibGame.States {
             // Options button
             var btnOptions = new Button {
                 Text = "Options",
-                Size = new Vector2(windowSize.X - 60, 50)
+                Size = new Vector2(buttonWidth, 50)
             };
             btnOptions.Clicked += (sender, args) => {
                 _optionsWindow.Visible = true;
@@ -71,7 +72,7 @@ namespace RaylibGame.States {
             // Quit button
             var btnQuit = new Button {
                 Text = "Quit",
-                Size = new Vector2(windowSize.X - 60, 50)
+                Size = new Vector2(buttonWidth, 50)
             };
             btnQuit.Clicked += (sender, args) => {
                 Program.Window.Close();
@@ -80,7 +81,7 @@ namespace RaylibGame.States {
             // OS Info button
             var btnInfo = new Button {
                 Text = "OS: " + Voxelgine.Utils.GetOSName(),
-                Size = new Vector2(windowSize.X - 60, 50)
+                Size = new Vector2(buttonWidth, 50)
             };
             btnInfo.Clicked += (sender, args) => {
                 Console.WriteLine("Running on {0}", Voxelgine.Utils.GetOSName());

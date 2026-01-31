@@ -8,6 +8,7 @@ namespace Voxelgine.GUI {
     /// <summary>
     /// FishUI-based item box control for inventory display.
     /// Displays an icon with optional count text in the corner.
+    /// Supports atlas regions via UV coordinates.
     /// </summary>
     public class FishUIItemBox : Control {
         public bool IsSelected { get; set; }
@@ -21,6 +22,12 @@ namespace Voxelgine.GUI {
         private ImageRef _backgroundSelected;
         private float _iconScale = 2.0f;
         private bool _hasIcon;
+
+        // Atlas region support
+        private bool _useAtlasRegion;
+        private Vector2 _uvPos;
+        private Vector2 _uvSize;
+        private Texture2D _atlasTexture;
 
         public event Action<FishUIItemBox> OnItemClicked;
 
@@ -42,6 +49,7 @@ namespace Voxelgine.GUI {
             ui.Graphics.SetImageFilter(_icon, true);
             _iconScale = scale;
             _hasIcon = true;
+            _useAtlasRegion = false;
         }
 
         public void SetIcon(global::FishUI.FishUI ui, ImageRef icon, float scale) {
@@ -49,15 +57,29 @@ namespace Voxelgine.GUI {
             ui.Graphics.SetImageFilter(_icon, true);
             _iconScale = scale;
             _hasIcon = true;
+            _useAtlasRegion = false;
+        }
+
+        /// <summary>
+        /// Sets an icon from an atlas texture with UV coordinates.
+        /// </summary>
+        /// <param name="atlasTexture">The atlas texture</param>
+        /// <param name="scale">Scale factor for drawing</param>
+        /// <param name="uvPos">UV position (normalized 0-1)</param>
+        /// <param name="uvSize">UV size (normalized 0-1)</param>
+        public void SetIcon(Texture2D atlasTexture, float scale, Vector2 uvPos, Vector2 uvSize) {
+            _atlasTexture = atlasTexture;
+            _iconScale = scale;
+            _uvPos = uvPos;
+            _uvSize = uvSize;
+            _hasIcon = true;
+            _useAtlasRegion = true;
+            Raylib.SetTextureFilter(atlasTexture, TextureFilter.Point);
         }
 
         public void SetItem(FishUIInventory parent, InventoryItem item) {
             ParentInventory = parent;
             Item = item;
-            // Let the item set up this box if it has a method for it
-            if (item != null) {
-                // Items will need to call SetIcon directly
-            }
         }
 
         public override void DrawControl(global::FishUI.FishUI UI, float Dt, float Time) {
@@ -77,13 +99,31 @@ namespace Voxelgine.GUI {
             }
 
             // Draw icon
-            if (_hasIcon && _icon.Userdata != null) {
-                float iconDrawSize = Math.Min(size.X, size.Y) * 0.7f;
-                var iconPos = pos + (size - new Vector2(iconDrawSize)) / 2;
-
+            if (_hasIcon) {
                 float tint = IsMousePressed ? 0.7f : 1.0f;
-                var tintColor = new FishColor((byte)(255 * tint), (byte)(255 * tint), (byte)(255 * tint), 255);
-                gfx.DrawImage(_icon, iconPos, new Vector2(iconDrawSize), 0, 1, tintColor);
+                byte tintByte = (byte)(255 * tint);
+                var tintColor = new Color(tintByte, tintByte, tintByte, (byte)255);
+
+                if (_useAtlasRegion && _atlasTexture.Id != 0) {
+                    // Draw from atlas using UV coordinates
+                    float srcX = _uvPos.X * _atlasTexture.Width;
+                    float srcY = _uvPos.Y * _atlasTexture.Height;
+                    float srcW = _uvSize.X * _atlasTexture.Width;
+                    float srcH = _uvSize.Y * _atlasTexture.Height;
+
+                    float iconDrawSize = Math.Min(size.X, size.Y) * 0.75f;
+                    var iconPos = pos + (size - new Vector2(iconDrawSize)) / 2;
+
+                    Rectangle source = new Rectangle(srcX, srcY, srcW, srcH);
+                    Rectangle dest = new Rectangle(iconPos.X, iconPos.Y, iconDrawSize, iconDrawSize);
+                    Raylib.DrawTexturePro(_atlasTexture, source, dest, Vector2.Zero, 0, tintColor);
+                } else if (_icon.Userdata != null) {
+                    // Draw regular image
+                    float iconDrawSize = Math.Min(size.X, size.Y) * 0.7f;
+                    var iconPos = pos + (size - new Vector2(iconDrawSize)) / 2;
+                    var fishColor = new FishColor(tintColor.R, tintColor.G, tintColor.B, tintColor.A);
+                    gfx.DrawImage(_icon, iconPos, new Vector2(iconDrawSize), 0, 1, fishColor);
+                }
             }
 
             // Update text from item if needed

@@ -30,53 +30,19 @@ namespace Voxelgine.Engine {
 			GameState GS = Ent.GetGameState();
 			ChunkMap map = GS.Map;
 
-			const float Gravity = 9.81f;
 			// Apply gravity
-			Ent.Velocity.Y -= Gravity * Dt;
-			// Try to move entity by velocity, axis by axis (AABB sweep)
-			Vector3 newPos = Ent.Position;
-			Vector3 move = Ent.Velocity * Dt;
-			// X axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X + move.X, newPos.Y, newPos.Z), Ent.Size))
-				newPos.X += move.X;
-			else
-				Ent.Velocity.X = 0;
-			// Y axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z), Ent.Size))
-				newPos.Y += move.Y;
-			else {
-				Ent.Velocity.Y = 0;
-			}
-			// Z axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z), Ent.Size))
-				newPos.Z += move.Z;
-			else
-				Ent.Velocity.Z = 0;
+			PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
 
-			Ent.Position = newPos;
+			// Move with axis-separated collision
+			Ent.Position = PhysicsUtils.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
-			// --- Player collision check ---
-			// TODO: Use Player.BBox 
-			if (GS != null && GS.Ply != null) {
-				// Player AABB
-				Vector3 playerFeet = GS.Ply.Position - new Vector3(0, Player.PlayerEyeOffset, 0);
-				Vector3 playerMin = new Vector3(
-					playerFeet.X - Player.PlayerRadius,
-					playerFeet.Y,
-					playerFeet.Z - Player.PlayerRadius
-				);
-				Vector3 playerMax = new Vector3(
-					playerFeet.X + Player.PlayerRadius,
-					playerFeet.Y + Player.PlayerHeight,
-					playerFeet.Z + Player.PlayerRadius
-				);
-				// Entity AABB
-				Vector3 entMin = Ent.Position;
-				Vector3 entMax = Ent.Position + Ent.Size;
-				bool touching =
-					entMin.X <= playerMax.X && entMax.X >= playerMin.X &&
-					entMin.Y <= playerMax.Y && entMax.Y >= playerMin.Y &&
-					entMin.Z <= playerMax.Z && entMax.Z >= playerMin.Z;
+			// --- Player collision check using AABB ---
+			if (GS?.Ply != null) {
+				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(GS.Ply.Position);
+				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
+
+				bool touching = playerAABB.Overlaps(entityAABB);
+
 				if (touching && !Ent._WasPlayerTouching) {
 					Ent.OnPlayerTouch(GS.Ply);
 					Ent._WasPlayerTouching = true;

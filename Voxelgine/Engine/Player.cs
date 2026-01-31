@@ -744,11 +744,8 @@ namespace Voxelgine.Engine {
 			Itm.UpdateTextFromItem = true;
 			Itm.Item = InvItem;
 
-			// Set up icon from item
-			string iconPath = InvItem.GetIconPath();
-			if (!string.IsNullOrEmpty(iconPath)) {
-				Itm.SetIcon(ui, iconPath, 2);
-			}
+			// Set up icon from item using atlas coordinates
+			InvItem.SetupFishUIItemBox(Itm);
 		}
 
 		public void TickGUI(InputMgr InMgr, ChunkMap Map) {

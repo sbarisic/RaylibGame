@@ -77,5 +77,48 @@ namespace Voxelgine.Engine {
 			Vector3 max = Vector3.Max(A.Position + A.Size, B.Position + B.Size);
 			return new AABB(min, max - min);
 		}
+
+		/// <summary>
+		/// Tests if two AABBs overlap.
+		/// </summary>
+		public bool Overlaps(AABB other) {
+			Vector3 aMin = Position;
+			Vector3 aMax = Position + Size;
+			Vector3 bMin = other.Position;
+			Vector3 bMax = other.Position + other.Size;
+
+			return aMin.X <= bMax.X && aMax.X >= bMin.X &&
+				   aMin.Y <= bMax.Y && aMax.Y >= bMin.Y &&
+				   aMin.Z <= bMax.Z && aMax.Z >= bMin.Z;
+		}
+
+		/// <summary>
+		/// Tests if two AABBs overlap (static version).
+		/// </summary>
+		public static bool Overlaps(AABB a, AABB b) {
+			return a.Overlaps(b);
+		}
+
+		/// <summary>
+		/// Creates an AABB from min/max corners.
+		/// </summary>
+		public static AABB FromMinMax(Vector3 min, Vector3 max) {
+			return new AABB(min, max - min);
+		}
+
+		/// <summary>
+		/// Gets the min corner of the AABB.
+		/// </summary>
+		public Vector3 Min => Position;
+
+		/// <summary>
+		/// Gets the max corner of the AABB.
+		/// </summary>
+		public Vector3 Max => Position + Size;
+
+		/// <summary>
+		/// Gets the center of the AABB.
+		/// </summary>
+		public Vector3 Center => Position + Size * 0.5f;
 	}
 }

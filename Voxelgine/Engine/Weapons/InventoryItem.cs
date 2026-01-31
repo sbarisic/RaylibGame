@@ -88,25 +88,15 @@ namespace Voxelgine.Engine {
 		}
 
 		/// <summary>
-		/// Gets the path to the icon image for FishUI-based inventory.
+		/// Sets up a FishUI item box with the correct icon from atlas textures.
 		/// </summary>
-		public virtual string GetIconPath() {
-			if (UseBlockIcon && BlockIcon != BlockType.None) {
-				// Return atlas texture path - FishUI controls will need to handle atlas regions
-				return "data/textures/atlas.png";
-			} else if (!UseBlockIcon && Icon != IconType.None) {
-				return "data/textures/items.png";
-			}
-			return null;
-		}
-
-		public virtual void SetupItemBox(GUIItemBox ItmBox) {
+		public virtual void SetupFishUIItemBox(FishUIItemBox itmBox) {
 			if (UseBlockIcon && BlockIcon != BlockType.None) {
 				BlockInfo.GetBlockTexCoords(BlockIcon, new Vector3(0, 1, 0), out Vector2 UVSize, out Vector2 UVPos);
-				ItmBox.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
+				itmBox.SetIcon(ResMgr.AtlasTexture, 0.092f, UVPos, UVSize);
 			} else if (!UseBlockIcon && Icon != IconType.None) {
 				BlockInfo.GetIconTexCoords(Icon, out Texture2D Texture, out Vector2 UVSize, out Vector2 UVPos, out float Scale);
-				ItmBox.SetIcon(Texture, Scale, UVPos, UVSize);
+				itmBox.SetIcon(Texture, Scale, UVPos, UVSize);
 			}
 		}
 

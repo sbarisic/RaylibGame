@@ -15,19 +15,31 @@ using FishUI.Controls;
 
 namespace Voxelgine.Engine
 {
-	// TODO: Implement player as VEntity in class VEntPlayer
+	/// <summary>
+	/// Represents the player entity with first-person camera, physics, inventory, and input handling.
+	/// Implements Quake-style movement physics including strafe-jumping, bunny-hopping, and swimming.
+	/// </summary>
+	/// <remarks>
+	/// The player uses a separate physics position and interpolated render camera for smooth visuals.
+	/// Physics are updated at a fixed timestep while rendering interpolates between states.
+	/// </remarks>
 	public unsafe class Player
 	{
 		const bool DEBUG_PLAYER = true;
 
+		/// <summary>The physics camera used for game logic and collision.</summary>
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
-		public Camera3D RenderCam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective); // Interpolated camera for rendering only
+
+		/// <summary>The interpolated camera used for smooth rendering (updated each frame).</summary>
+		public Camera3D RenderCam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
 
 		FishUIManager GUI;
 
+		/// <summary>The first-person view model (weapon/tool) renderer.</summary>
 		public ViewModel ViewMdl;
 
 		bool NoClip;
+		/// <summary>When true, freezes the view frustum for debugging culling.</summary>
 		public bool FreezeFrustum = false;
 
 		Dictionary<InputKey, Action<OnKeyPressedEventArg>> OnKeyFuncs = new Dictionary<InputKey, Action<OnKeyPressedEventArg>>();
@@ -42,8 +54,11 @@ namespace Voxelgine.Engine
 		bool LocalPlayer;
 		SoundMgr Snd;
 
+		/// <summary>Player collision cylinder height in world units.</summary>
 		public const float PlayerHeight = 1.7f;
+		/// <summary>Eye position offset from feet (camera height).</summary>
 		public const float PlayerEyeOffset = 1.6f;
+		/// <summary>Player collision cylinder radius.</summary>
 		public const float PlayerRadius = 0.4f;
 		// TODO Implement bounding box calculation
 		public BoundingBox BBox;

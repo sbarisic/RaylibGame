@@ -11,8 +11,13 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine
 {
+	/// <summary>
+	/// Defines all block types in the voxel world.
+	/// Block types determine texture, transparency, solidity, and light emission.
+	/// </summary>
 	public enum BlockType : ushort
 	{
+		/// <summary>Empty/air block.</summary>
 		None,
 		Stone,
 		Dirt,
@@ -21,15 +26,19 @@ namespace Voxelgine.Engine
 		Bricks,
 		Plank,
 		EndStoneBrick,
+		/// <summary>Transparent solid block.</summary>
 		Ice,
 		Test,
 		Leaf,
+		/// <summary>Transparent non-solid block (swimmable).</summary>
 		Water,
+		/// <summary>Transparent solid block.</summary>
 		Glass,
+		/// <summary>Light-emitting block (emits level 15 light).</summary>
 		Glowstone,
 		Test2,
 
-		// Blocks with different sides go here
+		// Blocks with different sides (multi-texture) go here
 		Grass,
 		Wood,
 		CraftingTable,
@@ -37,6 +46,9 @@ namespace Voxelgine.Engine
 		Campfire
 	}
 
+	/// <summary>
+	/// Icon types for inventory items and GUI elements.
+	/// </summary>
 	public enum IconType : ushort
 	{
 		None,

@@ -11,12 +11,19 @@ using Voxelgine.Engine;
 
 namespace Voxelgine.Graphics
 {
+	/// <summary>
+	/// Represents a block placed in the world with its type and per-face lighting.
+	/// Each block stores 6 light values (one per face) supporting dual-channel lighting.
+	/// </summary>
 	public class PlacedBlock
 	{
+		/// <summary>The type of block (determines texture, transparency, solidity).</summary>
 		public BlockType Type;
-		//public OnBlockActivateFunc OnBlockActivate;
 
-		// Recalculated, always 6 (one per face direction)
+		/// <summary>
+		/// Light values for each face direction (6 total).
+		/// Each BlockLight contains skylight and blocklight channels.
+		/// </summary>
 		public BlockLight[] Lights;
 
 		public PlacedBlock(BlockType Type, BlockLight DefaultLight)

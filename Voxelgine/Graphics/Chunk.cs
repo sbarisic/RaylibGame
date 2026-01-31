@@ -20,9 +20,12 @@ namespace Voxelgine.Graphics
 	/// </summary>
 	public struct TransparentFace
 	{
-		public Vector3 Center;           // Center of face for distance calculation
-		public Vertex3[] Vertices;       // 6 vertices (2 triangles)
-		public float DistanceSquared;    // Cached distance for sorting
+		/// <summary>Center of face for distance calculation during depth sorting.</summary>
+		public Vector3 Center;
+		/// <summary>6 vertices forming 2 triangles for this face.</summary>
+		public Vertex3[] Vertices;
+		/// <summary>Cached squared distance from camera for sorting.</summary>
+		public float DistanceSquared;
 
 		public TransparentFace(Vector3 center, Vertex3[] vertices)
 		{
@@ -37,12 +40,24 @@ namespace Voxelgine.Graphics
 		}
 	}
 
+	/// <summary>
+	/// A 16³ block container that manages block storage, mesh generation, and rendering.
+	/// Uses separate meshes for opaque and transparent blocks for correct rendering order.
+	/// </summary>
+	/// <remarks>
+	/// Chunks cache their meshes and only rebuild when marked dirty. Transparent faces
+	/// are stored separately for per-frame depth sorting against the camera position.
+	/// </remarks>
 	public unsafe class Chunk
 	{
+		/// <summary>Number of blocks per chunk dimension (16³ = 4096 blocks per chunk).</summary>
 		public const int ChunkSize = 16;
+		/// <summary>Size of each block in world units.</summary>
 		public const float BlockSize = 1;
+		/// <summary>Number of textures per row in the texture atlas.</summary>
 		public const int AtlasSize = 16;
 
+		/// <summary>Block data array indexed as [X + ChunkSize * (Y + ChunkSize * Z)].</summary>
 		public PlacedBlock[] Blocks;
 		bool Dirty;
 

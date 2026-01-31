@@ -12,9 +12,20 @@ using System.Threading.Tasks;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
+	/// <summary>
+	/// Base class for all voxel world entities. Provides position, velocity, size,
+	/// model rendering, and integration with the EntityManager physics system.
+	/// </summary>
+	/// <remarks>
+	/// Subclasses should override <see cref="OnPlayerTouch"/> for interaction,
+	/// <see cref="UpdateLockstep"/> for physics/logic, and <see cref="Draw3D"/> for custom rendering.
+	/// </remarks>
 	public abstract class VoxEntity {
+		/// <summary>World position of the entity (bottom-center for physics).</summary>
 		public Vector3 Position;
+		/// <summary>Entity bounding box size for collision.</summary>
 		public Vector3 Size;
+		/// <summary>Current velocity (updated by EntityManager physics).</summary>
 		public Vector3 Velocity;
 
 		protected bool HasModel;

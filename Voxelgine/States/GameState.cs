@@ -14,6 +14,14 @@ using FishUI.Controls;
 
 namespace RaylibGame.States
 {
+	/// <summary>
+	/// Main gameplay state handling the voxel world, player, entities, and rendering.
+	/// Manages the game loop including physics updates, input handling, and drawing.
+	/// </summary>
+	/// <remarks>
+	/// GameState owns the ChunkMap (world), Player, EntityManager, ParticleSystem, and GUI.
+	/// It handles save/load functionality and coordinates between all game systems.
+	/// </remarks>
 	public unsafe class GameState : GameStateImpl
 	{
 		private const string MAP_FILE = "data/map.bin";
@@ -24,21 +32,25 @@ namespace RaylibGame.States
 		Vector3 NPCPos = new Vector3(32, 66, 14);
 		Vector3 PlayerPos = new Vector3(32, 73, 19);
 
+		/// <summary>The voxel world chunk manager.</summary>
 		public ChunkMap Map
 		{
 			get; private set;
 		}
 
+		/// <summary>The local player instance.</summary>
 		public Player Ply
 		{
 			get; private set;
 		}
 
+		/// <summary>Positional audio manager.</summary>
 		public SoundMgr Snd
 		{
 			get; private set;
 		}
 
+		/// <summary>Particle effect system.</summary>
 		public ParticleSystem Particle
 		{
 			get; private set;

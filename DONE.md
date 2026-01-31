@@ -29,6 +29,12 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 ---
 
+## Documentation
+
+- **Full codebase documentation** — Updated README.md with comprehensive architecture, controls, and project status; added XML documentation to core classes (Player, VoxEntity, ChunkMap, Chunk, PlacedBlock, BlockInfo, GameState, PhysicsUtils, FishUIManager)
+
+---
+
 ## Bug Fixes
 
 - **Particle System** — Fixed depth ordering and underwater rendering (physics resistance, blue tint)

@@ -73,10 +73,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Documentation
 
-### High Priority
-
-- [ ] **Full codebase documentation** — Analyze all code, add documentation comments, and update README.md with current architecture **[CPX: 4]**
-
 ### Lower Priority
 
 - [ ] API reference documentation

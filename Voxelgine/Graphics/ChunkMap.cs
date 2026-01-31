@@ -11,6 +11,18 @@ using System.Data;
 
 namespace Voxelgine.Graphics
 {
+	/// <summary>
+	/// Manages the voxel world as a collection of chunks stored in a spatial hash grid.
+	/// Provides world generation, block access, collision queries, lighting computation,
+	/// and rendering with frustum culling.
+	/// </summary>
+	/// <remarks>
+	/// Each chunk is 16³ blocks. The ChunkMap handles:
+	/// - Procedural floating island generation via simplex noise
+	/// - Block placement/removal with automatic lighting updates
+	/// - Serialization (save/load) with GZip compression
+	/// - Transparent block rendering with depth sorting
+	/// </remarks>
 	public unsafe class ChunkMap
 	{
 		SpatialHashGrid<Chunk> Chunks;

@@ -22,12 +22,13 @@ namespace Voxelgine.Engine {
 		public float Gravity { get; set; } = 15.0f;
 
 		// Swimming (Quake-style)
-		public float WaterAccel { get; set; } = 10.0f;      // Acceleration in water
-		public float WaterFriction { get; set; } = 4.0f;    // Water drag/friction
-		public float MaxWaterSpeed { get; set; } = 4.0f;    // Max swimming speed
-		public float WaterGravity { get; set; } = 2.0f;     // Reduced gravity in water
-		public float WaterJumpImpulse { get; set; } = 4.5f; // Jump out of water impulse
-		public float WaterSinkSpeed { get; set; } = 1.0f;   // How fast player sinks when not moving
+			public float WaterAccel { get; set; } = 10.0f;      // Acceleration in water
+			public float WaterFriction { get; set; } = 4.0f;    // Water drag/friction
+			public float MaxWaterSpeed { get; set; } = 4.0f;    // Max swimming speed
+			public float WaterGravity { get; set; } = 2.0f;     // Reduced gravity in water (when head above)
+			public float WaterJumpImpulse { get; set; } = 4.5f; // Jump out of water impulse
+			public float WaterSinkSpeed { get; set; } = 0.3f;   // How fast player sinks when not moving (reduced for buoyancy)
+			public float WaterBuoyancy { get; set; } = 1.5f;    // Upward buoyancy force when submerged
 
 		// Misc
 		public float ClampHyst { get; set; } = 0.001f;

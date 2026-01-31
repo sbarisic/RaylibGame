@@ -435,22 +435,31 @@ namespace Voxelgine.Engine
 				}
 
 				// --- Apply reduced gravity (sink slowly if not actively swimming) ---
-				bool activelySwimming = wishdir != Vector3.Zero;
+					bool activelySwimming = wishdir != Vector3.Zero;
 
-				// --- Play swimming sound when actively moving in water ---
-				if (activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
+					// --- Play swimming sound when actively moving in water ---
+					if (activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
+					{
+						LastSwimSound = LegTimer.ElapsedMilliseconds;
+						Vector3 Fwd = FPSCamera.GetForward();
+						Snd.PlayCombo("swim", FPSCamera.Position, Fwd, Position);
+					}
+
+					// --- Apply buoyancy and gravity in water ---
+					if (headInWater)
 				{
-					LastSwimSound = LegTimer.ElapsedMilliseconds;
-					Vector3 Fwd = FPSCamera.GetForward();
-					Snd.PlayCombo("swim", FPSCamera.Position, Fwd, Position);
-				}
+					// When fully submerged: apply buoyancy (upward force) countered by gentle sinking
+					// Net effect: player floats slowly upward or stays neutral
+					float netBuoyancy = PhysicsData.WaterBuoyancy - PhysicsData.WaterSinkSpeed;
+					PlyVelocity.Y += netBuoyancy * Dt;
 
-				if (!activelySwimming && headInWater)
-			{
-				// Player sinks slowly when not moving in water
-				PlyVelocity.Y -= PhysicsData.WaterSinkSpeed * Dt;
-			}
-			else if (!headInWater)
+					// Dampen vertical velocity more when not actively swimming (water resistance)
+					if (!activelySwimming)
+					{
+						PlyVelocity.Y *= (1.0f - PhysicsData.WaterFriction * 0.5f * Dt);
+					}
+				}
+				else
 			{
 				// Head above water - apply normal gravity but reduced
 				PhysicsUtils.ApplyGravity(ref PlyVelocity, PhysicsData.WaterGravity, Dt);

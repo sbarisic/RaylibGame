@@ -49,13 +49,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
 
 ### Medium Priority
 
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **NPC Animation System** — Add animation support for NPCs (walking, attacking, crouching, lying down) **[CPX: 3]**
-- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
 
 ### Lower Priority
 

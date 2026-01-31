@@ -49,20 +49,20 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **GUI: Replace with FishUI** — Replace existing GUI system (`GUIManager`, `GUIWindow`, `GUIButton`, etc.) with FishUI **[CPX: 4]**
 
 ### Medium Priority
 
-- [ ] **Voxel World: Procedural buildings/structures** — Generate structures on the island using prefabs or procedural rules **[CPX: 4]**
 - [ ] **Centralized Physics System** — Consolidate collision detection from `Player` and `EntityManager` into a unified physics system **[CPX: 4]**
-- [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
-- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
-- [ ] **Pathfinding: Air navigation** — 3D pathfinding for flying entities **[CPX: 3]**
+- [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
 
 ### Lower Priority
 
+- [ ] - [ ] **Voxel World: Procedural buildings/structures** — Generate structures on the island using prefabs or procedural rules **[CPX: 4]**
+- [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
+- [ ] **Pathfinding: Air navigation** — 3D pathfinding for flying entities **[CPX: 3
 - [ ] **Graphics: Lighting system enhancements** — Improve the existing `ComputeLighting` with dynamic lights, shadows **[CPX: 4]**
-- [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
 - [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
@@ -87,7 +87,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-*No refactoring items*
+*No Code Refactoring items*
 
 ---
 
@@ -116,28 +116,4 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Completed
 
-### Features
-
-- [x] **Voxel World: Procedurally generated island** — Simplex noise based terrain generation
-- [x] **Voxel World: Transparent blocks** — Support for transparent block rendering
-- [x] **GUI System: Core elements** — Window, Button, Label, Input, Image elements implemented
-- [x] **Entity System: Pickup entity** — `VEntPickup` for weapons, ammo, armor pickups
-- [x] **Entity System: NPC entity** — `VEntNPC` base class exists
-- [x] **Animation System: Base lerp system** — `AnimLerp`, `LerpManager` with easing functions
-- [x] **Unit Testing** — Tests for AABB, Easing, Utils, Noise (made Easing class public)
-- [x] **Quake-like player movement** — Strafe-jumping, bunny-hopping, air control via proper Quake acceleration model
-- [x] **Voxel World: Real-time block creation/destruction** — Left-click destroy, right-click place with automatic mesh rebuilding
-- [x] **Collision: Quake-style clip velocity** — ClipVelocity slides along surfaces preserving momentum, multi-plane clipping for corners
-- [x] **Rendering: Frame interpolation** — Interpolated camera, position, and view model between physics frames for smooth rendering
-- [x] **Block Placement Preview** — Wireframe outline showing where block would be placed when holding a block item
-
-### Improvements
-
-- [x] **Animation: Easing functions expansion** — Extended `Easing` with Quad, Cubic, Quart, Quint, Sine, Expo, Circ, Back, Elastic, Bounce (In/Out/InOut)
-
-### Fixed Bugs
-
-- [x] **Particle System: Depth ordering** — Sorted particles back-to-front for proper alpha blending
-- [x] **Particle System: Underwater rendering** — Particles now detect water, apply physics resistance and blue tint
-- [x] **Unit Test: Noise seed test** — Fixed test using larger coordinates for seed differentiation
-- [x] **Transparent blocks: Depth sorting** — Water/glass now render correctly when overlapping via face-level depth sorting
+See [DONE.md](DONE.md) for completed items.

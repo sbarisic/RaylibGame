@@ -9,8 +9,10 @@ using Voxelgine.Engine;
 using RaylibGame.States;
 using System.Data;
 
-namespace Voxelgine.Graphics {
-	public unsafe class ChunkMap {
+namespace Voxelgine.Graphics
+{
+	public unsafe class ChunkMap
+	{
 		SpatialHashGrid<Chunk> Chunks;
 		Random Rnd = new Random();
 
@@ -29,17 +31,21 @@ namespace Voxelgine.Graphics {
 		Material TransparentMaterial;
 		bool TransparentMeshInitialized = false;
 
-		public ChunkMap(GameState GS) {
+		public ChunkMap(GameState GS)
+		{
 			Chunks = new SpatialHashGrid<Chunk>(1);
 		}
 
-		public void Write(Stream Output) {
+		public void Write(Stream Output)
+		{
 			using (GZipStream ZipStream = new GZipStream(Output, CompressionMode.Compress, true))
-			using (var Writer = new System.IO.BinaryWriter(ZipStream)) {
+			using (var Writer = new System.IO.BinaryWriter(ZipStream))
+			{
 				var ChunksArray = Chunks.Items.ToArray();
 				Writer.Write(ChunksArray.Length);
 
-				foreach (var chunk in ChunksArray) {
+				foreach (var chunk in ChunksArray)
+				{
 					Writer.Write((int)chunk.Key.X);
 					Writer.Write((int)chunk.Key.Y);
 					Writer.Write((int)chunk.Key.Z);
@@ -49,12 +55,15 @@ namespace Voxelgine.Graphics {
 			}
 		}
 
-		public void Read(System.IO.Stream Input) {
+		public void Read(System.IO.Stream Input)
+		{
 			using (GZipStream ZipStream = new GZipStream(Input, CompressionMode.Decompress, true))
-			using (var Reader = new System.IO.BinaryReader(ZipStream)) {
+			using (var Reader = new System.IO.BinaryReader(ZipStream))
+			{
 				int Count = Reader.ReadInt32();
 
-				for (int i = 0; i < Count; i++) {
+				for (int i = 0; i < Count; i++)
+				{
 					int CX = Reader.ReadInt32();
 					int CY = Reader.ReadInt32();
 					int CZ = Reader.ReadInt32();
@@ -75,13 +84,16 @@ namespace Voxelgine.Graphics {
 		/// Marks all chunks as dirty, forcing mesh rebuild on next draw.
 		/// Useful when global rendering settings change (e.g., fullbright mode).
 		/// </summary>
-		public void MarkAllChunksDirty() {
-			foreach (var chunk in Chunks.Values) {
+		public void MarkAllChunksDirty()
+		{
+			foreach (var chunk in Chunks.Values)
+			{
 				chunk.MarkDirty();
 			}
 		}
 
-		public void GenerateFloatingIsland(int Width, int Length, int Seed = 666) {
+		public void GenerateFloatingIsland(int Width, int Length, int Seed = 666)
+		{
 			Noise.Seed = Seed;
 			float Scale = 0.02f;
 			int WorldHeight = 64;
@@ -91,7 +103,8 @@ namespace Voxelgine.Graphics {
 
 			for (int x = 0; x < Width; x++)
 				for (int z = 0; z < Length; z++)
-					for (int y = 0; y < WorldHeight; y++) {
+					for (int y = 0; y < WorldHeight; y++)
+					{
 
 						Vector3 Pos = new Vector3(x, (WorldHeight - y), z);
 
@@ -105,7 +118,8 @@ namespace Voxelgine.Graphics {
 						float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
 						float Density = Simplex(2, x, y * 0.5f, z, Scale) * CenterFalloff * HeightFalloff;
 
-						if (Density > 0.1f) {
+						if (Density > 0.1f)
+						{
 							float Caves = Simplex(1, x, y, z, Scale * 4) * HeightFalloff;
 							if (Caves < 0.65f)
 								SetBlock(x, y, z, BlockType.Stone);
@@ -113,10 +127,13 @@ namespace Voxelgine.Graphics {
 					}
 
 			for (int x = 0; x < Width; x++)
-				for (int z = 0; z < Length; z++) {
+				for (int z = 0; z < Length; z++)
+				{
 					int DownRayHits = 0;
-					for (int y = WorldHeight - 1; y >= 0; y--) {
-						if (GetBlock(x, y, z) != BlockType.None) {
+					for (int y = WorldHeight - 1; y >= 0; y--)
+					{
+						if (GetBlock(x, y, z) != BlockType.None)
+						{
 							DownRayHits++;
 
 							if (DownRayHits == 1)
@@ -124,7 +141,8 @@ namespace Voxelgine.Graphics {
 							else if (DownRayHits < 5)
 								SetBlock(x, y, z, BlockType.Dirt);
 
-						} else if (DownRayHits != 0)
+						}
+						else if (DownRayHits != 0)
 							break;
 					}
 				}
@@ -132,7 +150,8 @@ namespace Voxelgine.Graphics {
 			ComputeLighting();
 		}
 
-		float Simplex(int Octaves, float X, float Y, float Z, float Scale) {
+		float Simplex(int Octaves, float X, float Y, float Z, float Scale)
+		{
 			float Val = 0.0f;
 
 			for (int i = 0; i < Octaves; i++)
@@ -141,7 +160,8 @@ namespace Voxelgine.Graphics {
 			return (Val / Octaves) / 255;
 		}
 
-		public void SetPlacedBlock(int X, int Y, int Z, PlacedBlock Block) {
+		public void SetPlacedBlock(int X, int Y, int Z, PlacedBlock Block)
+		{
 			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
 
 			int XX = (int)BlockPos.X, YY = (int)BlockPos.Y, ZZ = (int)BlockPos.Z;
@@ -171,33 +191,52 @@ namespace Voxelgine.Graphics {
 						affectedChunks.Add(ChunkIndex + new Vector3(xOffset, yOffset, zOffset));
 
 			foreach (var chunkPos in affectedChunks)
+				if (Chunks.TryGetValue(chunkPos, out var chunk))
+					chunk.MarkDirty();
+
+			if (!Chunks.ContainsKey(ChunkIndex))
+				Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
+
+			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+			targetChunk.SetBlock(XX, YY, ZZ, Block);
+
+			// Recompute lighting if a light-emitting or light-blocking block was placed/removed
+			bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
+									   Block.Type == BlockType.None || // Block removed
+									   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
+
+			if (needsLightingUpdate)
+			{
+				// Recompute lighting for affected chunks
+				foreach (var chunkPos in affectedChunks)
+				{
 					if (Chunks.TryGetValue(chunkPos, out var chunk))
-						chunk.MarkDirty();
-
-				if (!Chunks.ContainsKey(ChunkIndex))
-					Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
-
-				Chunks.TryGetValue(ChunkIndex, out var targetChunk);
-				targetChunk.SetBlock(XX, YY, ZZ, Block);
-
-				// Recompute lighting if a light-emitting or light-blocking block was placed/removed
-				bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
-										   Block.Type == BlockType.None || // Block removed
-										   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
-
-				if (needsLightingUpdate) {
-					// Recompute lighting for affected chunks
-					foreach (var chunkPos in affectedChunks) {
-						if (Chunks.TryGetValue(chunkPos, out var chunk)) {
-							chunk.ComputeLighting();
-						}
+					{
+						chunk.ComputeLighting();
 					}
 				}
 			}
+		}
+
+		/// <summary>
+		/// Sets a block without triggering lighting recalculation.
+		/// Used during light propagation to avoid infinite recursion.
+		/// </summary>
+		public void SetPlacedBlockNoLighting(int X, int Y, int Z, PlacedBlock Block)
+		{
+			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
+
+			if (!Chunks.ContainsKey(ChunkIndex))
+				return; // Don't create chunks during light propagation
+
+			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+			targetChunk.SetBlock((int)BlockPos.X, (int)BlockPos.Y, (int)BlockPos.Z, Block);
+		}
 
 		public void SetBlock(int X, int Y, int Z, BlockType T) => SetPlacedBlock(X, Y, Z, new PlacedBlock(T));
 
-		public PlacedBlock GetPlacedBlock(int X, int Y, int Z, out Chunk Chk) {
+		public PlacedBlock GetPlacedBlock(int X, int Y, int Z, out Chunk Chk)
+		{
 			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
 			if (Chunks.TryGetValue(ChunkIndex, out Chk))
 				return Chk.GetBlock((int)BlockPos.X, (int)BlockPos.Y, (int)BlockPos.Z);
@@ -214,33 +253,40 @@ namespace Voxelgine.Graphics {
 		public bool IsWaterAt(Vector3 Pos) => BlockInfo.IsWater(GetBlock(Pos));
 		public bool IsWaterAt(int X, int Y, int Z) => BlockInfo.IsWater(GetBlock(X, Y, Z));
 
-		void TranslateChunkPos(int X, int Y, int Z, out Vector3 ChunkIndex, out Vector3 BlockPos) {
+		void TranslateChunkPos(int X, int Y, int Z, out Vector3 ChunkIndex, out Vector3 BlockPos)
+		{
 			TransPosScalar(X, out int ChkX, out int BlkX);
 			TransPosScalar(Y, out int ChkY, out int BlkY);
 			TransPosScalar(Z, out int ChkZ, out int BlkZ);
 			ChunkIndex = new Vector3(ChkX, ChkY, ChkZ);
 			BlockPos = new Vector3(BlkX, BlkY, BlkZ);
 		}
-		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos) {
+		void TransPosScalar(int S, out int ChunkIndex, out int BlockPos)
+		{
 			ChunkIndex = (int)Math.Floor((float)S / Chunk.ChunkSize);
 			BlockPos = Utils.Mod(S, Chunk.ChunkSize);
 		}
-		public void GetWorldPos(int X, int Y, int Z, Vector3 ChunkIndex, out Vector3 GlobalPos) {
+		public void GetWorldPos(int X, int Y, int Z, Vector3 ChunkIndex, out Vector3 GlobalPos)
+		{
 			GlobalPos = ChunkIndex * Chunk.ChunkSize + new Vector3(X, Y, Z);
 		}
 
-		public void ComputeLighting() {
+		public void ComputeLighting()
+		{
 			foreach (Chunk C in GetAllChunks())
 				C.ComputeLighting();
 			foreach (Chunk C in GetAllChunks())
 				C.MarkDirty();
 		}
 
-		public void Tick() {
+		public void Tick()
+		{
 		}
 
-		public void Draw(ref Frustum Fr) {
-			foreach (var KV in Chunks.Items) {
+		public void Draw(ref Frustum Fr)
+		{
+			foreach (var KV in Chunks.Items)
+			{
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 				KV.Value.Draw(ChunkPos, ref Fr);
 			}
@@ -248,12 +294,15 @@ namespace Voxelgine.Graphics {
 			Utils.DrawRaycastRecord();
 		}
 
-		public void DrawTransparent(ref Frustum Fr, Vector3 cameraPos) {
+		public void DrawTransparent(ref Frustum Fr, Vector3 cameraPos)
+		{
 			// Collect all transparent faces from all visible chunks
 			TransparentFaceBuffer.Clear();
 
-			foreach (var KV in Chunks.Items) {
-				if (KV.Value.HasTransparentFaces()) {
+			foreach (var KV in Chunks.Items)
+			{
+				if (KV.Value.HasTransparentFaces())
+				{
 					var faces = KV.Value.GetTransparentFaces(ref Fr);
 					TransparentFaceBuffer.AddRange(faces);
 				}
@@ -266,14 +315,16 @@ namespace Voxelgine.Graphics {
 			int vertexCount = faceCount * 6;
 
 			// Ensure sorting buffers are large enough
-			if (DistanceBuffer.Length < faceCount) {
+			if (DistanceBuffer.Length < faceCount)
+			{
 				int newSize = faceCount * 2;
 				DistanceBuffer = new float[newSize];
 				IndexBuffer = new int[newSize];
 			}
 
 			// Ensure mesh buffers are large enough (only reallocate when capacity exceeded)
-			if (vertexCount > TransparentMeshCapacity) {
+			if (vertexCount > TransparentMeshCapacity)
+			{
 				int newCapacity = Math.Max(vertexCount * 2, 6144); // Start with reasonable size
 				TransparentMeshCapacity = newCapacity;
 				TransparentVertices = new Vector3[newCapacity];
@@ -282,7 +333,8 @@ namespace Voxelgine.Graphics {
 				TransparentColors = new Color[newCapacity];
 
 				// Recreate mesh with new capacity
-				if (TransparentMeshInitialized) {
+				if (TransparentMeshInitialized)
+				{
 					Raylib.UnloadMesh(TransparentMesh);
 				}
 				TransparentMesh = CreateTransparentMesh(newCapacity);
@@ -292,7 +344,8 @@ namespace Voxelgine.Graphics {
 			}
 
 			// Calculate distances and build index array
-			for (int i = 0; i < faceCount; i++) {
+			for (int i = 0; i < faceCount; i++)
+			{
 				DistanceBuffer[i] = Vector3.DistanceSquared(cameraPos, TransparentFaceBuffer[i].Center);
 				IndexBuffer[i] = i;
 			}
@@ -303,9 +356,11 @@ namespace Voxelgine.Graphics {
 
 			// Fill buffers with sorted face data
 			int vIdx = 0;
-			for (int i = 0; i < faceCount; i++) {
+			for (int i = 0; i < faceCount; i++)
+			{
 				var face = TransparentFaceBuffer[IndexBuffer[i]];
-				for (int j = 0; j < 6; j++) {
+				for (int j = 0; j < 6; j++)
+				{
 					var v = face.Vertices[j];
 					TransparentVertices[vIdx] = v.Position;
 					TransparentNormals[vIdx] = v.Normal;
@@ -319,7 +374,8 @@ namespace Voxelgine.Graphics {
 			fixed (Vector3* verts = TransparentVertices)
 			fixed (Vector3* norms = TransparentNormals)
 			fixed (Vector2* uvs = TransparentTexCoords)
-			fixed (Color* cols = TransparentColors) {
+			fixed (Color* cols = TransparentColors)
+			{
 				Raylib.UpdateMeshBuffer(TransparentMesh, 0, verts, vertexCount * sizeof(Vector3), 0); // vertices
 				Raylib.UpdateMeshBuffer(TransparentMesh, 1, uvs, vertexCount * sizeof(Vector2), 0);   // texcoords
 				Raylib.UpdateMeshBuffer(TransparentMesh, 2, norms, vertexCount * sizeof(Vector3), 0); // normals
@@ -338,7 +394,8 @@ namespace Voxelgine.Graphics {
 			Raylib.EndBlendMode();
 		}
 
-		Mesh CreateTransparentMesh(int capacity) {
+		Mesh CreateTransparentMesh(int capacity)
+		{
 			Mesh mesh = new Mesh();
 			mesh.VertexCount = capacity;
 			mesh.TriangleCount = capacity / 3;
@@ -354,13 +411,16 @@ namespace Voxelgine.Graphics {
 		}
 
 		// RaycastPos: Returns the first solid block hit by a block-based raycast, or Vector3.Zero if none is found.
-		public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir) {
+		public Vector3 RaycastPos(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 FaceDir)
+		{
 			// Block-based raycast: returns the first solid block hit, or Vector3.Zero if none
 			Vector3 hitPos = Vector3.Zero;
 			Vector3 hitFace = Vector3.Zero;
-			bool found = Voxelgine.Utils.Raycast(Origin, Dir, Distance, (x, y, z, face) => {
+			bool found = Voxelgine.Utils.Raycast(Origin, Dir, Distance, (x, y, z, face) =>
+			{
 
-				if (BlockInfo.IsSolid(GetBlock(x, y, z))) {
+				if (BlockInfo.IsSolid(GetBlock(x, y, z)))
+				{
 					hitPos = new Vector3(x, y, z);
 					hitFace = face;
 					return true;
@@ -373,11 +433,13 @@ namespace Voxelgine.Graphics {
 		}
 
 		// Collide: Checks if the position is inside a solid block, or if moving in ProbeDir hits a block. Returns true and the collision normal if a block is hit, otherwise false.
-		public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal) {
+		public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal)
+		{
 			// Check if the position is inside a solid block, or if moving in ProbeDir hits a block
 			Vector3 probe = Pos + ProbeDir * 0.1f;
 
-			if (BlockInfo.IsSolid(GetBlock((int)MathF.Floor(probe.X), (int)MathF.Floor(probe.Y), (int)MathF.Floor(probe.Z)))) {
+			if (BlockInfo.IsSolid(GetBlock((int)MathF.Floor(probe.X), (int)MathF.Floor(probe.Y), (int)MathF.Floor(probe.Z))))
+			{
 
 				if (ProbeDir != Vector3.Zero)
 					PickNormal = -Vector3.Normalize(ProbeDir);
@@ -391,25 +453,29 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public bool HasBlocksInBounds(Vector3 pos, Vector3 size, bool SolidOnly = true) {
+		public bool HasBlocksInBounds(Vector3 pos, Vector3 size, bool SolidOnly = true)
+		{
 			Vector3 min = pos;
 			Vector3 max = pos + size;
 
 			return HasBlocksInBoundsMinMax(min, max, SolidOnly);
 		}
 
-		public bool IsSolid(int X, int Y, int Z) {
+		public bool IsSolid(int X, int Y, int Z)
+		{
 			if (BlockInfo.IsSolid(GetBlock(X, Y, Z)))
 				return true;
 
 			return false;
 		}
 
-		public bool IsSolid(Vector3 Pos) {
+		public bool IsSolid(Vector3 Pos)
+		{
 			return IsSolid((int)MathF.Floor(Pos.X), (int)MathF.Floor(Pos.Y), (int)MathF.Floor(Pos.Z));
 		}
 
-		public bool HasBlocksInBoundsMinMax(Vector3 min, Vector3 max, bool SolidOnly = true) {
+		public bool HasBlocksInBoundsMinMax(Vector3 min, Vector3 max, bool SolidOnly = true)
+		{
 			int minX = (int)MathF.Floor(min.X);
 			int minY = (int)MathF.Floor(min.Y);
 			int minZ = (int)MathF.Floor(min.Z);
@@ -419,12 +485,16 @@ namespace Voxelgine.Graphics {
 
 			for (int x = minX; x <= maxX; x++)
 				for (int y = minY; y <= maxY; y++)
-					for (int z = minZ; z <= maxZ; z++) {
-						if (SolidOnly) {
+					for (int z = minZ; z <= maxZ; z++)
+					{
+						if (SolidOnly)
+						{
 							if (IsSolid(x, y, z))
 								return true;
 
-						} else {
+						}
+						else
+						{
 							if (GetBlock(x, y, z) != BlockType.None)
 								return true;
 						}
@@ -432,14 +502,17 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public RayCollision RaycastRay(Ray R, float MaxLen) {
+		public RayCollision RaycastRay(Ray R, float MaxLen)
+		{
 			List<RayCollision> Cols = new List<RayCollision>();
 
-			foreach (var KV in Chunks.Items) {
+			foreach (var KV in Chunks.Items)
+			{
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
 
 				RayCollision Col = KV.Value.Collide(ChunkPos, R);
-				if (Col.Hit) {
+				if (Col.Hit)
+				{
 					Cols.Add(Col);
 				}
 			}

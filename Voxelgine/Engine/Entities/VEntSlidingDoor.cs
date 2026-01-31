@@ -7,14 +7,17 @@ using System.Numerics;
 
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
+namespace Voxelgine.Engine
+{
 	/// <summary>
 	/// A door entity that slides into the wall when the player approaches.
 	/// Collision is disabled when the door is open.
 	/// </summary>
-	public class VEntSlidingDoor : VoxEntity {
+	public class VEntSlidingDoor : VoxEntity
+	{
 		// Door state
-		public enum DoorState {
+		public enum DoorState
+		{
 			Closed,
 			Opening,
 			Open,
@@ -36,7 +39,8 @@ namespace Voxelgine.Engine {
 		Vector3 ClosedPosition;                     // Original position when closed
 		bool CollisionEnabled = true;
 
-		public VEntSlidingDoor() : base() {
+		public VEntSlidingDoor() : base()
+		{
 			IsRotating = false;
 		}
 
@@ -47,7 +51,8 @@ namespace Voxelgine.Engine {
 		/// <param name="size">Door size for collision</param>
 		/// <param name="slideDirection">Direction the door slides (e.g., Vector3.UnitY for up)</param>
 		/// <param name="slideDistance">How far to slide</param>
-		public void Initialize(Vector3 position, Vector3 size, Vector3 slideDirection, float slideDistance = 1.0f) {
+		public void Initialize(Vector3 position, Vector3 size, Vector3 slideDirection, float slideDistance = 1.0f)
+		{
 			Position = position;
 			ClosedPosition = position;
 			Size = size;
@@ -55,7 +60,8 @@ namespace Voxelgine.Engine {
 			SlideDistance = slideDistance;
 		}
 
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+		{
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
 			GameState gs = GetGameState();
@@ -69,16 +75,19 @@ namespace Voxelgine.Engine {
 			bool playerInRange = distanceToPlayer <= TriggerRadius;
 
 			// State machine for door
-			switch (State) {
+			switch (State)
+			{
 				case DoorState.Closed:
-					if (playerInRange) {
+					if (playerInRange)
+					{
 						State = DoorState.Opening;
 					}
 					break;
 
 				case DoorState.Opening:
 					SlideProgress += SlideSpeed * Dt / SlideDistance;
-					if (SlideProgress >= 1.0f) {
+					if (SlideProgress >= 1.0f)
+					{
 						SlideProgress = 1.0f;
 						State = DoorState.Open;
 						CollisionEnabled = false;
@@ -88,25 +97,31 @@ namespace Voxelgine.Engine {
 
 				case DoorState.Open:
 					CollisionEnabled = false;
-					if (!playerInRange) {
+					if (!playerInRange)
+					{
 						OpenTimer += Dt;
-						if (OpenTimer >= OpenDelay) {
+						if (OpenTimer >= OpenDelay)
+						{
 							State = DoorState.Closing;
 							OpenTimer = 0f;
 						}
-					} else {
+					}
+					else
+					{
 						OpenTimer = 0f; // Reset timer if player is still in range
 					}
 					break;
 
 				case DoorState.Closing:
-					if (playerInRange) {
+					if (playerInRange)
+					{
 						// Player re-entered, open again
 						State = DoorState.Opening;
 						break;
 					}
 					SlideProgress -= SlideSpeed * Dt / SlideDistance;
-					if (SlideProgress <= 0f) {
+					if (SlideProgress <= 0f)
+					{
 						SlideProgress = 0f;
 						State = DoorState.Closed;
 						CollisionEnabled = true;
@@ -116,27 +131,31 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		void UpdateDoorPosition() {
+		void UpdateDoorPosition()
+		{
 			Position = ClosedPosition + SlideDirection * SlideDistance * SlideProgress;
 		}
 
 		/// <summary>
 		/// Returns whether the door should block movement.
 		/// </summary>
-		public bool IsCollisionEnabled() {
+		public bool IsCollisionEnabled()
+		{
 			return CollisionEnabled;
 		}
 
 		/// <summary>
 		/// Get the AABB for collision checking (only valid when collision is enabled).
 		/// </summary>
-		public AABB GetCollisionAABB() {
+		public AABB GetCollisionAABB()
+		{
 			if (!CollisionEnabled)
 				return AABB.Empty;
 			return new AABB(Position, Position + Size);
 		}
 
-		protected override void DrawCollisionBox() {
+		protected override void DrawCollisionBox()
+		{
 			if (!Program.DebugMode)
 				return;
 

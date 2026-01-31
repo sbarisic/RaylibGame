@@ -9,8 +9,10 @@ using System.Threading.Tasks;
 
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
-	public enum BlockType : ushort {
+namespace Voxelgine.Engine
+{
+	public enum BlockType : ushort
+	{
 		None,
 		Stone,
 		Dirt,
@@ -35,7 +37,8 @@ namespace Voxelgine.Engine {
 		Campfire
 	}
 
-	public enum IconType : ushort {
+	public enum IconType : ushort
+	{
 		None,
 
 		Particle1,
@@ -50,9 +53,12 @@ namespace Voxelgine.Engine {
 		Pickaxe
 	}
 
-	static class BlockInfo {
-		public static bool IsOpaque(BlockType T) {
-			switch (T) {
+	static class BlockInfo
+	{
+		public static bool IsOpaque(BlockType T)
+		{
+			switch (T)
+			{
 				case BlockType.None:
 					return false;
 
@@ -69,8 +75,10 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public static bool IsSolid(BlockType T) {
-			switch (T) {
+		public static bool IsSolid(BlockType T)
+		{
+			switch (T)
+			{
 				case BlockType.None:
 				case BlockType.Water:
 					return false;
@@ -82,12 +90,15 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Returns true if the block is a swimmable liquid (water).
 		/// </summary>
-		public static bool IsWater(BlockType T) {
+		public static bool IsWater(BlockType T)
+		{
 			return T == BlockType.Water;
 		}
 
-		public static bool EmitsLight(BlockType T) {
-			switch (T) {
+		public static bool EmitsLight(BlockType T)
+		{
+			switch (T)
+			{
 				case BlockType.Campfire:
 				case BlockType.Glowstone:
 					return true;
@@ -98,11 +109,29 @@ namespace Voxelgine.Engine {
 		}
 
 		/// <summary>
+		/// Returns the light emission level (0-15) for a block type.
+		/// </summary>
+		public static byte GetLightEmission(BlockType T)
+		{
+			switch (T)
+			{
+				case BlockType.Glowstone:
+					return 15;
+				case BlockType.Campfire:
+					return 14;
+				default:
+					return 0;
+			}
+		}
+
+		/// <summary>
 		/// Returns true if the block type should render backfaces (double-sided).
 		/// This applies to glass-like blocks that should be visible from both sides.
 		/// </summary>
-		public static bool NeedsBackfaceRendering(BlockType T) {
-			switch (T) {
+		public static bool NeedsBackfaceRendering(BlockType T)
+		{
+			switch (T)
+			{
 				case BlockType.Glass:
 				case BlockType.Ice:
 					return true;
@@ -112,12 +141,14 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public static void GetIconTexCoords(IconType Icon, out Texture2D Texture, out Vector2 UVSize, out Vector2 UVPos, out float Scale) {
+		public static void GetIconTexCoords(IconType Icon, out Texture2D Texture, out Vector2 UVSize, out Vector2 UVPos, out float Scale)
+		{
 			UVSize = Vector2.One;
 			UVPos = Vector2.Zero;
 			Scale = 3.8f;
 
-			switch (Icon) {
+			switch (Icon)
+			{
 				case IconType.Particle1:
 					Texture = ResMgr.GetTexture("items/particle1.png", TextureFilter.Point);
 					return;
@@ -165,7 +196,8 @@ namespace Voxelgine.Engine {
 			UVPos = UVSize * new Vector2(IconX, IconY);
 		}
 
-		public static void GetBlockTexCoords(BlockType BlockType, Vector3 FaceNormal, out Vector2 UVSize, out Vector2 UVPos) {
+		public static void GetBlockTexCoords(BlockType BlockType, Vector3 FaceNormal, out Vector2 UVSize, out Vector2 UVPos)
+		{
 			int BlockID = BlockInfo.GetBlockID(BlockType, FaceNormal);
 			int BlockX = BlockID % Chunk.AtlasSize;
 			int BlockY = BlockID / Chunk.AtlasSize;
@@ -174,22 +206,28 @@ namespace Voxelgine.Engine {
 			UVPos = UVSize * new Vector2(BlockX, BlockY);
 		}
 
-		public static int GetBlockID(BlockType BType, Vector3 Face) {
+		public static int GetBlockID(BlockType BType, Vector3 Face)
+		{
 			int BlockID = (int)BType - 1;
 
-			if (BType == BlockType.Grass) {
+			if (BType == BlockType.Grass)
+			{
 				if (Face.Y == 1)
 					BlockID = 240;
 				else if (Face.Y == 0)
 					BlockID = 241;
 				else
 					BlockID = 1;
-			} else if (BType == BlockType.Wood) {
+			}
+			else if (BType == BlockType.Wood)
+			{
 				if (Face.Y == 0)
 					BlockID = 242;
 				else
 					BlockID = 243;
-			} else if (BType == BlockType.CraftingTable) {
+			}
+			else if (BType == BlockType.CraftingTable)
+			{
 				if (Face.Y == 1)
 					BlockID = 244;
 				else if (Face.Y == -1)
@@ -198,14 +236,17 @@ namespace Voxelgine.Engine {
 					BlockID = 245;
 				else
 					BlockID = 246;
-			} else if (BType == BlockType.Barrel) {
+			}
+			else if (BType == BlockType.Barrel)
+			{
 				BlockID = 8;
 			}
 
 			return BlockID;
 		}
 
-		public static bool CustomModel(BlockType BType) {
+		public static bool CustomModel(BlockType BType)
+		{
 			if (BType == BlockType.Barrel)
 				return true;
 
@@ -215,12 +256,17 @@ namespace Voxelgine.Engine {
 			return false;
 		}
 
-		public static Model GetCustomModel(BlockType BType) {
-			if (BType == BlockType.Barrel) {
+		public static Model GetCustomModel(BlockType BType)
+		{
+			if (BType == BlockType.Barrel)
+			{
 				return ResMgr.GetModel("barrel/barrel.obj");
-			} else if (BType == BlockType.Campfire) {
+			}
+			else if (BType == BlockType.Campfire)
+			{
 				return ResMgr.GetModel("campfire/campfire.obj");
-			} else
+			}
+			else
 				throw new NotImplementedException();
 		}
 	}

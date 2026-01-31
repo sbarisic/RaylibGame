@@ -29,7 +29,7 @@ A list of planned features, improvements, and tasks for this project.
 |--------|--------|-------------|
 | **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr` |
 | **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
-| **Voxel World** | 🔶 | Procedural island generation via simplex noise, block types, lighting system |
+| **Voxel World** | ✅ | Procedural island generation via simplex noise, block types, dual-channel lighting (skylight/block light) |
 | **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
 | **Player** | ✅ | `Player`, `FPSCamera`, `ViewModel`, inventory system |
 | **Weapons** | ✅ | `Weapon`, `WeaponGun`, `WeaponPicker`, `InventoryItem` |
@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
@@ -71,9 +71,14 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ---
 
-## Documentation **LOW PRIORITY**
+## Documentation
 
-- [ ] **Update README.md** — Analyze solution and update README with current architecture and features **[CPX: 2]**
+### High Priority
+
+- [ ] **Full codebase documentation** — Analyze all code, add documentation comments, and update README.md with current architecture **[CPX: 4]**
+
+### Lower Priority
+
 - [ ] API reference documentation
 - [ ] Getting started guide
 - [ ] Architecture overview

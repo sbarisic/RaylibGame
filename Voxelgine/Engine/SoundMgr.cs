@@ -9,19 +9,23 @@ using System.Threading.Tasks;
 
 using Raylib_cs;
 
-namespace RaylibGame.Engine {
-	class FancySound {
+namespace RaylibGame.Engine
+{
+	class FancySound
+	{
 		public string Name;
 		public Sound Sound;
 		public float Volume;
 
-		public FancySound(string Name, Sound Sound, float Volume) {
+		public FancySound(string Name, Sound Sound, float Volume)
+		{
 			this.Name = Name;
 			this.Sound = Sound;
 			this.Volume = Volume;
 		}
 
-		public void Play(Vector3 Ears, Vector3 Dir, Vector3 Pos) {
+		public void Play(Vector3 Ears, Vector3 Dir, Vector3 Pos)
+		{
 			float Dist = Vector3.Distance(Ears, Pos);
 
 			float Vol = Dist * Volume * 0.1f;
@@ -34,7 +38,8 @@ namespace RaylibGame.Engine {
 		}
 	}
 
-	public class SoundMgr {
+	public class SoundMgr
+	{
 		Random Rnd = new Random();
 
 		//Dictionary<string, Sound> SoundDict = new Dictionary<string, Sound>();
@@ -42,7 +47,8 @@ namespace RaylibGame.Engine {
 
 		Dictionary<string, List<string>> ComboDict = new Dictionary<string, List<string>>();
 
-		public void Init() {
+		public void Init()
+		{
 			Raylib.InitAudioDevice();
 
 			Raylib.SetMasterVolume(0.5f);
@@ -58,15 +64,18 @@ namespace RaylibGame.Engine {
 			LoadCombo("swim", "data/sound/swim/swim{0}.wav", 1, 0.5f);
 		}
 
-		public void LoadSound(string Name, string FilePath, float Volume) {
+		public void LoadSound(string Name, string FilePath, float Volume)
+		{
 			Sound Snd = Raylib.LoadSound(FilePath);
 			SoundList.Add(new FancySound(Name, Snd, Volume));
 		}
 
-		public void LoadCombo(string Name, string FilePath, int Count, float Volume) {
+		public void LoadCombo(string Name, string FilePath, int Count, float Volume)
+		{
 			CreateCombo(Name);
 
-			for (int i = 1; i < Count + 1; i++) {
+			for (int i = 1; i < Count + 1; i++)
+			{
 				string NewFileName = string.Format(FilePath, i);
 				string[] Toks = NewFileName.Split('/').ToArray();
 
@@ -78,23 +87,28 @@ namespace RaylibGame.Engine {
 			}
 		}
 
-		public void PlaySound(string Name, Vector3 Ears, Vector3 Dir, Vector3 Pos) {
+		public void PlaySound(string Name, Vector3 Ears, Vector3 Dir, Vector3 Pos)
+		{
 			FancySound[] FancySounds = SoundList.Where(I => I.Name == Name).ToArray();
 
-			foreach (FancySound FS in FancySounds) {
-				FS.Play(Ears, Dir,Pos);
+			foreach (FancySound FS in FancySounds)
+			{
+				FS.Play(Ears, Dir, Pos);
 			}
 		}
 
-		public void CreateCombo(string ComboName) {
+		public void CreateCombo(string ComboName)
+		{
 			ComboDict.Add(ComboName, new List<string>());
 		}
 
-		public void AddCombo(string ComboName, string SoundName) {
+		public void AddCombo(string ComboName, string SoundName)
+		{
 			ComboDict[ComboName].Add(SoundName);
 		}
 
-		public void PlayCombo(string ComboName, Vector3 Ears, Vector3 Dir, Vector3 Pos) {
+		public void PlayCombo(string ComboName, Vector3 Ears, Vector3 Dir, Vector3 Pos)
+		{
 			if (!ComboDict.ContainsKey(ComboName))
 				return;
 

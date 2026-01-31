@@ -13,7 +13,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **GUI: In-game debug menu** — Added FishUI debug window (F1 key) with debug toggle, save/load game, regenerate world, and main menu buttons.
 - **Graphics: Fullbright mode** — Added toggleable fullbright rendering via debug menu. Uses `BlockLight.FullbrightMode` flag.
 - **Graphics: Underwater overlay** — Added water overlay when player camera is submerged (texture-based or fallback blue tint).
-- **Graphics: Lighting calculation fix** — Fixed sunlight propagation (opaque blocks don't emit), cross-chunk light propagation, and early termination logic.
+- **Graphics: Improved lighting system** — Separated skylight and block light channels for day/night support. Added ambient light minimum, sky light multiplier, proper cross-chunk propagation, and per-block-type light emission levels.
 - **GUI: Inventory item box textures** — Added state-based textures (normal, selected, hover, pressed) for `FishUIItemBox` from `data/textures/gui/`.
 - **Graphics: Glowstone light emission** — Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.
 - **Audio: Block placement sounds** — Added sound effects for placing and breaking blocks.
@@ -35,3 +35,4 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Transparent Blocks** — Fixed depth sorting for water/glass overlap
 - **Unit Tests** — Fixed noise seed test with larger coordinates
 - **GUI: Main menu button clipping** — Fixed button borders being cut off by adding padding to StackLayout
+- **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel causing light to not propagate from sources

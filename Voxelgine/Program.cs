@@ -11,8 +11,10 @@ using TextCopy;
 using Voxelgine.Engine;
 using Voxelgine.Graphics;
 
-namespace Voxelgine {
-	internal class Program {
+namespace Voxelgine
+{
+	internal class Program
+	{
 		// Fancy info
 		public static int ChunkDrawCalls;
 
@@ -24,14 +26,15 @@ namespace Voxelgine {
 
 		public static MainMenuStateFishUI MainMenuState;
 		public static GameState GameState;
-		//public static GameStateImpl OptionsState;
+		public static NPCPreviewState NPCPreviewState;
 
 		public static Clipboard Clipb;
 
 		public static float TotalTime;
 		public static LerpManager LerpMgr;
 
-		static void Main(string[] args) {
+		static void Main(string[] args)
+		{
 			DebugMode = Debugger.IsAttached;
 
 			Console.WriteLine("Aurora Falls - Voxelgine Engine");
@@ -51,7 +54,8 @@ namespace Voxelgine {
 			ResMgr.InitHotReload();
 
 			List<Texture2D> TexList = new List<Texture2D>();
-			for (int i = 1; i < 12; i++) {
+			for (int i = 1; i < 12; i++)
+			{
 				TexList.Add(ResMgr.GetTexture($"smoke/{i}.png"));
 			}
 			ResMgr.CreateCollection("smoke", TexList.ToArray());
@@ -61,7 +65,7 @@ namespace Voxelgine {
 
 			MainMenuState = new MainMenuStateFishUI(Window);
 			GameState = new GameState(Window);
-			//OptionsState = new OptionsState(Window);
+			NPCPreviewState = new NPCPreviewState(Window);
 
 			Window.SetState(MainMenuState);
 
@@ -81,13 +85,15 @@ namespace Voxelgine {
 			GameFrameInfo LastFrame = new GameFrameInfo();
 			Rlgl.EnableBackfaceCulling();
 
-			while (Window.IsOpen()) {
+			while (Window.IsOpen())
+			{
 				TotalTime = (float)Raylib.GetTime();
 				ResMgr.HandleHotReload();
 
 				float NewTime = (float)SWatch.Elapsed.TotalSeconds;
 				float FrameTime = NewTime - CurrentTime;
-				if (FrameTime > MaxFrameTime) {
+				if (FrameTime > MaxFrameTime)
+				{
 					FrameTime = MaxFrameTime;
 				}
 
@@ -97,7 +103,8 @@ namespace Voxelgine {
 
 				Window.Tick(NewTime);
 
-				while (Accumulator >= DeltaTime) {
+				while (Accumulator >= DeltaTime)
+				{
 					// PreviousState = CurrentState;
 
 					// Update

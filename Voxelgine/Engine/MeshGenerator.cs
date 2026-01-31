@@ -9,13 +9,13 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	unsafe class CustomMaterial {
+	/// <summary>
+	/// Material wrapper for custom models.
+	/// </summary>
+	public unsafe class CustomMaterial {
 		public Material Mat;
 
 		public CustomMaterial() {
-			//Mat = new Material();
-			//Mat.Shader = ResMgr.GetShader("default/default");
-
 			Mesh CubeMesh = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
 			Model Mdl = Raylib.LoadModelFromMesh(CubeMesh);
 			Mat = Mdl.Materials[0];
@@ -24,7 +24,10 @@ namespace Voxelgine.Engine {
 		}
 	}
 
-	class CustomMesh {
+	/// <summary>
+	/// A single mesh element within a CustomModel. Supports animation transforms.
+	/// </summary>
+	public class CustomMesh {
 		public string Name;
 		public Vector3 RotationOrigin;
 
@@ -34,31 +37,53 @@ namespace Voxelgine.Engine {
 
 		public Matrix4x4 Matrix;
 
+		// Animation properties
+		/// <summary>Current animation rotation in degrees (X=pitch, Y=yaw, Z=roll).</summary>
+		public Vector3 AnimationRotation;
+		/// <summary>Current animation position offset.</summary>
+		public Vector3 AnimationPosition;
+		/// <summary>Combined animation matrix (updated by UpdateAnimationMatrix).</summary>
+		public Matrix4x4 AnimationMatrix = Matrix4x4.Identity;
+
 		public CustomMesh(Mesh M) {
 			Mesh = M;
 			Material = new CustomMaterial();
 			Matrix = Matrix4x4.Identity;
+			AnimationRotation = Vector3.Zero;
+			AnimationPosition = Vector3.Zero;
 
 			BBox = Raylib.GetMeshBoundingBox(M);
+		}
+
+		/// <summary>
+		/// Updates the animation matrix from the current AnimationRotation and AnimationPosition.
+		/// </summary>
+		public void UpdateAnimationMatrix() {
+			// Convert degrees to radians
+			float pitch = Utils.ToRad(AnimationRotation.X);
+			float yaw = Utils.ToRad(AnimationRotation.Y);
+			float roll = Utils.ToRad(AnimationRotation.Z);
+
+			// Build rotation matrix (X * Y * Z order)
+			AnimationMatrix = Matrix4x4.CreateRotationX(pitch) *
+							  Matrix4x4.CreateRotationY(yaw) *
+							  Matrix4x4.CreateRotationZ(roll) *
+							  Matrix4x4.CreateTranslation(AnimationPosition);
 		}
 
 		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
 			Matrix4x4 MeshMat = Matrix4x4.Identity;
 
-			//Vector3 RotOr = RotationOrigin + new Vector3(-1, 0, -0.5f);
-			//RotOr.Y = 0;
-
 			Vector3 RotOr = RotationOrigin;
 			RotOr.X = 1 - RotOr.X;
 			RotOr.Z = 0;
 
-			//if (Name != "body") {
+			// Apply base transform around rotation origin
 			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotOr);
 			MeshMat = MeshMat * Matrix;
+			// Apply animation transform
+			MeshMat = MeshMat * AnimationMatrix;
 			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotOr);
-			//}
-
-
 
 			MeshMat = MeshMat * Model;
 			return MeshMat;
@@ -69,7 +94,11 @@ namespace Voxelgine.Engine {
 		}
 	}
 
-	class CustomModel {
+	/// <summary>
+	/// A model composed of multiple CustomMesh elements, typically loaded from JSON.
+	/// Supports animation via NPCAnimator.
+	/// </summary>
+	public class CustomModel {
 		public Vector3 Position;
 		public Vector3 LookDirection;
 		public List<CustomMesh> Meshes = new List<CustomMesh>();
@@ -77,6 +106,17 @@ namespace Voxelgine.Engine {
 		public CustomModel(Vector3 Position, Vector3 LookDirection) {
 			this.Position = Position;
 			this.LookDirection = Vector3.Normalize(LookDirection);
+		}
+
+		/// <summary>
+		/// Finds a mesh by its element name.
+		/// </summary>
+		public CustomMesh GetMeshByName(string name) {
+			foreach (var mesh in Meshes) {
+				if (mesh.Name == name)
+					return mesh;
+			}
+			return null;
 		}
 
 		public BoundingBox GetBoundingBox() {
@@ -107,6 +147,7 @@ namespace Voxelgine.Engine {
 		public RayCollision Collide(Ray R, out CustomMesh HitMesh) {
 			Matrix4x4 Model = GetModelMatrix();
 			HitMesh = null;
+
 
 			foreach (CustomMesh CM in Meshes) {
 				Matrix4x4 World = CM.GetWorldMatrix(Model);

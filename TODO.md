@@ -54,7 +54,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Medium Priority
 
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
-- [ ] **NPC Animation System** — Add animation support for NPCs (walking, attacking, crouching, lying down) **[CPX: 3]**
 
 ### Lower Priority
 
@@ -97,7 +96,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- There is a bug with .json model loading, player character UV mapping or direction or something is off, need to investigate and fix
 
 ---
 

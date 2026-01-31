@@ -49,20 +49,17 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Physics: Swimming movement** — Implement Quake-style swimming movement mode for water blocks **[CPX: 3]**
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
 
 ### Lower Priority
 
-- [ ] **Physics: Swimming movement** — Implement Quake-style swimming movement mode for water blocks **[CPX: 3]**
 - [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
 - [ ] **NPC AI System** — Implement AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
-- [ ] **Graphics: Improved lighting** — Enhanced lighting system **[CPX: 3]**
-- [ ] **Entity: Sliding door entity** — Door that slides into wall when player approaches, toggles collision **[CPX: 2]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 
@@ -76,6 +73,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Documentation **LOW PRIORITY**
 
+- [ ] **Update README.md** — Analyze solution and update README with current architecture and features **[CPX: 2]**
 - [ ] API reference documentation
 - [ ] Getting started guide
 - [ ] Architecture overview
@@ -98,7 +96,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- NPC entities need to be completed
+- NPC entities need animation support, like walking, attacking, crouching, lying down
 
 ---
 

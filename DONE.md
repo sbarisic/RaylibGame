@@ -7,7 +7,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 ## Features
 
 - **Voxel World** — Procedural island generation, transparent blocks, real-time block creation/destruction, block placement preview
-- **Entity System** — Pickup entity (`VEntPickup`), NPC entity base (`VEntNPC`)
+- **Entity System** — Pickup entity (`VEntPickup`), NPC entity base (`VEntNPC`), sliding door entity (`VEntSlidingDoor`)
 - **GUI System** — Migrated to FishUI with Raylib backend (`FishUIManager`, `RaylibFishUIGfx`, `RaylibFishUIInput`). Custom controls: `FishUIItemBox`, `FishUIInventory`, `FishUIInfoLabel`. Removed old GUI code.
 - **GUI: Main menu title logo** — Added `ImageBox` displaying game logo at top of main menu.
 - **GUI: In-game debug menu** — Added FishUI debug window (F1 key) with debug toggle, save/load game, regenerate world, and main menu buttons.

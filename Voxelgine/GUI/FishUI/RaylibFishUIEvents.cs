@@ -6,7 +6,7 @@ namespace Voxelgine.GUI {
     /// Default event handler for FishUI - logs events to console in debug mode.
     /// </summary>
     public class RaylibFishUIEvents : IFishUIEvents {
-        public void Broadcast(FishUI.FishUI FUI, Control Ctrl, string Name, params object[] Args) {
+        public void Broadcast(global::FishUI.FishUI FUI, Control Ctrl, string Name, params object[] Args) {
 #if DEBUG
             Console.WriteLine($"[FishUI Event] {Ctrl?.GetType().Name ?? "null"}: {Name}");
 #endif

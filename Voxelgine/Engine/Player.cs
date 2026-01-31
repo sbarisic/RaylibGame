@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
+using FishUI.Controls;
 
 namespace Voxelgine.Engine {
 	// TODO: Implement player as VEntity in class VEntPlayer
@@ -20,7 +21,7 @@ namespace Voxelgine.Engine {
 		public Camera3D Cam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective);
 		public Camera3D RenderCam = new Camera3D(Vector3.Zero, Vector3.UnitX, Vector3.UnitY, 90, CameraProjection.Perspective); // Interpolated camera for rendering only
 
-		GUIManager GUI;
+		FishUIManager GUI;
 
 		public ViewModel ViewMdl;
 
@@ -57,7 +58,7 @@ namespace Voxelgine.Engine {
 		Stopwatch JumpCounter = Stopwatch.StartNew();
 		float HeadBumpCooldown = 0f; // Cooldown applied when hitting head shortly after jumping
 
-		public Player(GUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd) {
+		public Player(FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd) {
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
@@ -650,9 +651,9 @@ namespace Voxelgine.Engine {
 			ViewMdl.Update(this);
 		}
 
-		GUIItemBox Box_Health;
-		GUILabel InfoLbl;
-		GUIInventory Inventory;
+		FishUIItemBox Box_Health;
+		FishUIInfoLabel InfoLbl;
+		FishUIInventory Inventory;
 
 		InventoryItem ActiveSelection;
 
@@ -662,31 +663,36 @@ namespace Voxelgine.Engine {
 		public InventoryItem GetActiveItem() => ActiveSelection;
 
 		public void RecalcGUI(GameWindow Window) {
-			//Box_Health.Pos = new Vector2(64, Window.Height - 128);
-
-			//InfoLbl.Pos = new Vector2(16, 40);
-			//InfoLbl.Size = new Vector2(300, 250);
-
-			//Inventory.Pos = GUI.WindowScale(new Vector2(0.5f, 0.9f)) - new Vector2(Inventory.Size.X / 2, 0);
-			GUI.Tick();
+			// FishUI handles positioning via control properties
 		}
 
-		public void InitGUI(GameWindow Window) {
-			Box_Health = new GUIItemBox(GUI, null);
+		public void InitGUI(GameWindow Window, FishUIManager gui) {
+			// Health box
+			Box_Health = new FishUIItemBox {
+				Position = new Vector2(100, Window.Height - 100),
+				Size = new Vector2(64, 64)
+			};
+			Box_Health.LoadTextures(gui.UI);
+			Box_Health.SetIcon(gui.UI, "data/textures/items/heart_full.png", 3);
 			Box_Health.Text = "100";
-			Box_Health.SetIcon(ResMgr.GetTexture("items/heart_full.png"), 3);
-			Box_Health.FlexNode.nodeStyle.Set("position: absolute; left: 100; bottom: 100; width: 64; height: 64;");
-			GUI.AddElement(Box_Health);
+			gui.AddControl(Box_Health);
 
-			InfoLbl = new GUILabel(GUI, null);
-			InfoLbl.Clear();
+			// Debug info label
+			InfoLbl = new FishUIInfoLabel {
+				Position = new Vector2(20, 40),
+				Size = new Vector2(300, 250),
+				Visible = Program.DebugMode
+			};
 			InfoLbl.WriteLine("Hello World!");
-			InfoLbl.FlexNode.nodeStyle.Set("position: absolute; width: 300; height: 250; left: 20; top: 40;");
-			GUI.AddElement(InfoLbl);
+			gui.AddControl(InfoLbl);
 
-			Inventory = new GUIInventory(GUI, null);
-			Inventory.FlexNode.nodeStyle.Set("width: 40%; height: 64; left: 30%; top: 87%; justify-content: center;");
-			GUI.AddElement(Inventory);
+			// Inventory
+			Inventory = new FishUIInventory(gui.UI, 10);
+			Inventory.Position = new Vector2(
+				(Window.Width / 2f) - (Inventory.Size.X / 2f),
+				Window.Height - 80
+			);
+			gui.AddControl(Inventory);
 
 			Inventory.OnActiveSelectionChanged = (E) => {
 				if (ActiveSelection != null) {
@@ -694,7 +700,7 @@ namespace Voxelgine.Engine {
 					ActiveSelection = null;
 				}
 
-				ActiveSelection = E.ItmBox.Item;
+				ActiveSelection = E.ItemBox.Item;
 
 				if (ActiveSelection != null) {
 					ActiveSelection.OnSelected(ViewMdl);
@@ -702,25 +708,23 @@ namespace Voxelgine.Engine {
 			};
 
 			int ItmIdx = 0;
-			SetInvItem(Inventory, ItmIdx++, new WeaponGun(this, "Gun"));
-			SetInvItem(Inventory, ItmIdx++, new WeaponPicker(this, "Hammer"));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(10));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
-			SetInvItem(Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponGun(this, "Gun"));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponPicker(this, "Hammer"));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(10));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
 			Inventory.SetSelectedIndex(0);
-
-			GUI.Tick();
 		}
 
 		public void UpdateGUI() {
-			InfoLbl.Enabled = false;
+			InfoLbl.Visible = false;
 
 			if (Program.DebugMode) {
-				InfoLbl.Enabled = true;
+				InfoLbl.Visible = true;
 				InfoLbl.Clear();
 				InfoLbl.WriteLine("Pos: {0:0.00}, {1:0.00}, {2:0.00}", MathF.Round(Position.X, 2), MathF.Round(Position.Y, 2), MathF.Round(Position.Z, 2));
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(GetVelocity().Length(), 3));
@@ -733,10 +737,18 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		void SetInvItem(GUIInventory Inventory, int Idx, InventoryItem InvItem) {
-			GUIItemBox Itm = Inventory.GetItem(Idx);
+		void SetInvItem(global::FishUI.FishUI ui, FishUIInventory Inventory, int Idx, InventoryItem InvItem) {
+			FishUIItemBox Itm = Inventory.GetItem(Idx);
+			if (Itm == null) return;
+
 			Itm.UpdateTextFromItem = true;
-			Itm.SetItem(Inventory, InvItem);
+			Itm.Item = InvItem;
+
+			// Set up icon from item
+			string iconPath = InvItem.GetIconPath();
+			if (!string.IsNullOrEmpty(iconPath)) {
+				Itm.SetIcon(ui, iconPath, 2);
+			}
 		}
 
 		public void TickGUI(InputMgr InMgr, ChunkMap Map) {
@@ -768,8 +780,7 @@ namespace Voxelgine.Engine {
 			}
 
 			if (!CursorDisabled) {
-				GUI.Tick();
-				//Inventory.Update();
+				// FishUI tick is called by GameState.Draw2D
 			} else {
 				if (InMgr.IsInputPressed(InputKey.Q))
 					Inventory.SelectPrevious();
@@ -789,14 +800,14 @@ namespace Voxelgine.Engine {
 					}
 					Inventory.SelectNext();
 				}
-				Inventory.Update();
+				// FishUI handles updates internally
 			}
 		}
 
 		public void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
 			if (LocalPlayer) {
 
-				RenderTexture2D RT = GUI.Window.ViewmodelRT;
+				RenderTexture2D RT = Program.Window.ViewmodelRT;
 				Raylib.BeginTextureMode(RT);
 				{
 					Raylib.ClearBackground(new Color(0, 0, 0, 0));
@@ -812,7 +823,7 @@ namespace Voxelgine.Engine {
 
 				}
 				Raylib.EndTextureMode();
-				Raylib.BeginTextureMode(GUI.Window.WindowG.Target);
+				Raylib.BeginTextureMode(Program.Window.WindowG.Target);
 
 				Rectangle Src = new Rectangle(0, 0, RT.Texture.Width, -RT.Texture.Height);
 				Rectangle Dst = new Rectangle(0, 0, RT.Texture.Width, RT.Texture.Height);

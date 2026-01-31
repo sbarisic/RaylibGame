@@ -46,14 +46,15 @@ namespace RaylibGame.States
 		public Vector3 PlayerCollisionBoxPos;
 
 		private readonly List<Tuple<Vector3, Vector3>> MarkerList = new();
-		private readonly GUIManager GUI;
+		private readonly FishUIManager GUI;
 		private readonly PhysData PhysicsData;
 		private readonly EntityManager EntMgr;
 		private Frustum ViewFrustum;
+		private float _totalTime;
 
 		public GameState(GameWindow window) : base(window)
 		{
-			GUI = new GUIManager(window);
+			GUI = new FishUIManager(window);
 			EntMgr = new EntityManager();
 			Snd = new SoundMgr();
 			PhysicsData = new PhysData();
@@ -96,9 +97,9 @@ namespace RaylibGame.States
 
 
 			// ====================================== Init player ====================================================
-			Ply = new Player(GUI, "snoutx10k", true, Snd);
-			Ply.InitGUI(window);
-			Ply.Init(Map);
+				Ply = new Player(GUI, "snoutx10k", true, Snd);
+				Ply.InitGUI(window, GUI);
+				Ply.Init(Map);
 
 			if (File.Exists(PLAYER_FILE))
 			{
@@ -180,14 +181,16 @@ namespace RaylibGame.States
 			}*/
 
 			Raylib.EndMode3D();
-		}
+			}
 
-		public override void Draw2D()
-		{
-			GUI.Draw();
-			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
-			Raylib.DrawFPS(10, 10);
-		}
+			public override void Draw2D()
+			{
+				float deltaTime = Raylib.GetFrameTime();
+				_totalTime += deltaTime;
+				GUI.Tick(deltaTime, _totalTime);
+				Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
+				Raylib.DrawFPS(10, 10);
+			}
 
 		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
 		{

@@ -22,7 +22,7 @@ namespace Voxelgine {
 
 		public static GameWindow Window;
 
-		public static MainMenuState MainMenuState;
+		public static MainMenuStateFishUI MainMenuState;
 		public static GameState GameState;
 		//public static GameStateImpl OptionsState;
 
@@ -59,7 +59,7 @@ namespace Voxelgine {
 			GraphicsUtils.Init();
 			Scripting.Init();
 
-			MainMenuState = new MainMenuState(Window);
+			MainMenuState = new MainMenuStateFishUI(Window);
 			GameState = new GameState(Window);
 			//OptionsState = new OptionsState(Window);
 

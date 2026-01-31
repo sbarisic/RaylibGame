@@ -33,7 +33,7 @@ A list of planned features, improvements, and tasks for this project.
 | **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
 | **Player** | ✅ | `Player`, `FPSCamera`, `ViewModel`, inventory system |
 | **Weapons** | ✅ | `Weapon`, `WeaponGun`, `WeaponPicker`, `InventoryItem` |
-| **GUI** | 🔶 | `GUIManager`, `GUIWindow`, `GUIButton`, `GUILabel`, `GUIInputBox`, `GUIImage`, Flexbox layout |
+| **GUI** | 🔶 | FishUI: MainMenuState, GameState, Player HUD migrated. Old GUI code still present for removal. |
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
 | **Animation** | 🔶 | `AnimLerp`, `LerpManager`, easing functions |
 | **Physics** | 🔶 | `AABB`, `PhysData`, collision in `EntityManager` and `Player` |
@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **GUI: Replace with FishUI** — Replace existing GUI system (`GUIManager`, `GUIWindow`, `GUIButton`, etc.) with FishUI **[CPX: 4]**
+- [ ] **GUI: Remove old GUI code** — Delete old GUIManager, GUIWindow, GUIButton, etc. files now that FishUI migration is complete **[CPX: 2]**
 
 ### Medium Priority
 

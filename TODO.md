@@ -97,8 +97,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Lighting calculation needs to be reanalyzed for logic errors. 
-- Glowstone needs to be asdded to inventory
+- In game inventory display should have textures, use data/textures/gui/itembox.png, data/textures/gui/itembox_sel.png, data/textures/gui/itembox_hover.png, data/textures/gui/itembox_pressed.png 
 
 ---
 

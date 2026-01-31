@@ -49,7 +49,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Unit Testing: Implement tests** — Create unit tests in UnitTest project, expose required engine internals (make classes/methods public or use InternalsVisibleTo) **[CPX: 3]**
 - [ ] **Quake-like player movement** — Implement strafe-jumping, bunny-hopping, air control mechanics in `Player.cs` **[CPX: 3]**
 
 ### Medium Priority
@@ -102,7 +101,19 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- UnitTest.NoiseTests.DifferentSeeds_ProduceDifferentResults
+-    Source: UnitTest1.cs line 244
+-    Duration: 3 ms
+- 
+-   Message: 
+- Assert.NotEqual() Failure: Values are equal
+- Expected: Not 29.5963058
+- Actual:       29.5963058
+- 
+-   Stack Trace: 
+- NoiseTests.DifferentSeeds_ProduceDifferentResults() line 251
+- RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+- MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
 ---
 
@@ -126,6 +137,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Entity System: Pickup entity** — `VEntPickup` for weapons, ammo, armor pickups
 - [x] **Entity System: NPC entity** — `VEntNPC` base class exists
 - [x] **Animation System: Base lerp system** — `AnimLerp`, `LerpManager` with easing functions
+- [x] **Unit Testing** — Tests for AABB, Easing, Utils, Noise (made Easing class public)
 
 ### Improvements
 

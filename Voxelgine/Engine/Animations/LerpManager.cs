@@ -21,7 +21,7 @@ namespace Voxelgine.Engine {
 		}
 	}
 
-	static class Easing {
+	public static class Easing {
 		public static float Linear(float T) {
 			return T;
 		}

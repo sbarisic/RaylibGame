@@ -27,15 +27,17 @@ namespace Voxelgine.Engine {
 		const string DefaultViewModelName = "gun/gun.obj";
 		ViewModelRotationMode ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
 
-		Vector3 DesiredViewModelPos = Vector3.Zero;
-		public Vector3 ViewModelPos = Vector3.Zero;
+		// Store offset from camera instead of absolute position for proper interpolation
+		Vector3 DesiredViewModelOffset = Vector3.Zero;
+		public Vector3 ViewModelOffset = Vector3.Zero;
+		public Vector3 ViewModelPos = Vector3.Zero; // Final position (for capture in GameFrameInfo)
 
 		Quaternion DesiredVMRot = Quaternion.Identity;
 		public Quaternion VMRot = Quaternion.Identity;
 
 		public bool IsActive;
 
-		LerpVec3 LrpPos;
+		LerpVec3 LrpOffset;
 		LerpQuat LrpRot;
 
 		public ViewModel() {
@@ -47,10 +49,10 @@ namespace Voxelgine.Engine {
 				Console.WriteLine("======================== Warning! Zero meshes in model {0}", DefaultViewModelName);
 			}
 
-			LrpPos = new LerpVec3();
-			LrpPos.Easing = Easing.Linear;
-			LrpPos.Loop = false;
-			LrpPos.StartLerp(1, Vector3.Zero, Vector3.Zero);
+			LrpOffset = new LerpVec3();
+			LrpOffset.Easing = Easing.Linear;
+			LrpOffset.Loop = false;
+			LrpOffset.StartLerp(1, Vector3.Zero, Vector3.Zero);
 
 			LrpRot = new LerpQuat();
 			LrpRot.Easing = Easing.Linear;
@@ -83,38 +85,41 @@ namespace Voxelgine.Engine {
 			Vector3 camRight = -Ply.GetLeft();
 			Vector3 camUp = Ply.GetUp();
 
-			// Set desired position and rotation based on mode
-			Vector3 newDesiredPos;
+			// Calculate offset from camera based on mode (not absolute position)
+			Vector3 newDesiredOffset;
 			Quaternion newDesiredRotOffset;
 			switch (ViewMdlRotMode) {
 				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
-					newDesiredPos = cam.Position + camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+					newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
 					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
 					break;
 				case ViewModelRotationMode.Gun:
-					newDesiredPos = cam.Position + camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
+					newDesiredOffset = camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
 					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0);
 					break;
 				case ViewModelRotationMode.GunIronsight:
-					newDesiredPos = cam.Position + camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+					newDesiredOffset = camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
 					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
 					break;
 				default:
 					throw new NotImplementedException();
 			}
 
-			// Start lerps if desired position/rotation changed
-			if (DesiredViewModelPos != newDesiredPos) {
-				LrpPos.StartLerp(0.2f, ViewModelPos, newDesiredPos);
-				DesiredViewModelPos = newDesiredPos;
+			// Start lerps if desired offset/rotation changed
+			if (DesiredViewModelOffset != newDesiredOffset) {
+				LrpOffset.StartLerp(0.2f, ViewModelOffset, newDesiredOffset);
+				DesiredViewModelOffset = newDesiredOffset;
 			}
 			if (LrpRot.GetQuat() != newDesiredRotOffset) {
 				LrpRot.StartLerp(0.2f, LrpRot.GetQuat(), newDesiredRotOffset);
 			}
 
-			// Lerp position and rotation
-			ViewModelPos = LrpPos.GetVec3();
+			// Lerp offset
+			ViewModelOffset = LrpOffset.GetVec3();
+
+			// Calculate absolute position for GameFrameInfo capture
+			ViewModelPos = cam.Position + ViewModelOffset;
 
 			Vector3 CamAngle = Ply.GetCamAngle();
 			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;
@@ -156,9 +161,10 @@ namespace Voxelgine.Engine {
 			if (!IsActive)
 				return;
 
-			GameFrameInfo GFI = CurFame.Interpolate(LastFrame, TimeAlpha);
-			Quaternion R = GFI.ViewModelRot;
-			Vector3 P = GFI.ViewModelPos;
+			// Calculate final position using interpolated camera position + offset
+			// The camera (Ply.Cam) is already interpolated in GameWindow.Draw()
+			Vector3 P = Ply.Cam.Position + ViewModelOffset;
+			Quaternion R = VMRot;
 
 			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - R.W * R.W);

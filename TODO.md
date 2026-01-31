@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Rendering: Frame interpolation** — Implement position interpolation between physics frames using existing `TimeAlpha` and `GameFrameInfo` for smooth rendering at any framerate **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
@@ -129,6 +129,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Quake-like player movement** — Strafe-jumping, bunny-hopping, air control via proper Quake acceleration model
 - [x] **Voxel World: Real-time block creation/destruction** — Left-click destroy, right-click place with automatic mesh rebuilding
 - [x] **Collision: Quake-style clip velocity** — ClipVelocity slides along surfaces preserving momentum, multi-plane clipping for corners
+- [x] **Rendering: Frame interpolation** — Interpolated camera, position, and view model between physics frames for smooth rendering
 
 ### Improvements
 

@@ -241,7 +241,7 @@ namespace Voxelgine.Engine {
 			FInfo.FeetPosition = GState.Ply.FeetPosition;
 			FInfo.Frustum = new Frustum(ref FInfo.Cam);
 
-			FInfo.ViewModelPos = GState.Ply.ViewMdl.ViewModelPos;
+			FInfo.ViewModelOffset = GState.Ply.ViewMdl.ViewModelOffset;
 			FInfo.ViewModelRot = GState.Ply.ViewMdl.VMRot;
 		}
 
@@ -250,19 +250,20 @@ namespace Voxelgine.Engine {
 			GameFrameInfo FInfo = new GameFrameInfo();
 			GetCurrentFrame(ref FInfo, State as GameState);
 
-			//FPSCamera.Position = LastFrame.Pos;
+			// Store the original physics state to return (before interpolation modifies anything)
+			GameFrameInfo PhysicsFrame = FInfo;
+
 			if (State is GameState GS && !LastFrame.Empty) {
 				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
 
-				//FPSCamera.Position = Interp.Pos;
+				// Apply interpolated camera for smooth rendering
 				GS.Ply.Cam = Interp.Cam;
 				GS.Ply.SetCamAngle(Interp.CamAngle);
 				GS.PlayerCollisionBoxPos = Interp.FeetPosition;
 
-				//GS.Ply.ViewMdl.ViewModelPos = Interp.ViewModelPos;
-				//GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
-
-				//FPSCamera.Position = Vector3.Lerp(LastFrame.Pos, FPSCamera.Position, TimeAlpha);
+				// Apply interpolated view model offset (position calculated at draw time from camera + offset)
+				GS.Ply.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
+				GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
 			}
 
 			if (Raylib.IsWindowResized()) {
@@ -290,8 +291,8 @@ namespace Voxelgine.Engine {
 
 			Raylib.EndDrawing();
 
-			GetCurrentFrame(ref FInfo, State as GameState);
-			return FInfo;
+			// Return the physics state (not interpolated) for next frame's interpolation
+			return PhysicsFrame;
 		}
 	}
 }

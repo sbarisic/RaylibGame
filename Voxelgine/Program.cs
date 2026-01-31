@@ -108,8 +108,7 @@ namespace Voxelgine {
 
 				float TimeAlpha = Accumulator / DeltaTime;
 
-				// TODO: Interpolation for rendering?
-				// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
+				// Interpolation between physics frames for smooth rendering
 				ChunkDrawCalls = 0;
 				LastFrame = Window.Draw(TimeAlpha, LastFrame);
 			}

@@ -16,7 +16,7 @@ namespace Voxelgine.Engine {
 		public Vector3 Pos;
 		public Vector3 CamAngle;
 		public Quaternion ViewModelRot;
-		public Vector3 ViewModelPos;
+		public Vector3 ViewModelOffset; // Offset from camera, not absolute position
 		public Vector3 FeetPosition;
 		public Frustum Frustum;
 
@@ -29,7 +29,7 @@ namespace Voxelgine.Engine {
 
 			GameFrameInfo New = new GameFrameInfo();
 
-			
+
 
 			New.Cam.FovY = float.Lerp(Old.Cam.FovY, Cam.FovY, T);
 			New.Cam.Position = Vector3.Lerp(Old.Cam.Position, Cam.Position, T);
@@ -38,7 +38,7 @@ namespace Voxelgine.Engine {
 			New.Cam.Projection = Cam.Projection;
 			New.Pos = Vector3.Lerp(Old.Pos, Pos, T);
 			New.CamAngle = Vector3.Lerp(Old.CamAngle, CamAngle, T);
-			New.ViewModelPos = Vector3.Lerp(Old.ViewModelPos, ViewModelPos, T);
+			New.ViewModelOffset = Vector3.Lerp(Old.ViewModelOffset, ViewModelOffset, T);
 			New.ViewModelRot = Quaternion.Slerp(Old.ViewModelRot, ViewModelRot, T);
 			New.FeetPosition = Vector3.Lerp(Old.FeetPosition, FeetPosition, T);
 			New.Frustum = Frustum;

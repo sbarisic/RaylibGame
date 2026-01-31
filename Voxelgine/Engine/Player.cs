@@ -216,6 +216,57 @@ namespace Voxelgine.Engine {
 			return feetPos + new Vector3(0, Player.PlayerEyeOffset, 0);
 		}
 
+		// --- Quake-style acceleration (ground) ---
+		void Accelerate(ref Vector3 velocity, Vector3 wishdir, float wishspeed, float accel, float dt) {
+			float currentspeed = Vector3.Dot(velocity, wishdir);
+			float addspeed = wishspeed - currentspeed;
+			if (addspeed <= 0)
+				return;
+			float accelspeed = accel * dt * wishspeed;
+			if (accelspeed > addspeed)
+				accelspeed = addspeed;
+			velocity += accelspeed * wishdir;
+		}
+
+		// --- Quake-style air acceleration (key for strafe jumping) ---
+		void AirAccelerate(ref Vector3 velocity, Vector3 wishdir, float wishspeed, float accel, float dt) {
+			// Cap wishspeed for air acceleration - this is what makes strafe jumping work
+			float wishspd = wishspeed;
+			if (wishspd > 0.7f) // Quake uses 30 units, but we're scaled differently
+				wishspd = 0.7f;
+
+			float currentspeed = Vector3.Dot(velocity, wishdir);
+			float addspeed = wishspd - currentspeed;
+			if (addspeed <= 0)
+				return;
+			float accelspeed = accel * dt * wishspeed;
+			if (accelspeed > addspeed)
+				accelspeed = addspeed;
+			velocity += accelspeed * wishdir;
+		}
+
+		// --- Quake-style friction ---
+		void ApplyFriction(ref Vector3 velocity, float friction, float dt, bool onGround) {
+			if (!onGround)
+				return;
+
+			float speed = MathF.Sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z);
+			if (speed < 0.1f) {
+				velocity.X = 0;
+				velocity.Z = 0;
+				return;
+			}
+
+			float drop = speed * friction * dt;
+			float newspeed = speed - drop;
+			if (newspeed < 0)
+				newspeed = 0;
+			newspeed /= speed;
+
+			velocity.X *= newspeed;
+			velocity.Z *= newspeed;
+		}
+
 		void NoclipMove(PhysData PhysicsData, float Dt, InputMgr InMgr) {
 			Vector3 move = Vector3.Zero;
 			Vector3 fwd = GetForward();
@@ -376,38 +427,62 @@ namespace Voxelgine.Engine {
 				WasLastLegsOnFloor = false;
 			}
 
+			// --- Apply friction BEFORE acceleration (Quake order) ---
+			ApplyFriction(ref PlyVelocity, PhysicsData.GroundFriction, Dt, OnGroundGrace);
+
+			// --- Jumping (before movement for bunny hop) ---
 			if (InMgr.IsInputDown(InputKey.Space) && OnGroundGrace && JumpCounter.ElapsedMilliseconds > 50) {
 				JumpCounter.Restart();
 				PlyVelocity.Y = PhysicsData.JumpImpulse;
 				this.PhysicsHit(HitFloor, VelLen, false, false, false, true);
 				GroundGraceTimer = 0;
+				OnGroundGrace = false; // Immediately in air after jump
 			}
 
-			if (OnGroundGrace) {
-				Vector2 velH = new Vector2(PlyVelocity.X, PlyVelocity.Z);
-				float speed = velH.Length();
+			// --- Apply acceleration ---
+			if (wishdir != Vector3.Zero) {
+				float wishspeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
 
-				if (speed > 0) {
-					float drop = speed * PhysicsData.GroundFriction * Dt;
-					float newSpeed = MathF.Max(speed - drop, 0);
+				if (OnGroundGrace) {
+					// Ground acceleration - standard Quake ground move
+					Accelerate(ref PlyVelocity, wishdir, wishspeed, PhysicsData.GroundAccel, Dt);
+				} else {
+					// Air acceleration - key for strafe jumping
+					// Wall sliding adjustment
+					Vector3 accelDir = wishdir;
+					if (LastWallNormal != Vector3.Zero) {
+						accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
+						if (accelDir.LengthSquared() > 1e-4f)
+							accelDir = Vector3.Normalize(accelDir);
+						else
+							accelDir = Vector3.Zero;
+					}
 
-					if (newSpeed != speed) {
-						newSpeed /= speed;
-						PlyVelocity.X *= newSpeed;
-						PlyVelocity.Z *= newSpeed;
+					if (accelDir != Vector3.Zero) {
+						AirAccelerate(ref PlyVelocity, accelDir, wishspeed, PhysicsData.AirAccel, Dt);
 					}
 				}
-			} else {
-				PlyVelocity.X *= (1.0f - PhysicsData.AirFriction * Dt);
-				PlyVelocity.Z *= (1.0f - PhysicsData.AirFriction * Dt);
 			}
 
+			// --- Gravity ---
 			if (!OnGroundGrace) {
 				PlyVelocity.Y -= PhysicsData.Gravity * Dt;
 			} else if (PlyVelocity.Y < 0) {
 				PlyVelocity.Y = 0;
 			}
 
+			// --- Cap ground speed only (NOT air speed - allows bunny hopping) ---
+			if (OnGroundGrace) {
+				float maxSpeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
+				float horizSpeed = MathF.Sqrt(PlyVelocity.X * PlyVelocity.X + PlyVelocity.Z * PlyVelocity.Z);
+				if (horizSpeed > maxSpeed) {
+					float scale = maxSpeed / horizSpeed;
+					PlyVelocity.X *= scale;
+					PlyVelocity.Z *= scale;
+				}
+			}
+
+			// --- Move and collide ---
 			float stepHeight = OnGroundGrace ? 0.5f : 0.0f;
 			Vector3 newPos = QuakeMoveWithCollision(Map, Position, PlyVelocity, Dt, stepHeight, 4, OnGroundGrace);
 
@@ -417,74 +492,10 @@ namespace Voxelgine.Engine {
 				PlyVelocity = Vector3.Zero;
 			}
 
-			if (wishdir != Vector3.Zero) {
-				Vector3 accelDir = wishdir;
-
-				if (!OnGroundGrace && LastWallNormal != Vector3.Zero) {
-					accelDir -= Vector3.Dot(accelDir, LastWallNormal) * LastWallNormal;
-
-					if (accelDir.LengthSquared() > 1e-4f)
-						accelDir = Vector3.Normalize(accelDir);
-					else
-						accelDir = Vector3.Zero;
-				}
-
-				bool canApplyAirAccel = OnGroundGrace || accelDir != Vector3.Zero;
-
-				if (canApplyAirAccel) {
-					float curSpeed = PlyVelocity.X * accelDir.X + PlyVelocity.Z * accelDir.Z;
-					float addSpeed, accel;
-					float maxGroundSpeed = InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed;
-					if (OnGroundGrace) {
-						addSpeed = maxGroundSpeed - curSpeed;
-						accel = PhysicsData.GroundAccel;
-					} else {
-						addSpeed = PhysicsData.MaxAirSpeed - curSpeed;
-						accel = PhysicsData.AirAccel;
-					}
-					if (addSpeed > 0) {
-						float accelSpeed = accel * Dt * maxGroundSpeed;
-						if (accelSpeed > addSpeed)
-							accelSpeed = addSpeed;
-						PlyVelocity.X += accelSpeed * accelDir.X;
-						PlyVelocity.Z += accelSpeed * accelDir.Z;
-					}
-				}
-			}
+			// --- Head collision check ---
 			if (PlyVelocity.Y > 0) {
 				float headEpsilon = 0.02f;
 				Vector3 headPos = feetPos + new Vector3(0, playerHeight - headEpsilon, 0);
-				Vector3[] headCheckPoints = new Vector3[] {
-					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
-					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),
-					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z + playerRadius),
-					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z + playerRadius),
-					headPos
-				};
-
-				foreach (var pt in headCheckPoints) {
-					if (Map.IsSolid(pt)) {
-						PlyVelocity.Y = 0;
-						break;
-					}
-				}
-			}
-
-			Vector2 horizVel2 = new Vector2(PlyVelocity.X, PlyVelocity.Z);
-			float horizSpeed2 = horizVel2.Length();
-			float maxSpeed2 = OnGroundGrace ? (InMgr.IsInputDown(InputKey.Shift) ? PhysicsData.MaxWalkSpeed : PhysicsData.MaxGroundSpeed) : PhysicsData.MaxAirSpeed;
-
-			if (horizSpeed2 > maxSpeed2) {
-				float scale = maxSpeed2 / horizSpeed2;
-				PlyVelocity.X *= scale;
-				PlyVelocity.Z *= scale;
-			}
-
-			if (PlyVelocity.Y > 0) {
-				float headEpsilon = 0.02f;
-				Vector3 feetPos2 = FeetPosition;
-				Vector3 headPos = feetPos2 + new Vector3(0, playerHeight - headEpsilon, 0);
-
 				Vector3[] headCheckPoints = new Vector3[] {
 					new Vector3(headPos.X - playerRadius, headPos.Y, headPos.Z - playerRadius),
 					new Vector3(headPos.X + playerRadius, headPos.Y, headPos.Z - playerRadius),

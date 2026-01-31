@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Quake-like player movement** — Implement strafe-jumping, bunny-hopping, air control mechanics in `Player.cs` **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
@@ -101,7 +101,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Analyze collision detection and how it interacts with quake movement, see if improvements can be made to avoid sticking on edges or corners or resetting speed when hitting a plane
+- Analyze update time steps and interpolation for rendering, what's incomplete, what can be improved?
 
 ---
 
@@ -127,6 +128,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [x] **Entity System: NPC entity** — `VEntNPC` base class exists
 - [x] **Animation System: Base lerp system** — `AnimLerp`, `LerpManager` with easing functions
 - [x] **Unit Testing** — Tests for AABB, Easing, Utils, Noise (made Easing class public)
+- [x] **Quake-like player movement** — Strafe-jumping, bunny-hopping, air control via proper Quake acceleration model
 
 ### Improvements
 

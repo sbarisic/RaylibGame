@@ -53,7 +53,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Graphics: Fullbright/debug modes** — Add toggleable fullbright and debug rendering modes in settings **[CPX: 2]**
+*No medium priority items*
 
 ### Lower Priority
 
@@ -69,7 +69,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Improvements
 
-*No improvement items*
+- [ ] **Graphics: Glass block backface rendering** — Render backfaces of glass blocks (double-sided) except between adjacent glass blocks (Minecraft-style) **[CPX: 2]**
 
 ---
 
@@ -97,7 +97,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Glass blocks should render the backside of the glass, too, except the panes between two glass blocks. So minecraft like.
+- Lighting calculation needs to be reanalyzed for logic errors. 
+- Glowstone needs to be asdded to inventory
 
 ---
 

@@ -71,6 +71,16 @@ namespace Voxelgine.Graphics {
 
 		public Chunk[] GetAllChunks() => Chunks.Values.ToArray();
 
+		/// <summary>
+		/// Marks all chunks as dirty, forcing mesh rebuild on next draw.
+		/// Useful when global rendering settings change (e.g., fullbright mode).
+		/// </summary>
+		public void MarkAllChunksDirty() {
+			foreach (var chunk in Chunks.Values) {
+				chunk.MarkDirty();
+			}
+		}
+
 		public void GenerateFloatingIsland(int Width, int Length, int Seed = 666) {
 			Noise.Seed = Seed;
 			float Scale = 0.02f;

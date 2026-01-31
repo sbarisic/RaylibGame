@@ -56,6 +56,7 @@ namespace RaylibGame.States
 		// Debug menu
 		private Window _debugMenu;
 		private CheckBox _debugModeCheckbox;
+		private CheckBox _fullbrightCheckbox;
 
 		public GameState(GameWindow window) : base(window)
 		{
@@ -184,6 +185,27 @@ namespace RaylibGame.States
 				Program.DebugMode = isChecked;
 			};
 			stack.AddChild(_debugModeCheckbox);
+
+			// Fullbright mode toggle
+			var fullbrightLabel = new Label
+			{
+				Text = "Fullbright Mode",
+				Size = new Vector2(150, 24)
+			};
+			stack.AddChild(fullbrightLabel);
+
+			_fullbrightCheckbox = new CheckBox
+			{
+				IsChecked = BlockLight.FullbrightMode,
+				Size = new Vector2(24, 24)
+			};
+			_fullbrightCheckbox.OnCheckedChanged += (sender, isChecked) =>
+			{
+				BlockLight.FullbrightMode = isChecked;
+				// Force chunk mesh rebuild to apply new lighting
+				Map.MarkAllChunksDirty();
+			};
+			stack.AddChild(_fullbrightCheckbox);
 
 			// Save game button
 			var btnSave = new Button

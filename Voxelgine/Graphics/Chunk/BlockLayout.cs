@@ -14,6 +14,12 @@ namespace Voxelgine.Graphics {
 		public static readonly BlockLight Ambient = new BlockLight(LightLevels);
 		public static readonly BlockLight FullBright = new BlockLight(15); // Set to max light level
 
+		/// <summary>
+		/// When true, ToColor() always returns white (full brightness).
+		/// Toggle this for fullbright/debug rendering mode.
+		/// </summary>
+		public static bool FullbrightMode = false;
+
 		[FieldOffset(0)]
 		public byte R;
 
@@ -65,11 +71,16 @@ namespace Voxelgine.Graphics {
 		}
 
 		public Color ToColor() {
+			// In fullbright mode, return max brightness
+			if (FullbrightMode) {
+				return new Color((byte)255, (byte)255, (byte)255, (byte)255);
+			}
+
 			// Scale from 0-15 to 0-255
 			byte RR = (byte)Utils.Clamp(R * 17, 0, 255); // 17 = ~255/15
 			byte GG = (byte)Utils.Clamp(G * 17, 0, 255);
 			byte BB = (byte)Utils.Clamp(B * 17, 0, 255);
-			return new Color(RR, GG, BB);
+			return new Color(RR, GG, BB, (byte)255);
 		}
 
 		public static BlockLight operator +(BlockLight BL, byte Amt) {

@@ -55,89 +55,87 @@ namespace RaylibGame.States
 		}
 
 		private void CreateMainMenu()
-		{
-			// Calculate centered position
-			var windowSize = new Vector2(400, 400);
-			var windowPos = new Vector2(
-				(Window.Width / 2f) - (windowSize.X / 2f),
-				(Window.Height / 1.65f) - (windowSize.Y / 2f)
-			);
+			{
+				// Calculate centered position
+				var windowSize = new Vector2(320, 340);
+				var windowPos = new Vector2(
+					(Window.Width / 2f) - (windowSize.X / 2f),
+					(Window.Height / 1.65f) - (windowSize.Y / 2f)
+				);
 
-			// Create main menu window
-			_mainWindow = new Window
-			{
-				Title = "Main Menu",
-				Position = windowPos,
-				Size = windowSize,
-				IsResizable = false,
-				ShowCloseButton = false
-			};
+				// Create main menu window
+				_mainWindow = new Window
+				{
+					Title = "Main Menu",
+					Position = windowPos,
+					Size = windowSize,
+					IsResizable = false,
+					ShowCloseButton = false
+				};
+				_gui.AddControl(_mainWindow);
 
-			// Create buttons using StackLayout for automatic positioning
-			float buttonWidth = 200;
-			float stackPadding = 10; // Extra padding for button borders
-			var buttonStack = new StackLayout
-			{
-				Orientation = StackOrientation.Vertical,
-				Spacing = 8,
-				Position = new Vector2((windowSize.X - buttonWidth - 40) / 2 - stackPadding, 10),
-				Size = new Vector2(buttonWidth + stackPadding * 2, windowSize.Y - 20),
-				IsTransparent = true
-			};
+				// Create ScrollablePane for buttons
+				var scrollPane = new ScrollablePane();
+				scrollPane.Position = new Vector2(0, 0);
+				scrollPane.Size = _mainWindow.GetContentSize();
+				scrollPane.Anchor = FishUIAnchor.All;
+				_mainWindow.AddChild(scrollPane);
 
-			// New Game button
-			var btnNewGame = new Button
-			{
-				Text = "New Game",
-				Size = new Vector2(buttonWidth, 50)
-			};
-			btnNewGame.Clicked += (sender, args) =>
-			{
-				Program.Window.SetState(Program.GameState);
-			};
+				// Button layout settings
+				float buttonHeight = 50f;
+				float buttonSpacing = 10f;
+				float margin = 20f;
+				float contentWidth = windowSize.X - 60; // Account for window borders and scrollbar
 
-			// NPC Preview button
-			var btnNPCPreview = new Button
-			{
-				Text = "NPC Preview",
-				Size = new Vector2(buttonWidth, 50)
-			};
-			btnNPCPreview.Clicked += (sender, args) =>
-			{
-				Program.Window.SetState(Program.NPCPreviewState);
-			};
+				// New Game button
+				var btnNewGame = new Button();
+				btnNewGame.Text = "New Game";
+				btnNewGame.Position = new Vector2(margin, margin);
+				btnNewGame.Size = new Vector2(contentWidth, buttonHeight);
+				btnNewGame.TooltipText = "Start a new game";
+				btnNewGame.OnButtonPressed += (sender, mbtn, pos) =>
+				{
+					Program.Window.SetState(Program.GameState);
+				};
+				scrollPane.AddChild(btnNewGame);
 
-			// Options button
-			var btnOptions = new Button
-			{
-				Text = "Options",
-				Size = new Vector2(buttonWidth, 50)
-			};
-			btnOptions.Clicked += (sender, args) =>
-			{
-				_optionsWindow.Visible = true;
-				_optionsWindow.BringToFront();
-			};
+				// NPC Preview button
+				var btnNPCPreview = new Button();
+				btnNPCPreview.Text = "NPC Preview";
+				btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 1);
+				btnNPCPreview.Size = new Vector2(contentWidth, buttonHeight);
+				btnNPCPreview.TooltipText = "Preview NPC models and animations";
+				btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
+				{
+					Program.Window.SetState(Program.NPCPreviewState);
+				};
+				scrollPane.AddChild(btnNPCPreview);
 
-			// Quit button
-			var btnQuit = new Button
-			{
-				Text = "Quit",
-				Size = new Vector2(buttonWidth, 50)
-			};
-			btnQuit.Clicked += (sender, args) =>
-			{
-				Program.Window.Close();
-			};
+				// Options button
+				var btnOptions = new Button();
+				btnOptions.Text = "Options";
+				btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
+				btnOptions.Size = new Vector2(contentWidth, buttonHeight);
+				btnOptions.TooltipText = "Configure game settings";
+				btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
+				{
+					_optionsWindow.Visible = true;
+					_optionsWindow.BringToFront();
+				};
+				scrollPane.AddChild(btnOptions);
 
-			buttonStack.AddChild(btnNewGame);
-			buttonStack.AddChild(btnNPCPreview);
-			buttonStack.AddChild(btnOptions);
-			buttonStack.AddChild(btnQuit);
-
-			_mainWindow.AddChild(buttonStack);
-			_gui.AddControl(_mainWindow);
-		}
+				// Quit button
+				var btnQuit = new Button();
+				btnQuit.Text = "Quit";
+				btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+				btnQuit.Size = new Vector2(contentWidth, buttonHeight);
+				btnQuit.TooltipText = "Exit the game";
+				btnQuit.OnButtonPressed += (sender, mbtn, pos) =>
+				{
+					Program.Window.Close();
+				};
+				scrollPane.AddChild(btnQuit);
+			}
 
 		private void CreateOptionsWindow()
 		{

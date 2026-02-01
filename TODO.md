@@ -92,11 +92,13 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-*No active bugs*
+#### Active Bugs
+
+- [ ] **.json model loading bug** — Player character UV mapping or direction is off, investigate and fix **[CPX: 2]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- There is a bug with .json model loading, player character UV mapping or direction or something is off, need to investigate and fix
+*No uncategorized items*
 
 ---
 

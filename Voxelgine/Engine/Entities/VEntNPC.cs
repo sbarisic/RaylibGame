@@ -60,6 +60,36 @@ namespace Voxelgine.Engine
 		public PathFollower GetPathFollower() => _pathFollower;
 
 		/// <summary>
+		/// Performs a detailed raycast against the NPC's model to determine which body part was hit.
+		/// Takes animation transforms into account.
+		/// </summary>
+		/// <param name="rayOrigin">Origin of the ray in world space.</param>
+		/// <param name="rayDirection">Normalized direction of the ray.</param>
+		/// <param name="hitPosition">Output: world position where the ray hit.</param>
+		/// <param name="hitNormal">Output: surface normal at the hit point.</param>
+		/// <returns>Name of the hit body part (e.g., "head", "body", "leg_r"), or null if no hit.</returns>
+		public string RaycastBodyPart(Vector3 rayOrigin, Vector3 rayDirection, out Vector3 hitPosition, out Vector3 hitNormal)
+		{
+			hitPosition = Vector3.Zero;
+			hitNormal = Vector3.Zero;
+
+			if (CModel == null)
+				return null;
+
+			Ray ray = new Ray(rayOrigin, rayDirection);
+			RayCollision collision = CModel.Collide(ray, out CustomMesh hitMesh);
+
+			if (collision.Hit && hitMesh != null)
+			{
+				hitPosition = collision.Point;
+				hitNormal = collision.Normal;
+				return hitMesh.Name;
+			}
+
+			return null;
+		}
+
+		/// <summary>
 		/// Initializes pathfinding for this NPC.
 		/// Must be called after entity is spawned and has access to the world.
 		/// </summary>

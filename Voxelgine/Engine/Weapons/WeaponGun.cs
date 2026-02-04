@@ -74,7 +74,27 @@ namespace Voxelgine.Engine
 				hitPos = entityHit.HitPosition;
 				hitNormal = entityHit.HitNormal;
 				hitEntity = entityHit.Entity;
-				Console.WriteLine($"Hit entity: {hitEntity.GetType().Name} at distance {entityHit.Distance:F2}");
+
+				// If it's an NPC, perform detailed body part raycast
+				if (hitEntity is VEntNPC npc)
+				{
+					string bodyPart = npc.RaycastBodyPart(E.Start, E.Dir, out Vector3 partHitPos, out Vector3 partHitNormal);
+					if (bodyPart != null)
+					{
+						// Use the more precise mesh hit position/normal
+						hitPos = partHitPos;
+						hitNormal = partHitNormal;
+						Console.WriteLine($"Hit NPC body part: {bodyPart} at distance {entityHit.Distance:F2}");
+					}
+					else
+					{
+						Console.WriteLine($"Hit NPC (AABB) at distance {entityHit.Distance:F2}");
+					}
+				}
+				else
+				{
+					Console.WriteLine($"Hit entity: {hitEntity.GetType().Name} at distance {entityHit.Distance:F2}");
+				}
 			}
 			else if (worldHitPos != Vector3.Zero)
 			{

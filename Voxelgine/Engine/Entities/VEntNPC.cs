@@ -9,12 +9,13 @@ using Raylib_cs;
 
 using RaylibGame.States;
 
+using Voxelgine.Engine.Pathfinding;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine
 {
 	/// <summary>
-	/// NPC entity with support for animated JSON models.
+	/// NPC entity with support for animated JSON models and pathfinding navigation.
 	/// Uses NPCAnimator to play predefined animations (walk, idle, attack, etc.).
 	/// </summary>
 	public class VEntNPC : VoxEntity
@@ -23,11 +24,97 @@ namespace Voxelgine.Engine
 		BoundingBox BBox;
 		NPCAnimator Animator;
 
+		// Pathfinding
+		PathFollower _pathFollower;
+		ChunkMap _map;
+		Vector3 _lookDirection = Vector3.UnitZ;
+
+		// Stuck detection and recovery
+		private Vector3 _lastStuckCheckPos;
+		private float _stuckCheckTimer;
+		private int _stuckRecalculateAttempts;
+		private bool _isUnstuckWandering;
+		private Vector3 _originalTarget;
+		private bool _hasOriginalTarget;
+		private bool _triedJumpingToUnstuck;
+		private static readonly Random _random = new();
+		private const float StuckCheckInterval = 0.5f;      // Check every 0.5 seconds
+		private const float StuckDistanceThreshold = 0.3f;  // Must move at least this far
+		private const int MaxRecalculateAttempts = 3;       // Try random directions this many times
+		private const float WanderDistance = 3f;            // How far to wander when stuck
+		private const float JumpVelocity = 5.5f;            // Jump impulse strength (enough for ~1 block)
+		private const float GroundCheckDistance = 0.15f;    // How far below feet to check for ground
+
+		// Idle wandering
+		private float _idleTimer;
+		private const float IdleWanderDelay = 10f;          // Seconds before wandering when idle
+		private const float IdleWanderRadius = 10f;         // Max distance to wander
+
 		/// <summary>Gets the animator for this NPC (null if model not loaded).</summary>
 		public NPCAnimator GetAnimator() => Animator;
 
 		/// <summary>Gets the custom model for this NPC (null if not loaded).</summary>
 		public CustomModel GetCustomModel() => CModel;
+
+		/// <summary>Gets the path follower for this NPC (null if not initialized).</summary>
+		public PathFollower GetPathFollower() => _pathFollower;
+
+		/// <summary>
+		/// Initializes pathfinding for this NPC.
+		/// Must be called after entity is spawned and has access to the world.
+		/// </summary>
+		public void InitPathfinding(ChunkMap map)
+		{
+			_map = map;
+			int entityHeight = (int)MathF.Ceiling(Size.Y);
+			int entityWidth = (int)MathF.Ceiling(MathF.Max(Size.X, Size.Z));
+			_pathFollower = new PathFollower(map, entityHeight, entityWidth)
+			{
+				MoveSpeed = 3.0f,
+				WaypointReachDistance = 0.4f
+			};
+		}
+
+		/// <summary>
+		/// Commands the NPC to navigate to a target position.
+		/// </summary>
+		/// <param name="target">World position to navigate to.</param>
+		/// <returns>True if a path was found.</returns>
+		public bool NavigateTo(Vector3 target)
+		{
+			if (_pathFollower == null)
+				return false;
+
+			// Reset stuck detection when starting new navigation
+			_lastStuckCheckPos = Position;
+			_stuckCheckTimer = 0f;
+			_stuckRecalculateAttempts = 0;
+			_isUnstuckWandering = false;
+			_hasOriginalTarget = false;
+			_triedJumpingToUnstuck = false;
+
+			return _pathFollower.SetTarget(Position, target);
+		}
+
+		/// <summary>
+		/// Stops the NPC from following its current path.
+		/// </summary>
+		public void StopNavigation()
+		{
+			_pathFollower?.ClearPath();
+			_isUnstuckWandering = false;
+			_hasOriginalTarget = false;
+		}
+
+		/// <summary>
+		/// Returns true if the NPC is currently navigating.
+		/// </summary>
+		public bool IsNavigating => _pathFollower?.IsFollowingPath ?? false;
+
+		/// <summary>
+		/// Returns true if the NPC has reached its navigation target.
+		/// </summary>
+		public bool HasReachedTarget => _pathFollower?.HasReachedTarget ?? false;
 
 		public override void SetModel(string MdlName)
 		{
@@ -69,11 +156,123 @@ namespace Voxelgine.Engine
 		{
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
+			// Resolve any block clipping first
+			ResolveBlockCollisions();
+
+			// Check if grounded
+			bool isGrounded = IsGrounded();
+
+			// Update pathfinding movement
+			if (_pathFollower != null && _pathFollower.IsFollowingPath)
+			{
+				// Stuck detection
+				_stuckCheckTimer += Dt;
+				if (_stuckCheckTimer >= StuckCheckInterval)
+				{
+					_stuckCheckTimer = 0f;
+
+					// Check if we've moved enough since last check
+					float distanceMoved = Vector3.Distance(Position, _lastStuckCheckPos);
+					if (distanceMoved < StuckDistanceThreshold)
+					{
+						// We're stuck - try different recovery methods
+						HandleStuckRecovery(isGrounded);
+					}
+					else
+					{
+						// Making progress
+						if (_isUnstuckWandering)
+						{
+							// Successfully unstuck - return to original target
+							Console.WriteLine("NPC unstuck, resuming original navigation");
+							_isUnstuckWandering = false;
+							_stuckRecalculateAttempts = 0;
+							_triedJumpingToUnstuck = false;
+
+							if (_hasOriginalTarget)
+							{
+								_pathFollower.SetTarget(Position, _originalTarget);
+								_hasOriginalTarget = false;
+							}
+						}
+						else
+						{
+							// Normal progress - reset attempts
+							_stuckRecalculateAttempts = 0;
+							_triedJumpingToUnstuck = false;
+						}
+					}
+
+					_lastStuckCheckPos = Position;
+				}
+
+				// Get movement direction from path follower
+				Vector3 moveDir = _pathFollower.Update(Position, Dt);
+
+				if (moveDir.LengthSquared() > 0.001f)
+				{
+					// Apply horizontal velocity
+					Velocity = new Vector3(
+						moveDir.X * _pathFollower.MoveSpeed,
+						Velocity.Y, // Keep vertical velocity (gravity)
+						moveDir.Z * _pathFollower.MoveSpeed
+					);
+
+					// Update look direction
+					_lookDirection = moveDir;
+				}
+				else
+				{
+					// Stop horizontal movement when no direction
+					Velocity = new Vector3(0, Velocity.Y, 0);
+				}
+
+				// Handle jumping for navigation
+				if (isGrounded)
+				{
+					// Jump if path requires it (waypoint is higher)
+					if (_pathFollower.ShouldJump(Position))
+					{
+						Jump();
+					}
+					// Also jump if target is significantly higher than current position
+					else if (_pathFollower.HasTarget)
+					{
+						float heightDiff = _pathFollower.TargetPosition.Y - Position.Y;
+						if (heightDiff > 0.5f && IsBlockedAhead(moveDir))
+						{
+							Jump();
+						}
+					}
+				}
+			}
+
+			// Idle wandering behavior
+			if (_pathFollower != null && !_pathFollower.IsFollowingPath)
+			{
+				_idleTimer += Dt;
+				if (_idleTimer >= IdleWanderDelay)
+				{
+					_idleTimer = 0f;
+					Vector3? wanderTarget = GetIdleWanderTarget();
+					if (wanderTarget.HasValue)
+					{
+						NavigateTo(wanderTarget.Value);
+					}
+				}
+			}
+			else
+			{
+				// Reset idle timer while navigating
+				_idleTimer = 0f;
+			}
+
 			// Update animation
 			Animator?.Update(Dt);
 
-			// Simple AI: play walk animation when moving, idle when stationary
-			if (Animator != null && Velocity.LengthSquared() > 0.01f)
+			// Play walk animation when moving, idle when stationary
+			float horizontalSpeed = MathF.Sqrt(Velocity.X * Velocity.X + Velocity.Z * Velocity.Z);
+			if (Animator != null && horizontalSpeed > 0.5f)
 			{
 				if (Animator.CurrentAnimation != "walk")
 					Animator.Play("walk");
@@ -85,6 +284,281 @@ namespace Voxelgine.Engine
 			}
 		}
 
+		/// <summary>
+		/// Handles recovery when the NPC is stuck.
+		/// Tries jumping first, then wandering in random directions.
+		/// </summary>
+		private void HandleStuckRecovery(bool isGrounded)
+		{
+			// First, try jumping if we haven't yet and we're grounded
+			if (!_triedJumpingToUnstuck && isGrounded)
+			{
+				Console.WriteLine("NPC stuck, trying to jump out");
+				_triedJumpingToUnstuck = true;
+				Jump();
+				return;
+			}
+
+			// If jumping didn't help, try wandering
+			_stuckRecalculateAttempts++;
+
+			if (_stuckRecalculateAttempts <= MaxRecalculateAttempts)
+			{
+				// Save original target if not already wandering
+				if (!_isUnstuckWandering && _pathFollower.HasTarget)
+				{
+					_originalTarget = _pathFollower.TargetPosition;
+					_hasOriginalTarget = true;
+				}
+
+				// Try wandering in a random direction
+				_isUnstuckWandering = true;
+				_triedJumpingToUnstuck = false; // Reset jump flag for next attempt
+				Vector3 randomTarget = GetRandomWanderTarget();
+				Console.WriteLine($"NPC stuck, wandering to random position (attempt {_stuckRecalculateAttempts}/{MaxRecalculateAttempts})");
+				_pathFollower.SetTarget(Position, randomTarget);
+			}
+			else
+			{
+				// Give up after max attempts
+				Console.WriteLine("NPC giving up on navigation after max attempts");
+				StopNavigation();
+			}
+		}
+
+		/// <summary>
+		/// Makes the NPC jump if grounded.
+		/// </summary>
+		private void Jump()
+		{
+			Velocity = new Vector3(Velocity.X, JumpVelocity, Velocity.Z);
+		}
+
+		/// <summary>
+		/// Checks if the NPC is standing on solid ground.
+		/// </summary>
+		private bool IsGrounded()
+		{
+			if (_map == null)
+				return false;
+
+			float halfWidth = Size.X / 2f;
+
+			// Check multiple points under the NPC's feet
+			Vector2[] checkPoints =
+			{
+				new Vector2(Position.X, Position.Z),                          // Center
+				new Vector2(Position.X - halfWidth * 0.5f, Position.Z),       // Left
+				new Vector2(Position.X + halfWidth * 0.5f, Position.Z),       // Right
+				new Vector2(Position.X, Position.Z - halfWidth * 0.5f),       // Back
+				new Vector2(Position.X, Position.Z + halfWidth * 0.5f),       // Front
+			};
+
+			float checkY = Position.Y - GroundCheckDistance;
+
+			foreach (var point in checkPoints)
+			{
+				int blockX = (int)MathF.Floor(point.X);
+				int blockY = (int)MathF.Floor(checkY);
+				int blockZ = (int)MathF.Floor(point.Y);
+
+				if (_map.IsSolid(blockX, blockY, blockZ))
+					return true;
+			}
+
+			return false;
+		}
+
+		/// <summary>
+		/// Checks if there's a solid block ahead in the movement direction.
+		/// Used to detect when jumping might help navigate obstacles.
+		/// </summary>
+		private bool IsBlockedAhead(Vector3 moveDir)
+		{
+			if (_map == null || moveDir.LengthSquared() < 0.001f)
+				return false;
+
+			// Check at knee height (where we'd bump into blocks)
+			Vector3 checkPos = Position + new Vector3(0, 0.5f, 0) + moveDir * (Size.X / 2f + 0.3f);
+
+			int blockX = (int)MathF.Floor(checkPos.X);
+			int blockY = (int)MathF.Floor(checkPos.Y);
+			int blockZ = (int)MathF.Floor(checkPos.Z);
+
+			return _map.IsSolid(blockX, blockY, blockZ);
+		}
+
+		/// <summary>
+		/// Gets a random walkable position at the same height for idle wandering.
+		/// </summary>
+		private Vector3? GetIdleWanderTarget()
+		{
+			if (_map == null)
+				return null;
+
+			int currentY = (int)MathF.Floor(Position.Y);
+
+			// Try several random positions
+			for (int attempt = 0; attempt < 10; attempt++)
+			{
+				float angle = (float)(_random.NextDouble() * Math.PI * 2);
+				float distance = 3f + (float)(_random.NextDouble() * (IdleWanderRadius - 3f));
+
+				int targetX = (int)MathF.Floor(Position.X + MathF.Cos(angle) * distance);
+				int targetZ = (int)MathF.Floor(Position.Z + MathF.Sin(angle) * distance);
+
+				// Check if target position is walkable (solid below, air at feet and head)
+				bool groundSolid = _map.IsSolid(targetX, currentY - 1, targetZ);
+				bool feetClear = !_map.IsSolid(targetX, currentY, targetZ);
+				bool headClear = !_map.IsSolid(targetX, currentY + 1, targetZ);
+
+				if (groundSolid && feetClear && headClear)
+				{
+					return new Vector3(targetX + 0.5f, currentY, targetZ + 0.5f);
+				}
+			}
+
+			return null;
+		}
+
+		/// <summary>
+		/// Gets a random walkable position near the NPC for unstuck wandering.
+		/// </summary>
+		private Vector3 GetRandomWanderTarget()
+		{
+			// Try random directions
+			for (int i = 0; i < 8; i++)
+			{
+				float angle = (float)(_random.NextDouble() * Math.PI * 2);
+				float distance = WanderDistance * (0.5f + (float)_random.NextDouble() * 0.5f);
+
+				Vector3 offset = new Vector3(
+					MathF.Cos(angle) * distance,
+					0,
+					MathF.Sin(angle) * distance
+				);
+
+				Vector3 target = Position + offset;
+
+				// Check if there's a valid path to this random position
+				// (the pathfinder will handle finding walkable ground)
+				return target;
+			}
+
+			// Fallback: just offset in a random direction
+			return Position + new Vector3(
+				(float)(_random.NextDouble() - 0.5) * WanderDistance * 2,
+				0,
+				(float)(_random.NextDouble() - 0.5) * WanderDistance * 2
+			);
+		}
+
+		/// <summary>
+		/// Checks if the NPC is clipping into solid blocks and pushes it out.
+		/// Uses minimum penetration axis to resolve collisions smoothly.
+		/// </summary>
+		private void ResolveBlockCollisions()
+		{
+			if (_map == null)
+				return;
+
+			// NPC collision bounds (centered on X/Z, feet at Y)
+			float halfWidth = Size.X / 2f;
+			float height = Size.Y;
+			const float skinWidth = 0.02f; // Small buffer to prevent sticking
+
+			// Calculate NPC AABB
+			float minX = Position.X - halfWidth;
+			float maxX = Position.X + halfWidth;
+			float minY = Position.Y;
+			float maxY = Position.Y + height;
+			float minZ = Position.Z - halfWidth;
+			float maxZ = Position.Z + halfWidth;
+
+			// Get block range to check
+			int blockMinX = (int)MathF.Floor(minX);
+			int blockMaxX = (int)MathF.Floor(maxX);
+			int blockMinY = (int)MathF.Floor(minY);
+			int blockMaxY = (int)MathF.Floor(maxY);
+			int blockMinZ = (int)MathF.Floor(minZ);
+			int blockMaxZ = (int)MathF.Floor(maxZ);
+
+			// Check each potentially overlapping block
+				for (int bx = blockMinX; bx <= blockMaxX; bx++)
+				{
+					for (int by = blockMinY; by <= blockMaxY; by++)
+					{
+						for (int bz = blockMinZ; bz <= blockMaxZ; bz++)
+						{
+							if (!_map.IsSolid(bx, by, bz))
+								continue;
+
+							// Block AABB (use float directly from int coords)
+							float bMinX = bx;
+							float bMaxX = bx + 1f;
+							float bMinY = by;
+							float bMaxY = by + 1f;
+							float bMinZ = bz;
+							float bMaxZ = bz + 1f;
+
+							// Check if actually overlapping
+							if (maxX <= bMinX || minX >= bMaxX ||
+								maxY <= bMinY || minY >= bMaxY ||
+								maxZ <= bMinZ || minZ >= bMaxZ)
+								continue;
+
+							// Calculate penetration on each axis
+							float overlapLeft = maxX - bMinX;   // Push -X
+							float overlapRight = bMaxX - minX;  // Push +X
+							float overlapBottom = maxY - bMinY; // Push -Y
+							float overlapTop = bMaxY - minY;    // Push +Y
+							float overlapBack = maxZ - bMinZ;   // Push -Z
+							float overlapFront = bMaxZ - minZ;  // Push +Z
+
+							// Find minimum horizontal penetration (ignore Y for now - gravity handles that)
+							float minOverlapX = MathF.Min(overlapLeft, overlapRight);
+							float minOverlapZ = MathF.Min(overlapBack, overlapFront);
+
+							// Push out on the axis with smallest penetration
+							if (minOverlapX < minOverlapZ)
+							{
+								// Push on X axis
+								if (overlapLeft < overlapRight)
+								{
+									Position.X -= overlapLeft + skinWidth;
+									if (Velocity.X > 0) Velocity.X = 0;
+								}
+								else
+								{
+									Position.X += overlapRight + skinWidth;
+									if (Velocity.X < 0) Velocity.X = 0;
+								}
+							}
+							else
+							{
+								// Push on Z axis
+								if (overlapBack < overlapFront)
+								{
+									Position.Z -= overlapBack + skinWidth;
+									if (Velocity.Z > 0) Velocity.Z = 0;
+								}
+								else
+								{
+									Position.Z += overlapFront + skinWidth;
+									if (Velocity.Z < 0) Velocity.Z = 0;
+								}
+							}
+
+							// Recalculate NPC bounds after push
+							minX = Position.X - halfWidth;
+							maxX = Position.X + halfWidth;
+							minZ = Position.Z - halfWidth;
+							maxZ = Position.Z + halfWidth;
+						}
+					}
+				}
+			}
+
 		protected override void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
 		{
 			if (HasModel)
@@ -92,11 +566,26 @@ namespace Voxelgine.Engine
 				BBox = CModel.GetBoundingBox();
 
 				CModel.Position = GetDrawPosition();
-				CModel.LookDirection = Vector3.UnitZ;
+				CModel.LookDirection = _lookDirection;
 				CModel.Draw();
 
 				if (Program.DebugMode)
+				{
 					Raylib.DrawBoundingBox(BBox, Color.Blue);
+
+					// Draw path if navigating
+					if (_pathFollower != null && _pathFollower.IsFollowingPath)
+					{
+						var path = _pathFollower.CurrentPath;
+						for (int i = _pathFollower.CurrentWaypointIndex; i < path.Count - 1; i++)
+						{
+							Raylib.DrawLine3D(path[i], path[i + 1], Color.Yellow);
+							Raylib.DrawSphere(path[i], 0.15f, Color.Green);
+						}
+						if (path.Count > 0)
+							Raylib.DrawSphere(path[^1], 0.2f, Color.Red);
+					}
+				}
 			}
 		}
 	}

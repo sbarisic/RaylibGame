@@ -664,5 +664,37 @@ namespace Voxelgine.Graphics
 
 			return Cols.OrderBy(c => c.Distance).FirstOrDefault();
 		}
+
+		/// <summary>
+		/// Creates a new pathfinder instance for this map.
+		/// </summary>
+		/// <param name="entityHeight">Height of the entity in blocks (default 2).</param>
+		/// <param name="entityWidth">Width of the entity in blocks (default 1).</param>
+		/// <returns>A VoxelPathfinder configured for this map.</returns>
+		public Voxelgine.Engine.Pathfinding.VoxelPathfinder CreatePathfinder(int entityHeight = 2, int entityWidth = 1)
+		{
+			return new Voxelgine.Engine.Pathfinding.VoxelPathfinder(this)
+			{
+				EntityHeight = entityHeight,
+				EntityWidth = entityWidth
+			};
+		}
+
+		/// <summary>
+		/// Finds a path between two positions using A* pathfinding.
+		/// Creates a temporary pathfinder - for repeated pathfinding, use CreatePathfinder() instead.
+		/// </summary>
+		/// <param name="start">Starting world position.</param>
+		/// <param name="end">Target world position.</param>
+		/// <param name="entityHeight">Height of the entity in blocks (default 2).</param>
+		/// <returns>List of waypoints from start to end, or empty list if no path found.</returns>
+		public List<Vector3> FindPath(Vector3 start, Vector3 end, int entityHeight = 2)
+		{
+			var pathfinder = new Voxelgine.Engine.Pathfinding.VoxelPathfinder(this)
+			{
+				EntityHeight = entityHeight
+			};
+			return pathfinder.FindPath(start, end);
+		}
 	}
 }

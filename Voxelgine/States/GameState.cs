@@ -93,6 +93,9 @@ namespace RaylibGame.States
 		private CheckBox _debugModeCheckbox;
 		private CheckBox _fullbrightCheckbox;
 
+		// Test NPC reference
+		private VEntNPC _testNpc;
+
 		public GameState(GameWindow window) : base(window)
 		{
 			GUI = new FishUIManager(window);
@@ -103,40 +106,43 @@ namespace RaylibGame.States
 
 			// =========================================== Init Systems ==============================================
 			Snd.Init();
-			Map = new ChunkMap(this);
+				Map = new ChunkMap(this);
 
-			Particle = new ParticleSystem();
-			Particle.Init(
-				(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
-				(Pt) => Map.GetBlock(Pt),
-				(Pt) => Map.GetLightColor(Pt)
-			);
+				Particle = new ParticleSystem();
+				Particle.Init(
+					(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
+					(Pt) => Map.GetBlock(Pt),
+					(Pt) => Map.GetLightColor(Pt)
+				);
 
-			// =========================================== Create entities ===========================================
-			// Create pickup entity
-			VEntPickup pickup = new VEntPickup();
-			pickup.SetPosition(PickupPos);
-			pickup.SetSize(Vector3.One);
-			pickup.SetModel("orb_xp/orb_xp.obj");
-			EntMgr.Spawn(this, pickup);
+				// =========================================== Create entities ===========================================
+				// Create pickup entity
+				VEntPickup pickup = new VEntPickup();
+				pickup.SetPosition(PickupPos);
+				pickup.SetSize(Vector3.One);
+				pickup.SetModel("orb_xp/orb_xp.obj");
+				EntMgr.Spawn(this, pickup);
 
-			// Create NPC entity  
-			VEntNPC npc = new VEntNPC();
-			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-			npc.SetPosition(NPCPos);
-			npc.SetModel("npc/humanoid.json");
-			EntMgr.Spawn(this, npc);
+				// Create NPC entity  
+				_testNpc = new VEntNPC();
+				_testNpc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
+				_testNpc.SetPosition(NPCPos);
+				_testNpc.SetModel("npc/humanoid.json");
+				EntMgr.Spawn(this, _testNpc);
 
-			// ======================================= Create rest of the world ======================================
-			if (File.Exists(MAP_FILE))
-			{
-				using var fileStream = File.OpenRead(MAP_FILE);
-				Map.Read(fileStream);
-			}
-			else
-			{
-				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
-			}
+				// ======================================= Create rest of the world ======================================
+				if (File.Exists(MAP_FILE))
+				{
+					using var fileStream = File.OpenRead(MAP_FILE);
+					Map.Read(fileStream);
+				}
+				else
+				{
+					Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
+				}
+
+				// Initialize pathfinding for NPCs (must be after map is loaded)
+				_testNpc.InitPathfinding(Map);
 
 			Map.ComputeLighting();
 
@@ -323,6 +329,22 @@ namespace RaylibGame.States
 				Console.WriteLine("World regenerated!");
 			};
 			stack.AddChild(btnRegen);
+
+			// NPC navigate to player button
+			var btnNpcNavigate = new Button
+			{
+				Text = "NPC Navigate to Player",
+				Size = new Vector2(280, 40)
+			};
+			btnNpcNavigate.Clicked += (sender, args) =>
+			{
+				if (_testNpc != null)
+				{
+					bool pathFound = _testNpc.NavigateTo(Ply.Position);
+					Console.WriteLine(pathFound ? "NPC navigating to player!" : "NPC could not find path to player!");
+				}
+			};
+			stack.AddChild(btnNpcNavigate);
 
 			/*// Export animations button
 			var btnExportAnims = new Button

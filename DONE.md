@@ -48,6 +48,8 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Unit Tests** — Fixed noise seed test with larger coordinates
 - **GUI: Main menu button clipping** — Fixed button borders being cut off by adding padding to StackLayout
 - **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel; fixed opaque block face lighting to sample from adjacent air blocks instead of the opaque block itself
+- **Cross-chunk light propagation** — Fixed neighbor chunks not being marked dirty when light propagates across chunk boundaries; glowstone near edges now properly updates adjacent chunk meshes
+- **Chunk mesh lighting seams** — Fixed by splitting lighting computation into reset and compute phases; all chunks now reset before any propagation to prevent cross-chunk values from being overwritten
 
 ---
 

@@ -74,6 +74,10 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Documentation
 
+### Medium Priority
+
+- [ ] **README.md update** — Update with newest project changes, architecture overview and project status table **[CPX: 2]**
+
 ### Lower Priority
 
 - [ ] API reference documentation

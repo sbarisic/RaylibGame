@@ -41,17 +41,34 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
+		/// Resets all light values in this chunk to black.
+		/// Called before computing lighting to ensure clean state.
+		/// </summary>
+		public void ResetLighting()
+		{
+			for (int i = 0; i < Blocks.Length; i++)
+			{
+				Blocks[i].SetAllLights(BlockLight.Black);
+			}
+		}
+
+		/// <summary>
 		/// Computes lighting for this chunk. Handles both skylight and block light separately.
 		/// Skylight propagates from sky-exposed blocks, block light from light-emitting blocks.
 		/// </summary>
 		public void ComputeLighting()
 		{
-			// Reset all light values to zero
-			for (int i = 0; i < Blocks.Length; i++)
-			{
-				Blocks[i].SetAllLights(BlockLight.Black);
-			}
+			ResetLighting();
+			ComputeLightingWithoutReset();
+		}
 
+		/// <summary>
+		/// Computes lighting without resetting light values first.
+		/// Used when all chunks need to be reset before any propagation to avoid
+		/// cross-chunk light values being overwritten.
+		/// </summary>
+		public void ComputeLightingWithoutReset()
+		{
 			// Compute skylight (from sky exposure)
 			ComputeSkylight();
 
@@ -179,6 +196,7 @@ namespace Voxelgine.Graphics
 						{
 							neighborBlock.SetSkylight(newSkylight);
 							WorldMap.SetPlacedBlockNoLighting(worldNx, worldNy, worldNz, neighborBlock);
+							neighborChunk.MarkDirty(); // Ensure neighbor chunk mesh is rebuilt
 						}
 						continue;
 					}
@@ -309,6 +327,7 @@ namespace Voxelgine.Graphics
 						{
 							neighborBlock.SetBlockLightLevel(newBlockLight);
 							WorldMap.SetPlacedBlockNoLighting(worldNx, worldNy, worldNz, neighborBlock);
+							neighborChunk.MarkDirty(); // Ensure neighbor chunk mesh is rebuilt
 						}
 						continue;
 					}

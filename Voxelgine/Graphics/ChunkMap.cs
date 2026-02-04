@@ -302,8 +302,14 @@ namespace Voxelgine.Graphics
 
 		public void ComputeLighting()
 		{
+			// Reset all chunks first to prevent cross-chunk propagated values from being overwritten
 			foreach (Chunk C in GetAllChunks())
-				C.ComputeLighting();
+				C.ResetLighting();
+
+			// Then compute lighting for all chunks (propagation can now safely update neighbors)
+			foreach (Chunk C in GetAllChunks())
+				C.ComputeLightingWithoutReset();
+
 			foreach (Chunk C in GetAllChunks())
 				C.MarkDirty();
 		}
@@ -314,9 +320,13 @@ namespace Voxelgine.Graphics
 		/// <param name="entityLights">Collection of point lights from entities.</param>
 		public void ComputeLightingWithEntities(IEnumerable<PointLight> entityLights)
 		{
-			// First compute standard block-based lighting
+			// Reset all chunks first to prevent cross-chunk propagated values from being overwritten
 			foreach (Chunk C in GetAllChunks())
-				C.ComputeLighting();
+				C.ResetLighting();
+
+			// Then compute standard block-based lighting for all chunks
+			foreach (Chunk C in GetAllChunks())
+				C.ComputeLightingWithoutReset();
 
 			// Then add entity lights with shadows
 			if (entityLights != null)

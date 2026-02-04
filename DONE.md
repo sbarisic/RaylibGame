@@ -46,3 +46,9 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Unit Tests** — Fixed noise seed test with larger coordinates
 - **GUI: Main menu button clipping** — Fixed button borders being cut off by adding padding to StackLayout
 - **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel; fixed opaque block face lighting to sample from adjacent air blocks instead of the opaque block itself
+
+---
+
+## Code Refactoring
+
+- **Chunk class file split** — Split `Chunk.Base.cs` into multiple partial class files: `Chunk.Base.cs` (core), `Chunk.Lighting.cs`, `Chunk.Rendering.cs`, `Chunk.Serialization.cs`, and existing `Chunk.GenMesh.cs`

@@ -86,5 +86,39 @@ namespace Voxelgine.Engine {
 					yield return Ent;
 			}
 		}
+
+		/// <summary>
+		/// Returns all entities in the manager.
+		/// </summary>
+		public IEnumerable<VoxEntity> GetAllEntities() {
+			for (int i = 0; i < Entities.Count; i++) {
+				if (Entities[i] != null)
+					yield return Entities[i];
+			}
+		}
+
+		/// <summary>
+		/// Casts a ray against all entities and returns the closest hit.
+		/// </summary>
+		/// <param name="rayOrigin">Origin point of the ray.</param>
+		/// <param name="rayDir">Normalized direction of the ray.</param>
+		/// <param name="maxDistance">Maximum distance to check.</param>
+		/// <param name="excludeEntity">Optional entity to exclude from testing.</param>
+		/// <returns>RaycastHit with closest hit information, or RaycastHit.None if no hit.</returns>
+		public RaycastHit Raycast(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null) {
+			return Engine.Raycast.CastAgainstEntities(rayOrigin, rayDir, Entities, maxDistance, excludeEntity);
+		}
+
+		/// <summary>
+		/// Casts a ray against all entities and returns all hits sorted by distance.
+		/// </summary>
+		/// <param name="rayOrigin">Origin point of the ray.</param>
+		/// <param name="rayDir">Normalized direction of the ray.</param>
+		/// <param name="maxDistance">Maximum distance to check.</param>
+		/// <param name="excludeEntity">Optional entity to exclude from testing.</param>
+		/// <returns>List of all hits sorted by distance (closest first).</returns>
+		public List<RaycastHit> RaycastAll(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null) {
+			return Engine.Raycast.CastAgainstEntitiesAll(rayOrigin, rayDir, Entities, maxDistance, excludeEntity);
+		}
 	}
 }

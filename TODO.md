@@ -49,10 +49,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
+- [ ] **Weapons: Tracer lines** — Add tracer lines when shooting that persist for a few seconds and fade out **[CPX: 2]**
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
 ### Medium Priority
 
+- [ ] **Weapons: Automatic fire** — Add automatic gun firing when left mouse button is held down **[CPX: 1]**
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
 
 ### Lower Priority
@@ -108,9 +110,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- When shooting gun, add tracer lines that persist for a few seconds and fade out **HIGH PRIORITY**
-- Add a raycasting utility that can pick entities in the way, for example for shooting guns, picking up items, or interacting with doors **HIGH PRIORITY**
-- When hitting an NPC, get the precise hit position and normal to spawn hit particles and decals (e.g., blood) at the correct location and orientation **HIGH PRIORITY**
+- **HIGHEST PRIORITY** Add a function to NPC which will pick the hit model entity (e.g. leg_r, leg_l, head) based on a raycast, take into account animation morphs, modify gun so when an NPC is shot, print which part of the NPC is shot
 
 
 ---

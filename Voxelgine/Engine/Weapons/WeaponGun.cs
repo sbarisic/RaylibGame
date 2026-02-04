@@ -54,31 +54,56 @@ namespace Voxelgine.Engine
 			// Play shooting sound at player position
 			ParentPlayer.PlaySound("shoot1", ParentPlayer.Position);
 
-			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
+			GameState GState = ((GameState)Program.GameState);
 
-			if (Pos != Vector3.Zero)
+			// Raycast against world (blocks)
+			Vector3 worldHitPos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 worldNorm);
+			float worldDist = worldHitPos != Vector3.Zero ? Vector3.Distance(E.Start, worldHitPos) : float.MaxValue;
+
+			// Raycast against entities
+			RaycastHit entityHit = GState.Entities.Raycast(E.Start, E.Dir, E.MaxLen);
+
+			// Determine which hit is closer
+			Vector3 hitPos;
+			Vector3 hitNormal;
+			VoxEntity hitEntity = null;
+
+			if (entityHit.Hit && entityHit.Distance < worldDist)
 			{
-				Console.WriteLine("Hit!");
-
-				GameState GState = ((GameState)Program.GameState);
-				// Spawn fire effect at hit position with wall normal as initial force
-
-				for (int i = 0; i < 6; i++)
-				{
-					float ForceFactor = 10.6f;
-					float RandomUnitFactor = 0.6f;
-
-					if (Norm.Y == 0)
-					{
-						ForceFactor *= 2;
-						RandomUnitFactor = 0.4f;
-					}
-
-					Vector3 RndDir = Vector3.Normalize(Norm + Utils.GetRandomUnitVector() * RandomUnitFactor);
-					GState.Particle.SpawnFire(Pos, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
-				}
+				// Entity hit is closer
+				hitPos = entityHit.HitPosition;
+				hitNormal = entityHit.HitNormal;
+				hitEntity = entityHit.Entity;
+				Console.WriteLine($"Hit entity: {hitEntity.GetType().Name} at distance {entityHit.Distance:F2}");
+			}
+			else if (worldHitPos != Vector3.Zero)
+			{
+				// World hit is closer (or no entity hit)
+				hitPos = worldHitPos;
+				hitNormal = worldNorm;
+				Console.WriteLine("Hit world!");
+			}
+			else
+			{
+				// No hit at all
+				return;
 			}
 
+			// Spawn fire effect at hit position with surface normal as initial force
+			for (int i = 0; i < 6; i++)
+			{
+				float ForceFactor = 10.6f;
+				float RandomUnitFactor = 0.6f;
+
+				if (hitNormal.Y == 0)
+				{
+					ForceFactor *= 2;
+					RandomUnitFactor = 0.4f;
+				}
+
+				Vector3 RndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * RandomUnitFactor);
+				GState.Particle.SpawnFire(hitPos, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
+			}
 		}
 	}
 }

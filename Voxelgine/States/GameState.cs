@@ -71,6 +71,9 @@ namespace RaylibGame.States
 		private Frustum ViewFrustum;
 		private float _totalTime;
 
+		/// <summary>Gets the entity manager for this game state.</summary>
+		public EntityManager Entities => EntMgr;
+
 		// Water overlay
 		private Texture2D? _waterOverlayTexture;
 		private bool _waterOverlayLoaded;

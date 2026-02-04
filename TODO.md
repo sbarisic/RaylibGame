@@ -49,7 +49,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Graphics: Day/night cycle** — Add time-based day/night cycle that adjusts skylight levels over time, integrating with the ambient lighting system **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 
@@ -110,7 +110,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Make smoke particles have the same color as light on their current block position (requires sampling light level at particle position)
 
 ---
 

@@ -56,6 +56,12 @@ namespace RaylibGame.States
 			get; private set;
 		}
 
+		/// <summary>Day/night cycle manager.</summary>
+		public DayNightCycle DayNight
+		{
+			get; private set;
+		}
+
 		public Vector3 PlayerCollisionBoxPos;
 
 		private readonly List<Tuple<Vector3, Vector3>> MarkerList = new();
@@ -80,6 +86,7 @@ namespace RaylibGame.States
 			EntMgr = new EntityManager();
 			Snd = new SoundMgr();
 			PhysicsData = new PhysData();
+			DayNight = new DayNightCycle();
 
 			// =========================================== Init Systems ==============================================
 			Snd.Init();
@@ -157,7 +164,7 @@ namespace RaylibGame.States
 
 		private void CreateDebugMenu()
 		{
-			var menuSize = new Vector2(340, 480);
+			var menuSize = new Vector2(340, 560);
 			var menuPos = new Vector2(
 				(Program.Window.Width - menuSize.X) / 2,
 				(Program.Window.Height - menuSize.Y) / 2
@@ -226,6 +233,41 @@ namespace RaylibGame.States
 				// Force chunk mesh rebuild to apply new lighting
 				Map.MarkAllChunksDirty();
 			};
+			stack.AddChild(_fullbrightCheckbox);
+
+			// Day/Night cycle controls
+			var timeLabel = new Label
+			{
+				Text = "Time of Day:",
+				Size = new Vector2(200, 24)
+			};
+			stack.AddChild(timeLabel);
+
+			var timeButtonsLayout = new StackLayout
+			{
+				Orientation = StackOrientation.Horizontal,
+				Spacing = 5,
+				Size = new Vector2(280, 35),
+				IsTransparent = true
+			};
+
+			var btnDawn = new Button { Text = "Dawn", Size = new Vector2(65, 32) };
+			btnDawn.Clicked += (s, e) => { DayNight.SetTime(6f); Map.MarkAllChunksDirty(); };
+			timeButtonsLayout.AddChild(btnDawn);
+
+			var btnNoon = new Button { Text = "Noon", Size = new Vector2(65, 32) };
+			btnNoon.Clicked += (s, e) => { DayNight.SetTime(12f); Map.MarkAllChunksDirty(); };
+			timeButtonsLayout.AddChild(btnNoon);
+
+			var btnDusk = new Button { Text = "Dusk", Size = new Vector2(65, 32) };
+			btnDusk.Clicked += (s, e) => { DayNight.SetTime(18f); Map.MarkAllChunksDirty(); };
+			timeButtonsLayout.AddChild(btnDusk);
+
+			var btnNight = new Button { Text = "Night", Size = new Vector2(65, 32) };
+			btnNight.Clicked += (s, e) => { DayNight.SetTime(0f); Map.MarkAllChunksDirty(); };
+			timeButtonsLayout.AddChild(btnNight);
+
+			stack.AddChild(timeButtonsLayout);
 			stack.AddChild(_fullbrightCheckbox);
 
 			// Save game button
@@ -352,6 +394,18 @@ namespace RaylibGame.States
 
 		public override void Tick(float GameTime)
 		{
+			float dt = Raylib.GetFrameTime();
+
+			// Update day/night cycle
+			float prevMultiplier = DayNight.SkyLightMultiplier;
+			DayNight.Update(dt);
+
+			// Mark chunks dirty if sky light changed significantly (threshold to avoid constant rebuilds)
+			if (MathF.Abs(DayNight.SkyLightMultiplier - prevMultiplier) > 0.01f)
+			{
+				Map.MarkAllChunksDirty();
+			}
+
 			Particle.Tick(GameTime);
 
 			// Handle input
@@ -383,7 +437,8 @@ namespace RaylibGame.States
 		{
 			Ply.UpdateFPSCamera(ref FInfo);
 
-			Raylib.ClearBackground(new Color(200, 200, 200));
+			// Use sky color from day/night cycle
+			Raylib.ClearBackground(DayNight.SkyColor);
 			Raylib.BeginMode3D(Ply.RenderCam); // Use interpolated render camera
 
 			Shader defaultShader = ResMgr.GetShader("default");
@@ -418,6 +473,10 @@ namespace RaylibGame.States
 			GUI.Tick(deltaTime, _totalTime);
 			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
 			Raylib.DrawFPS(10, 10);
+
+			// Draw time of day
+			string timeStr = $"Time: {DayNight.GetTimeString()} ({DayNight.GetPeriodString()})";
+			Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
 		}
 
 		private void DrawUnderwaterOverlay()

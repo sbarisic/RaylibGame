@@ -142,20 +142,6 @@ namespace Voxelgine.Engine
 		public virtual void Tick(ViewModel ViewMdl, InputMgr InMgr)
 		{
 			ViewMdl.SetRotationMode(ViewModelRotationMode);
-
-			if (Name == "Gun")
-			{
-
-				if (InMgr.IsInputDown(InputKey.Click_Right))
-				{
-					ViewModelRotationMode = ViewModelRotationMode.GunIronsight;
-				}
-				else
-				{
-					ViewModelRotationMode = ViewModelRotationMode.Gun;
-				}
-
-			}
 		}
 
 		public virtual void OnDeselected(ViewModel CurViewModel)

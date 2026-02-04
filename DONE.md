@@ -16,7 +16,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Graphics: Underwater overlay** — Added water overlay when player camera is submerged (texture-based or fallback blue tint).
 - **Graphics: Improved lighting system** — Separated skylight and block light channels for day/night support. Added ambient light minimum, sky light multiplier, proper cross-chunk propagation, and per-block-type light emission levels.
 - **Graphics: Shadow support** — Added ray-traced shadow casting for block lights using 3D DDA algorithm. Entities can now emit light with `LightEmission` property. Added `ShadowTracer`, `PointLight` struct, and `ComputeLightingWithEntities()` for shadow-aware lighting.
-- **Graphics: Lighting performance optimizations** — Replaced heap allocations with stack-based arrays in `SetPlacedBlock`, added sky exposure caching per chunk, moved direction arrays to static readonly fields, eliminated array allocations in propagation loops.
+- **Graphics: Lighting performance optimizations** — Replaced heap allocations with stack-based arrays in `SetPlacedBlock`, added sky exposure caching per chunk, moved direction arrays to static readonly fields, eliminated array allocations in propagation loops. **Additional pass:** Replaced HashSet with flat bool array for visited tracking, replaced per-light Queue allocations with reusable pooled collections, cached chunk world positions to avoid repeated `GetWorldPos` calls, optimized `QueueBoundaryBlocksForExternalLight` with bounding box intersection culling to limit iteration scope.
 - **GUI: Inventory item box textures** — Added state-based textures (normal, selected, hover, pressed) for `FishUIItemBox` from `data/textures/gui/`.
 - **Graphics: Glowstone light emission** — Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.
 - **Audio: Block placement sounds** — Added sound effects for placing and breaking blocks.
@@ -30,6 +30,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Physics: Water buoyancy** — Added proper buoyancy force so player floats in water instead of sinking quickly
 - **Rendering** — Frame interpolation for smooth camera/position/view model rendering
 - **Unit Testing** — Tests for AABB, Easing, Utils, Noise
+- **Weapons: Require aim to fire** — Gun now requires right-click (aim/ironsight) to be held before firing. Moved aim handling from base `InventoryItem.Tick()` to `WeaponGun.Tick()` override with `IsAiming` property.
 
 ---
 
@@ -43,7 +44,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 - **Animation attachment points** — Fixed child model parts (hands) not following parent transforms (torso) during animations by implementing parent-child hierarchy in `CustomMesh` with `GetCombinedAnimationMatrix()`
 - **Water exit boost** — Fixed by applying 15% velocity boost when player exits water with upward momentum
-- **JSON model UV mapping** — Fixed UV coordinate calculation in MeshGenerator; now uses texture size instead of GlobalScale for normalization
+- **JSON model UV mapping** — Fixed UV coordinate calculation in MeshGenerator. Minecraft/Blockbench JSON models use 0-16 UV coordinate space that maps to the full texture regardless of resolution. Now divides by 16 instead of texture size. Fixed face UV vertex mappings to correctly map texture corners (UV.Y=0 → top, UV.Y=1 → bottom).
 - **Particle System** — Fixed depth ordering and underwater rendering (physics resistance, blue tint)
 - **Transparent Blocks** — Fixed depth sorting for water/glass overlap
 - **Unit Tests** — Fixed noise seed test with larger coordinates

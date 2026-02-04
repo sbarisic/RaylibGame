@@ -32,6 +32,12 @@ namespace Voxelgine.Graphics
 		bool[] SkyExposureCache;
 		bool SkyExposureCacheValid;
 
+		// Reusable collections for lighting propagation (avoid allocations)
+		Queue<BlockPos> _skylightQueue;
+		Queue<(int x, int y, int z, byte level)> _blockLightQueue;
+		List<PointLight> _lightSources;
+		bool[] _visitedBlocks; // Flat array: idx = x + ChunkSize*(y + ChunkSize*z)
+
 		/// <summary>
 		/// Invalidates the sky exposure cache, forcing recalculation on next lighting compute.
 		/// </summary>
@@ -84,8 +90,10 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void ComputeSkylight()
 		{
-			//return;
-			Queue<BlockPos> skylightQueue = new Queue<BlockPos>(ChunkSize * ChunkSize);
+			// Reuse or allocate queue
+			_skylightQueue ??= new Queue<BlockPos>(ChunkSize * ChunkSize);
+			_skylightQueue.Clear();
+			var skylightQueue = _skylightQueue;
 
 			// Build or use cached sky exposure data
 			if (!SkyExposureCacheValid || SkyExposureCache == null)
@@ -226,8 +234,10 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void ComputeBlockLights()
 		{
-			// Collect all light sources in this chunk
-			List<PointLight> lightSources = new List<PointLight>(32);
+			// Reuse light sources list to avoid allocation
+			_lightSources ??= new List<PointLight>(64);
+			_lightSources.Clear();
+			var lightSources = _lightSources;
 
 			for (int x = 0; x < ChunkSize; x++)
 			{
@@ -338,22 +348,31 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void PropagateBlockLightWithShadows(PointLight light)
 		{
-			// Queue entry includes the block position and current light level
-			Queue<(int x, int y, int z, byte level)> queue = new Queue<(int, int, int, byte)>(256);
+			// Reuse queue to avoid allocation
+			_blockLightQueue ??= new Queue<(int, int, int, byte)>(512);
+			_blockLightQueue.Clear();
+			var queue = _blockLightQueue;
+
+			// Reuse visited array - more efficient than HashSet for dense local access
+			const int totalBlocks = ChunkSize * ChunkSize * ChunkSize;
+			_visitedBlocks ??= new bool[totalBlocks];
+			Array.Clear(_visitedBlocks, 0, totalBlocks);
+			var visited = _visitedBlocks;
 
 			// Start from the light source block
 			int srcX = (int)MathF.Floor(light.Position.X);
 			int srcY = (int)MathF.Floor(light.Position.Y);
 			int srcZ = (int)MathF.Floor(light.Position.Z);
 
-			// Convert to local chunk coordinates
+			// Cache chunk world position once
 			WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 chunkWorldPos);
-			int localX = srcX - (int)chunkWorldPos.X;
-			int localY = srcY - (int)chunkWorldPos.Y;
-			int localZ = srcZ - (int)chunkWorldPos.Z;
+			int chunkWorldX = (int)chunkWorldPos.X;
+			int chunkWorldY = (int)chunkWorldPos.Y;
+			int chunkWorldZ = (int)chunkWorldPos.Z;
 
-			// Visited set to avoid reprocessing
-			HashSet<(int, int, int)> visited = new HashSet<(int, int, int)>();
+			int localX = srcX - chunkWorldX;
+			int localY = srcY - chunkWorldY;
+			int localZ = srcZ - chunkWorldZ;
 
 			if (localX >= 0 && localX < ChunkSize && localY >= 0 && localY < ChunkSize && localZ >= 0 && localZ < ChunkSize)
 			{
@@ -364,7 +383,7 @@ namespace Voxelgine.Graphics
 			{
 				// Light source is in a neighbor chunk - find entry points at chunk boundary
 				// Scan boundary blocks that could receive light from this source
-				QueueBoundaryBlocksForExternalLight(light, chunkWorldPos, queue, visited);
+				QueueBoundaryBlocksForExternalLight(light, chunkWorldX, chunkWorldY, chunkWorldZ, queue, visited);
 			}
 
 			while (queue.Count > 0)
@@ -383,11 +402,10 @@ namespace Voxelgine.Graphics
 					// Handle cross-chunk propagation
 					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize)
 					{
-						// Get world position and propagate to neighbor chunk
-						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 worldPos);
-						int worldNx = (int)worldPos.X + DirX[d];
-						int worldNy = (int)worldPos.Y + DirY[d];
-						int worldNz = (int)worldPos.Z + DirZ[d];
+						// Calculate world position using cached chunk coords
+						int worldNx = chunkWorldX + x + DirX[d];
+						int worldNy = chunkWorldY + y + DirY[d];
+						int worldNz = chunkWorldZ + z + DirZ[d];
 
 						PlacedBlock neighborBlock = WorldMap.GetPlacedBlock(worldNx, worldNy, worldNz, out Chunk neighborChunk);
 						if (neighborChunk == null || BlockInfo.IsOpaque(neighborBlock.Type))
@@ -412,11 +430,11 @@ namespace Voxelgine.Graphics
 						continue;
 					}
 
-					// Within chunk bounds
-					if (visited.Contains((nx, ny, nz)))
+					// Within chunk bounds - use array index for visited check (faster than HashSet)
+					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
+					if (visited[nidx])
 						continue;
 
-					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
 					PlacedBlock neighborBlock2 = Blocks[nidx];
 
 					if (BlockInfo.IsOpaque(neighborBlock2.Type))
@@ -425,8 +443,11 @@ namespace Voxelgine.Graphics
 					// Shadow check: verify line-of-sight to light source
 					if (light.CastsShadows)
 					{
-						WorldMap.GetWorldPos(nx, ny, nz, GlobalChunkIndex, out Vector3 neighborWorldPos);
-						Vector3 neighborCenter = neighborWorldPos + new Vector3(0.5f, 0.5f, 0.5f);
+						// Calculate world position using cached chunk coords instead of calling GetWorldPos
+						Vector3 neighborCenter = new Vector3(
+							chunkWorldX + nx + 0.5f,
+							chunkWorldY + ny + 0.5f,
+							chunkWorldZ + nz + 0.5f);
 						if (!ShadowTracer.HasLineOfSight(WorldMap, light.Position, neighborCenter))
 							continue; // In shadow, skip
 					}
@@ -437,7 +458,7 @@ namespace Voxelgine.Graphics
 					if (newBlockLight2 > neighborBlockLight2)
 					{
 						Blocks[nidx].SetBlockLightLevel(newBlockLight2);
-						visited.Add((nx, ny, nz));
+						visited[nidx] = true;
 						queue.Enqueue((nx, ny, nz, newBlockLight2));
 					}
 				}
@@ -447,28 +468,44 @@ namespace Voxelgine.Graphics
 		/// <summary>
 		/// Finds boundary blocks in this chunk that should receive light from an external source
 		/// and queues them with the appropriate light level based on distance.
+		/// Optimized to use integer chunk world coords and array-based visited tracking.
 		/// </summary>
-		void QueueBoundaryBlocksForExternalLight(PointLight light, Vector3 chunkWorldPos, 
-			Queue<(int x, int y, int z, byte level)> queue, HashSet<(int, int, int)> visited)
+		void QueueBoundaryBlocksForExternalLight(PointLight light, int chunkWorldX, int chunkWorldY, int chunkWorldZ,
+			Queue<(int x, int y, int z, byte level)> queue, bool[] visited)
 		{
 			int maxRange = light.Intensity;
+			int lightX = (int)MathF.Floor(light.Position.X);
+			int lightY = (int)MathF.Floor(light.Position.Y);
+			int lightZ = (int)MathF.Floor(light.Position.Z);
 
-			// Scan all blocks in this chunk that are within range of the external light
-			// Focus on boundary regions facing the light source for efficiency
-			for (int x = 0; x < ChunkSize; x++)
+			// Calculate bounding box intersection with chunk to limit iteration
+			int minX = Math.Max(0, lightX - maxRange - chunkWorldX);
+			int maxX = Math.Min(ChunkSize, lightX + maxRange + 1 - chunkWorldX);
+			int minY = Math.Max(0, lightY - maxRange - chunkWorldY);
+			int maxY = Math.Min(ChunkSize, lightY + maxRange + 1 - chunkWorldY);
+			int minZ = Math.Max(0, lightZ - maxRange - chunkWorldZ);
+			int maxZ = Math.Min(ChunkSize, lightZ + maxRange + 1 - chunkWorldZ);
+
+			// Skip if bounding box doesn't intersect chunk
+			if (minX >= maxX || minY >= maxY || minZ >= maxZ)
+				return;
+
+			// Scan only blocks within the light's bounding box
+			for (int x = minX; x < maxX; x++)
 			{
-				for (int y = 0; y < ChunkSize; y++)
+				for (int y = minY; y < maxY; y++)
 				{
-					for (int z = 0; z < ChunkSize; z++)
+					for (int z = minZ; z < maxZ; z++)
 					{
-						// Calculate world position of this block
-						Vector3 blockWorldPos = chunkWorldPos + new Vector3(x, y, z);
-						Vector3 blockCenter = blockWorldPos + new Vector3(0.5f, 0.5f, 0.5f);
+						// Calculate world position of block center
+						float blockCenterX = chunkWorldX + x + 0.5f;
+						float blockCenterY = chunkWorldY + y + 0.5f;
+						float blockCenterZ = chunkWorldZ + z + 0.5f;
 
 						// Calculate Manhattan distance to light source
-						float dist = MathF.Abs(blockCenter.X - light.Position.X) +
-									 MathF.Abs(blockCenter.Y - light.Position.Y) +
-									 MathF.Abs(blockCenter.Z - light.Position.Z);
+						float dist = MathF.Abs(blockCenterX - light.Position.X) +
+									 MathF.Abs(blockCenterY - light.Position.Y) +
+									 MathF.Abs(blockCenterZ - light.Position.Z);
 
 						// Skip if too far from light
 						if (dist > maxRange)
@@ -487,6 +524,7 @@ namespace Voxelgine.Graphics
 						// Shadow check
 						if (light.CastsShadows)
 						{
+							Vector3 blockCenter = new Vector3(blockCenterX, blockCenterY, blockCenterZ);
 							if (!ShadowTracer.HasLineOfSight(WorldMap, light.Position, blockCenter))
 								continue;
 						}
@@ -496,9 +534,9 @@ namespace Voxelgine.Graphics
 						if (lightLevel > existingLight)
 						{
 							Blocks[idx].SetBlockLightLevel(lightLevel);
-							if (!visited.Contains((x, y, z)))
+							if (!visited[idx])
 							{
-								visited.Add((x, y, z));
+								visited[idx] = true;
 								queue.Enqueue((x, y, z, lightLevel));
 							}
 						}

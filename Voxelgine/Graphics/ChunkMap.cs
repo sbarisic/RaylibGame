@@ -173,62 +173,79 @@ namespace Voxelgine.Graphics
 		}
 
 		public void SetPlacedBlock(int X, int Y, int Z, PlacedBlock Block)
-		{
-			TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
-
-			int XX = (int)BlockPos.X, YY = (int)BlockPos.Y, ZZ = (int)BlockPos.Z;
-			const int MaxBlock = Chunk.ChunkSize - 1;
-			HashSet<Vector3> affectedChunks = new HashSet<Vector3> { ChunkIndex };
-
-			int[] xOffsets = { 0 }, yOffsets = { 0 }, zOffsets = { 0 };
-
-			if (XX == 0)
-				xOffsets = xOffsets.Concat([-1]).ToArray();
-			if (XX == MaxBlock)
-				xOffsets = xOffsets.Concat([1]).ToArray();
-
-			if (YY == 0)
-				yOffsets = yOffsets.Concat([-1]).ToArray();
-			if (YY == MaxBlock)
-				yOffsets = yOffsets.Concat([1]).ToArray();
-
-			if (ZZ == 0)
-				zOffsets = zOffsets.Concat([-1]).ToArray();
-			if (ZZ == MaxBlock)
-				zOffsets = zOffsets.Concat([1]).ToArray();
-
-			foreach (int xOffset in xOffsets)
-				foreach (int yOffset in yOffsets)
-					foreach (int zOffset in zOffsets)
-						affectedChunks.Add(ChunkIndex + new Vector3(xOffset, yOffset, zOffset));
-
-			foreach (var chunkPos in affectedChunks)
-				if (Chunks.TryGetValue(chunkPos, out var chunk))
-					chunk.MarkDirty();
-
-			if (!Chunks.ContainsKey(ChunkIndex))
-				Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
-
-			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
-			targetChunk.SetBlock(XX, YY, ZZ, Block);
-
-			// Recompute lighting if a light-emitting or light-blocking block was placed/removed
-			bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
-									   Block.Type == BlockType.None || // Block removed
-									   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
-
-			if (needsLightingUpdate)
 			{
-				// Recompute lighting for affected chunks
-				foreach (var chunkPos in affectedChunks)
+				TranslateChunkPos(X, Y, Z, out Vector3 ChunkIndex, out Vector3 BlockPos);
+
+				int XX = (int)BlockPos.X, YY = (int)BlockPos.Y, ZZ = (int)BlockPos.Z;
+				const int MaxBlock = Chunk.ChunkSize - 1;
+
+				// Use stackalloc-style approach with fixed arrays to avoid allocations
+				Span<Vector3> affectedChunks = stackalloc Vector3[8]; // Max 8 chunks can be affected (corner case)
+				int affectedCount = 0;
+
+				// Calculate which neighbor chunks are affected based on block position
+				int xMin = XX == 0 ? -1 : 0;
+				int xMax = XX == MaxBlock ? 1 : 0;
+				int yMin = YY == 0 ? -1 : 0;
+				int yMax = YY == MaxBlock ? 1 : 0;
+				int zMin = ZZ == 0 ? -1 : 0;
+				int zMax = ZZ == MaxBlock ? 1 : 0;
+
+				for (int xOff = xMin; xOff <= xMax; xOff++)
 				{
-					if (Chunks.TryGetValue(chunkPos, out var chunk))
+					for (int yOff = yMin; yOff <= yMax; yOff++)
 					{
-						chunk.ComputeLighting();
+						for (int zOff = zMin; zOff <= zMax; zOff++)
+						{
+							Vector3 chunkPos = ChunkIndex + new Vector3(xOff, yOff, zOff);
+							// Check if already added (simple linear search for small array)
+							bool found = false;
+							for (int i = 0; i < affectedCount; i++)
+							{
+								if (affectedChunks[i] == chunkPos)
+								{
+									found = true;
+									break;
+								}
+							}
+							if (!found)
+							{
+								affectedChunks[affectedCount++] = chunkPos;
+							}
+						}
+					}
+				}
+
+				// Mark affected chunks dirty
+				for (int i = 0; i < affectedCount; i++)
+				{
+					if (Chunks.TryGetValue(affectedChunks[i], out var chunk))
+						chunk.MarkDirty();
+				}
+
+				if (!Chunks.ContainsKey(ChunkIndex))
+					Chunks.Add(ChunkIndex, new Chunk(ChunkIndex, this));
+
+				Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+				targetChunk.SetBlock(XX, YY, ZZ, Block);
+
+				// Recompute lighting if a light-emitting or light-blocking block was placed/removed
+				bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
+										   Block.Type == BlockType.None || // Block removed
+										   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
+
+				if (needsLightingUpdate)
+				{
+					// Recompute lighting for affected chunks
+					for (int i = 0; i < affectedCount; i++)
+					{
+						if (Chunks.TryGetValue(affectedChunks[i], out var chunk))
+						{
+							chunk.ComputeLighting();
+						}
 					}
 				}
 			}
-		}
 
 		/// <summary>
 		/// Sets a block without triggering lighting recalculation.

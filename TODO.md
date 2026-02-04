@@ -68,7 +68,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Lighting: Performance & Calculations** — Investigate and optimize lighting calculations for better performance **[CPX: 3]**
 - [ ] **Lighting: Shadow Support** — Upgrade lighting system to support shadows; light-emitting entities need to trace the world before updating light values **[CPX: 4]**
 
 ---
@@ -99,7 +98,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- HIGHEST PRIORITY: Find what can be moved from Chunk.Base.cs and into separate files, similar to Chunk.GenMesh.cs. Split the file into multiple files based on functionality to improve maintainability and readability
 
 ---
 

@@ -111,6 +111,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
 - Particles need to render behind glass and water, not in front.
+- Added data/textures/spark/(1-4).png but not used yet, need to implement spark particle effect. It should be similar to fire, except particles should always be oriented the way they are moving
+- Spark particles should fall to the floor slowly, they should live twice as long as fire particles
 
 ---
 

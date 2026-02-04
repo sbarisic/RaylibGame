@@ -47,11 +47,13 @@ namespace Voxelgine.Engine
 		public ParticleType Type;
 		public float InitialScale; // For fire shrinking effect
 
+		public bool IsEmissive;
 		public ParticleBlendMode BlendMode;
 	}
 
 	public delegate bool TestFunc(Vector3 Point);
 	public delegate BlockType GetBlockFunc(Vector3 Point);
+	public delegate Color GetLightColorFunc(Vector3 Point);
 
 	public class ParticleSystem
 	{
@@ -62,16 +64,18 @@ namespace Voxelgine.Engine
 
 		public TestFunc Test;
 		public GetBlockFunc GetBlock;
+		public GetLightColorFunc GetLightColor;
 
 		// Debug variables
 		int OnScreen;
 		int Drawn;
 		int Max;
 
-		public void Init(TestFunc Test, GetBlockFunc GetBlock)
+		public void Init(TestFunc Test, GetBlockFunc GetBlock, GetLightColorFunc GetLightColor)
 		{
 			this.Test = Test;
 			this.GetBlock = GetBlock;
+			this.GetLightColor = GetLightColor;
 
 			for (int i = 0; i < Particles.Length; i++)
 			{
@@ -107,6 +111,7 @@ namespace Voxelgine.Engine
 					P.Scale = 1.0f;
 					P.Rnd = Random.Shared.NextSingle();
 					P.Type = ParticleType.Smoke;
+					P.IsEmissive = false;
 					P.BlendMode = ParticleBlendMode.AlphaPremul;
 
 					return;
@@ -149,6 +154,7 @@ namespace Voxelgine.Engine
 					P.Scale = P.InitialScale;
 					P.Rnd = Random.Shared.NextSingle();
 					P.Type = ParticleType.Fire;
+					P.IsEmissive = true;
 					P.BlendMode = ParticleBlendMode.FireType;
 
 					return;
@@ -293,6 +299,18 @@ namespace Voxelgine.Engine
 						(byte)(P.Color.G * 0.8f),
 						(byte)Math.Min(255, P.Color.B * 1.1f),
 						(byte)(P.Color.A * 0.7f)
+					);
+				}
+
+				// Apply world lighting to particle color
+				if (GetLightColor != null && !P.IsEmissive)
+				{
+					Color lightColor = GetLightColor(P.Pos);
+					drawColor = new Color(
+						(byte)(drawColor.R * lightColor.R / 255),
+						(byte)(drawColor.G * lightColor.G / 255),
+						(byte)(drawColor.B * lightColor.B / 255),
+						drawColor.A
 					);
 				}
 

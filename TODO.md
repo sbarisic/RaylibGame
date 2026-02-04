@@ -49,19 +49,18 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities (as a utility in the world class?) **[CPX: 4]**
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
 ### Medium Priority
 
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
-- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities (as a utility in the world class?) **[CPX: 4]**
 
 ### Lower Priority
 
 - [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
 ---
@@ -110,7 +109,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Make smoke particles have the same color as light on their current block position (requires sampling light level at particle position)
+- Draw a sun circle in the sky based on the day/night cycle time **HIGHEST PRIORITY**
+
 
 ---
 

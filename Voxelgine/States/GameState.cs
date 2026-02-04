@@ -95,7 +95,8 @@ namespace RaylibGame.States
 			Particle = new ParticleSystem();
 			Particle.Init(
 				(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
-				(Pt) => Map.GetBlock(Pt)
+				(Pt) => Map.GetBlock(Pt),
+				(Pt) => Map.GetLightColor(Pt)
 			);
 
 			// =========================================== Create entities ===========================================

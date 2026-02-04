@@ -31,6 +31,8 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Rendering** — Frame interpolation for smooth camera/position/view model rendering
 - **Unit Testing** — Tests for AABB, Easing, Utils, Noise
 - **Weapons: Require aim to fire** — Gun now requires right-click (aim/ironsight) to be held before firing. Moved aim handling from base `InventoryItem.Tick()` to `WeaponGun.Tick()` override with `IsAiming` property.
+- **Particles: Fire effect** — Added `SpawnFire()` method with fire textures (1-4.png). Fire rises upward with random drift, semi-transparent, short-lived (0.6-1.0s), shrinks over lifetime, supports initial force/direction for wall impact effects. Added `ParticleType` enum for type-specific behavior.
+- **Weapons: Gun fire particles** — Gun now spawns fire particles instead of smoke on impact, using the wall normal as initial force direction.
 
 ---
 

@@ -53,8 +53,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Particles: Fire effect** — Add fire particle using textures (`data/textures/fire/1-4.png`), rises upward, semi-transparent, short-lived, decreases in size over lifetime, supports initial force/direction for effects like wall impact normals **[CPX: 2]**
-- [ ] **Weapons: Gun fire particles** — Replace smoke with fire effect when gun fires **[CPX: 1]**
 - [ ] **Graphics: Day/night cycle** — Add time-based day/night cycle that adjusts skylight levels over time, integrating with the ambient lighting system **[CPX: 3]**
 - [ ] **NPC Animation: Save/Load clips** — Add ability to save and load `NPCAnimationClip` to `.npcanim.json` files in `data/animations/npc/` folder **[CPX: 2]**
 - [ ] **NPC Animation: Layered playback** — Add ability to play multiple animation clips simultaneously for layered animations (e.g. walk + attack) **[CPX: 3]**

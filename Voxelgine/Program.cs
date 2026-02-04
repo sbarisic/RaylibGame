@@ -60,6 +60,14 @@ namespace Voxelgine
 			}
 			ResMgr.CreateCollection("smoke", TexList.ToArray());
 
+			// Fire particle textures
+			List<Texture2D> FireTexList = new List<Texture2D>();
+			for (int i = 1; i <= 4; i++)
+			{
+				FireTexList.Add(ResMgr.GetTexture($"fire/{i}.png"));
+			}
+			ResMgr.CreateCollection("fire", FireTexList.ToArray());
+
 			GraphicsUtils.Init();
 			Scripting.Init();
 

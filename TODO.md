@@ -114,7 +114,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Added data/sound/shoot1/(shoot1-shoot4).wav add it to the sound effect combos in SoundMgr, make it play when shooting the gun 
+*No uncategorized items*
 
 ---
 

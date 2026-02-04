@@ -62,6 +62,7 @@ namespace RaylibGame.Engine
 			LoadCombo("block_place", "data/sound/block/place{0}.wav", 1, 1.0f);
 			LoadCombo("block_break", "data/sound/block/break{0}.wav", 1, 1.0f);
 			LoadCombo("swim", "data/sound/swim/swim{0}.wav", 1, 0.5f);
+			LoadCombo("shoot1", "data/sound/shoot1/shoot{0}.wav", 4, 0.6f);
 		}
 
 		public void LoadSound(string Name, string FilePath, float Volume)

@@ -51,6 +51,9 @@ namespace Voxelgine.Engine
 			// Apply kickback animation to the view model
 			ParentPlayer.ViewMdl.ApplyKickback();
 
+			// Play shooting sound at player position
+			ParentPlayer.PlaySound("shoot1", ParentPlayer.Position);
+
 			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
 
 			if (Pos != Vector3.Zero)

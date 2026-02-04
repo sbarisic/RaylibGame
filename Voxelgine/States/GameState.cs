@@ -459,11 +459,12 @@ namespace RaylibGame.States
 
 			DrawBlockPlacementPreview();
 
-			// Draw particles BEFORE transparent blocks so they appear behind glass/water
-			Particle.Draw(Ply, ref ViewFrustum);
 
 			// Draw transparent blocks last for proper alpha blending
 			DrawTransparent();
+
+			// Draw particles BEFORE transparent blocks so they appear behind glass/water
+			Particle.Draw(Ply, ref ViewFrustum);
 
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
 

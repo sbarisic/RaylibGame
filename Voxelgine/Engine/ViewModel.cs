@@ -206,7 +206,13 @@ namespace Voxelgine.Engine {
 			float s = MathF.Sqrt(1 - R.W * R.W);
 			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(R.X / s, R.Y / s, R.Z / s);
 
-			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), Color.White);
+			// Sample light level at player position and apply to view model
+			Color lightColor = Color.White;
+			if (Program.GameState?.Map != null) {
+				lightColor = Program.GameState.Map.GetLightColor(Ply.Position);
+			}
+
+			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), lightColor);
 		}
 	}
 }

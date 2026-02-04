@@ -321,6 +321,43 @@ namespace Voxelgine.Graphics
 		public bool IsWaterAt(Vector3 Pos) => BlockInfo.IsWater(GetBlock(Pos));
 		public bool IsWaterAt(int X, int Y, int Z) => BlockInfo.IsWater(GetBlock(X, Y, Z));
 
+		/// <summary>
+		/// Gets the effective light level at a world position as a normalized value (0.0 to 1.0).
+		/// Samples the block at the position and returns the maximum light from all faces.
+		/// </summary>
+		public float GetLightLevel(Vector3 Pos)
+		{
+			return GetLightLevel((int)MathF.Floor(Pos.X), (int)MathF.Floor(Pos.Y), (int)MathF.Floor(Pos.Z));
+		}
+
+		/// <summary>
+		/// Gets the effective light level at a world position as a normalized value (0.0 to 1.0).
+		/// </summary>
+		public float GetLightLevel(int X, int Y, int Z)
+		{
+			var block = GetPlacedBlock(X, Y, Z, out _);
+			// Get max of skylight and block light
+			byte maxSky = block.GetMaxSkylight();
+			byte maxBlock = block.GetMaxBlockLight();
+			// Apply sky multiplier
+			float skyContrib = maxSky * BlockLight.SkyLightMultiplier;
+			float combined = MathF.Max(skyContrib, maxBlock);
+			// Apply ambient minimum
+			combined = MathF.Max(combined, BlockLight.AmbientLight);
+			// Normalize from 0-15 to 0.0-1.0
+			return combined / 15f;
+		}
+
+		/// <summary>
+		/// Gets the light color at a world position for rendering.
+		/// </summary>
+		public Color GetLightColor(Vector3 Pos)
+		{
+			float level = GetLightLevel(Pos);
+			byte val = (byte)(level * 255);
+			return new Color(val, val, val, (byte)255);
+		}
+
 		void TranslateChunkPos(int X, int Y, int Z, out Vector3 ChunkIndex, out Vector3 BlockPos)
 		{
 			TransPosScalar(X, out int ChkX, out int BlkX);

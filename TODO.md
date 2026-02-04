@@ -71,7 +71,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Graphics: View model lighting** — Sample light level at player position and apply it to the view model rendering **[CPX: 3]**
+*No high priority items*
 
 ### Medium Priority
 

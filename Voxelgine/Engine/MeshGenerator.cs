@@ -291,11 +291,11 @@ namespace Voxelgine.Engine {
 
 			if (GenUseUVs) {
 				float XVal = float.Lerp(GenUV1.X, GenUV2.X, UV.X);
-				float YVal = float.Lerp(GenUV2.Y, GenUV1.Y, UV.Y);
+				float YVal = float.Lerp(GenUV1.Y, GenUV2.Y, UV.Y);
 
-
-				XVal /= GlobalScale.X;
-				YVal /= GlobalScale.Y;
+				// Normalize UVs by texture size (not GlobalScale)
+				XVal /= GenDivideUV.X;
+				YVal /= GenDivideUV.Y;
 
 				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)) + GlobalOffset, new Vector2(XVal, YVal), Normal, Clr);
 			} else {

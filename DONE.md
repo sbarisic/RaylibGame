@@ -39,6 +39,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 ## Bug Fixes
 
+- **JSON model UV mapping** — Fixed UV coordinate calculation in MeshGenerator; now uses texture size instead of GlobalScale for normalization
 - **Particle System** — Fixed depth ordering and underwater rendering (physics resistance, blue tint)
 - **Transparent Blocks** — Fixed depth sorting for water/glass overlap
 - **Unit Tests** — Fixed noise seed test with larger coordinates

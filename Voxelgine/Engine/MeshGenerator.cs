@@ -380,12 +380,16 @@ namespace Voxelgine.Engine {
 		static Vertex3 Gen(Vector3 Pos, Vector2 UV, Vector3 Normal, Color Clr) {
 
 			if (GenUseUVs) {
+				// UV coordinates from JSON are [u1, v1, u2, v2] in Minecraft's 0-16 UV space
+				// GenUV1 = (u1, v1) = top-left corner of texture region
+				// GenUV2 = (u2, v2) = bottom-right corner of texture region
+				// Lerp maps vertex UV (0-1) to the actual texture region
 				float XVal = float.Lerp(GenUV1.X, GenUV2.X, UV.X);
 				float YVal = float.Lerp(GenUV1.Y, GenUV2.Y, UV.Y);
 
-				// Normalize UVs by texture size (not GlobalScale)
-				XVal /= GenDivideUV.X;
-				YVal /= GenDivideUV.Y;
+				// Normalize UVs - Minecraft UV coordinates are in 0-16 range, convert to 0-1
+				XVal /= 16.0f;
+				YVal /= 16.0f;
 
 				return new Vertex3((GenOffset / GlobalScale) + (Pos * (GenSize / GlobalScale)) + GlobalOffset, new Vector2(XVal, YVal), Normal, Clr);
 			} else {
@@ -424,88 +428,88 @@ namespace Voxelgine.Engine {
 			GenSize = Size;
 			GenOffset = Pos;
 
-			// X++
+			// X++ (east face) - viewed from +X looking at -X
 			if (!XPosSkipFace) {
 				Vector3 CurDir = new Vector3(1, 0, 0);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(1, 1, 1), new Vector2(0, 1), new Vector3(1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(1, 0, 0), new Vector2(1, 0), new Vector3(1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 0), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 1), new Vector2(0, 0), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 1), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 0), new Vector2(1, 1), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 0), new Vector3(1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 1), new Vector3(1, 0, 0), FaceClr);
 			}
 
-			// X--
+			// X-- (west face) - viewed from -X looking at +X
 			if (!XNegSkipFace) {
 				Vector3 CurDir = new Vector3(-1, 0, 0);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(0, 1, 0), new Vector2(0, 1), new Vector3(-1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 1), new Vector2(1, 0), new Vector3(-1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 0), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 0), new Vector2(0, 0), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 1), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 1), new Vector2(1, 1), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 0), new Vector3(-1, 0, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 1), new Vector3(-1, 0, 0), FaceClr);
 			}
 
-			// Y++
+			// Y++ (up face) - viewed from above
 			if (!YPosSkipFace) {
 				Vector3 CurDir = new Vector3(0, 1, 0);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(0, 1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 1, 0), new Vector2(0, 1), new Vector3(0, 1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 0), new Vector3(0, 1, 0), FaceClr);
-				yield return Gen(new Vector3(1, 1, 1), new Vector2(1, 0), new Vector3(0, 1, 0), FaceClr);
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 1), new Vector3(0, 1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 0), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 0), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 0), new Vector2(0, 0), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 1), new Vector2(1, 1), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(1, 0), new Vector3(0, 1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 1, 0), FaceClr);
 			}
 
-			// Y--
+			// Y-- (down face) - viewed from below
 			if (!YNegSkipFace) {
 				Vector3 CurDir = new Vector3(0, -1, 0);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 1), new Vector2(1, 0), new Vector3(0, -1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
-				yield return Gen(new Vector3(1, 0, 0), new Vector2(0, 1), new Vector3(0, -1, 0), FaceClr);
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 1), new Vector2(0, 0), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 1), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 0), new Vector2(1, 1), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, -1, 0), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(0, 1), new Vector3(0, -1, 0), FaceClr);
 			}
 
-			// Z++
+			// Z++ (south face) - viewed from +Z looking at -Z
 			if (!ZPosSkipFace) {
 				Vector3 CurDir = new Vector3(0, 0, 1);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
-				yield return Gen(new Vector3(1, 1, 1), new Vector2(1, 1), new Vector3(0, 0, 1), FaceClr);
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
-				yield return Gen(new Vector3(0, 0, 1), new Vector2(0, 0), new Vector3(0, 0, 1), FaceClr);
-				yield return Gen(new Vector3(1, 0, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
-				yield return Gen(new Vector3(0, 1, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(1, 1, 1), new Vector2(0, 0), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(0, 0, 1), new Vector2(1, 1), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(1, 0, 1), new Vector2(0, 1), new Vector3(0, 0, 1), FaceClr);
+				yield return Gen(new Vector3(0, 1, 1), new Vector2(1, 0), new Vector3(0, 0, 1), FaceClr);
 			}
 
-			// Z--
+			// Z-- (north face) - viewed from -Z looking at +Z
 			if (!ZNegSkipFace) {
 				Vector3 CurDir = new Vector3(0, 0, -1);
 
 				SetBlockTextureUV(CurDir, UseUVs);
 
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(0, 1), new Vector3(0, 0, -1), FaceClr);
-				yield return Gen(new Vector3(1, 0, 0), new Vector2(0, 0), new Vector3(0, 0, -1), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 0), new Vector3(0, 0, -1), FaceClr);
-				yield return Gen(new Vector3(0, 1, 0), new Vector2(1, 1), new Vector3(0, 0, -1), FaceClr);
-				yield return Gen(new Vector3(1, 1, 0), new Vector2(0, 1), new Vector3(0, 0, -1), FaceClr);
-				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 0), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(0, 0), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(1, 0, 0), new Vector2(0, 1), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(0, 1, 0), new Vector2(1, 0), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(1, 1, 0), new Vector2(0, 0), new Vector3(0, 0, -1), FaceClr);
+				yield return Gen(new Vector3(0, 0, 0), new Vector2(1, 1), new Vector3(0, 0, -1), FaceClr);
 			}
 		}
 	}

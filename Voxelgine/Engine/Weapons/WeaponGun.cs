@@ -56,6 +56,9 @@ namespace Voxelgine.Engine
 
 			GameState GState = ((GameState)Program.GameState);
 
+			// Calculate muzzle position (slightly in front of camera)
+			Vector3 muzzlePos = E.Start + E.Dir * 0.5f;
+
 			// Raycast against world (blocks)
 			Vector3 worldHitPos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 worldNorm);
 			float worldDist = worldHitPos != Vector3.Zero ? Vector3.Distance(E.Start, worldHitPos) : float.MaxValue;
@@ -114,12 +117,17 @@ namespace Voxelgine.Engine
 			}
 			else
 			{
-				// No hit at all
-				return;
+				// No hit at all - tracer goes to max range
+				hitPos = E.Start + E.Dir * E.MaxLen;
+				hitNormal = -E.Dir;
 			}
 
-			// Spawn fire effect at hit position with surface normal as initial force (only for non-NPC hits)
-			if (hitEntity is not VEntNPC)
+			// Spawn tracer line from muzzle to hit point
+			GState.Particle.SpawnTracer(muzzlePos, hitPos);
+
+			// Only spawn fire for actual world hits (not NPCs, not empty air)
+			bool hitWorld = worldHitPos != Vector3.Zero && (hitEntity == null || worldDist <= entityHit.Distance);
+			if (hitWorld && hitEntity is not VEntNPC)
 			{
 				for (int i = 0; i < 6; i++)
 				{

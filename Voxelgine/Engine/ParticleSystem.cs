@@ -52,6 +52,16 @@ namespace Voxelgine.Engine
 		public ParticleBlendMode BlendMode;
 	}
 
+	struct TracerLine
+	{
+		public bool Active;
+		public Vector3 Start;
+		public Vector3 End;
+		public Color Color;
+		public float SpawnedAt;
+		public float LifeTime;
+	}
+
 	public delegate bool TestFunc(Vector3 Point);
 	public delegate BlockType GetBlockFunc(Vector3 Point);
 	public delegate Color GetLightColorFunc(Vector3 Point);
@@ -62,6 +72,10 @@ namespace Voxelgine.Engine
 		int[] SortedIndices = new int[256];
 		float[] DistanceCache = new float[256];
 		float lastGameTime = 0;
+
+		// Tracer lines
+		TracerLine[] Tracers = new TracerLine[32];
+		const float TracerLifetime = 0.15f; // How long tracers persist (seconds)
 
 		public TestFunc Test;
 		public GetBlockFunc GetBlock;
@@ -82,6 +96,12 @@ namespace Voxelgine.Engine
 			{
 				Particles[i] = new Particle();
 				Particles[i].Draw = false;
+			}
+
+			for (int i = 0; i < Tracers.Length; i++)
+			{
+				Tracers[i] = new TracerLine();
+				Tracers[i].Active = false;
 			}
 		}
 
@@ -208,9 +228,45 @@ namespace Voxelgine.Engine
 								}
 							}
 
+		/// <summary>
+		/// Spawns a tracer line effect from start to end position.
+		/// The tracer will fade out over a short duration.
+		/// </summary>
+		/// <param name="start">Start position (gun muzzle).</param>
+		/// <param name="end">End position (hit point or max range).</param>
+		/// <param name="color">Tracer color (default: bright yellow).</param>
+		public void SpawnTracer(Vector3 start, Vector3 end, Color? color = null)
+		{
+			for (int i = 0; i < Tracers.Length; i++)
+			{
+				ref TracerLine T = ref Tracers[i];
+
+				if (!T.Active)
+				{
+					T.Active = true;
+					T.Start = start;
+					T.End = end;
+					T.Color = color ?? new Color(255, 255, 150, 255); // Bright yellow-white
+					T.SpawnedAt = lastGameTime;
+					T.LifeTime = TracerLifetime;
+					return;
+				}
+			}
+		}
+
 		public void Tick(float GameTime)
 		{
 			float Dt = GameTime - lastGameTime;
+
+			// Update tracers (just check lifetime, they don't move)
+			for (int i = 0; i < Tracers.Length; i++)
+			{
+				ref TracerLine T = ref Tracers[i];
+				if (T.Active && T.SpawnedAt + T.LifeTime < GameTime)
+				{
+					T.Active = false;
+				}
+			}
 
 			for (int i = 0; i < Particles.Length; i++)
 			{
@@ -339,7 +395,30 @@ namespace Voxelgine.Engine
 
 			Rlgl.DisableDepthMask();
 
-			bool BlendModeSet = false;
+						// Draw tracer lines first (additive blend for glow effect)
+						Raylib.BeginBlendMode(BlendMode.Additive);
+						for (int i = 0; i < Tracers.Length; i++)
+						{
+							ref TracerLine T = ref Tracers[i];
+							if (T.Active)
+							{
+								// Calculate fade based on lifetime progress
+								float lifeProgress = (lastGameTime - T.SpawnedAt) / T.LifeTime;
+								byte alpha = (byte)(255 * (1.0f - lifeProgress));
+								Color fadeColor = new Color(T.Color.R, T.Color.G, T.Color.B, alpha);
+
+								// Draw the tracer line
+								Raylib.DrawLine3D(T.Start, T.End, fadeColor);
+
+								// Draw a slightly thicker line by offsetting (gives more visibility)
+								Vector3 offset = new Vector3(0.01f, 0, 0);
+								Raylib.DrawLine3D(T.Start + offset, T.End + offset, fadeColor);
+								Raylib.DrawLine3D(T.Start - offset, T.End - offset, fadeColor);
+							}
+						}
+						Raylib.EndBlendMode();
+
+						bool BlendModeSet = false;
 			ParticleBlendMode CurBlendMode = ParticleBlendMode.Multiply;
 			SetParticleBlendMode(CurBlendMode);
 

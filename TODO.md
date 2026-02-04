@@ -49,7 +49,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Weapons: Tracer lines** — Add tracer lines when shooting that persist for a few seconds and fade out **[CPX: 2]**
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
 ### Medium Priority

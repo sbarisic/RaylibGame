@@ -1,0 +1,183 @@
+{
+  "name": "walk",
+  "duration": 0.8,
+  "loop": true,
+  "tracks": {
+    "leg_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.4,
+        "rotation": [
+          30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.8,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ],
+    "leg_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.4,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.8,
+        "rotation": [
+          30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ],
+    "hand_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.4,
+        "rotation": [
+          -25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.8,
+        "rotation": [
+          25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ],
+    "hand_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          -25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.4,
+        "rotation": [
+          25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.8,
+        "rotation": [
+          -25.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ]
+  }
+}

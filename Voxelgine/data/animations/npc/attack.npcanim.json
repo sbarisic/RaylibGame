@@ -1,0 +1,243 @@
+{
+  "name": "attack",
+  "duration": 0.5,
+  "loop": false,
+  "tracks": {
+    "hand_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.15,
+        "rotation": [
+          -90.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutQuad"
+      }
+    ],
+    "hand_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "body": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.15,
+        "rotation": [
+          15.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutQuad"
+      }
+    ],
+    "leg_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.15,
+        "rotation": [
+          -15.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutQuad"
+      }
+    ],
+    "leg_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.15,
+        "rotation": [
+          -15.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutQuad"
+      }
+    ],
+    "head": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.5,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ]
+  }
+}

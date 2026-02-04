@@ -1,9 +1,75 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Voxelgine.Engine
 {
+	/// <summary>
+	/// Helper class for serializing EasingFunc delegates to/from string names.
+	/// </summary>
+	public static class EasingSerializer
+	{
+		static readonly Dictionary<string, EasingFunc> NameToFunc = new Dictionary<string, EasingFunc>(StringComparer.OrdinalIgnoreCase)
+		{
+			["Linear"] = Easing.Linear,
+			["EaseInQuad"] = Easing.EaseInQuad,
+			["EaseOutQuad"] = Easing.EaseOutQuad,
+			["EaseInOutQuad"] = Easing.EaseInOutQuad,
+			["EaseInCubic"] = Easing.EaseInCubic,
+			["EaseOutCubic"] = Easing.EaseOutCubic,
+			["EaseInOutCubic"] = Easing.EaseInOutCubic,
+			["EaseInQuart"] = Easing.EaseInQuart,
+			["EaseOutQuart"] = Easing.EaseOutQuart,
+			["EaseInOutQuart"] = Easing.EaseInOutQuart,
+			["EaseInQuint"] = Easing.EaseInQuint,
+			["EaseOutQuint"] = Easing.EaseOutQuint,
+			["EaseInOutQuint"] = Easing.EaseInOutQuint,
+			["EaseInSine"] = Easing.EaseInSine,
+			["EaseOutSine"] = Easing.EaseOutSine,
+			["EaseInOutSine"] = Easing.EaseInOutSine,
+			["EaseInExpo"] = Easing.EaseInExpo,
+			["EaseOutExpo"] = Easing.EaseOutExpo,
+			["EaseInOutExpo"] = Easing.EaseInOutExpo,
+			["EaseInCirc"] = Easing.EaseInCirc,
+			["EaseOutCirc"] = Easing.EaseOutCirc,
+			["EaseInOutCirc"] = Easing.EaseInOutCirc,
+			["EaseInBack"] = Easing.EaseInBack,
+			["EaseOutBack"] = Easing.EaseOutBack,
+			["EaseInOutBack"] = Easing.EaseInOutBack,
+			["EaseInElastic"] = Easing.EaseInElastic,
+			["EaseOutElastic"] = Easing.EaseOutElastic,
+			["EaseInOutElastic"] = Easing.EaseInOutElastic,
+			["EaseInBounce"] = Easing.EaseInBounce,
+			["EaseOutBounce"] = Easing.EaseOutBounce,
+			["EaseInOutBounce"] = Easing.EaseInOutBounce,
+		};
+
+		static readonly Dictionary<EasingFunc, string> FuncToName;
+
+		static EasingSerializer()
+		{
+			FuncToName = new Dictionary<EasingFunc, string>();
+			foreach (var kv in NameToFunc)
+				FuncToName[kv.Value] = kv.Key;
+		}
+
+		public static string GetName(EasingFunc func)
+		{
+			if (func == null) return "Linear";
+			return FuncToName.TryGetValue(func, out var name) ? name : "Linear";
+		}
+
+		public static EasingFunc GetFunc(string name)
+		{
+			if (string.IsNullOrEmpty(name)) return Easing.Linear;
+			return NameToFunc.TryGetValue(name, out var func) ? func : Easing.Linear;
+		}
+	}
+
 	/// <summary>
 	/// Defines a single keyframe for an element's transform at a specific time.
 	/// </summary>
@@ -149,6 +215,126 @@ namespace Voxelgine.Engine
 			}
 			return result;
 		}
+
+		/// <summary>
+		/// Default folder for NPC animation files.
+		/// </summary>
+		public const string AnimationsFolder = "data/animations/npc";
+
+		/// <summary>
+		/// Saves this animation clip to a JSON file.
+		/// </summary>
+		/// <param name="filename">Filename without path or extension (e.g., "walk"). Will be saved to data/animations/npc/{filename}.npcanim.json</param>
+		public void Save(string filename)
+		{
+			var data = new JObject
+			{
+				["name"] = Name,
+				["duration"] = Duration,
+				["loop"] = Loop,
+				["tracks"] = new JObject()
+			};
+
+			var tracksObj = (JObject)data["tracks"];
+			foreach (var track in Tracks.Values)
+			{
+				var keyframesArr = new JArray();
+				foreach (var kf in track.Keyframes)
+				{
+					keyframesArr.Add(new JObject
+					{
+						["time"] = kf.Time,
+						["rotation"] = new JArray(kf.Rotation.X, kf.Rotation.Y, kf.Rotation.Z),
+						["position"] = new JArray(kf.Position.X, kf.Position.Y, kf.Position.Z),
+						["easing"] = EasingSerializer.GetName(kf.Easing)
+					});
+				}
+				tracksObj[track.ElementName] = keyframesArr;
+			}
+
+			Directory.CreateDirectory(AnimationsFolder);
+			string path = Path.Combine(AnimationsFolder, $"{filename}.npcanim.json");
+			File.WriteAllText(path, data.ToString(Formatting.Indented));
+		}
+
+		/// <summary>
+		/// Loads an animation clip from a JSON file.
+		/// </summary>
+		/// <param name="filename">Filename without path or extension (e.g., "walk"). Will be loaded from data/animations/npc/{filename}.npcanim.json</param>
+		/// <returns>The loaded animation clip, or null if the file doesn't exist.</returns>
+		public static NPCAnimationClip Load(string filename)
+		{
+			string path = Path.Combine(AnimationsFolder, $"{filename}.npcanim.json");
+			if (!File.Exists(path))
+				return null;
+
+			string json = File.ReadAllText(path);
+			var data = JObject.Parse(json);
+
+			string name = data["name"]?.Value<string>() ?? filename;
+			float duration = data["duration"]?.Value<float>() ?? 1.0f;
+			bool loop = data["loop"]?.Value<bool>() ?? true;
+
+			var clip = new NPCAnimationClip(name, duration) { Loop = loop };
+
+			var tracksObj = data["tracks"] as JObject;
+			if (tracksObj != null)
+			{
+				foreach (var prop in tracksObj.Properties())
+				{
+					string elementName = prop.Name;
+					var keyframesArr = prop.Value as JArray;
+					if (keyframesArr == null) continue;
+
+					var track = clip.GetOrCreateTrack(elementName);
+					foreach (var kfToken in keyframesArr)
+					{
+						var kfObj = kfToken as JObject;
+						if (kfObj == null) continue;
+
+						float time = kfObj["time"]?.Value<float>() ?? 0f;
+
+						Vector3 rotation = Vector3.Zero;
+						var rotArr = kfObj["rotation"] as JArray;
+						if (rotArr != null && rotArr.Count >= 3)
+							rotation = new Vector3(rotArr[0].Value<float>(), rotArr[1].Value<float>(), rotArr[2].Value<float>());
+
+						Vector3 position = Vector3.Zero;
+						var posArr = kfObj["position"] as JArray;
+						if (posArr != null && posArr.Count >= 3)
+							position = new Vector3(posArr[0].Value<float>(), posArr[1].Value<float>(), posArr[2].Value<float>());
+
+						string easingName = kfObj["easing"]?.Value<string>() ?? "Linear";
+						EasingFunc easing = EasingSerializer.GetFunc(easingName);
+
+						track.AddKeyframe(time, rotation, position, easing);
+					}
+				}
+			}
+
+			return clip;
+		}
+
+		/// <summary>
+		/// Gets all available animation clip filenames from the animations folder.
+		/// </summary>
+		/// <returns>List of animation names (without path or extension).</returns>
+		public static List<string> GetAvailableAnimations()
+		{
+			var result = new List<string>();
+			if (!Directory.Exists(AnimationsFolder))
+				return result;
+
+			foreach (var file in Directory.GetFiles(AnimationsFolder, "*.npcanim.json"))
+			{
+				string name = Path.GetFileNameWithoutExtension(file);
+				// Remove the .npcanim part
+				if (name.EndsWith(".npcanim", StringComparison.OrdinalIgnoreCase))
+					name = name.Substring(0, name.Length - 8);
+				result.Add(name);
+			}
+			return result;
+		}
 	}
 
 	/// <summary>
@@ -157,7 +343,7 @@ namespace Voxelgine.Engine
 	public static class NPCAnimations
 	{
 		/// <summary>Creates the walk animation for humanoid NPCs.</summary>
-		public static NPCAnimationClip CreateWalkAnimation()
+		/*public static NPCAnimationClip CreateWalkAnimation()
 		{
 			var clip = new NPCAnimationClip("walk", 0.8f);
 
@@ -301,5 +487,28 @@ namespace Voxelgine.Engine
 
 			return clip;
 		}
+
+		/// <summary>
+		/// Exports all default animations to .npcanim.json files in the animations folder.
+		/// Useful for creating initial animation files that can be edited externally.
+		/// </summary>
+		public static void ExportAllDefaults()
+		{
+			Console.WriteLine("[NPCAnimations] Exporting default animations...");
+
+			CreateWalkAnimation().Save("walk");
+			Console.WriteLine("  - Exported walk.npcanim.json");
+
+			CreateIdleAnimation().Save("idle");
+			Console.WriteLine("  - Exported idle.npcanim.json");
+
+			CreateAttackAnimation().Save("attack");
+			Console.WriteLine("  - Exported attack.npcanim.json");
+
+			CreateCrouchAnimation().Save("crouch");
+			Console.WriteLine("  - Exported crouch.npcanim.json");
+
+			Console.WriteLine($"[NPCAnimations] Exported 4 animations to {NPCAnimationClip.AnimationsFolder}/");
+		}//*/
 	}
 }

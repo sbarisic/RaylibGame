@@ -73,6 +73,37 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
+		/// Loads an animation clip from file and registers it with this animator.
+		/// </summary>
+		/// <param name="filename">Animation filename without path or extension.</param>
+		/// <returns>True if the clip was loaded successfully.</returns>
+		public bool LoadClip(string filename)
+		{
+			var clip = NPCAnimationClip.Load(filename);
+			if (clip != null)
+			{
+				AddClip(clip);
+				return true;
+			}
+			return false;
+		}
+
+		/// <summary>
+		/// Loads all animation clips from the animations folder.
+		/// </summary>
+		/// <returns>Number of clips loaded.</returns>
+		public int LoadAllClips()
+		{
+			int count = 0;
+			foreach (var name in NPCAnimationClip.GetAvailableAnimations())
+			{
+				if (LoadClip(name))
+					count++;
+			}
+			return count;
+		}
+
+		/// <summary>
 		/// Plays the specified animation from the beginning.
 		/// </summary>
 		public void Play(string animationName)

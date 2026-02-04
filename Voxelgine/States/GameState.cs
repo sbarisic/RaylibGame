@@ -157,8 +157,11 @@ namespace RaylibGame.States
 
 		private void CreateDebugMenu()
 		{
-			var menuSize = new Vector2(280, 320);
-			var menuPos = new Vector2(20, 80);
+			var menuSize = new Vector2(340, 480);
+			var menuPos = new Vector2(
+				(Program.Window.Width - menuSize.X) / 2,
+				(Program.Window.Height - menuSize.Y) / 2
+			);
 
 			_debugMenu = new Window
 			{
@@ -189,7 +192,7 @@ namespace RaylibGame.States
 			var debugLabel = new Label
 			{
 				Text = "Debug Mode (F3)",
-				Size = new Vector2(150, 24)
+				Size = new Vector2(200, 24)
 			};
 			stack.AddChild(debugLabel);
 
@@ -208,7 +211,7 @@ namespace RaylibGame.States
 			var fullbrightLabel = new Label
 			{
 				Text = "Fullbright Mode",
-				Size = new Vector2(150, 24)
+				Size = new Vector2(200, 24)
 			};
 			stack.AddChild(fullbrightLabel);
 
@@ -229,7 +232,7 @@ namespace RaylibGame.States
 			var btnSave = new Button
 			{
 				Text = "Save Game",
-				Size = new Vector2(200, 40)
+				Size = new Vector2(280, 40)
 			};
 			btnSave.Clicked += (sender, args) =>
 			{
@@ -242,7 +245,7 @@ namespace RaylibGame.States
 			var btnLoad = new Button
 			{
 				Text = "Load Game",
-				Size = new Vector2(200, 40)
+				Size = new Vector2(280, 40)
 			};
 			btnLoad.Clicked += (sender, args) =>
 			{
@@ -255,7 +258,7 @@ namespace RaylibGame.States
 			var btnRegen = new Button
 			{
 				Text = "Regenerate World",
-				Size = new Vector2(200, 40)
+				Size = new Vector2(280, 40)
 			};
 			btnRegen.Clicked += (sender, args) =>
 			{
@@ -265,11 +268,23 @@ namespace RaylibGame.States
 			};
 			stack.AddChild(btnRegen);
 
+			/*// Export animations button
+			var btnExportAnims = new Button
+			{
+				Text = "Export Default Animations",
+				Size = new Vector2(280, 40)
+			};
+			btnExportAnims.Clicked += (sender, args) =>
+			{
+				NPCAnimations.ExportAllDefaults();
+			};
+			stack.AddChild(btnExportAnims);*/
+
 			// Return to main menu button
 			var btnMainMenu = new Button
 			{
 				Text = "Main Menu",
-				Size = new Vector2(200, 40)
+				Size = new Vector2(280, 40)
 			};
 			btnMainMenu.Clicked += (sender, args) =>
 			{

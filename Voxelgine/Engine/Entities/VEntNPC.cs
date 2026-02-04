@@ -49,12 +49,13 @@ namespace Voxelgine.Engine
 
 			// Initialize animator with standard animations
 			Animator = new NPCAnimator(CModel);
-			Animator.AddClips(
+			Animator.LoadAllClips();
+			/*Animator.AddClips(
 				NPCAnimations.CreateIdleAnimation(),
 				NPCAnimations.CreateWalkAnimation(),
 				NPCAnimations.CreateAttackAnimation(),
 				NPCAnimations.CreateCrouchAnimation()
-			);
+			);*/
 			Animator.Play("idle");
 
 			if (Size != Vector3.Zero)

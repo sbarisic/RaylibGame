@@ -1,0 +1,187 @@
+{
+  "name": "crouch",
+  "duration": 0.3,
+  "loop": false,
+  "tracks": {
+    "body": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseOutQuad"
+      }
+    ],
+    "leg_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "leg_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "hand_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "hand_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          -30.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "head": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 0.3,
+        "rotation": [
+          -15.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ]
+  }
+}

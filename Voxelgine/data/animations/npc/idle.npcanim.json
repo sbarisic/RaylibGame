@@ -1,0 +1,229 @@
+{
+  "name": "idle",
+  "duration": 2.0,
+  "loop": true,
+  "tracks": {
+    "body": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 1.0,
+        "rotation": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ],
+    "head": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 0.7,
+        "rotation": [
+          0.0,
+          -15.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 1.4,
+        "rotation": [
+          0.0,
+          15.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "EaseInOutSine"
+      }
+    ],
+    "leg_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "leg_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "hand_l": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ],
+    "hand_r": [
+      {
+        "time": 0.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      },
+      {
+        "time": 2.0,
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "easing": "Linear"
+      }
+    ]
+  }
+}

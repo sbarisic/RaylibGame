@@ -117,6 +117,8 @@ namespace RaylibGame.States
 				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
 			}
 
+			Map.ComputeLighting();
+
 
 			// ====================================== Init player ====================================================
 			Ply = new Player(GUI, "snoutx10k", true, Snd);

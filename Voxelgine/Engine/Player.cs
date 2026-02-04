@@ -121,6 +121,11 @@ namespace Voxelgine.Engine
 			AddOnKeyPressed(InputKey.Num2, (K) => { Inventory?.SetSelectedIndex(1); });
 			AddOnKeyPressed(InputKey.Num3, (K) => { Inventory?.SetSelectedIndex(2); });
 			AddOnKeyPressed(InputKey.Num4, (K) => { Inventory?.SetSelectedIndex(3); });
+			AddOnKeyPressed(InputKey.Num5, (K) => { Inventory?.SetSelectedIndex(4); });
+			AddOnKeyPressed(InputKey.Num6, (K) => { Inventory?.SetSelectedIndex(5); });
+			AddOnKeyPressed(InputKey.Num7, (K) => { Inventory?.SetSelectedIndex(6); });
+			AddOnKeyPressed(InputKey.Num8, (K) => { Inventory?.SetSelectedIndex(7); });
+			AddOnKeyPressed(InputKey.Num9, (K) => { Inventory?.SetSelectedIndex(8); });
 
 			AddOnKeyPressed(InputKey.I, (K) =>
 			{
@@ -880,10 +885,13 @@ namespace Voxelgine.Engine
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(10));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
+
+			Inventory.SetSelectedIndex(0);
+			Inventory.SetSelectedIndex(1);
 			Inventory.SetSelectedIndex(0);
 		}
 

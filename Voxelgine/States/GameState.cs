@@ -75,6 +75,19 @@ namespace RaylibGame.States
 		private Texture2D? _waterOverlayTexture;
 		private bool _waterOverlayLoaded;
 
+		// Sun/Moon textures
+		private Texture2D? _sunTexture;
+		private Texture2D? _moonTexture;
+		private bool _celestialTexturesLoaded;
+
+		// Sun/Moon screen positions (calculated in Draw3D, rendered in Draw2D)
+		private Vector2 _sunScreenPos;
+		private bool _sunVisible;
+		private float _sunScreenSize;
+		private Vector2 _moonScreenPos;
+		private bool _moonVisible;
+		private float _moonScreenSize;
+
 		// Debug menu
 		private Window _debugMenu;
 		private CheckBox _debugModeCheckbox;
@@ -440,6 +453,11 @@ namespace RaylibGame.States
 
 			// Use sky color from day/night cycle
 			Raylib.ClearBackground(DayNight.SkyColor);
+
+			// Draw celestial bodies in 2D before 3D scene (so they appear behind everything)
+			CalculateCelestialPositions();
+			DrawCelestialBodies();
+
 			Raylib.BeginMode3D(Ply.RenderCam); // Use interpolated render camera
 
 			Shader defaultShader = ResMgr.GetShader("default");
@@ -478,6 +496,50 @@ namespace RaylibGame.States
 			// Draw time of day
 			string timeStr = $"Time: {DayNight.GetTimeString()} ({DayNight.GetPeriodString()})";
 			Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
+		}
+
+		/// <summary>
+		/// Draws sun and moon textures in screen space at their calculated positions.
+		/// </summary>
+		private void DrawCelestialBodies()
+		{
+			// Draw sun if visible
+			if (_sunVisible && _sunTexture.HasValue)
+			{
+				Texture2D tex = _sunTexture.Value;
+				float halfSize = _sunScreenSize / 2f;
+
+				// Center the texture on the screen position
+				Rectangle srcRect = new Rectangle(0, 0, tex.Width, tex.Height);
+				Rectangle destRect = new Rectangle(
+					_sunScreenPos.X - halfSize,
+					_sunScreenPos.Y - halfSize,
+					_sunScreenSize,
+					_sunScreenSize
+				);
+
+				Raylib.DrawTexturePro(tex, srcRect, destRect, Vector2.Zero, 0f, DayNight.SunColor);
+			}
+
+			// Draw moon if visible
+			if (_moonVisible && _moonTexture.HasValue)
+			{
+				Texture2D tex = _moonTexture.Value;
+				float halfSize = _moonScreenSize / 2f;
+
+				// Moon has a cool white/blue tint
+				Color moonColor = new Color(220, 230, 255, 255);
+
+				Rectangle srcRect = new Rectangle(0, 0, tex.Width, tex.Height);
+				Rectangle destRect = new Rectangle(
+					_moonScreenPos.X - halfSize,
+					_moonScreenPos.Y - halfSize,
+					_moonScreenSize,
+					_moonScreenSize
+				);
+
+				Raylib.DrawTexturePro(tex, srcRect, destRect, Vector2.Zero, 0f, moonColor);
+			}
 		}
 
 		private void DrawUnderwaterOverlay()
@@ -543,6 +605,103 @@ namespace RaylibGame.States
 
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
 
+		}
+
+		/// <summary>
+		/// Loads sun and moon textures if not already loaded.
+		/// </summary>
+		private void LoadCelestialTextures()
+		{
+			if (_celestialTexturesLoaded)
+				return;
+
+			_celestialTexturesLoaded = true;
+			try
+			{
+				_sunTexture = ResMgr.GetTexture("sun.png", TextureFilter.Bilinear);
+			}
+			catch
+			{
+				_sunTexture = null;
+			}
+
+			try
+			{
+				_moonTexture = ResMgr.GetTexture("moon.png", TextureFilter.Bilinear);
+			}
+			catch
+			{
+				_moonTexture = null;
+			}
+		}
+
+		/// <summary>
+		/// Calculates screen positions for sun and moon based on day/night cycle.
+		/// Actual rendering happens in Draw2D for proper screen-space drawing.
+		/// </summary>
+		private void CalculateCelestialPositions()
+		{
+			LoadCelestialTextures();
+
+			const float CelestialDistance = 100f; // Distance for world position calculation
+			const float BaseSunScreenSize = 128f;
+			const float BaseMoonScreenSize = 96f;
+
+			_sunVisible = false;
+			_moonVisible = false;
+
+			// Calculate sun screen position if above horizon
+			if (DayNight.SunElevation > 0 && _sunTexture.HasValue)
+			{
+				Vector3 sunDir = DayNight.GetSunDirection();
+				Vector3 sunWorldPos = Ply.RenderCam.Position + sunDir * CelestialDistance;
+
+				// Check if sun is in front of camera
+				Vector3 toSun = Vector3.Normalize(sunWorldPos - Ply.RenderCam.Position);
+				Vector3 camForward = Vector3.Normalize(Ply.RenderCam.Target - Ply.RenderCam.Position);
+				float dot = Vector3.Dot(toSun, camForward);
+
+				if (dot > 0) // Sun is in front of camera
+				{
+					_sunScreenPos = Raylib.GetWorldToScreen(sunWorldPos, Ply.RenderCam);
+
+					// Sun size (larger when near horizon for dramatic effect)
+					float horizonScale = 1f + (1f - Math.Min(1f, DayNight.SunElevation / 0.5f)) * 0.3f;
+					_sunScreenSize = BaseSunScreenSize * horizonScale;
+					_sunVisible = true;
+				}
+			}
+
+			// Calculate moon screen position if sun is below horizon (night time)
+			if (DayNight.SunElevation <= 0 && _moonTexture.HasValue)
+			{
+				// Moon is opposite to sun position, elevated in night sky
+				float moonElevation = MathF.Abs(DayNight.SunElevation) + 0.3f;
+				moonElevation = MathF.Min(moonElevation, MathF.PI / 3f);
+
+				float moonAzimuth = DayNight.SunAzimuth + MathF.PI;
+
+				float cosElev = MathF.Cos(moonElevation);
+				Vector3 moonDir = new Vector3(
+					cosElev * MathF.Cos(moonAzimuth),
+					MathF.Sin(moonElevation),
+					cosElev * MathF.Sin(moonAzimuth)
+				);
+
+				Vector3 moonWorldPos = Ply.RenderCam.Position + moonDir * CelestialDistance;
+
+				// Check if moon is in front of camera
+				Vector3 toMoon = Vector3.Normalize(moonWorldPos - Ply.RenderCam.Position);
+				Vector3 camForward = Vector3.Normalize(Ply.RenderCam.Target - Ply.RenderCam.Position);
+				float dot = Vector3.Dot(toMoon, camForward);
+
+				if (dot > 0) // Moon is in front of camera
+				{
+					_moonScreenPos = Raylib.GetWorldToScreen(moonWorldPos, Ply.RenderCam);
+					_moonScreenSize = BaseMoonScreenSize;
+					_moonVisible = true;
+				}
+			}
 		}
 
 		private void DrawTransparent()

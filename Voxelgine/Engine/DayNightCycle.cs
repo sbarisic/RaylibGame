@@ -64,6 +64,26 @@ namespace Voxelgine.Engine
 		public float SkyLightMultiplier { get; private set; } = 1f;
 
 		/// <summary>
+		/// Current sun color based on time of day.
+		/// </summary>
+		public Color SunColor { get; private set; } = Color.White;
+
+		/// <summary>
+		/// Sun elevation angle in radians (0 = horizon, PI/2 = zenith, negative = below horizon).
+		/// </summary>
+		public float SunElevation { get; private set; } = 0f;
+
+		/// <summary>
+		/// Sun azimuth angle in radians (direction around Y axis).
+		/// </summary>
+		public float SunAzimuth { get; private set; } = 0f;
+
+		// Sun colors for different times
+		static readonly Color SunColorNoon = new Color(255, 255, 240, 255);      // Bright white-yellow
+		static readonly Color SunColorDawn = new Color(255, 180, 100, 255);      // Orange
+		static readonly Color SunColorDusk = new Color(255, 120, 80, 255);       // Red-orange
+
+		/// <summary>
 		/// Updates the day/night cycle. Call this every frame.
 		/// </summary>
 		/// <param name="deltaTime">Frame delta time in seconds.</param>
@@ -106,17 +126,83 @@ namespace Voxelgine.Engine
 		{
 			// Calculate sky light multiplier
 			SkyLightMultiplier = CalculateSkyLightMultiplier();
-			
+
 			// Apply to the global BlockLight multiplier
 			BlockLight.SkyLightMultiplier = SkyLightMultiplier;
-			
+
 			// Update ambient light level
 			float ambientT = (SkyLightMultiplier - NightLightLevel) / (DayLightLevel - NightLightLevel);
 			ambientT = Math.Clamp(ambientT, 0f, 1f);
 			BlockLight.AmbientLight = (byte)Math.Round(Lerp(MinAmbientNight, MinAmbientDay, ambientT));
-			
+
 			// Calculate sky color
 			SkyColor = CalculateSkyColor();
+
+			// Calculate sun position and color
+			CalculateSunPosition();
+		}
+
+		/// <summary>
+		/// Calculates sun position (elevation and azimuth) based on time of day.
+		/// Sun rises in east (azimuth 0), peaks at noon (elevation PI/2), sets in west (azimuth PI).
+		/// </summary>
+		void CalculateSunPosition()
+		{
+			// Sun travels from east to west over 12 hours (sunrise to sunset)
+			// At 6:00 (sunrise): azimuth = 0, elevation = 0
+			// At 12:00 (noon): azimuth = PI/2, elevation = PI/2 (zenith)
+			// At 18:00 (sunset): azimuth = PI, elevation = 0
+
+			float t = TimeOfDay;
+
+			// Calculate sun azimuth (horizontal angle)
+			// Maps 6:00-18:00 to 0-PI (east to west)
+			float dayProgress = (t - 6f) / 12f; // 0 at 6:00, 1 at 18:00
+			SunAzimuth = dayProgress * MathF.PI;
+
+			// Calculate sun elevation (vertical angle)
+			// Peaks at noon (12:00), 0 at sunrise/sunset
+			// Use sine curve for smooth arc
+			if (t >= SunriseStart && t <= SunsetEnd)
+			{
+				float sunProgress = (t - SunriseStart) / (SunsetEnd - SunriseStart); // 0-1 over sun visible time
+				SunElevation = MathF.Sin(sunProgress * MathF.PI) * (MathF.PI / 2f) * 0.8f; // Max ~72 degrees
+			}
+			else
+			{
+				SunElevation = -0.3f; // Below horizon at night
+			}
+
+			// Calculate sun color based on elevation
+			if (SunElevation <= 0)
+			{
+				SunColor = new Color(0, 0, 0, 0); // Invisible when below horizon
+			}
+			else if (SunElevation < 0.3f) // Low sun (dawn/dusk)
+			{
+				float blend = SunElevation / 0.3f;
+				SunColor = t < Noon ? 
+					LerpColor(SunColorDawn, SunColorNoon, blend) : 
+					LerpColor(SunColorDusk, SunColorNoon, 1f - blend);
+			}
+			else
+			{
+				SunColor = SunColorNoon;
+			}
+		}
+
+		/// <summary>
+		/// Gets the sun direction vector (pointing from origin toward sun).
+		/// </summary>
+		public Vector3 GetSunDirection()
+		{
+			// Convert spherical to cartesian coordinates
+			float cosElev = MathF.Cos(SunElevation);
+			return new Vector3(
+				cosElev * MathF.Cos(SunAzimuth),
+				MathF.Sin(SunElevation),
+				cosElev * MathF.Sin(SunAzimuth)
+			);
 		}
 
 		/// <summary>

@@ -222,6 +222,7 @@ namespace Voxelgine.Graphics
 		/// <summary>
 		/// Computes block light from light-emitting blocks (Glowstone, Campfire, etc.)
 		/// Uses shadow tracing when enabled to create realistic shadows.
+		/// Also considers light sources from neighboring chunks near borders.
 		/// </summary>
 		void ComputeBlockLights()
 		{
@@ -252,6 +253,9 @@ namespace Voxelgine.Graphics
 				}
 			}
 
+			// Collect light sources from neighboring chunks that can affect this chunk
+			CollectNeighborLightSources(lightSources);
+
 			// Propagate light from each source with shadow checking
 			foreach (var light in lightSources)
 			{
@@ -260,8 +264,77 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
+		/// Collects light-emitting blocks from neighboring chunks that are within
+		/// light propagation range of this chunk's borders.
+		/// </summary>
+		void CollectNeighborLightSources(List<PointLight> lightSources)
+		{
+			const int maxLightRange = 15; // Maximum light propagation distance
+
+			// Check all 26 neighboring chunk directions (6 faces + 12 edges + 8 corners)
+			for (int dx = -1; dx <= 1; dx++)
+			{
+				for (int dy = -1; dy <= 1; dy++)
+				{
+					for (int dz = -1; dz <= 1; dz++)
+					{
+						if (dx == 0 && dy == 0 && dz == 0)
+							continue; // Skip self
+
+						Vector3 neighborChunkIndex = GlobalChunkIndex + new Vector3(dx, dy, dz);
+						Chunk neighborChunk = WorldMap.GetChunk(neighborChunkIndex);
+
+						if (neighborChunk == null)
+							continue;
+
+						// Scan the border region of the neighbor chunk facing us
+						ScanNeighborBorderForLights(neighborChunk, dx, dy, dz, maxLightRange, lightSources);
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Scans the border region of a neighbor chunk for light sources.
+		/// Only scans blocks within light range of our chunk boundary.
+		/// </summary>
+		void ScanNeighborBorderForLights(Chunk neighbor, int dx, int dy, int dz, int range, List<PointLight> lightSources)
+		{
+			// Determine which region of the neighbor to scan based on direction
+			// If dx == 1, neighbor is to our +X side, so we scan its low-X border (0 to range)
+			// If dx == -1, neighbor is to our -X side, so we scan its high-X border (ChunkSize-range to ChunkSize)
+			int xStart = dx == 1 ? 0 : (dx == -1 ? Math.Max(0, ChunkSize - range) : 0);
+			int xEnd = dx == 1 ? Math.Min(range, ChunkSize) : (dx == -1 ? ChunkSize : ChunkSize);
+			int yStart = dy == 1 ? 0 : (dy == -1 ? Math.Max(0, ChunkSize - range) : 0);
+			int yEnd = dy == 1 ? Math.Min(range, ChunkSize) : (dy == -1 ? ChunkSize : ChunkSize);
+			int zStart = dz == 1 ? 0 : (dz == -1 ? Math.Max(0, ChunkSize - range) : 0);
+			int zEnd = dz == 1 ? Math.Min(range, ChunkSize) : (dz == -1 ? ChunkSize : ChunkSize);
+
+			for (int x = xStart; x < xEnd; x++)
+			{
+				for (int y = yStart; y < yEnd; y++)
+				{
+					for (int z = zStart; z < zEnd; z++)
+					{
+						int idx = x + ChunkSize * (y + ChunkSize * z);
+						PlacedBlock block = neighbor.Blocks[idx];
+
+						if (BlockInfo.EmitsLight(block.Type))
+						{
+							byte lightLevel = BlockInfo.GetLightEmission(block.Type);
+							WorldMap.GetWorldPos(x, y, z, neighbor.GlobalChunkIndex, out Vector3 worldPos);
+							Vector3 lightPos = worldPos + new Vector3(0.5f, 0.5f, 0.5f);
+							lightSources.Add(new PointLight(lightPos, lightLevel, castsShadows: true));
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
 		/// Propagates block light from a single source with shadow tracing.
 		/// Uses BFS but checks line-of-sight to the source for each propagation step.
+		/// Handles both internal and external (neighbor chunk) light sources.
 		/// </summary>
 		void PropagateBlockLightWithShadows(PointLight light)
 		{
@@ -273,19 +346,26 @@ namespace Voxelgine.Graphics
 			int srcY = (int)MathF.Floor(light.Position.Y);
 			int srcZ = (int)MathF.Floor(light.Position.Z);
 
-			// Convert to local chunk coordinates if within this chunk
+			// Convert to local chunk coordinates
 			WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 chunkWorldPos);
 			int localX = srcX - (int)chunkWorldPos.X;
 			int localY = srcY - (int)chunkWorldPos.Y;
 			int localZ = srcZ - (int)chunkWorldPos.Z;
 
+			// Visited set to avoid reprocessing
+			HashSet<(int, int, int)> visited = new HashSet<(int, int, int)>();
+
 			if (localX >= 0 && localX < ChunkSize && localY >= 0 && localY < ChunkSize && localZ >= 0 && localZ < ChunkSize)
 			{
+				// Light source is inside this chunk - start from its position
 				queue.Enqueue((localX, localY, localZ, light.Intensity));
 			}
-
-			// Visited set to avoid reprocessing (we may want to update with higher values though)
-			HashSet<(int, int, int)> visited = new HashSet<(int, int, int)>();
+			else
+			{
+				// Light source is in a neighbor chunk - find entry points at chunk boundary
+				// Scan boundary blocks that could receive light from this source
+				QueueBoundaryBlocksForExternalLight(light, chunkWorldPos, queue, visited);
+			}
 
 			while (queue.Count > 0)
 			{
@@ -359,6 +439,69 @@ namespace Voxelgine.Graphics
 						Blocks[nidx].SetBlockLightLevel(newBlockLight2);
 						visited.Add((nx, ny, nz));
 						queue.Enqueue((nx, ny, nz, newBlockLight2));
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Finds boundary blocks in this chunk that should receive light from an external source
+		/// and queues them with the appropriate light level based on distance.
+		/// </summary>
+		void QueueBoundaryBlocksForExternalLight(PointLight light, Vector3 chunkWorldPos, 
+			Queue<(int x, int y, int z, byte level)> queue, HashSet<(int, int, int)> visited)
+		{
+			int maxRange = light.Intensity;
+
+			// Scan all blocks in this chunk that are within range of the external light
+			// Focus on boundary regions facing the light source for efficiency
+			for (int x = 0; x < ChunkSize; x++)
+			{
+				for (int y = 0; y < ChunkSize; y++)
+				{
+					for (int z = 0; z < ChunkSize; z++)
+					{
+						// Calculate world position of this block
+						Vector3 blockWorldPos = chunkWorldPos + new Vector3(x, y, z);
+						Vector3 blockCenter = blockWorldPos + new Vector3(0.5f, 0.5f, 0.5f);
+
+						// Calculate Manhattan distance to light source
+						float dist = MathF.Abs(blockCenter.X - light.Position.X) +
+									 MathF.Abs(blockCenter.Y - light.Position.Y) +
+									 MathF.Abs(blockCenter.Z - light.Position.Z);
+
+						// Skip if too far from light
+						if (dist > maxRange)
+							continue;
+
+						// Calculate light level at this distance
+						byte lightLevel = (byte)Math.Max(0, light.Intensity - (int)dist);
+						if (lightLevel <= 1)
+							continue;
+
+						// Check if block is transparent (can receive light)
+						int idx = x + ChunkSize * (y + ChunkSize * z);
+						if (BlockInfo.IsOpaque(Blocks[idx].Type))
+							continue;
+
+						// Shadow check
+						if (light.CastsShadows)
+						{
+							if (!ShadowTracer.HasLineOfSight(WorldMap, light.Position, blockCenter))
+								continue;
+						}
+
+						// Only queue if this light level is better than existing
+						byte existingLight = Blocks[idx].GetMaxBlockLight();
+						if (lightLevel > existingLight)
+						{
+							Blocks[idx].SetBlockLightLevel(lightLevel);
+							if (!visited.Contains((x, y, z)))
+							{
+								visited.Add((x, y, z));
+								queue.Enqueue((x, y, z, lightLevel));
+							}
+						}
 					}
 				}
 			}

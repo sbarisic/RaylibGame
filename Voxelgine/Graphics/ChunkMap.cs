@@ -236,13 +236,43 @@ namespace Voxelgine.Graphics
 
 				if (needsLightingUpdate)
 				{
-					// Recompute lighting for affected chunks
-					for (int i = 0; i < affectedCount; i++)
+					// For light sources, we need to update all chunks within light propagation range
+					// Light can travel up to 15 blocks, which is almost 1 full chunk in each direction
+					const int lightRangeInChunks = 1; // 15 blocks / 16 blocks per chunk, rounded up
+
+					// Collect all chunks within light range
+					List<Chunk> chunksToUpdate = new List<Chunk>();
+					for (int cx = -lightRangeInChunks; cx <= lightRangeInChunks; cx++)
 					{
-						if (Chunks.TryGetValue(affectedChunks[i], out var chunk))
+						for (int cy = -lightRangeInChunks; cy <= lightRangeInChunks; cy++)
 						{
-							chunk.ComputeLighting();
+							for (int cz = -lightRangeInChunks; cz <= lightRangeInChunks; cz++)
+							{
+								Vector3 neighborIdx = ChunkIndex + new Vector3(cx, cy, cz);
+								if (Chunks.TryGetValue(neighborIdx, out var chunk))
+								{
+									chunksToUpdate.Add(chunk);
+								}
+							}
 						}
+					}
+
+					// Reset all affected chunks first (prevents stale cross-chunk light values)
+					foreach (var chunk in chunksToUpdate)
+					{
+						chunk.ResetLighting();
+					}
+
+					// Then compute lighting (propagation can now safely update neighbors)
+					foreach (var chunk in chunksToUpdate)
+					{
+						chunk.ComputeLightingWithoutReset();
+					}
+
+					// Mark all as dirty for mesh rebuild
+					foreach (var chunk in chunksToUpdate)
+					{
+						chunk.MarkDirty();
 					}
 				}
 			}
@@ -275,6 +305,15 @@ namespace Voxelgine.Graphics
 
 		public BlockType GetBlock(int X, int Y, int Z) => GetPlacedBlock(X, Y, Z, out _).Type;
 		public BlockType GetBlock(Vector3 Pos) => GetBlock((int)Pos.X, (int)Pos.Y, (int)Pos.Z);
+
+		/// <summary>
+		/// Gets a chunk by its global chunk index, or null if not loaded.
+		/// </summary>
+		public Chunk GetChunk(Vector3 chunkIndex)
+		{
+			Chunks.TryGetValue(chunkIndex, out var chunk);
+			return chunk;
+		}
 
 		/// <summary>
 		/// Returns true if the block at the given position is water.

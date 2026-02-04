@@ -50,7 +50,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### High Priority
 
 - [ ] **Graphics: Day/night cycle** — Add time-based day/night cycle that adjusts skylight levels over time, integrating with the ambient lighting system **[CPX: 3]**
-- [ ] **NPC Animation: Layered playback** — Add ability to play multiple animation clips simultaneously for layered animations (e.g. walk + attack) **[CPX: 3]**
 
 ### Medium Priority
 

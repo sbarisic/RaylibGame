@@ -52,7 +52,7 @@ namespace RaylibGame.States
 
         private void CreateUI()
         {
-            var windowSize = new Vector2(280, 450);
+            var windowSize = new Vector2(280, 660);
             var windowPos = new Vector2(20, 20);
 
             _controlsWindow = new Window
@@ -76,7 +76,7 @@ namespace RaylibGame.States
             // Animation info
             _animationLabel = new Label
             {
-                Text = "Animation: idle",
+                Text = "Base: idle | Overlay: none",
                 Size = new Vector2(220, 24)
             };
             stack.AddChild(_animationLabel);
@@ -88,32 +88,51 @@ namespace RaylibGame.States
             };
             stack.AddChild(_timeLabel);
 
-            // Animation buttons section
-            var animLabel = new Label
-            {
-                Text = "Animations:",
-                Size = new Vector2(220, 24)
-            };
-            stack.AddChild(animLabel);
-
             var animator = _previewNPC.GetAnimator();
 
-            // Create a button for each animation
-            var btnIdle = new Button { Text = "Idle", Size = new Vector2(220, 35) };
-            btnIdle.Clicked += (s, e) => animator?.Play("idle");
-            stack.AddChild(btnIdle);
+            // Base Layer buttons section
+            var baseLabel = new Label
+            {
+                Text = "Base Layer:",
+                Size = new Vector2(220, 24)
+            };
+            stack.AddChild(baseLabel);
 
-            var btnWalk = new Button { Text = "Walk", Size = new Vector2(220, 35) };
-            btnWalk.Clicked += (s, e) => animator?.Play("walk");
-            stack.AddChild(btnWalk);
+            var btnBaseIdle = new Button { Text = "Idle (Base)", Size = new Vector2(220, 32) };
+            btnBaseIdle.Clicked += (s, e) => animator?.PlayOnLayer("base", "idle");
+            stack.AddChild(btnBaseIdle);
 
-            var btnAttack = new Button { Text = "Attack", Size = new Vector2(220, 35) };
-            btnAttack.Clicked += (s, e) => animator?.Play("attack");
-            stack.AddChild(btnAttack);
+            var btnBaseWalk = new Button { Text = "Walk (Base)", Size = new Vector2(220, 32) };
+            btnBaseWalk.Clicked += (s, e) => animator?.PlayOnLayer("base", "walk");
+            stack.AddChild(btnBaseWalk);
 
-            var btnCrouch = new Button { Text = "Crouch", Size = new Vector2(220, 35) };
-            btnCrouch.Clicked += (s, e) => animator?.Play("crouch");
-            stack.AddChild(btnCrouch);
+            var btnBaseCrouch = new Button { Text = "Crouch (Base)", Size = new Vector2(220, 32) };
+            btnBaseCrouch.Clicked += (s, e) => animator?.PlayOnLayer("base", "crouch");
+            stack.AddChild(btnBaseCrouch);
+
+            // Overlay Layer buttons section
+            var overlayLabel = new Label
+            {
+                Text = "Overlay Layer (plays on top):",
+                Size = new Vector2(220, 24)
+            };
+            stack.AddChild(overlayLabel);
+
+            var btnOverlayAttack = new Button { Text = "Attack (Overlay)", Size = new Vector2(220, 32) };
+            btnOverlayAttack.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "attack");
+            stack.AddChild(btnOverlayAttack);
+
+            var btnOverlayWalk = new Button { Text = "Walk (Overlay)", Size = new Vector2(220, 32) };
+            btnOverlayWalk.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "walk");
+            stack.AddChild(btnOverlayWalk);
+
+            var btnOverlayIdle = new Button { Text = "Idle (Overlay)", Size = new Vector2(220, 32) };
+            btnOverlayIdle.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "idle");
+            stack.AddChild(btnOverlayIdle);
+
+            var btnStopOverlay = new Button { Text = "Stop Overlay", Size = new Vector2(220, 32) };
+            btnStopOverlay.Clicked += (s, e) => animator?.StopLayer("overlay");
+            stack.AddChild(btnStopOverlay);
 
             // Control section
             var controlLabel = new Label
@@ -123,18 +142,21 @@ namespace RaylibGame.States
             };
             stack.AddChild(controlLabel);
 
-            var btnPause = new Button { Text = "Pause/Resume", Size = new Vector2(220, 35) };
-            btnPause.Clicked += (s, e) =>
+            var btnStopAll = new Button { Text = "Stop All Layers", Size = new Vector2(220, 32) };
+            btnStopAll.Clicked += (s, e) =>
             {
-                if (animator?.State == NPCAnimationState.Playing)
-                    animator.Pause();
-                else
-                    animator?.Resume();
+                animator?.StopAllLayers();
+                animator?.Stop();
             };
-            stack.AddChild(btnPause);
+            stack.AddChild(btnStopAll);
 
-            var btnReset = new Button { Text = "Reset Pose", Size = new Vector2(220, 35) };
-            btnReset.Clicked += (s, e) => animator?.Stop();
+            var btnReset = new Button { Text = "Reset Pose", Size = new Vector2(220, 32) };
+            btnReset.Clicked += (s, e) =>
+            {
+                animator?.StopAllLayers();
+                animator?.Stop();
+                animator?.ResetToDefaultPose();
+            };
             stack.AddChild(btnReset);
 
             // Back button
@@ -189,7 +211,7 @@ namespace RaylibGame.States
         private bool IsMouseOverUI()
         {
             Vector2 mousePos = Raylib.GetMousePosition();
-            return mousePos.X < 300 && mousePos.Y < 470;
+            return mousePos.X < 300 && mousePos.Y < 680;
         }
 
         public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
@@ -229,12 +251,23 @@ namespace RaylibGame.States
             float dt = Raylib.GetFrameTime();
             _gui.Tick(dt, _totalTime);
 
-            // Update labels
+            // Update labels with layer information
             var animator = _previewNPC.GetAnimator();
             if (animator != null)
             {
-                _animationLabel.Text = $"Animation: {animator.CurrentAnimation ?? "none"} ({animator.State})";
-                _timeLabel.Text = $"Time: {animator.CurrentTime:F2}s";
+                var baseLayer = animator.GetLayer("base");
+                var overlayLayer = animator.GetLayer("overlay");
+
+                string baseAnim = baseLayer?.Clip?.Name ?? "none";
+                string overlayAnim = overlayLayer?.Clip?.Name ?? "none";
+                string baseState = baseLayer?.State.ToString() ?? "";
+                string overlayState = overlayLayer?.State.ToString() ?? "";
+
+                _animationLabel.Text = $"Base: {baseAnim} | Overlay: {overlayAnim}";
+
+                float baseTime = baseLayer?.Time ?? 0;
+                float overlayTime = overlayLayer?.Time ?? 0;
+                _timeLabel.Text = $"Base: {baseTime:F2}s | Overlay: {overlayTime:F2}s";
             }
 
             // Draw instructions

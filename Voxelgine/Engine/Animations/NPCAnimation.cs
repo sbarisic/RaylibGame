@@ -206,6 +206,24 @@ namespace Voxelgine.Engine
 			head.AddKeyframe(1.4f, new Vector3(0, 15, 0), Vector3.Zero, Easing.EaseInOutSine);
 			head.AddKeyframe(2.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseInOutSine);
 
+			// Legs stay planted (counteract body sway on Y axis - no effect needed since body only rotates Y)
+			var legL = clip.GetOrCreateTrack("leg_l");
+			legL.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			legL.AddKeyframe(2.0f, Vector3.Zero, Vector3.Zero);
+
+			var legR = clip.GetOrCreateTrack("leg_r");
+			legR.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			legR.AddKeyframe(2.0f, Vector3.Zero, Vector3.Zero);
+
+			// Arms relaxed at sides
+			var handL = clip.GetOrCreateTrack("hand_l");
+			handL.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			handL.AddKeyframe(2.0f, Vector3.Zero, Vector3.Zero);
+
+			var handR = clip.GetOrCreateTrack("hand_r");
+			handR.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			handR.AddKeyframe(2.0f, Vector3.Zero, Vector3.Zero);
+
 			return clip;
 		}
 
@@ -220,11 +238,32 @@ namespace Voxelgine.Engine
 			handR.AddKeyframe(0.15f, new Vector3(-90, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
 			handR.AddKeyframe(0.5f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseInOutQuad);
 
+			// Left arm stays relaxed
+			var handL = clip.GetOrCreateTrack("hand_l");
+			handL.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			handL.AddKeyframe(0.5f, Vector3.Zero, Vector3.Zero);
+
 			// Body lunge forward slightly
 			var body = clip.GetOrCreateTrack("body");
 			body.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
 			body.AddKeyframe(0.15f, new Vector3(15, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
 			body.AddKeyframe(0.5f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseInOutQuad);
+
+			// Legs stay planted - counteract body's forward pitch to keep feet grounded
+			var legL = clip.GetOrCreateTrack("leg_l");
+			legL.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
+			legL.AddKeyframe(0.15f, new Vector3(-15, 0, 0), Vector3.Zero, Easing.EaseOutQuad);  // Counter body's 15 deg pitch
+			legL.AddKeyframe(0.5f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseInOutQuad);
+
+			var legR = clip.GetOrCreateTrack("leg_r");
+			legR.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
+			legR.AddKeyframe(0.15f, new Vector3(-15, 0, 0), Vector3.Zero, Easing.EaseOutQuad);  // Counter body's 15 deg pitch
+			legR.AddKeyframe(0.5f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseInOutQuad);
+
+			// Head follows body naturally (no counter-rotation needed)
+			var head = clip.GetOrCreateTrack("head");
+			head.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero);
+			head.AddKeyframe(0.5f, Vector3.Zero, Vector3.Zero);
 
 			return clip;
 		}
@@ -234,19 +273,33 @@ namespace Voxelgine.Engine
 		{
 			var clip = new NPCAnimationClip("crouch", 0.3f) { Loop = false };
 
-			// Legs bend
-			var legL = clip.GetOrCreateTrack("leg_l");
-			legL.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
-			legL.AddKeyframe(0.3f, new Vector3(-45, 0, 0), new Vector3(0, -0.3f, 0), Easing.EaseOutQuad);
-
-			var legR = clip.GetOrCreateTrack("leg_r");
-			legR.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
-			legR.AddKeyframe(0.3f, new Vector3(-45, 0, 0), new Vector3(0, -0.3f, 0), Easing.EaseOutQuad);
-
-			// Body lowers
+			// Body lowers and leans forward
 			var body = clip.GetOrCreateTrack("body");
 			body.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
 			body.AddKeyframe(0.3f, new Vector3(20, 0, 0), new Vector3(0, -0.4f, 0), Easing.EaseOutQuad);
+
+			// Legs bend - counteract body's 20 deg pitch plus add knee bend
+			var legL = clip.GetOrCreateTrack("leg_l");
+			legL.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
+			legL.AddKeyframe(0.3f, new Vector3(-65, 0, 0), new Vector3(0, -0.3f, 0), Easing.EaseOutQuad);  // -20 (counter) + -45 (bend)
+
+			var legR = clip.GetOrCreateTrack("leg_r");
+			legR.AddKeyframe(0.0f, new Vector3(0, 0, 0), Vector3.Zero, Easing.EaseOutQuad);
+			legR.AddKeyframe(0.3f, new Vector3(-65, 0, 0), new Vector3(0, -0.3f, 0), Easing.EaseOutQuad);  // -20 (counter) + -45 (bend)
+
+			// Arms hang naturally
+			var handL = clip.GetOrCreateTrack("hand_l");
+			handL.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero, Easing.EaseOutQuad);
+			handL.AddKeyframe(0.3f, new Vector3(-20, 0, 0), Vector3.Zero, Easing.EaseOutQuad);  // Counter body pitch
+
+			var handR = clip.GetOrCreateTrack("hand_r");
+			handR.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero, Easing.EaseOutQuad);
+			handR.AddKeyframe(0.3f, new Vector3(-20, 0, 0), Vector3.Zero, Easing.EaseOutQuad);  // Counter body pitch
+
+			// Head stays level (counter body pitch)
+			var head = clip.GetOrCreateTrack("head");
+			head.AddKeyframe(0.0f, Vector3.Zero, Vector3.Zero, Easing.EaseOutQuad);
+			head.AddKeyframe(0.3f, new Vector3(-20, 0, 0), Vector3.Zero, Easing.EaseOutQuad);  // Counter body pitch
 
 			return clip;
 		}

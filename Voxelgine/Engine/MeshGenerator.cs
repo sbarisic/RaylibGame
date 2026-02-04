@@ -84,13 +84,12 @@ namespace Voxelgine.Engine {
 		/// Composites base rotation (from model) with animation rotation.
 		/// </summary>
 		public void UpdateAnimationMatrix() {
-			// Combine base rotation (model's initial pose) with animation rotation
-			Vector3 totalRotation = BaseRotation + AnimationRotation;
-
-			// Convert degrees to radians
-			float pitch = Utils.ToRad(totalRotation.X);
-			float yaw = Utils.ToRad(totalRotation.Y);
-			float roll = Utils.ToRad(totalRotation.Z);
+			// Base rotation defines the model's rest pose as designed in Blockbench - keep as-is
+			// Animation rotation needs negation to correct for Z-axis orientation difference
+			// between Minecraft model format (+Z = south/forward) and engine (+Z = north/backward)
+			float pitch = Utils.ToRad(BaseRotation.X - AnimationRotation.X);
+			float yaw = Utils.ToRad(BaseRotation.Y + AnimationRotation.Y);
+			float roll = Utils.ToRad(BaseRotation.Z + AnimationRotation.Z);
 
 			// Build rotation-only matrix (used for hierarchy propagation)
 			AnimationRotationMatrix = Matrix4x4.CreateRotationX(pitch) *
@@ -292,7 +291,9 @@ namespace Voxelgine.Engine {
 			CustomModel CMdl = new CustomModel(Vector3.Zero, new Vector3(1, 0, 1));
 
 			foreach (MinecraftMdlElement E in JMdl.Elements) {
-				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin) / GlobalScale;
+				// Rotation origin must be transformed the same way as vertices:
+				// divide by GlobalScale AND add GlobalOffset to match vertex positions
+				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin) / GlobalScale + GlobalOffset;
 
 				// Convert model's single-axis rotation to Vector3
 				Vector3 baseRotation = AxisAngleToVector3(E.Rotation.Axis, E.Rotation.Angle);

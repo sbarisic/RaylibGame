@@ -51,4 +51,4 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 ## Code Refactoring
 
-- **Chunk class file split** — Split `Chunk.Base.cs` into multiple partial class files: `Chunk.Base.cs` (core), `Chunk.Lighting.cs`, `Chunk.Rendering.cs`, `Chunk.Serialization.cs`, and existing `Chunk.GenMesh.cs`
+- **Chunk class file split** — Split `Chunk` into 6 partial class files: `Chunk.Base.cs` (core), `Chunk.Lighting.cs`, `Chunk.Rendering.cs`, `Chunk.Serialization.cs`, `Chunk.GenMesh.cs` (opaque), `Chunk.GenMeshTransparent.cs` (transparent)

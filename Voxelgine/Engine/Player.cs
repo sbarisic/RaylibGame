@@ -80,6 +80,7 @@ namespace Voxelgine.Engine
 		Vector3 LastWallNormal = Vector3.Zero;
 		Stopwatch JumpCounter = Stopwatch.StartNew();
 		float HeadBumpCooldown = 0f; // Cooldown applied when hitting head shortly after jumping
+		bool WasInWater = false; // Track previous frame's water state for exit boost
 
 		public Player(FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
 		{
@@ -412,8 +413,8 @@ namespace Voxelgine.Engine
 		/// </summary>
 		void UpdateSwimmingPhysics(ChunkMap Map, PhysData PhysicsData, float Dt, InputMgr InMgr, bool headInWater)
 		{
-			float playerRadius = Player.PlayerRadius;
-			float playerHeight = Player.PlayerHeight;
+			//float playerRadius = Player.PlayerRadius;
+			//float playerHeight = Player.PlayerHeight;
 			Vector3 feetPos = FeetPosition;
 
 			ClampToZero(ref PlyVelocity, PhysicsData.ClampHyst);
@@ -535,6 +536,13 @@ namespace Voxelgine.Engine
 			// --- Check if player is in water (check at eye level and feet level) ---
 			bool inWater = Map.IsWaterAt(Position) || Map.IsWaterAt(feetPos + new Vector3(0, playerHeight * 0.5f, 0));
 			bool headInWater = Map.IsWaterAt(Position);
+
+			// --- Water exit boost: apply 15% velocity boost when exiting water with upward velocity ---
+			if (WasInWater && !inWater && PlyVelocity.Y > 0)
+			{
+				PlyVelocity.Y *= 1.15f;
+			}
+			WasInWater = inWater;
 
 			if (inWater)
 			{
@@ -889,6 +897,7 @@ namespace Voxelgine.Engine
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
 			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Water).SetCount(64));
 
 			Inventory.SetSelectedIndex(0);
 			Inventory.SetSelectedIndex(1);

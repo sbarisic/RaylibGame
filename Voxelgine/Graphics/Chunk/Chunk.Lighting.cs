@@ -67,6 +67,7 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void ComputeSkylight()
 		{
+			//return;
 			Queue<BlockPos> skylightQueue = new Queue<BlockPos>(ChunkSize * ChunkSize);
 
 			// Build or use cached sky exposure data

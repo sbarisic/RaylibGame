@@ -253,7 +253,7 @@ namespace Voxelgine
 
 			double da = Math.PI / (Slices - 1);
 			double a = -0.5 * Math.PI;
-			int Hits = 0;
+			//int Hits = 0;
 
 			for (int ia = 0; ia < Slices; ia++, a += da)
 			{

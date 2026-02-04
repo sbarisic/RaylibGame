@@ -190,8 +190,8 @@ namespace Voxelgine.Engine {
 	}
 
 	static unsafe class MeshGenerator {
-		static Vector2 UVSize;
-		static Vector2 UVPos;
+		//static Vector2 UVSize;
+		//static Vector2 UVPos;
 
 		public static Mesh ToMesh(Vertex3[] Vts) {
 			Mesh M = new Mesh(Vts.Length, Vts.Length / 3);

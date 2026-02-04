@@ -40,6 +40,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 ## Bug Fixes
 
+- **Water exit boost** — Fixed by applying 15% velocity boost when player exits water with upward momentum
 - **JSON model UV mapping** — Fixed UV coordinate calculation in MeshGenerator; now uses texture size instead of GlobalScale for normalization
 - **Particle System** — Fixed depth ordering and underwater rendering (physics resistance, blue tint)
 - **Transparent Blocks** — Fixed depth sorting for water/glass overlap

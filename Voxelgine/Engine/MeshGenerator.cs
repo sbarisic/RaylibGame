@@ -43,6 +43,10 @@ namespace Voxelgine.Engine {
 		/// <summary>Attachment point offset relative to parent's rotation origin.</summary>
 		public Vector3 AttachmentPoint;
 
+		// Model base pose (from JSON)
+		/// <summary>Base rotation from model definition (angle around single axis, stored as degrees).</summary>
+		public Vector3 BaseRotation;
+
 		// Animation properties
 		/// <summary>Current animation rotation in degrees (X=pitch, Y=yaw, Z=roll).</summary>
 		public Vector3 AnimationRotation;
@@ -57,6 +61,7 @@ namespace Voxelgine.Engine {
 			Mesh = M;
 			Material = new CustomMaterial();
 			Matrix = Matrix4x4.Identity;
+			BaseRotation = Vector3.Zero;
 			AnimationRotation = Vector3.Zero;
 			AnimationPosition = Vector3.Zero;
 			AnimationRotationMatrix = Matrix4x4.Identity;
@@ -76,12 +81,16 @@ namespace Voxelgine.Engine {
 
 		/// <summary>
 		/// Updates the animation matrix from the current AnimationRotation and AnimationPosition.
+		/// Composites base rotation (from model) with animation rotation.
 		/// </summary>
 		public void UpdateAnimationMatrix() {
+			// Combine base rotation (model's initial pose) with animation rotation
+			Vector3 totalRotation = BaseRotation + AnimationRotation;
+
 			// Convert degrees to radians
-			float pitch = Utils.ToRad(AnimationRotation.X);
-			float yaw = Utils.ToRad(AnimationRotation.Y);
-			float roll = Utils.ToRad(AnimationRotation.Z);
+			float pitch = Utils.ToRad(totalRotation.X);
+			float yaw = Utils.ToRad(totalRotation.Y);
+			float roll = Utils.ToRad(totalRotation.Z);
 
 			// Build rotation-only matrix (used for hierarchy propagation)
 			AnimationRotationMatrix = Matrix4x4.CreateRotationX(pitch) *
@@ -94,82 +103,32 @@ namespace Voxelgine.Engine {
 
 		/// <summary>
 		/// Gets the combined animation matrix including all parent transforms.
-		/// This propagates parent transforms down the hierarchy.
+		/// Each rotation is properly applied around its respective pivot point.
 		/// </summary>
 		public Matrix4x4 GetCombinedAnimationMatrix() {
+			// This mesh's animation around its own pivot point
+			Matrix4x4 localAnimAroundPivot = 
+				Matrix4x4.CreateTranslation(-RotationOrigin) * 
+				AnimationRotationMatrix * 
+				Matrix4x4.CreateTranslation(RotationOrigin) *
+				Matrix4x4.CreateTranslation(AnimationPosition);
+
 			if (Parent == null) {
-				return AnimationMatrix;
+				return localAnimAroundPivot;
 			}
 
-			// Get parent's rotation origin for proper pivot-based rotation
-			Vector3 parentRotOr = Parent.RotationOrigin;
-			parentRotOr.X = 1 - parentRotOr.X;
-			parentRotOr.Z = 0;
+			// Parent's full transform (recursive - includes all ancestor pivots)
+			Matrix4x4 parentCombined = Parent.GetCombinedAnimationMatrix();
 
-			// Get parent's combined rotation and position (recursive up the chain)
-			var (parentRotation, parentPosition) = Parent.GetCombinedTransforms();
-
-			// Build parent rotation transform around pivot point:
-			// 1. Move to pivot origin
-			// 2. Apply rotation
-			// 3. Move back from pivot origin
-			Matrix4x4 parentRotationAroundPivot = 
-				Matrix4x4.CreateTranslation(-parentRotOr) * 
-				parentRotation * 
-				Matrix4x4.CreateTranslation(parentRotOr);
-
-			// Parent translation is applied directly (not around pivot)
-			Matrix4x4 parentTranslation = Matrix4x4.CreateTranslation(parentPosition);
-
-			// Combined: first rotate around pivot, then translate, then apply child's local animation
-			return parentRotationAroundPivot * parentTranslation * AnimationMatrix;
-		}
-
-		/// <summary>
-		/// Gets the combined rotation matrix and position offset from this element and all parents.
-		/// Used internally for proper hierarchy transform propagation.
-		/// </summary>
-		public (Matrix4x4 Rotation, Vector3 Position) GetCombinedTransforms() {
-			if (Parent == null) {
-				return (AnimationRotationMatrix, AnimationPosition);
-			}
-
-			// Get parent's combined transforms
-			var (parentRotation, parentPosition) = Parent.GetCombinedTransforms();
-
-			// Get parent's rotation origin
-			Vector3 parentRotOr = Parent.RotationOrigin;
-			parentRotOr.X = 1 - parentRotOr.X;
-			parentRotOr.Z = 0;
-
-			// This element's position is affected by parent's rotation around pivot
-			// Transform this element's animation position by parent's rotation
-			Vector3 rotatedPosition = Vector3.Transform(AnimationPosition, parentRotation);
-
-			// Combine rotations (parent first, then local)
-			Matrix4x4 combinedRotation = parentRotation * AnimationRotationMatrix;
-
-			// Combine positions (parent position + rotated local position)
-			Vector3 combinedPosition = parentPosition + rotatedPosition;
-
-			return (combinedRotation, combinedPosition);
+			// First apply local animation around local pivot,
+			// then parent's animation moves us around parent's pivot
+			return localAnimAroundPivot * parentCombined;
 		}
 
 		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
-			Matrix4x4 MeshMat = Matrix4x4.Identity;
-
-			Vector3 RotOr = RotationOrigin;
-			RotOr.X = 1 - RotOr.X;
-			RotOr.Z = 0;
-
-			// Apply base transform around rotation origin
-			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotOr);
-			MeshMat = MeshMat * Matrix;
-			// Apply combined animation transform (includes parent transforms)
-			MeshMat = MeshMat * GetCombinedAnimationMatrix();
-			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotOr);
-
-			MeshMat = MeshMat * Model;
+			// GetCombinedAnimationMatrix now handles all pivot/rotation properly
+			// Just apply base matrix and model transform
+			Matrix4x4 MeshMat = Matrix * GetCombinedAnimationMatrix() * Model;
 			return MeshMat;
 		}
 
@@ -335,15 +294,32 @@ namespace Voxelgine.Engine {
 			foreach (MinecraftMdlElement E in JMdl.Elements) {
 				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin) / GlobalScale;
 
+				// Convert model's single-axis rotation to Vector3
+				Vector3 baseRotation = AxisAngleToVector3(E.Rotation.Axis, E.Rotation.Angle);
+
 				Vertex3[] ElementVerts = Generate(JMdl, E).ToArray();
 
 				Mesh ElMesh = ToMesh(ElementVerts);
 				CustomMesh CMesh = CMdl.AddMesh(ElMesh);
 				CMesh.Name = E.Name;
 				CMesh.RotationOrigin = RotOrig;
+				CMesh.BaseRotation = baseRotation;
+				CMesh.UpdateAnimationMatrix(); // Apply base rotation immediately
 			}
 
 			return CMdl;
+		}
+
+		/// <summary>
+		/// Converts Minecraft's single-axis rotation (axis name + angle) to a Vector3 (pitch, yaw, roll) in degrees.
+		/// </summary>
+		static Vector3 AxisAngleToVector3(string axis, float angle) {
+			return axis?.ToLowerInvariant() switch {
+				"x" => new Vector3(angle, 0, 0),  // Pitch
+				"y" => new Vector3(0, angle, 0),  // Yaw
+				"z" => new Vector3(0, 0, angle),  // Roll
+				_ => Vector3.Zero
+			};
 		}
 
 		static Vector3 CompassToDir(string SDir) {

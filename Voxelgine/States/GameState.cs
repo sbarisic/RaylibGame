@@ -453,14 +453,18 @@ namespace RaylibGame.States
 
 			// Draw world geometry
 			Map.Draw(ref ViewFrustum);
-			DrawTransparent();
 
 			// Draw entities and effects
 			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
 
 			DrawBlockPlacementPreview();
 
+			// Draw particles BEFORE transparent blocks so they appear behind glass/water
 			Particle.Draw(Ply, ref ViewFrustum);
+
+			// Draw transparent blocks last for proper alpha blending
+			DrawTransparent();
+
 			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
 
 		}

@@ -48,6 +48,9 @@ namespace Voxelgine.Engine
 			if (!IsAiming)
 				return;
 
+			// Apply kickback animation to the view model
+			ParentPlayer.ViewMdl.ApplyKickback();
+
 			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
 
 			if (Pos != Vector3.Zero)
@@ -56,8 +59,6 @@ namespace Voxelgine.Engine
 
 				GameState GState = ((GameState)Program.GameState);
 				// Spawn fire effect at hit position with wall normal as initial force
-
-
 
 				for (int i = 0; i < 6; i++)
 				{

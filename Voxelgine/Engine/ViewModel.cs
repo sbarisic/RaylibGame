@@ -40,6 +40,10 @@ namespace Voxelgine.Engine {
 		LerpVec3 LrpOffset;
 		LerpQuat LrpRot;
 
+		// Kickback animation for weapon firing
+		LerpVec3 LrpKickback;
+		Vector3 KickbackOffset = Vector3.Zero;
+
 		public ViewModel() {
 			SetModel(DefaultViewModelName);
 			IsActive = true;
@@ -58,6 +62,11 @@ namespace Voxelgine.Engine {
 			LrpRot.Easing = Easing.Linear;
 			LrpRot.Loop = false;
 			LrpRot.StartLerp(1, Quaternion.CreateFromYawPitchRoll(0, 0, 0), Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
+
+			LrpKickback = new LerpVec3();
+			LrpKickback.Easing = Easing.EaseOutQuad;
+			LrpKickback.Loop = false;
+			LrpKickback.StartLerp(0.01f, Vector3.Zero, Vector3.Zero);
 		}
 
 		public void SetModel(string ModelName) {
@@ -75,6 +84,27 @@ namespace Voxelgine.Engine {
 
 				Console.WriteLine("Toggle anim!");
 			}
+		}
+
+		/// <summary>
+		/// Applies a kickback animation to the view model (e.g., when firing a weapon).
+		/// The weapon moves backward briefly then returns to its original position.
+		/// </summary>
+		public void ApplyKickback() {
+			// Kickback moves the weapon backward (negative forward direction)
+			// The kickback amount is applied in local camera space
+			const float KickbackAmount = 0.08f;
+			const float KickbackDuration = 0.12f;
+
+			// Start kickback animation: move back then return to zero
+			LrpKickback.Easing = Easing.EaseOutQuad;
+			LrpKickback.StartLerp(KickbackDuration * 0.3f, Vector3.Zero, new Vector3(0, 0, -KickbackAmount));
+			LrpKickback.OnComplete = (lerp) => {
+				// Return to original position
+				LrpKickback.Easing = Easing.EaseOutQuad;
+				LrpKickback.StartLerp(KickbackDuration * 0.7f, new Vector3(0, 0, -KickbackAmount), Vector3.Zero);
+				LrpKickback.OnComplete = null;
+			};
 		}
 
 		public void Update(Player Ply) {
@@ -117,6 +147,9 @@ namespace Voxelgine.Engine {
 
 			// Lerp offset
 			ViewModelOffset = LrpOffset.GetVec3();
+
+			// Apply kickback offset in camera space
+			KickbackOffset = LrpKickback.GetVec3();
 
 			// Calculate absolute position for GameFrameInfo capture
 			ViewModelPos = cam.Position + ViewModelOffset;
@@ -161,8 +194,12 @@ namespace Voxelgine.Engine {
 			if (!IsActive)
 				return;
 
-			// Calculate final position using interpolated render camera position + offset
-			Vector3 P = Ply.RenderCam.Position + ViewModelOffset;
+			// Calculate kickback in world space using camera basis
+			Vector3 camForward = Ply.GetForward();
+			Vector3 KickbackWorld = camForward * KickbackOffset.Z;
+
+			// Calculate final position using interpolated render camera position + offset + kickback
+			Vector3 P = Ply.RenderCam.Position + ViewModelOffset + KickbackWorld;
 			Quaternion R = VMRot;
 
 			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;

@@ -49,23 +49,22 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Graphics: Day/night cycle** — Add time-based day/night cycle that adjusts skylight levels over time, integrating with the ambient lighting system **[CPX: 3]**
+- [ ] **NPC Animation: Save/Load clips** — Add ability to save and load `NPCAnimationClip` to `.npcanim.json` files in `data/animations/npc/` folder **[CPX: 2]**
+- [ ] **NPC Animation: Layered playback** — Add ability to play multiple animation clips simultaneously for layered animations (e.g. walk + attack) **[CPX: 3]**
 
 ### Medium Priority
 
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
-- [ ] **Graphics: Day/night cycle** — Add time-based day/night cycle that adjusts skylight levels over time, integrating with the ambient lighting system **[CPX: 3]**
-- [ ] **NPC Animation: Save/Load clips** — Add ability to save and load `NPCAnimationClip` to `.npcanim.json` files in `data/animations/npc/` folder **[CPX: 2]**
-- [ ] **NPC Animation: Layered playback** — Add ability to play multiple animation clips simultaneously for layered animations (e.g. walk + attack) **[CPX: 3]**
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities (as a utility in the world class?) **[CPX: 4]**
 
 ### Lower Priority
 
-- [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 - [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
-- [ ] **Pathfinding: Voxel navigation** — A* or similar pathfinding over voxel terrain for ground entities **[CPX: 4]**
 - [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
 - [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
 ---
 
@@ -73,11 +72,10 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Graphics: View model lighting** — Sample light level at player position and apply it to the view model rendering **[CPX: 3]**
 
 ### Medium Priority
 
-- [ ] **Graphics: View model lighting** — Sample light level at player position and apply it to the view model rendering **[CPX: 3]**
 - [ ] **Animation: View model mode transitions** — Add smooth toggle animations when switching view model rotation modes (e.g., hip to ironsight) **[CPX: 2]**
 - [ ] **Physics: Player bounding box** — Implement proper bounding box calculation for `Player` based on position and dimensions **[CPX: 1]**
 - [ ] **GUI: Disabled inventory items** — Draw inventory items as visually disabled when count reaches 0 **[CPX: 1]**

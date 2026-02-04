@@ -121,7 +121,7 @@ namespace Voxelgine.Engine
 		/// <param name="Pos">Spawn position</param>
 		/// <param name="InitialForce">Initial force direction (e.g., wall impact normal). Fire will combine this with upward rise.</param>
 		/// <param name="Clr">Tint color (use Color.White for default fire appearance)</param>
-		public void SpawnFire(Vector3 Pos, Vector3 InitialForce, Color Clr)
+		public void SpawnFire(Vector3 Pos, Vector3 InitialForce, Color Clr, float ScaleFactor = 1.0f)
 		{
 			for (int i = 0; i < Particles.Length; i++)
 			{
@@ -145,7 +145,7 @@ namespace Voxelgine.Engine
 					P.Tex = ResMgr.GetFromCollection("fire");
 
 					P.Scaler = 0; // Not used for fire, we use custom shrinking
-					P.InitialScale = 0.8f + Random.Shared.NextSingle() * 0.4f; // 0.8 - 1.2
+					P.InitialScale = (0.8f + Random.Shared.NextSingle() * 0.4f) * ScaleFactor; // 0.8 - 1.2
 					P.Scale = P.InitialScale;
 					P.Rnd = Random.Shared.NextSingle();
 					P.Type = ParticleType.Fire;

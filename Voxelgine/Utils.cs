@@ -90,6 +90,23 @@ namespace Voxelgine
 			return Rnd.Next(InclusiveMin, ExclusiveMax);
 		}
 
+		/// <summary>
+		/// Returns a random unit vector (normalized, uniformly distributed on sphere surface).
+		/// </summary>
+		public static Vector3 GetRandomUnitVector()
+		{
+			// Use spherical coordinates for uniform distribution
+			float theta = System.Random.Shared.NextSingle() * 2f * MathF.PI;
+			float phi = MathF.Acos(2f * System.Random.Shared.NextSingle() - 1f);
+
+			float sinPhi = MathF.Sin(phi);
+			return new Vector3(
+				sinPhi * MathF.Cos(theta),
+				sinPhi * MathF.Sin(theta),
+				MathF.Cos(phi)
+			);
+		}
+
 		public static void Deconstruct(Quaternion Q, out float Pitch, out float Yaw, out float Roll)
 		{
 			GetEulerAngles(Q, out Pitch, out Yaw, out Roll);

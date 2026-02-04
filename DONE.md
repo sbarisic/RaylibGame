@@ -41,6 +41,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 ## Bug Fixes
 
+- **Animation attachment points** — Fixed child model parts (hands) not following parent transforms (torso) during animations by implementing parent-child hierarchy in `CustomMesh` with `GetCombinedAnimationMatrix()`
 - **Water exit boost** — Fixed by applying 15% velocity boost when player exits water with upward momentum
 - **JSON model UV mapping** — Fixed UV coordinate calculation in MeshGenerator; now uses texture size instead of GlobalScale for normalization
 - **Particle System** — Fixed depth ordering and underwater rendering (physics resistance, blue tint)

@@ -40,6 +40,10 @@ namespace Voxelgine.Engine
 			EntModelName = MdlName;
 			MinecraftModel JMdl = ResMgr.GetJsonModel(MdlName);
 			CModel = MeshGenerator.Generate(JMdl);
+
+			// Set up parent-child hierarchy for proper animation attachment
+			CModel.SetupHumanoidHierarchy();
+
 			HasModel = true;
 			BBox = CModel.GetBoundingBox();
 

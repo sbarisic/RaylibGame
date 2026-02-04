@@ -25,7 +25,7 @@ namespace Voxelgine.Engine {
 	}
 
 	/// <summary>
-	/// A single mesh element within a CustomModel. Supports animation transforms.
+	/// A single mesh element within a CustomModel. Supports animation transforms and parent-child hierarchy.
 	/// </summary>
 	public class CustomMesh {
 		public string Name;
@@ -37,12 +37,20 @@ namespace Voxelgine.Engine {
 
 		public Matrix4x4 Matrix;
 
+		// Parent-child hierarchy for attachment points
+		/// <summary>Parent mesh that this mesh is attached to. Null if root element.</summary>
+		public CustomMesh Parent;
+		/// <summary>Attachment point offset relative to parent's rotation origin.</summary>
+		public Vector3 AttachmentPoint;
+
 		// Animation properties
 		/// <summary>Current animation rotation in degrees (X=pitch, Y=yaw, Z=roll).</summary>
 		public Vector3 AnimationRotation;
 		/// <summary>Current animation position offset.</summary>
 		public Vector3 AnimationPosition;
-		/// <summary>Combined animation matrix (updated by UpdateAnimationMatrix).</summary>
+		/// <summary>Rotation-only animation matrix (used for hierarchy propagation).</summary>
+		public Matrix4x4 AnimationRotationMatrix = Matrix4x4.Identity;
+		/// <summary>Combined animation matrix including rotation and translation.</summary>
 		public Matrix4x4 AnimationMatrix = Matrix4x4.Identity;
 
 		public CustomMesh(Mesh M) {
@@ -51,8 +59,19 @@ namespace Voxelgine.Engine {
 			Matrix = Matrix4x4.Identity;
 			AnimationRotation = Vector3.Zero;
 			AnimationPosition = Vector3.Zero;
+			AnimationRotationMatrix = Matrix4x4.Identity;
+			Parent = null;
+			AttachmentPoint = Vector3.Zero;
 
 			BBox = Raylib.GetMeshBoundingBox(M);
+		}
+
+		/// <summary>
+		/// Sets the parent mesh for this element, establishing attachment hierarchy.
+		/// </summary>
+		public void SetParent(CustomMesh parent, Vector3 attachmentPoint = default) {
+			Parent = parent;
+			AttachmentPoint = attachmentPoint;
 		}
 
 		/// <summary>
@@ -64,11 +83,76 @@ namespace Voxelgine.Engine {
 			float yaw = Utils.ToRad(AnimationRotation.Y);
 			float roll = Utils.ToRad(AnimationRotation.Z);
 
-			// Build rotation matrix (X * Y * Z order)
-			AnimationMatrix = Matrix4x4.CreateRotationX(pitch) *
-							  Matrix4x4.CreateRotationY(yaw) *
-							  Matrix4x4.CreateRotationZ(roll) *
-							  Matrix4x4.CreateTranslation(AnimationPosition);
+			// Build rotation-only matrix (used for hierarchy propagation)
+			AnimationRotationMatrix = Matrix4x4.CreateRotationX(pitch) *
+									  Matrix4x4.CreateRotationY(yaw) *
+									  Matrix4x4.CreateRotationZ(roll);
+
+			// Build full animation matrix (rotation + translation)
+			AnimationMatrix = AnimationRotationMatrix * Matrix4x4.CreateTranslation(AnimationPosition);
+		}
+
+		/// <summary>
+		/// Gets the combined animation matrix including all parent transforms.
+		/// This propagates parent transforms down the hierarchy.
+		/// </summary>
+		public Matrix4x4 GetCombinedAnimationMatrix() {
+			if (Parent == null) {
+				return AnimationMatrix;
+			}
+
+			// Get parent's rotation origin for proper pivot-based rotation
+			Vector3 parentRotOr = Parent.RotationOrigin;
+			parentRotOr.X = 1 - parentRotOr.X;
+			parentRotOr.Z = 0;
+
+			// Get parent's combined rotation and position (recursive up the chain)
+			var (parentRotation, parentPosition) = Parent.GetCombinedTransforms();
+
+			// Build parent rotation transform around pivot point:
+			// 1. Move to pivot origin
+			// 2. Apply rotation
+			// 3. Move back from pivot origin
+			Matrix4x4 parentRotationAroundPivot = 
+				Matrix4x4.CreateTranslation(-parentRotOr) * 
+				parentRotation * 
+				Matrix4x4.CreateTranslation(parentRotOr);
+
+			// Parent translation is applied directly (not around pivot)
+			Matrix4x4 parentTranslation = Matrix4x4.CreateTranslation(parentPosition);
+
+			// Combined: first rotate around pivot, then translate, then apply child's local animation
+			return parentRotationAroundPivot * parentTranslation * AnimationMatrix;
+		}
+
+		/// <summary>
+		/// Gets the combined rotation matrix and position offset from this element and all parents.
+		/// Used internally for proper hierarchy transform propagation.
+		/// </summary>
+		public (Matrix4x4 Rotation, Vector3 Position) GetCombinedTransforms() {
+			if (Parent == null) {
+				return (AnimationRotationMatrix, AnimationPosition);
+			}
+
+			// Get parent's combined transforms
+			var (parentRotation, parentPosition) = Parent.GetCombinedTransforms();
+
+			// Get parent's rotation origin
+			Vector3 parentRotOr = Parent.RotationOrigin;
+			parentRotOr.X = 1 - parentRotOr.X;
+			parentRotOr.Z = 0;
+
+			// This element's position is affected by parent's rotation around pivot
+			// Transform this element's animation position by parent's rotation
+			Vector3 rotatedPosition = Vector3.Transform(AnimationPosition, parentRotation);
+
+			// Combine rotations (parent first, then local)
+			Matrix4x4 combinedRotation = parentRotation * AnimationRotationMatrix;
+
+			// Combine positions (parent position + rotated local position)
+			Vector3 combinedPosition = parentPosition + rotatedPosition;
+
+			return (combinedRotation, combinedPosition);
 		}
 
 		public Matrix4x4 GetWorldMatrix(Matrix4x4 Model) {
@@ -81,8 +165,8 @@ namespace Voxelgine.Engine {
 			// Apply base transform around rotation origin
 			MeshMat = MeshMat * Matrix4x4.CreateTranslation(-RotOr);
 			MeshMat = MeshMat * Matrix;
-			// Apply animation transform
-			MeshMat = MeshMat * AnimationMatrix;
+			// Apply combined animation transform (includes parent transforms)
+			MeshMat = MeshMat * GetCombinedAnimationMatrix();
 			MeshMat = MeshMat * Matrix4x4.CreateTranslation(RotOr);
 
 			MeshMat = MeshMat * Model;
@@ -186,6 +270,35 @@ namespace Voxelgine.Engine {
 			foreach (var Msh in Meshes) {
 				Msh.Draw(Model);
 			}
+		}
+
+		/// <summary>
+		/// Sets up parent-child relationships between mesh elements.
+		/// Call this after loading the model to establish attachment hierarchy.
+		/// </summary>
+		/// <param name="parentName">Name of the parent element.</param>
+		/// <param name="childNames">Names of elements that should be children of the parent.</param>
+		public void SetupHierarchy(string parentName, params string[] childNames) {
+			var parent = GetMeshByName(parentName);
+			if (parent == null) return;
+
+			foreach (var childName in childNames) {
+				var child = GetMeshByName(childName);
+				if (child != null) {
+					child.SetParent(parent);
+				}
+			}
+		}
+
+		/// <summary>
+		/// Sets up the standard humanoid skeleton hierarchy:
+		/// - body is the root
+		/// - head, hand_l, hand_r are attached to body
+		/// - leg_l, leg_r are attached to body
+		/// </summary>
+		public void SetupHumanoidHierarchy() {
+			// Body is the root - everything attaches to it
+			SetupHierarchy("body", "head", "hand_l", "hand_r", "leg_l", "leg_r");
 		}
 	}
 

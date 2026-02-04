@@ -68,7 +68,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Lighting: Optimize propagation logic** — Analyze and optimize lighting update and propagation for better performance **[CPX: 3]**
+
+### Medium Priority
+
+*No medium priority items*
 
 ---
 
@@ -102,7 +106,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- **HIGHEST PRIORITY** Attachment points for json model animations. Currently when player goes into attack, torso transforms, but the hands do not follow. Need to implement attachment points so that child parts follow parent transforms properly
+*No uncategorized items*
 
 ---
 

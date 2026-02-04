@@ -75,5 +75,16 @@ namespace Voxelgine.Engine {
 				Ent.Draw3D(TimeAlpha, ref LastFrame);
 			}
 		}
+
+		/// <summary>
+		/// Returns all entities that emit light (LightEmission > 0).
+		/// </summary>
+		public IEnumerable<VoxEntity> GetLightEmittingEntities() {
+			for (int i = 0; i < Entities.Count; i++) {
+				VoxEntity Ent = Entities[i];
+				if (Ent != null && Ent.EmitsLight())
+					yield return Ent;
+			}
+		}
 	}
 }

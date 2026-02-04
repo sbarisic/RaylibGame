@@ -28,6 +28,11 @@ namespace Voxelgine.Engine {
 		/// <summary>Current velocity (updated by EntityManager physics).</summary>
 		public Vector3 Velocity;
 
+		/// <summary>Light emission level (0-15). Set to 0 for no light emission.</summary>
+		public byte LightEmission = 0;
+		/// <summary>If true, emitted light casts shadows (uses ray tracing, more expensive).</summary>
+		public bool LightCastsShadows = true;
+
 		protected bool HasModel;
 		protected string EntModelName;
 		protected Model EntModel;
@@ -118,6 +123,18 @@ namespace Voxelgine.Engine {
 
 		public virtual void OnUpdatePhysics(float Dt) {
 		}
+
+		/// <summary>
+		/// Gets the world position where light is emitted from (center of entity).
+		/// </summary>
+		public Vector3 GetLightSourcePosition() {
+			return Position + Size / 2f;
+		}
+
+		/// <summary>
+		/// Returns true if this entity emits light.
+		/// </summary>
+		public bool EmitsLight() => LightEmission > 0;
 
 		protected Vector3 GetDrawPosition() {
 			return Position + ModelOffset + CenterOffset;

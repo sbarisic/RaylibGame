@@ -68,7 +68,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Lighting: Shadow Support** — Upgrade lighting system to support shadows; light-emitting entities need to trace the world before updating light values **[CPX: 4]**
+*No high priority items*
 
 ---
 

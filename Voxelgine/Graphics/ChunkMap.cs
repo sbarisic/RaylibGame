@@ -308,6 +308,31 @@ namespace Voxelgine.Graphics
 				C.MarkDirty();
 		}
 
+		/// <summary>
+		/// Computes lighting including entity light sources with shadow support.
+		/// </summary>
+		/// <param name="entityLights">Collection of point lights from entities.</param>
+		public void ComputeLightingWithEntities(IEnumerable<PointLight> entityLights)
+		{
+			// First compute standard block-based lighting
+			foreach (Chunk C in GetAllChunks())
+				C.ComputeLighting();
+
+			// Then add entity lights with shadows
+			if (entityLights != null)
+			{
+				var lightList = entityLights.ToList();
+				if (lightList.Count > 0)
+				{
+					foreach (Chunk C in GetAllChunks())
+						C.ComputeEntityLights(lightList);
+				}
+			}
+
+			foreach (Chunk C in GetAllChunks())
+				C.MarkDirty();
+		}
+
 		public void Tick()
 		{
 		}

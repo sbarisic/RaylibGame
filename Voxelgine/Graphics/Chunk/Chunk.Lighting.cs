@@ -203,12 +203,13 @@ namespace Voxelgine.Graphics
 
 		/// <summary>
 		/// Computes block light from light-emitting blocks (Glowstone, Campfire, etc.)
+		/// Uses shadow tracing when enabled to create realistic shadows.
 		/// </summary>
 		void ComputeBlockLights()
 		{
-			Queue<BlockPos> blockLightQueue = new Queue<BlockPos>(256);
+			// Collect all light sources in this chunk
+			List<PointLight> lightSources = new List<PointLight>(32);
 
-			// Find all light-emitting blocks
 			for (int x = 0; x < ChunkSize; x++)
 			{
 				for (int y = 0; y < ChunkSize; y++)
@@ -222,44 +223,70 @@ namespace Voxelgine.Graphics
 						{
 							byte lightLevel = BlockInfo.GetLightEmission(block.Type);
 							Blocks[idx].SetBlockLightLevel(lightLevel);
-							blockLightQueue.Enqueue(new BlockPos(x, y, z));
+
+							// Get world position for this light source
+							WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 worldPos);
+							// Center the light in the block
+							Vector3 lightPos = worldPos + new Vector3(0.5f, 0.5f, 0.5f);
+							lightSources.Add(new PointLight(lightPos, lightLevel, castsShadows: true));
 						}
 					}
 				}
 			}
 
-			// Propagate block light
-			PropagateBlockLight(blockLightQueue);
+			// Propagate light from each source with shadow checking
+			foreach (var light in lightSources)
+			{
+				PropagateBlockLightWithShadows(light);
+			}
 		}
 
 		/// <summary>
-		/// Propagates block light from light sources to neighbors.
+		/// Propagates block light from a single source with shadow tracing.
+		/// Uses BFS but checks line-of-sight to the source for each propagation step.
 		/// </summary>
-		void PropagateBlockLight(Queue<BlockPos> queue)
+		void PropagateBlockLightWithShadows(PointLight light)
 		{
+			// Queue entry includes the block position and current light level
+			Queue<(int x, int y, int z, byte level)> queue = new Queue<(int, int, int, byte)>(256);
+
+			// Start from the light source block
+			int srcX = (int)MathF.Floor(light.Position.X);
+			int srcY = (int)MathF.Floor(light.Position.Y);
+			int srcZ = (int)MathF.Floor(light.Position.Z);
+
+			// Convert to local chunk coordinates if within this chunk
+			WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 chunkWorldPos);
+			int localX = srcX - (int)chunkWorldPos.X;
+			int localY = srcY - (int)chunkWorldPos.Y;
+			int localZ = srcZ - (int)chunkWorldPos.Z;
+
+			if (localX >= 0 && localX < ChunkSize && localY >= 0 && localY < ChunkSize && localZ >= 0 && localZ < ChunkSize)
+			{
+				queue.Enqueue((localX, localY, localZ, light.Intensity));
+			}
+
+			// Visited set to avoid reprocessing (we may want to update with higher values though)
+			HashSet<(int, int, int)> visited = new HashSet<(int, int, int)>();
+
 			while (queue.Count > 0)
 			{
-				BlockPos pos = queue.Dequeue();
+				var (x, y, z, level) = queue.Dequeue();
 
-				if (pos.X < 0 || pos.X >= ChunkSize || pos.Y < 0 || pos.Y >= ChunkSize || pos.Z < 0 || pos.Z >= ChunkSize)
-					continue;
-
-				int idx = pos.X + ChunkSize * (pos.Y + ChunkSize * pos.Z);
-				byte currentBlockLight = Blocks[idx].GetMaxBlockLight();
-
-				if (currentBlockLight <= 1)
+				if (level <= 1)
 					continue;
 
 				for (int d = 0; d < 6; d++)
 				{
-					int nx = pos.X + DirX[d];
-					int ny = pos.Y + DirY[d];
-					int nz = pos.Z + DirZ[d];
+					int nx = x + DirX[d];
+					int ny = y + DirY[d];
+					int nz = z + DirZ[d];
 
 					// Handle cross-chunk propagation
 					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize)
 					{
-						WorldMap.GetWorldPos(pos.X, pos.Y, pos.Z, GlobalChunkIndex, out Vector3 worldPos);
+						// Get world position and propagate to neighbor chunk
+						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 worldPos);
 						int worldNx = (int)worldPos.X + DirX[d];
 						int worldNy = (int)worldPos.Y + DirY[d];
 						int worldNz = (int)worldPos.Z + DirZ[d];
@@ -268,8 +295,16 @@ namespace Voxelgine.Graphics
 						if (neighborChunk == null || BlockInfo.IsOpaque(neighborBlock.Type))
 							continue;
 
+						// Shadow check: verify line-of-sight to light source
+						if (light.CastsShadows)
+						{
+							Vector3 neighborCenter = new Vector3(worldNx + 0.5f, worldNy + 0.5f, worldNz + 0.5f);
+							if (!ShadowTracer.HasLineOfSight(WorldMap, light.Position, neighborCenter))
+								continue; // In shadow, skip
+						}
+
 						byte neighborBlockLight = neighborBlock.GetMaxBlockLight();
-						byte newBlockLight = (byte)(currentBlockLight - 1);
+						byte newBlockLight = (byte)(level - 1);
 						if (newBlockLight > neighborBlockLight)
 						{
 							neighborBlock.SetBlockLightLevel(newBlockLight);
@@ -278,21 +313,47 @@ namespace Voxelgine.Graphics
 						continue;
 					}
 
+					// Within chunk bounds
+					if (visited.Contains((nx, ny, nz)))
+						continue;
+
 					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
 					PlacedBlock neighborBlock2 = Blocks[nidx];
 
 					if (BlockInfo.IsOpaque(neighborBlock2.Type))
 						continue;
 
+					// Shadow check: verify line-of-sight to light source
+					if (light.CastsShadows)
+					{
+						WorldMap.GetWorldPos(nx, ny, nz, GlobalChunkIndex, out Vector3 neighborWorldPos);
+						Vector3 neighborCenter = neighborWorldPos + new Vector3(0.5f, 0.5f, 0.5f);
+						if (!ShadowTracer.HasLineOfSight(WorldMap, light.Position, neighborCenter))
+							continue; // In shadow, skip
+					}
+
 					byte neighborBlockLight2 = neighborBlock2.GetMaxBlockLight();
-					byte newBlockLight2 = (byte)(currentBlockLight - 1);
+					byte newBlockLight2 = (byte)(level - 1);
 
 					if (newBlockLight2 > neighborBlockLight2)
 					{
 						Blocks[nidx].SetBlockLightLevel(newBlockLight2);
-						queue.Enqueue(new BlockPos(nx, ny, nz));
+						visited.Add((nx, ny, nz));
+						queue.Enqueue((nx, ny, nz, newBlockLight2));
 					}
 				}
+			}
+		}
+
+		/// <summary>
+		/// Computes light from entity light sources with shadow support.
+		/// Called by ChunkMap when entities are present.
+		/// </summary>
+		public void ComputeEntityLights(IEnumerable<PointLight> entityLights)
+		{
+			foreach (var light in entityLights)
+			{
+				PropagateBlockLightWithShadows(light);
 			}
 		}
 	}

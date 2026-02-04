@@ -68,6 +68,14 @@ namespace Voxelgine
 			}
 			ResMgr.CreateCollection("fire", FireTexList.ToArray());
 
+			// Blood particle textures
+			List<Texture2D> BloodTexList = new List<Texture2D>();
+			for (int i = 1; i <= 4; i++)
+			{
+				BloodTexList.Add(ResMgr.GetTexture($"blood/{i}.png"));
+			}
+			ResMgr.CreateCollection("blood", BloodTexList.ToArray());
+
 			GraphicsUtils.Init();
 			Scripting.Init();
 

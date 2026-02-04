@@ -85,10 +85,19 @@ namespace Voxelgine.Engine
 						hitPos = partHitPos;
 						hitNormal = partHitNormal;
 						Console.WriteLine($"Hit NPC body part: {bodyPart} at distance {entityHit.Distance:F2}");
+
+						// Apply twitch effect to the hit body part
+						npc.TwitchBodyPart(bodyPart, E.Dir);
 					}
 					else
 					{
 						Console.WriteLine($"Hit NPC (AABB) at distance {entityHit.Distance:F2}");
+					}
+
+					// Spawn blood particles for NPC hits
+					for (int i = 0; i < 8; i++)
+					{
+						GState.Particle.SpawnBlood(hitPos, hitNormal * 0.5f, (0.8f + (float)Utils.Rnd.NextDouble() * 0.4f) * 0.85f);
 					}
 				}
 				else
@@ -109,20 +118,23 @@ namespace Voxelgine.Engine
 				return;
 			}
 
-			// Spawn fire effect at hit position with surface normal as initial force
-			for (int i = 0; i < 6; i++)
+			// Spawn fire effect at hit position with surface normal as initial force (only for non-NPC hits)
+			if (hitEntity is not VEntNPC)
 			{
-				float ForceFactor = 10.6f;
-				float RandomUnitFactor = 0.6f;
-
-				if (hitNormal.Y == 0)
+				for (int i = 0; i < 6; i++)
 				{
-					ForceFactor *= 2;
-					RandomUnitFactor = 0.4f;
-				}
+					float ForceFactor = 10.6f;
+					float RandomUnitFactor = 0.6f;
 
-				Vector3 RndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * RandomUnitFactor);
-				GState.Particle.SpawnFire(hitPos, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
+					if (hitNormal.Y == 0)
+					{
+						ForceFactor *= 2;
+						RandomUnitFactor = 0.4f;
+					}
+
+					Vector3 RndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * RandomUnitFactor);
+					GState.Particle.SpawnFire(hitPos, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
+				}
 			}
 		}
 	}

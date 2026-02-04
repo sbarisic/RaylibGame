@@ -110,8 +110,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Added data/textures/blood/1-4.png for future blood particle effect, implement blood particles. Multiple should spawn and be ejected from the spawn normal, they should fall to the ground, they should fade out after about 8 seconds
-- When NPC is hit by a gun, create blood particles at the hit position and normal
+*No uncategorized items*
 
 
 ---

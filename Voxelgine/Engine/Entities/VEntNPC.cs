@@ -50,6 +50,11 @@ namespace Voxelgine.Engine
 		private const float IdleWanderDelay = 10f;          // Seconds before wandering when idle
 		private const float IdleWanderRadius = 10f;         // Max distance to wander
 
+		// Hit twitch effect
+		private Dictionary<string, Vector3> _twitchOffsets = new();
+		private const float TwitchDecayRate = 12f;          // How fast twitch decays per second
+		private const float TwitchStrength = 25f;           // Max rotation degrees on hit
+
 		/// <summary>Gets the animator for this NPC (null if model not loaded).</summary>
 		public NPCAnimator GetAnimator() => Animator;
 
@@ -87,6 +92,31 @@ namespace Voxelgine.Engine
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Applies a twitch effect to a body part (e.g., when hit by gunfire).
+		/// The twitch will decay over time automatically.
+		/// </summary>
+		/// <param name="bodyPartName">Name of the mesh to twitch (e.g., "head", "leg_r").</param>
+		/// <param name="hitNormal">Direction of impact (twitch rotates away from this).</param>
+		public void TwitchBodyPart(string bodyPartName, Vector3 hitNormal)
+		{
+			if (CModel == null || string.IsNullOrEmpty(bodyPartName))
+				return;
+
+			// Generate random twitch rotation based on hit direction
+			float twitchX = (hitNormal.Y * 0.5f + (_random.NextSingle() - 0.5f)) * TwitchStrength;
+			float twitchY = (_random.NextSingle() - 0.5f) * TwitchStrength * 0.5f;
+			float twitchZ = (hitNormal.X * 0.5f + (_random.NextSingle() - 0.5f)) * TwitchStrength;
+
+			Vector3 twitch = new Vector3(twitchX, twitchY, twitchZ) * 15;
+
+			// Add to existing twitch or create new
+			if (_twitchOffsets.ContainsKey(bodyPartName))
+				_twitchOffsets[bodyPartName] += twitch;
+			else
+				_twitchOffsets[bodyPartName] = twitch;
 		}
 
 		/// <summary>
@@ -299,6 +329,47 @@ namespace Voxelgine.Engine
 
 			// Update animation
 			Animator?.Update(Dt);
+
+			// Update and apply hit twitch effects
+			if (CModel != null && _twitchOffsets.Count > 0)
+			{
+				var keysToRemove = new List<string>();
+
+				foreach (var kvp in _twitchOffsets)
+				{
+					string partName = kvp.Key;
+					Vector3 twitch = kvp.Value;
+
+					// Decay the twitch
+					twitch *= MathF.Exp(-TwitchDecayRate * Dt);
+
+					// Remove if negligible
+					if (twitch.LengthSquared() < 0.01f)
+					{
+						keysToRemove.Add(partName);
+						// Reset mesh animation offset
+						var mesh = CModel.GetMeshByName(partName);
+						if (mesh != null)
+							mesh.AnimationRotation -= kvp.Value; // Remove old twitch
+					}
+					else
+					{
+						// Apply twitch offset to mesh
+						var mesh = CModel.GetMeshByName(partName);
+						if (mesh != null)
+						{
+							// Remove old twitch, apply new
+							mesh.AnimationRotation -= kvp.Value;
+							mesh.AnimationRotation += twitch;
+							mesh.UpdateAnimationMatrix();
+						}
+						_twitchOffsets[partName] = twitch;
+					}
+				}
+
+				foreach (var key in keysToRemove)
+					_twitchOffsets.Remove(key);
+			}
 
 			// Play walk animation when moving, idle when stationary
 			float horizontalSpeed = MathF.Sqrt(Velocity.X * Velocity.X + Velocity.Z * Velocity.Z);

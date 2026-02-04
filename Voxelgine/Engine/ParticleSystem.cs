@@ -14,7 +14,8 @@ namespace Voxelgine.Engine
 	enum ParticleType
 	{
 		Smoke,
-		Fire
+		Fire,
+		Blood
 	}
 
 	enum ParticleBlendMode
@@ -149,18 +150,63 @@ namespace Voxelgine.Engine
 					P.MovePhysics = true;
 					P.Tex = ResMgr.GetFromCollection("fire");
 
-					P.Scaler = 0; // Not used for fire, we use custom shrinking
-					P.InitialScale = (0.8f + Random.Shared.NextSingle() * 0.4f) * ScaleFactor; // 0.8 - 1.2
-					P.Scale = P.InitialScale;
-					P.Rnd = Random.Shared.NextSingle();
-					P.Type = ParticleType.Fire;
-					P.IsEmissive = true;
-					P.BlendMode = ParticleBlendMode.FireType;
+										P.Scaler = 0; // Not used for fire, we use custom shrinking
+										P.InitialScale = (0.8f + Random.Shared.NextSingle() * 0.4f) * ScaleFactor; // 0.8 - 1.2
+										P.Scale = P.InitialScale;
+										P.Rnd = Random.Shared.NextSingle();
+										P.Type = ParticleType.Fire;
+										P.IsEmissive = true;
+										P.BlendMode = ParticleBlendMode.FireType;
 
-					return;
-				}
-			}
-		}
+										return;
+									}
+								}
+							}
+
+							/// <summary>
+							/// Spawns a blood particle effect.
+							/// Blood is ejected from the normal direction, falls with gravity, and fades out over ~8 seconds.
+							/// </summary>
+							/// <param name="Pos">Spawn position (hit point on NPC)</param>
+							/// <param name="Normal">Surface normal direction (blood ejects outward from this)</param>
+							/// <param name="ScaleFactor">Size multiplier</param>
+							public void SpawnBlood(Vector3 Pos, Vector3 Normal, float ScaleFactor = 1.0f)
+							{
+								for (int i = 0; i < Particles.Length; i++)
+								{
+									ref Particle P = ref Particles[i];
+
+									if (P.Draw == false)
+									{
+										P.Draw = true;
+										P.Pos = Pos;
+										P.Color = Color.White; // Texture provides color
+
+										// Eject from normal with random spread and slight upward bias
+										float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+										float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+										float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+										float speed = 2.0f + Random.Shared.NextSingle() * 3.0f; // 2-5 units/sec
+										Vector3 spread = new Vector3(spreadX, spreadY + 0.5f, spreadZ);
+										P.Vel = (Normal + spread) * speed;
+
+										P.SpawnedAt = lastGameTime;
+										P.LifeTime = 6.0f + Random.Shared.NextSingle() * 4.0f; // 6-10 seconds
+										P.MovePhysics = true;
+										P.Tex = ResMgr.GetFromCollection("blood");
+
+										P.Scaler = 0; // Not used for blood
+										P.InitialScale = (0.4f + Random.Shared.NextSingle() * 0.3f) * ScaleFactor; // 0.4 - 0.7
+										P.Scale = P.InitialScale;
+										P.Rnd = Random.Shared.NextSingle();
+										P.Type = ParticleType.Blood;
+										P.IsEmissive = false;
+										P.BlendMode = ParticleBlendMode.Alpha;
+
+										return;
+									}
+								}
+							}
 
 		public void Tick(float GameTime)
 		{
@@ -208,6 +254,25 @@ namespace Voxelgine.Engine
 
 							// Fire velocity decays over time
 							P.Vel *= 0.97f;
+						}
+						else if (P.Type == ParticleType.Blood)
+						{
+							// Blood falls with gravity
+							P.Vel.Y -= 9.81f * Dt;
+
+							// Blood fades out over lifetime (modify alpha in color)
+							float lifeProgress = (GameTime - P.SpawnedAt) / P.LifeTime;
+							// Start fading after 50% of lifetime
+							if (lifeProgress > 0.5f)
+							{
+								float fadeProgress = (lifeProgress - 0.5f) * 2.0f; // 0.0 to 1.0 over second half
+								byte alpha = (byte)(255 * (1.0f - fadeProgress));
+								P.Color = new Color(P.Color.R, P.Color.G, P.Color.B, alpha);
+							}
+
+							// Blood velocity decays slightly (air resistance)
+							P.Vel.X *= 0.99f;
+							P.Vel.Z *= 0.99f;
 						}
 						else
 						{

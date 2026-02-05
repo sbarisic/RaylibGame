@@ -49,19 +49,22 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Weapons: Hammer swing animation** — Add swing animation for hammer weapon on click **[CPX: 2]**
 
 ### Medium Priority
 
-- [ ] **Weapons: Hammer swing animation** — Add swing animation for hammer weapon on click **[CPX: 2]**
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
 ### Lower Priority
 
-- [ ] **Voxel World: Procedural buildings/structures** **[CPX: 3]**
-- [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods **[CPX: 5]**
-- [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
+- [ ] **Voxel World: Procedural world generation, floating islands, but not infinite. There should be a single but big floating island. Maybe a few other floating islands stacked vertically? Trees, water, caves...**
+- [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods, create a separate category with all the planned subtasks, analyze the project before making decisions **[CPX: 5]**
+
+### On Hold
+
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
+- [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 
 ---
 
@@ -73,9 +76,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Animation: View model mode transitions** — Add smooth toggle animations when switching view model rotation modes (e.g., hip to ironsight) **[CPX: 2]**
-- [ ] **Physics: Player bounding box** — Implement proper bounding box calculation for `Player` based on position and dimensions **[CPX: 1]**
+*No medium priority items*
+
+### On Hold
+
 - [ ] **GUI: Disabled inventory items** — Draw inventory items as visually disabled when count reaches 0 **[CPX: 1]**
+- [ ] **Animation: View model mode transitions** — Add smooth toggle animations when switching view model rotation modes (e.g., hip to ironsight) **[CPX: 2]**
 
 ---
 
@@ -109,8 +115,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
-
+- Check out WORLDBUILDING.md, what can be changed to support a more multiplayer focused approach? Let's say up to 10 players.
+- Make the door entity use the data/models/door/door.json model, door model is 16x32 in size, 16 units is 1 block size in the world, so the door should be 1 block wide and 2 blocks tall
 
 ---
 

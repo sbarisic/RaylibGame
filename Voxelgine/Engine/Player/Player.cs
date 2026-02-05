@@ -58,8 +58,9 @@ namespace Voxelgine.Engine
 		public const float PlayerEyeOffset = 1.6f;
 		/// <summary>Player collision cylinder radius.</summary>
 		public const float PlayerRadius = 0.4f;
-		// TODO Implement bounding box calculation
-		public BoundingBox BBox;
+
+		/// <summary>Axis-aligned bounding box for the player, updated when position changes.</summary>
+		public BoundingBox BBox { get; private set; }
 
 		public Vector3 Position;
 		public bool CursorDisabled = false;
@@ -91,6 +92,7 @@ namespace Voxelgine.Engine
 		public void SetPosition(int X, int Y, int Z)
 		{
 			Position = FPSCamera.Position = new Vector3(X, Y, Z);
+			UpdateBoundingBox();
 		}
 
 		public void SetPosition(Vector3 Pos)
@@ -100,6 +102,19 @@ namespace Voxelgine.Engine
 
 			PreviousPosition = Position;
 			Position = FPSCamera.Position = Pos;
+			UpdateBoundingBox();
+		}
+
+		/// <summary>
+		/// Recalculates the player's axis-aligned bounding box based on current position.
+		/// </summary>
+		private void UpdateBoundingBox()
+		{
+			Vector3 feet = FeetPosition;
+			BBox = new BoundingBox(
+				new Vector3(feet.X - PlayerRadius, feet.Y, feet.Z - PlayerRadius),
+				new Vector3(feet.X + PlayerRadius, feet.Y + PlayerHeight, feet.Z + PlayerRadius)
+			);
 		}
 
 		public Vector3 GetPreviousPosition()

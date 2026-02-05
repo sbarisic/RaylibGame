@@ -100,8 +100,12 @@ namespace RaylibGame.States
 		// Test NPC reference
 		private VEntNPC _testNpc;
 
+		GameWindow _gameWindow;
+
 		public GameState(GameWindow window) : base(window)
 		{
+			_gameWindow = window;
+
 			GUI = new FishUIManager(window);
 			EntMgr = new EntityManager();
 			Snd = new SoundMgr();
@@ -110,43 +114,43 @@ namespace RaylibGame.States
 
 			// =========================================== Init Systems ==============================================
 			Snd.Init();
-				Map = new ChunkMap(this);
+			Map = new ChunkMap(this);
 
-				Particle = new ParticleSystem();
-				Particle.Init(
-					(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
-					(Pt) => Map.GetBlock(Pt),
-					(Pt) => Map.GetLightColor(Pt)
-				);
+			Particle = new ParticleSystem();
+			Particle.Init(
+				(Pt) => Map.Collide(Pt, Vector3.Zero, out Vector3 _),
+				(Pt) => Map.GetBlock(Pt),
+				(Pt) => Map.GetLightColor(Pt)
+			);
 
-				// =========================================== Create entities ===========================================
-				// Create pickup entity
-				VEntPickup pickup = new VEntPickup();
-				pickup.SetPosition(PickupPos);
-				pickup.SetSize(Vector3.One);
-				pickup.SetModel("orb_xp/orb_xp.obj");
-				EntMgr.Spawn(this, pickup);
+			// =========================================== Create entities ===========================================
+			// Create pickup entity
+			VEntPickup pickup = new VEntPickup();
+			pickup.SetPosition(PickupPos);
+			pickup.SetSize(Vector3.One);
+			pickup.SetModel("orb_xp/orb_xp.obj");
+			EntMgr.Spawn(this, pickup);
 
-				// Create NPC entity  
-				_testNpc = new VEntNPC();
-				_testNpc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-				_testNpc.SetPosition(NPCPos);
-				_testNpc.SetModel("npc/humanoid.json");
-				EntMgr.Spawn(this, _testNpc);
+			// Create NPC entity  
+			_testNpc = new VEntNPC();
+			_testNpc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
+			_testNpc.SetPosition(NPCPos);
+			_testNpc.SetModel("npc/humanoid.json");
+			EntMgr.Spawn(this, _testNpc);
 
-				// ======================================= Create rest of the world ======================================
-				if (File.Exists(MAP_FILE))
-				{
-					using var fileStream = File.OpenRead(MAP_FILE);
-					Map.Read(fileStream);
-				}
-				else
-				{
-					Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
-				}
+			// ======================================= Create rest of the world ======================================
+			if (File.Exists(MAP_FILE))
+			{
+				using var fileStream = File.OpenRead(MAP_FILE);
+				Map.Read(fileStream);
+			}
+			else
+			{
+				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
+			}
 
-				// Initialize pathfinding for NPCs (must be after map is loaded)
-				_testNpc.InitPathfinding(Map);
+			// Initialize pathfinding for NPCs (must be after map is loaded)
+			_testNpc.InitPathfinding(Map);
 
 			Map.ComputeLighting();
 

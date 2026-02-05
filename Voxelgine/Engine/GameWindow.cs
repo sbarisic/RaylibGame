@@ -7,26 +7,33 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mail;
 using System.Numerics;
+using System.Runtime.Intrinsics;
 using System.Text;
 using System.Threading.Tasks;
 
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
-namespace Voxelgine.Engine {
-	public unsafe class GameWindow {
+namespace Voxelgine.Engine
+{
+	public unsafe class GameWindow
+	{
 		public InputMgr InMgr;
 
-		public int Width {
+		public int Width
+		{
 			get; private set;
 		}
 
-		public int Height {
+		public int Height
+		{
 			get; private set;
 		}
 
-		public float AspectRatio {
-			get {
+		public float AspectRatio
+		{
+			get
+			{
 				if (Height == 0 || Width == 0)
 					return 1.0f;
 
@@ -48,7 +55,8 @@ namespace Voxelgine.Engine {
 
 		Shader DefaultShader;
 
-		public GameWindow(int W, int H, string Title) {
+		public GameWindow(int W, int H, string Title)
+		{
 			Open = true;
 
 			if (Program.Cfg.HighDpiWindow)
@@ -66,10 +74,13 @@ namespace Voxelgine.Engine {
 			if (Program.Cfg.Fullscreen && !Program.Cfg.Borderless)
 				Raylib.SetWindowState(ConfigFlags.FullscreenMode);
 
-			if (Program.Cfg.Msaa) {
+			if (Program.Cfg.Msaa)
+			{
 				Enable_SSAA = true;
 				//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
-			} else {
+			}
+			else
+			{
 				Enable_SSAA = false;
 			}
 			//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
@@ -80,9 +91,12 @@ namespace Voxelgine.Engine {
 			int MonCount = Raylib.GetMonitorCount();
 			int UseMon = 0;
 
-			if (Program.Cfg.Monitor >= 0 && Program.Cfg.Monitor < MonCount) {
+			if (Program.Cfg.Monitor >= 0 && Program.Cfg.Monitor < MonCount)
+			{
 				UseMon = Program.Cfg.Monitor;
-			} else {
+			}
+			else
+			{
 				Program.Cfg.Monitor = 0;
 			}
 
@@ -100,7 +114,8 @@ namespace Voxelgine.Engine {
 
 
 			int FPS = Program.Cfg.TargetFPS;
-			if (FPS <= 0) {
+			if (FPS <= 0)
+			{
 				FPS = MFPS;
 			}
 
@@ -109,19 +124,25 @@ namespace Voxelgine.Engine {
 			Raylib.SetExitKey(0);
 
 
-			if (Program.Cfg.Borderless) {
+			if (Program.Cfg.Borderless)
+			{
 				Raylib.ToggleBorderlessWindowed();
 				Raylib.SetWindowSize(W, H);
 				Raylib.SetWindowPosition(MW / 2 - W / 2, MH / 2 - H / 2);
 			}
 
-			if (Program.Cfg.Fullscreen) {
-				if (Program.Cfg.Borderless) {
+			if (Program.Cfg.Fullscreen)
+			{
+				if (Program.Cfg.Borderless)
+				{
 					Raylib.SetWindowSize(MW, MH);
-				} else {
+				}
+				else
+				{
 					Raylib.SetWindowMonitor(UseMon);
 
-					if (Program.Cfg.UseFSDesktopRes) {
+					if (Program.Cfg.UseFSDesktopRes)
+					{
 						Width = W = MW;
 						Height = H = MH;
 						Raylib.SetWindowSize(W, H);
@@ -141,18 +162,22 @@ namespace Voxelgine.Engine {
 			DefaultShader = ResMgr.GetShader("default");
 		}
 
-		void ReloadRT() {
-			if (HasWindowRT) {
+		void ReloadRT()
+		{
+			if (HasWindowRT)
+			{
 				WindowG?.Dispose();
 				WindowG = null;
 			}
 
-			if (HasViewmodelRT) {
+			if (HasViewmodelRT)
+			{
 				Raylib.UnloadRenderTexture(ViewmodelRT);
 				HasViewmodelRT = false;
 			}
 
-			if (!HasViewmodelRT) {
+			if (!HasViewmodelRT)
+			{
 				ViewmodelRT = Raylib.LoadRenderTexture(Width, Height);
 				HasViewmodelRT = true;
 			}
@@ -172,30 +197,88 @@ namespace Voxelgine.Engine {
 			HasWindowRT = true;
 		}
 
-		public void SetState(GameStateImpl State) {
+		public void SetState(GameStateImpl State)
+		{
 			this.State = State;
 			Raylib.EnableCursor();
 			State.SwapTo();
 		}
 
-		public bool IsOpen() {
+		public bool IsOpen()
+		{
 			return (!Raylib.WindowShouldClose() && Open);
 		}
 
-		public void Close() {
+		public void Close()
+		{
 			Open = false;
 		}
 
-		public void Tick(float GameTime) {
+		public void Tick(float GameTime)
+		{
 			InMgr.Tick(GameTime);
 			State.Tick(GameTime);
 		}
 
-		public void UpdateLockstep(float TotalTime, float Dt) {
+		public void UpdateLockstep(float TotalTime, float Dt)
+		{
 			State.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
-		void BeginScreenShader() {
+		Shader CurrentShader;
+
+		public void BeginShaderMode(string shaderName)
+		{
+			CurrentShader = ResMgr.GetShader(shaderName);
+			Raylib.BeginShaderMode(CurrentShader);
+		}
+
+		public void SetShaderValue<T>(string valName, T Val)
+		{
+			int Loc = Raylib.GetShaderLocation(CurrentShader, valName);
+			if (Loc <= 0)
+				return;
+
+			if (typeof(T) == typeof(Vector2))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (Vector2)(object)Val, ShaderUniformDataType.Vec2);
+			}
+			else if (typeof(T) == typeof(float))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (float)(object)Val, ShaderUniformDataType.Float);
+			}
+			else if (typeof(T) == typeof(Vector3))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (Vector3)(object)Val, ShaderUniformDataType.Vec3);
+			}
+			else if (typeof(T) == typeof(Vector4))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (Vector4)(object)Val, ShaderUniformDataType.Vec4);
+			}
+			else if (typeof(T) == typeof(int))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (int)(object)Val, ShaderUniformDataType.Int);
+			}
+			else if (typeof(T) == typeof(uint))
+			{
+				Raylib.SetShaderValue(CurrentShader, Loc, (uint)(object)Val, ShaderUniformDataType.UInt);
+			}
+			else if (typeof(T) == typeof(Texture2D))
+			{
+				Texture2D TT = (Texture2D)(object)Val;
+				Raylib.SetShaderValue(CurrentShader, Loc, TT, ShaderUniformDataType.Sampler2D);
+			}
+			else
+				throw new NotImplementedException($"Not implemented SetShaderValue for type {typeof(T).Name}");
+		}
+
+		public void EndShaderMode()
+		{
+			Raylib.EndShaderMode();
+		}
+
+		void BeginScreenShader()
+		{
 			if (!HasWindowRT)
 				return;
 
@@ -203,7 +286,8 @@ namespace Voxelgine.Engine {
 			Raylib.ClearBackground(new Color(0, 0, 0, 0));
 		}
 
-		void EndScreenShader(string ShaderName) {
+		void EndScreenShader(string ShaderName)
+		{
 			if (!HasWindowRT)
 				return;
 
@@ -212,25 +296,17 @@ namespace Voxelgine.Engine {
 			Rectangle Src = new Rectangle(0, 0, WindowG.Target.Texture.Width, -WindowG.Target.Texture.Height);
 			Rectangle Dst = new Rectangle(0, 0, Width, Height);
 
-			Shader ScreenShader = ResMgr.GetShader(ShaderName);
-			Raylib.BeginShaderMode(ScreenShader);
-
-			int Loc_Resolution = Raylib.GetShaderLocation(ScreenShader, "resolution");
-			if (Loc_Resolution >= 0) {
-				Raylib.SetShaderValue(ScreenShader, Loc_Resolution, new Vector2(Width, Height), ShaderUniformDataType.Vec2);
-			}
-
-			int Loc_Time = Raylib.GetShaderLocation(ScreenShader, "time");
-			if (Loc_Time >= 0) {
-				Raylib.SetShaderValue(ScreenShader, Loc_Time, Program.TotalTime, ShaderUniformDataType.Float);
-			}
+			BeginShaderMode(ShaderName);
+			SetShaderValue("resolution", new Vector2(Width, Height));
+			SetShaderValue("time", Program.TotalTime);
 
 			Raylib.DrawTexturePro(WindowG.Target.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
 
-			Raylib.EndShaderMode();
+			EndShaderMode();
 		}
 
-		void GetCurrentFrame(ref GameFrameInfo FInfo, GameState GState) {
+		void GetCurrentFrame(ref GameFrameInfo FInfo, GameState GState)
+		{
 			if (GState == null)
 				return;
 
@@ -246,14 +322,16 @@ namespace Voxelgine.Engine {
 		}
 
 		// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
-		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame) {
+		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame)
+		{
 			GameFrameInfo FInfo = new GameFrameInfo();
 			GetCurrentFrame(ref FInfo, State as GameState);
 
 			// Store the original physics state to return (before interpolation modifies anything)
 			GameFrameInfo PhysicsFrame = FInfo;
 
-			if (State is GameState GS && !LastFrame.Empty) {
+			if (State is GameState GS && !LastFrame.Empty)
+			{
 				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
 
 				// Apply interpolated camera to RenderCam only (don't modify physics Cam)
@@ -263,14 +341,18 @@ namespace Voxelgine.Engine {
 				// Apply interpolated view model offset (position calculated at draw time from camera + offset)
 				GS.Ply.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
 				GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
-			} else {
+			}
+			else
+			{
 				// First frame - use physics camera as render camera
-				if (State is GameState GS2) {
+				if (State is GameState GS2)
+				{
 					GS2.Ply.RenderCam = GS2.Ply.Cam;
 				}
 			}
 
-			if (Raylib.IsWindowResized()) {
+			if (Raylib.IsWindowResized())
+			{
 				Width = Raylib.GetRenderWidth();
 				Height = Raylib.GetRenderHeight();
 				ReloadRT();

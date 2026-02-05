@@ -22,6 +22,16 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public bool IsAiming { get; private set; }
 
+		/// <summary>
+		/// Gun supports automatic fire when aiming.
+		/// </summary>
+		public override bool SupportsAutoFire => true;
+
+		/// <summary>
+		/// Fire rate in shots per second.
+		/// </summary>
+		public override float AutoFireRate => 10f;
+
 		public WeaponGun(Player ParentPlayer, string Name) : base(ParentPlayer, Name, IconType.Gun)
 		{
 			SetViewModelInfo(ViewModelRotationMode.Gun);

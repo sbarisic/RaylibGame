@@ -53,7 +53,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Weapons: Automatic fire** — Add automatic gun firing when left mouse button is held down **[CPX: 1]**
+- [ ] **Weapons: Hammer swing animation** — Add swing animation for hammer weapon on click **[CPX: 2]**
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
 
 ### Lower Priority
@@ -109,7 +109,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Add weapon hammer swing animation on click 
+*No uncategorized items*
 
 
 ---

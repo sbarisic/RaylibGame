@@ -30,6 +30,34 @@ namespace Voxelgine.Engine
 
 		public ViewModelRotationMode ViewModelRotationMode;
 
+		/// <summary>
+		/// When true, OnLeftClick fires continuously while mouse button is held.
+		/// </summary>
+		public virtual bool SupportsAutoFire => false;
+
+		/// <summary>
+		/// Shots per second for automatic fire. Only used when SupportsAutoFire is true.
+		/// </summary>
+		public virtual float AutoFireRate => 10f;
+
+		/// <summary>Timestamp of last auto-fire shot.</summary>
+		private float _lastAutoFireTime;
+
+		/// <summary>
+		/// Checks if enough time has passed to fire again based on AutoFireRate.
+		/// Updates internal timing when returning true.
+		/// </summary>
+		public bool CanAutoFire(float currentTime)
+		{
+			float interval = 1f / AutoFireRate;
+			if (currentTime - _lastAutoFireTime >= interval)
+			{
+				_lastAutoFireTime = currentTime;
+				return true;
+			}
+			return false;
+		}
+
 		// TODO: Maybe draw that item as disabled when count is 0?
 		public int Count = -1; // -1 means infinite, 0 means no items left, >0 item count
 

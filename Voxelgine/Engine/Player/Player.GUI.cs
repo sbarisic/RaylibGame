@@ -121,7 +121,22 @@ namespace Voxelgine.Engine
 
 		public void TickGUI(InputMgr InMgr, ChunkMap Map)
 		{
-			bool Left = InMgr.IsInputPressed(InputKey.Click_Left);
+			// Check for auto-fire: use IsInputDown if item supports it, otherwise IsInputPressed
+			bool LeftPressed = InMgr.IsInputPressed(InputKey.Click_Left);
+			bool LeftHeld = InMgr.IsInputDown(InputKey.Click_Left);
+
+			// For auto-fire weapons, check both held state and fire rate cooldown
+			bool Left;
+			if (ActiveSelection != null && ActiveSelection.SupportsAutoFire)
+			{
+				float currentTime = (float)Raylib_cs.Raylib.GetTime();
+				Left = LeftHeld && ActiveSelection.CanAutoFire(currentTime);
+			}
+			else
+			{
+				Left = LeftPressed;
+			}
+
 			bool Right = InMgr.IsInputPressed(InputKey.Click_Right);
 			bool Middle = InMgr.IsInputPressed(InputKey.Click_Middle);
 			float Wheel = InMgr.GetMouseWheel();

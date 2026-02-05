@@ -37,7 +37,8 @@ namespace Voxelgine.Engine
 		/// <summary>The first-person view model (weapon/tool) renderer.</summary>
 		public ViewModel ViewMdl;
 
-		bool NoClip;
+		/// <summary>When true, player can fly through blocks without collision.</summary>
+		public bool NoClip;
 		/// <summary>When true, freezes the view frustum for debugging culling.</summary>
 		public bool FreezeFrustum = false;
 

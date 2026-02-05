@@ -12,6 +12,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **GUI: Main menu refactor** — Refactored main menu to use FishUI `ScrollablePane` with properly positioned buttons, tooltips, and `OnButtonPressed` event pattern.
 - **GUI: Main menu title logo** — Added `ImageBox` displaying game logo at top of main menu.
 - **GUI: In-game debug menu** — Added FishUI debug window (F1 key) with debug toggle, save/load game, regenerate world, and main menu buttons.
+- **Debug: NOCLIP toggle** - Added NOCLIP checkbox to F1 debug menu allowing player to fly through blocks without collision.
 - **Graphics: Fullbright mode** — Added toggleable fullbright rendering via debug menu. Uses `BlockLight.FullbrightMode` flag.
 - **Graphics: Underwater overlay** — Added water overlay when player camera is submerged (texture-based or fallback blue tint).
 - **Graphics: Improved lighting system** — Separated skylight and block light channels for day/night support. Added ambient light minimum, sky light multiplier, proper cross-chunk propagation, and per-block-type light emission levels.

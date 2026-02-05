@@ -95,6 +95,7 @@ namespace RaylibGame.States
 		private Window _debugMenu;
 		private CheckBox _debugModeCheckbox;
 		private CheckBox _fullbrightCheckbox;
+		private CheckBox _noclipCheckbox;
 
 		// Test NPC reference
 		private VEntNPC _testNpc;
@@ -257,6 +258,25 @@ namespace RaylibGame.States
 				Map.MarkAllChunksDirty();
 			};
 			stack.AddChild(_fullbrightCheckbox);
+
+			// NOCLIP mode toggle (fly mode)
+			var noclipLabel = new Label
+			{
+				Text = "NOCLIP Mode (Fly)",
+				Size = new Vector2(200, 24)
+			};
+			stack.AddChild(noclipLabel);
+
+			_noclipCheckbox = new CheckBox
+			{
+				IsChecked = Ply.NoClip,
+				Size = new Vector2(24, 24)
+			};
+			_noclipCheckbox.OnCheckedChanged += (sender, isChecked) =>
+			{
+				Ply.NoClip = isChecked;
+			};
+			stack.AddChild(_noclipCheckbox);
 
 			// Day/Night cycle controls
 			var timeLabel = new Label

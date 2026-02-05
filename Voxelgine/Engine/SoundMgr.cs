@@ -51,7 +51,7 @@ namespace RaylibGame.Engine
 		{
 			Raylib.InitAudioDevice();
 
-			Raylib.SetMasterVolume(0.5f);
+			Raylib.SetMasterVolume(0.7f);
 
 			LoadCombo("walk", "data/sound/walk/walk{0}.wav", 5, 0.1f);
 			LoadCombo("jump", "data/sound/jump/jump{0}.wav", 1, 0.5f);
@@ -62,7 +62,7 @@ namespace RaylibGame.Engine
 			LoadCombo("block_place", "data/sound/block/place{0}.wav", 1, 1.0f);
 			LoadCombo("block_break", "data/sound/block/break{0}.wav", 1, 1.0f);
 			LoadCombo("swim", "data/sound/swim/swim{0}.wav", 1, 0.5f);
-			LoadCombo("shoot1", "data/sound/shoot1/shoot{0}.wav", 4, 0.6f);
+			LoadCombo("shoot1", "data/sound/shoot1/shoot{0}.wav", 4, 1.0f);
 		}
 
 		public void LoadSound(string Name, string FilePath, float Volume)

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
     [System.AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]
-    sealed class SettingsHiddenAttribute : Attribute {
+    public sealed class SettingsHiddenAttribute : Attribute {
         public SettingsHiddenAttribute() {
         }
     }

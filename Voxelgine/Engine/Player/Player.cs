@@ -90,7 +90,9 @@ namespace Voxelgine.Engine
 			ViewMdl = new ViewModel(Eng);
 
 			Position = Vector3.Zero;
-			ToggleMouse(false);
+			ToggleMouse(true);
+
+
 		}
 
 		public void SetPosition(int X, int Y, int Z)

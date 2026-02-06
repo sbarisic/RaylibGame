@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Voxelgine.Engine.DI
+{
+	public interface IFishLogging
+	{
+		public void Init();
+
+		public void WriteLine(string message);
+	}
+}

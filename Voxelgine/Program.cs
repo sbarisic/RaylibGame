@@ -25,11 +25,13 @@ namespace Voxelgine
 		public GameState GameState { get; set; }
 		public NPCPreviewState NPCPreviewState { get; set; }
 
+		//public IFishLogging Logging { get; set; }
+
 		public FEngineRunner()
 		{
 		}
 
-		public void Run()
+		public void Init()
 		{
 		}
 	}
@@ -45,15 +47,13 @@ namespace Voxelgine
 			FDI.AddSingleton<ILerpManager, LerpManager>();
 			FDI.AddSingleton<IGameWindow, GameWindow>();
 			FDI.AddSingleton<IFishDebug, Engine.Debug>();
+			FDI.AddSingleton<IFishLogging, FishLogging>();
 
 			IHost Host = FDI.Build();
 			FDI.CreateScope();
-			//Host.Run();
-
-
 			IFishEngineRunner Eng = FDI.GetRequiredService<IFishEngineRunner>();
 			Eng.DI = FDI;
-			Eng.DebugMode = Debugger.IsAttached;
+			//Host.Run();
 
 			Console.WriteLine("Aurora Falls - Voxelgine Engine");
 			Console.WriteLine("Running on {0}", Utils.GetOSName());
@@ -61,6 +61,9 @@ namespace Voxelgine
 			//Cfg = new GameConfig();
 			GameConfig Cfg = FDI.GetRequiredService<GameConfig>();
 			Cfg.LoadFromJson();
+
+			IFishLogging Logging = FDI.GetRequiredService<IFishLogging>();
+			Logging.Init();
 
 			// Apply mouse sensitivity from config
 			FPSCamera.MouseMoveSen = Cfg.MouseSensitivity;
@@ -97,11 +100,13 @@ namespace Voxelgine
 			GraphicsUtils.Init();
 			Scripting.Init();
 
+			Eng.DebugMode = Debugger.IsAttached;
 			Eng.MainMenuState = new MainMenuStateFishUI(Window, Eng);
 			Eng.GameState = new GameState(Window, Eng);
 			Eng.NPCPreviewState = new NPCPreviewState(Window, Eng);
 
 			Window.SetState(Eng.MainMenuState);
+			Eng.Init();
 
 
 			Stopwatch SWatch = Stopwatch.StartNew();

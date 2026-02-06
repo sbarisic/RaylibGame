@@ -97,6 +97,8 @@ namespace Voxelgine.Engine
 
 		public string Title { get; set; } = "Aurora Falls";
 
+		public string LogFolder { get; set; } = "data/logs";
+
 		[SettingsHidden]
 		public bool HighDpiWindow;
 
@@ -188,7 +190,6 @@ namespace Voxelgine.Engine
 				return;
 			string json = File.ReadAllText(ConfigFileName);
 			JsonConvert.PopulateObject(json, this);
-
 		}
 
 		public void GenerateDefaultKeybinds()

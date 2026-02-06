@@ -17,10 +17,12 @@ namespace Voxelgine.Engine
 
 		IGameWindow window;
 		IFishEngineRunner Eng;
+		IFishLogging Logging;
 
 		public EntityManager(IGameWindow window, IFishEngineRunner eng)
 		{
 			Entities = new List<VoxEntity>();
+			Logging = eng.DI.GetRequiredService<IFishLogging>();
 
 			this.window = window;
 			this.Eng = eng;
@@ -28,6 +30,8 @@ namespace Voxelgine.Engine
 
 		public void Spawn(GameState GState, VoxEntity Ent)
 		{
+			Logging.WriteLine($"[Spawn] {(Ent == null ? "NULL" : Ent.GetType().Name)}");
+
 			if (Ent == null)
 				return;
 

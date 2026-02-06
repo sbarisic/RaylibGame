@@ -13,6 +13,8 @@ namespace Voxelgine.Engine.DI
 
 		public string Title { get; set; }
 
+		public string LogFolder { get; set; }
+
 		public void LoadFromJson();
 	}
 }

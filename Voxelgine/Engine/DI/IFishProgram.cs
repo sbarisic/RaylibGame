@@ -12,7 +12,9 @@ namespace Voxelgine.Engine.DI
 		public FishDI DI { get; set; }
 
 		public int ChunkDrawCalls { get; set; }
+
 		public bool DebugMode { get; set; }
+
 		public float TotalTime { get; set; }
 
 		public MainMenuStateFishUI MainMenuState { get; set; }
@@ -21,6 +23,8 @@ namespace Voxelgine.Engine.DI
 
 		public NPCPreviewState NPCPreviewState { get; set; }
 
-		public void Run();
+		//public IFishLogging Logging { get; set; }
+
+		public void Init();
 	}
 }

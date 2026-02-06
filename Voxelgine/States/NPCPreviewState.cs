@@ -8,7 +8,7 @@ using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.GUI;
 
-namespace RaylibGame.States
+namespace Voxelgine.States
 {
 	/// <summary>
 	/// Preview state for testing NPC models and animations.

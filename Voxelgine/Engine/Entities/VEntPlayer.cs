@@ -7,13 +7,16 @@ using System.Threading.Tasks;
 
 using Raylib_cs;
 
-using RaylibGame.States;
+using Voxelgine.States;
 
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
-	public class VEntPlayer : VoxEntity {
-		public VEntPlayer() : base() {
+namespace Voxelgine.Engine
+{
+	public class VEntPlayer : VoxEntity
+	{
+		public VEntPlayer() : base()
+		{
 		}
 	}
 }

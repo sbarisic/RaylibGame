@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	static class Scripting {
+	/*static class Scripting {
 		static Script Script = CreateContext();
 
 		public static void Init() {
@@ -29,5 +29,5 @@ namespace Voxelgine.Engine {
 
 			return S;
 		}
-	}
+	}*/
 }

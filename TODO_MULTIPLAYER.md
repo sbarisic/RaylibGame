@@ -325,12 +325,11 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **Loopback testing mode** — Support running server + client in the same process for development testing. `--loopback` flag creates both `NetServer` and `NetClient` communicating over localhost. Allows testing the full network flow without needing two instances. **[CPX: 2]**
+*No active high test priority items*
 
 ### Medium Priority
 
 - [ ] **Network simulation** — Debug options to simulate bad network conditions: artificial latency (add delay to packet delivery), packet loss (randomly drop X% of packets), jitter (randomize latency). Configurable via debug menu. Essential for testing prediction/interpolation robustness. **[CPX: 2]**
-
 - [ ] **Network packet logger** — Debug option to log all sent/received packets with timestamps, types, sizes, and source/destination. Output to `IFishLogging`. Toggle via debug menu. **[CPX: 1]**
 
 ### Lower Priority
@@ -365,7 +364,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- Highest priority - split everything you can that is not Raylib-dependent into VoxelgineEngine project. The server does not need rendering functions.
 
 ---
 

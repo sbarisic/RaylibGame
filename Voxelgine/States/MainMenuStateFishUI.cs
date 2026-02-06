@@ -7,7 +7,7 @@ using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.GUI;
 
-namespace RaylibGame.States
+namespace Voxelgine.States
 {
 	/// <summary>
 	/// Main menu state using FishUI for the GUI.

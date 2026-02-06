@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 
-namespace RaylibGame.States
+namespace Voxelgine.States
 {
 	class OptionsState : GameStateImpl
 	{

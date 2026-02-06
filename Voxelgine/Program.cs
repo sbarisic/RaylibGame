@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Hosting;
 using MoonSharp.Interpreter.CoreLib;
 using Raylib_cs;
-using RaylibGame.States;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,6 +9,7 @@ using TextCopy;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
+using Voxelgine.States;
 
 namespace Voxelgine
 {
@@ -102,7 +102,7 @@ namespace Voxelgine
 			ResMgr.CreateCollection("blood", BloodTexList.ToArray());
 
 			GraphicsUtils.Init(Eng.DI.GetRequiredService<IFishLogging>());
-			Scripting.Init();
+			//Scripting.Init();
 
 			Eng.DebugMode = Debugger.IsAttached;
 			Eng.MainMenuState = new MainMenuStateFishUI(Window, Eng);

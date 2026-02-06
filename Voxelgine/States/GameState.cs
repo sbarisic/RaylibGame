@@ -1,6 +1,5 @@
-﻿using RaylibGame.Engine;
+﻿using Voxelgine.Engine;
 using Raylib_cs;
-using Voxelgine.Engine;
 using Voxelgine.Graphics;
 using Voxelgine;
 using System;
@@ -13,7 +12,7 @@ using Voxelgine.GUI;
 using FishUI.Controls;
 using Voxelgine.Engine.DI;
 
-namespace RaylibGame.States
+namespace Voxelgine.States
 {
 	/// <summary>
 	/// Main gameplay state handling the voxel world, player, entities, and rendering.

@@ -1,5 +1,4 @@
 ﻿using Raylib_cs;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,54 +6,65 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Voxelgine.Engine {
-	public struct AABB {
+namespace Voxelgine.Engine
+{
+	public struct AABB
+	{
 		public static readonly AABB Empty = new AABB(Vector3.Zero, Vector3.Zero);
 
 		public Vector3 Position;
 		public Vector3 Size;
 
-		public bool IsEmpty {
+		public bool IsEmpty
+		{
 			get; private set;
 		}
 
-		public AABB() {
+		public AABB()
+		{
 			Position = Vector3.Zero;
 			Size = Vector3.One;
 			Calc();
 		}
 
-		public AABB(Vector3 Position, Vector3 Size) {
+		public AABB(Vector3 Position, Vector3 Size)
+		{
 			this.Position = Position;
 			this.Size = Size;
 			Calc();
 		}
 
-		public AABB(BoundingBox BB) {
+		public AABB(BoundingBox BB)
+		{
 			Position = BB.Min;
 			Size = BB.Max - BB.Min;
 			Calc();
 		}
 
-		public AABB Offset(Vector3 Offset) {
+		public AABB Offset(Vector3 Offset)
+		{
 			return new AABB(Position + Offset, Size);
 		}
 
-		public BoundingBox ToBoundingBox() {
+		public BoundingBox ToBoundingBox()
+		{
 			return new BoundingBox(Position, Position + Size);
 		}
 
-		public bool Contains(Vector3 Point) {
+		public bool Contains(Vector3 Point)
+		{
 			return Point.X >= Position.X && Point.X <= Position.X + Size.X &&
 				   Point.Y >= Position.Y && Point.Y <= Position.Y + Size.Y &&
 				   Point.Z >= Position.Z && Point.Z <= Position.Z + Size.Z;
 		}
 
-		void Calc() {
+		void Calc()
+		{
 			IsEmpty = Size.X == 0 && Size.Y == 0 && Size.Z == 0;
 		}
 
-		public Vector3[] GetCorners() {
+		public Vector3[] GetCorners()
+		{
 			Vector3 min = Position;
 			Vector3 max = Position + Size;
 
@@ -72,7 +82,8 @@ namespace Voxelgine.Engine {
 			return Corners;
 		}
 
-		public static AABB Union(AABB A, AABB B) {
+		public static AABB Union(AABB A, AABB B)
+		{
 			Vector3 min = Vector3.Min(A.Position, B.Position);
 			Vector3 max = Vector3.Max(A.Position + A.Size, B.Position + B.Size);
 			return new AABB(min, max - min);
@@ -81,7 +92,8 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Tests if two AABBs overlap.
 		/// </summary>
-		public bool Overlaps(AABB other) {
+		public bool Overlaps(AABB other)
+		{
 			Vector3 aMin = Position;
 			Vector3 aMax = Position + Size;
 			Vector3 bMin = other.Position;
@@ -95,14 +107,16 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Tests if two AABBs overlap (static version).
 		/// </summary>
-		public static bool Overlaps(AABB a, AABB b) {
+		public static bool Overlaps(AABB a, AABB b)
+		{
 			return a.Overlaps(b);
 		}
 
 		/// <summary>
 		/// Creates an AABB from min/max corners.
 		/// </summary>
-		public static AABB FromMinMax(Vector3 min, Vector3 max) {
+		public static AABB FromMinMax(Vector3 min, Vector3 max)
+		{
 			return new AABB(min, max - min);
 		}
 

@@ -11,6 +11,7 @@ using System.Linq;
 using System.Numerics;
 using Voxelgine.GUI;
 using FishUI.Controls;
+using Voxelgine.Engine.DI;
 
 namespace RaylibGame.States
 {
@@ -100,21 +101,21 @@ namespace RaylibGame.States
 		// Test NPC reference
 		private VEntNPC _testNpc;
 
-		GameWindow _gameWindow;
+		IGameWindow _gameWindow;
 
-		public GameState(GameWindow window) : base(window)
+		public GameState(IGameWindow window, IFishEngineRunner eng) : base(window, eng)
 		{
 			_gameWindow = window;
 
 			GUI = new FishUIManager(window);
-			EntMgr = new EntityManager();
+			EntMgr = new EntityManager(window, eng);
 			Snd = new SoundMgr();
 			PhysicsData = new PhysData();
 			DayNight = new DayNightCycle();
 
 			// =========================================== Init Systems ==============================================
 			Snd.Init();
-			Map = new ChunkMap(this);
+			Map = new ChunkMap(eng);
 
 			Particle = new ParticleSystem();
 			Particle.Init(
@@ -156,7 +157,7 @@ namespace RaylibGame.States
 
 
 			// ====================================== Init player ====================================================
-			Ply = new Player(GUI, "snoutx10k", true, Snd);
+			Ply = new Player(Eng, GUI, "snoutx10k", true, Snd);
 			Ply.InitGUI(window, GUI);
 			Ply.Init(Map);
 
@@ -192,10 +193,12 @@ namespace RaylibGame.States
 
 		private void CreateDebugMenu()
 		{
+			IGameWindow Window = Eng.DI.GetRequiredService<IGameWindow>();
+
 			var menuSize = new Vector2(340, 560);
 			var menuPos = new Vector2(
-				(Program.Window.Width - menuSize.X) / 2,
-				(Program.Window.Height - menuSize.Y) / 2
+				(Window.Width - menuSize.X) / 2,
+				(Window.Height - menuSize.Y) / 2
 			);
 
 			_debugMenu = new Window
@@ -233,12 +236,12 @@ namespace RaylibGame.States
 
 			_debugModeCheckbox = new CheckBox
 			{
-				IsChecked = Program.DebugMode,
+				IsChecked = Eng.DebugMode,
 				Size = new Vector2(24, 24)
 			};
 			_debugModeCheckbox.OnCheckedChanged += (sender, isChecked) =>
 			{
-				Program.DebugMode = isChecked;
+				Eng.DebugMode = isChecked;
 			};
 			stack.AddChild(_debugModeCheckbox);
 
@@ -394,7 +397,7 @@ namespace RaylibGame.States
 			btnMainMenu.Clicked += (sender, args) =>
 			{
 				_debugMenu.Visible = false;
-				Program.Window.SetState(Program.MainMenuState);
+				Window.SetState(Eng.MainMenuState);
 			};
 			stack.AddChild(btnMainMenu);
 
@@ -437,7 +440,7 @@ namespace RaylibGame.States
 			_debugMenu.Visible = !_debugMenu.Visible;
 			if (_debugMenu.Visible)
 			{
-				_debugModeCheckbox.IsChecked = Program.DebugMode;
+				_debugModeCheckbox.IsChecked = Eng.DebugMode;
 				_debugMenu.BringToFront();
 			}
 		}
@@ -474,7 +477,7 @@ namespace RaylibGame.States
 			// Handle input
 			if (Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
-				Window.SetState(Program.MainMenuState);
+				Window.SetState(Eng.MainMenuState);
 				return;
 			}
 
@@ -539,7 +542,7 @@ namespace RaylibGame.States
 			DrawUnderwaterOverlay();
 
 			GUI.Tick(deltaTime, _totalTime);
-			Raylib.DrawCircleLines(Program.Window.Width / 2, Program.Window.Height / 2, 5, Color.White);
+			Raylib.DrawCircleLines(Eng.DI.GetRequiredService<IGameWindow>().Width / 2, Eng.DI.GetRequiredService<IGameWindow>().Height / 2, 5, Color.White);
 			Raylib.DrawFPS(10, 10);
 
 			// Draw time of day
@@ -613,8 +616,8 @@ namespace RaylibGame.States
 				}
 			}
 
-			int screenWidth = Program.Window.Width;
-			int screenHeight = Program.Window.Height;
+			int screenWidth = Eng.DI.GetRequiredService<IGameWindow>().Width;
+			int screenHeight = Eng.DI.GetRequiredService<IGameWindow>().Height;
 
 			if (_waterOverlayTexture.HasValue && _waterOverlayTexture.Value.Id != 0)
 			{
@@ -635,7 +638,7 @@ namespace RaylibGame.States
 		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
 		{
 			if (!Ply.FreezeFrustum)
-				ViewFrustum = new Frustum(ref Ply.Cam);
+				ViewFrustum = new Frustum(Eng, ref Ply.Cam);
 
 			// Draw world geometry
 			Map.Draw(ref ViewFrustum);

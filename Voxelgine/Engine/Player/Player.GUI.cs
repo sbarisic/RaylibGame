@@ -19,12 +19,12 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public InventoryItem GetActiveItem() => ActiveSelection;
 
-		public void RecalcGUI(GameWindow Window)
+		public void RecalcGUI(IGameWindow Window)
 		{
 			// FishUI handles positioning via control properties
 		}
 
-		public void InitGUI(GameWindow Window, FishUIManager gui)
+		public void InitGUI(IGameWindow Window, FishUIManager gui)
 		{
 			// Health box
 			Box_Health = new FishUIItemBox
@@ -42,7 +42,7 @@ namespace Voxelgine.Engine
 			{
 				Position = new Vector2(20, 40),
 				Size = new Vector2(300, 250),
-				Visible = Program.DebugMode
+				Visible = Eng.DebugMode
 			};
 			InfoLbl.WriteLine("Hello World!");
 			gui.AddControl(InfoLbl);
@@ -72,16 +72,16 @@ namespace Voxelgine.Engine
 			};
 
 			int ItmIdx = 0;
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponGun(this, "Gun"));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponPicker(this, "Hammer"));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Dirt).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Stone).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Plank).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Bricks).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.StoneBrick).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glowstone).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Glass).SetCount(64));
-			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(this, BlockType.Water).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponGun(Eng, this, "Gun"));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new WeaponPicker(Eng, this, "Hammer"));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Dirt).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Stone).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Plank).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Bricks).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.StoneBrick).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Glowstone).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Glass).SetCount(64));
+			SetInvItem(gui.UI, Inventory, ItmIdx++, new Weapon(Eng, this, BlockType.Water).SetCount(64));
 
 			Inventory.SetSelectedIndex(0);
 			Inventory.SetSelectedIndex(1);
@@ -92,7 +92,7 @@ namespace Voxelgine.Engine
 		{
 			InfoLbl.Visible = false;
 
-			if (Program.DebugMode)
+			if (Eng.DebugMode)
 			{
 				InfoLbl.Visible = true;
 				InfoLbl.Clear();
@@ -100,9 +100,9 @@ namespace Voxelgine.Engine
 				InfoLbl.WriteLine("Vel: {0:0.000}", MathF.Round(GetVelocity().Length(), 3));
 				InfoLbl.WriteLine("NoClip (C): {0}", NoClip ? "ON" : "OFF");
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
-				InfoLbl.WriteLine("ChunkDraws: {0}", Program.ChunkDrawCalls.ToString());
+				InfoLbl.WriteLine("ChunkDraws: {0}", Eng.ChunkDrawCalls.ToString());
 
-				Program.GameState.Particle.GetStats(out int OnScreen, out int Drawn, out int Max);
+				Eng.GameState.Particle.GetStats(out int OnScreen, out int Drawn, out int Max);
 				InfoLbl.WriteLine("Particles: {0}/{1}/{2}", OnScreen, Drawn, Max);
 			}
 		}

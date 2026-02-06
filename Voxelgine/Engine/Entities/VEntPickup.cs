@@ -12,8 +12,10 @@ using RaylibGame.States;
 
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
-	public class VEntPickup : VoxEntity {
+namespace Voxelgine.Engine
+{
+	public class VEntPickup : VoxEntity
+	{
 		// Up down movement
 		public bool IsBobbing = false;
 		public float BobAmplitude = 0.15f;
@@ -22,32 +24,40 @@ namespace Voxelgine.Engine {
 
 		Stopwatch SWatch = Stopwatch.StartNew();
 
-		public VEntPickup() : base() {
+		public VEntPickup() : base()
+		{
 			IsRotating = true;
+			NextMs = 400;
+		}
 
-			BobbingLerp = new LerpVec3();
+		public override void OnInit()
+		{
+			base.OnInit();
+
+			BobbingLerp = new LerpVec3(Eng);
 			BobbingLerp.Loop = true;
 			BobbingLerp.Easing = Easing.EaseInOutQuart;
 			BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));
 			IsBobbing = true;
-
-			NextMs = 400;
 		}
 
 		long NextMs;
 
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+		{
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
-			if (IsBobbing) {
+			if (IsBobbing)
+			{
 				ModelOffset = new Vector3(0, BobbingLerp.GetVec3().Y, 0);
 			}
 
-			if (SWatch.ElapsedMilliseconds > NextMs) {
+			if (SWatch.ElapsedMilliseconds > NextMs)
+			{
 				SWatch.Restart();
 				NextMs = Random.Shared.Next(300, 700);
 
-				ParticleSystem Part = ((GameState)Program.GameState).Particle;
+				ParticleSystem Part = ((GameState)Eng.GameState).Particle;
 
 				Part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
 			}

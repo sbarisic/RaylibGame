@@ -49,11 +49,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Weapons: Hammer swing animation** — Add swing animation for hammer weapon on click **[CPX: 2]**
+*No high priority items*
 
 ### Medium Priority
 
 - [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
+- [ ] **Entities: Door model** — Make `VEntSlidingDoor` use `data/models/door/door.json` model (16x32 units = 1x2 blocks) **[CPX: 2]**
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
 ### Lower Priority
@@ -90,6 +91,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Medium Priority
 
 - [ ] **README.md update** — Update with newest project changes, architecture overview and project status table **[CPX: 2]**
+- [ ] **WORLDBUILDING.md: Multiplayer review** — Analyze and update worldbuilding document for multiplayer support (up to 10 players), consider cooperative/competitive elements, shared resources, base building **[CPX: 2]**
 
 ### Lower Priority
 
@@ -115,8 +117,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Check out WORLDBUILDING.md, what can be changed to support a more multiplayer focused approach? Let's say up to 10 players.
-- Make the door entity use the data/models/door/door.json model, door model is 16x32 in size, 16 units is 1 block size in the world, so the door should be 1 block wide and 2 blocks tall
+*No uncategorized items*
 
 ---
 

@@ -20,7 +20,7 @@ namespace Voxelgine.GUI {
         public int Width => UI.Width;
         public int Height => UI.Height;
 
-        public FishUIManager(GameWindow window) {
+        public FishUIManager(IGameWindow window) {
             _gfx = new RaylibFishUIGfx();
             _input = new RaylibFishUIInput();
             _events = new RaylibFishUIEvents();

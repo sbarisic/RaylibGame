@@ -105,7 +105,7 @@ namespace Voxelgine.Graphics
 			ModelValidTransp = CachedMeshTransp.VertexCount > 0;
 
 			// Debug: log transparent mesh vertex count
-			if (ModelValidTransp && Program.DebugMode)
+			if (ModelValidTransp && Eng.DebugMode)
 			{
 				Console.WriteLine($"[Chunk {GlobalChunkIndex}] Transparent mesh: {CachedMeshTransp.VertexCount} vertices");
 			}
@@ -161,13 +161,13 @@ namespace Voxelgine.Graphics
 			if (!IsInsideFrustum(ChunkPosition, ref Fr))
 				return;
 
-			if (Program.DebugMode)
+			if (Eng.DebugMode)
 				Raylib.DrawBoundingBox(ModelAABB.Offset(ChunkPosition).ToBoundingBox(), Color.Yellow);
 
 			if (ModelValidOpaque)
 			{
 				Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
-				Program.ChunkDrawCalls++;
+				Eng.ChunkDrawCalls++;
 			}
 		}
 

@@ -8,10 +8,11 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
+namespace Voxelgine.Engine
+{
 	/// <summary>
 	/// Base class for all voxel world entities. Provides position, velocity, size,
 	/// model rendering, and integration with the EntityManager physics system.
@@ -20,7 +21,8 @@ namespace Voxelgine.Engine {
 	/// Subclasses should override <see cref="OnPlayerTouch"/> for interaction,
 	/// <see cref="UpdateLockstep"/> for physics/logic, and <see cref="Draw3D"/> for custom rendering.
 	/// </remarks>
-	public abstract class VoxEntity {
+	public abstract class VoxEntity
+	{
 		/// <summary>World position of the entity (bottom-center for physics).</summary>
 		public Vector3 Position;
 		/// <summary>Entity bounding box size for collision.</summary>
@@ -48,17 +50,24 @@ namespace Voxelgine.Engine {
 		public bool IsRotating = false;
 		public float RotationSpeed = 30;
 
+		public IFishEngineRunner Eng { get; set; }
 		EntityManager EntMgr;
 		GameState GameState;
 
-		public virtual void SetModel(string MdlName) {
+		public virtual void OnInit()
+		{
+		}
+
+		public virtual void SetModel(string MdlName)
+		{
 			HasModel = false;
 			ModelOffset = Vector3.Zero;
 			ModelRotationDeg = 0;
 			ModelColor = Color.White;
 			ModelScale = Vector3.One;
 
-			if (Size != Vector3.Zero) {
+			if (Size != Vector3.Zero)
+			{
 				CenterOffset = new Vector3(Size.X / 2, ModelOffset.Y, Size.Y / 2);
 			}
 
@@ -67,51 +76,63 @@ namespace Voxelgine.Engine {
 			HasModel = EntModel.MeshCount > 0;
 		}
 
-		public virtual Vector3 GetPosition() {
+		public virtual Vector3 GetPosition()
+		{
 			return Position;
 		}
 
-		public virtual void SetPosition(Vector3 Pos) {
+		public virtual void SetPosition(Vector3 Pos)
+		{
 			Position = Pos;
 		}
 
-		public virtual Vector3 GetSize() {
+		public virtual Vector3 GetSize()
+		{
 			return Size;
 		}
 
-		public virtual void SetSize(Vector3 Size) {
+		public virtual void SetSize(Vector3 Size)
+		{
 			this.Size = Size;
 		}
 
-		public virtual Vector3 GetVelocity() {
+		public virtual Vector3 GetVelocity()
+		{
 			return Velocity;
 		}
 
-		public virtual void SetVelocity(Vector3 Velocity) {
+		public virtual void SetVelocity(Vector3 Velocity)
+		{
 			this.Velocity = Velocity;
 		}
 
-		public virtual EntityManager GetEntityManager() {
+		public virtual EntityManager GetEntityManager()
+		{
 			return EntMgr;
 		}
 
-		public virtual void SetEntityManager(EntityManager EntMgr) {
+		public virtual void SetEntityManager(EntityManager EntMgr)
+		{
 			this.EntMgr = EntMgr;
 		}
 
-		public virtual GameState GetGameState() {
+		public virtual GameState GetGameState()
+		{
 			return GameState;
 		}
 
-		public virtual void SetGameState(GameState State) {
+		public virtual void SetGameState(GameState State)
+		{
 			GameState = State;
 		}
 
-		public virtual void OnPlayerTouch(Player Ply) {
+		public virtual void OnPlayerTouch(Player Ply)
+		{
 			Console.WriteLine("Player touched me!");
 		}
 
-		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
+		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+		{
 			if (IsRotating)
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 
@@ -121,13 +142,15 @@ namespace Voxelgine.Engine {
 		// Also checks for collision with the player and triggers OnPlayerTouch only once per entry
 		public bool _WasPlayerTouching = false;
 
-		public virtual void OnUpdatePhysics(float Dt) {
+		public virtual void OnUpdatePhysics(float Dt)
+		{
 		}
 
 		/// <summary>
 		/// Gets the world position where light is emitted from (center of entity).
 		/// </summary>
-		public Vector3 GetLightSourcePosition() {
+		public Vector3 GetLightSourcePosition()
+		{
 			return Position + Size / 2f;
 		}
 
@@ -136,24 +159,29 @@ namespace Voxelgine.Engine {
 		/// </summary>
 		public bool EmitsLight() => LightEmission > 0;
 
-		protected Vector3 GetDrawPosition() {
+		protected Vector3 GetDrawPosition()
+		{
 			return Position + ModelOffset + CenterOffset;
 		}
 
-		protected virtual void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame) {
-			if (HasModel) {
+		protected virtual void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
+		{
+			if (HasModel)
+			{
 				Raylib.DrawModelEx(EntModel, GetDrawPosition(), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
 			}
 		}
 
-		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
+		public virtual void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame)
+		{
 			EntityDrawModel(TimeAlpha, ref LastFrame);
 			DrawCollisionBox();
 		}
 
 		// Draws the collision box at Position with Size
-		protected virtual void DrawCollisionBox() {
-			if (!Program.DebugMode)
+		protected virtual void DrawCollisionBox()
+		{
+			if (!Eng.DebugMode)
 				return;
 
 			Vector3 min = Position;

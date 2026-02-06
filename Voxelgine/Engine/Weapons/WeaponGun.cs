@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Voxelgine;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -32,7 +33,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public override float AutoFireRate => 10f;
 
-		public WeaponGun(Player ParentPlayer, string Name) : base(ParentPlayer, Name, IconType.Gun)
+		public WeaponGun(IFishEngineRunner Eng, Player ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Gun)
 		{
 			SetViewModelInfo(ViewModelRotationMode.Gun);
 			SetupModel("gun/gun.obj");
@@ -64,7 +65,7 @@ namespace Voxelgine.Engine
 			// Play shooting sound at player position
 			ParentPlayer.PlaySound("shoot1", ParentPlayer.Position);
 
-			GameState GState = ((GameState)Program.GameState);
+			GameState GState = ((GameState)Eng.GameState);
 
 			// Calculate muzzle position (slightly in front of camera)
 			Vector3 muzzlePos = E.Start + E.Dir * 0.5f;

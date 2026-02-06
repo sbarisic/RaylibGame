@@ -4,6 +4,7 @@ using Raylib_cs;
 using System.Numerics;
 using Voxelgine;
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 using Voxelgine.GUI;
 
 namespace RaylibGame.States
@@ -11,7 +12,7 @@ namespace RaylibGame.States
 	/// <summary>
 	/// Main menu state using FishUI for the GUI.
 	/// </summary>
-	class MainMenuStateFishUI : GameStateImpl
+	public class MainMenuStateFishUI : GameStateImpl
 	{
 		private FishUIManager _gui;
 		private Window _mainWindow;
@@ -19,7 +20,7 @@ namespace RaylibGame.States
 		private ImageBox _titleLogo;
 		private float _totalTime;
 
-		public MainMenuStateFishUI(GameWindow window) : base(window)
+		public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 			_gui = new FishUIManager(window);
 
@@ -55,87 +56,87 @@ namespace RaylibGame.States
 		}
 
 		private void CreateMainMenu()
+		{
+			// Calculate centered position
+			var windowSize = new Vector2(320, 340);
+			var windowPos = new Vector2(
+				(Window.Width / 2f) - (windowSize.X / 2f),
+				(Window.Height / 1.65f) - (windowSize.Y / 2f)
+			);
+
+			// Create main menu window
+			_mainWindow = new Window
 			{
-				// Calculate centered position
-				var windowSize = new Vector2(320, 340);
-				var windowPos = new Vector2(
-					(Window.Width / 2f) - (windowSize.X / 2f),
-					(Window.Height / 1.65f) - (windowSize.Y / 2f)
-				);
+				Title = "Main Menu",
+				Position = windowPos,
+				Size = windowSize,
+				IsResizable = false,
+				ShowCloseButton = false
+			};
+			_gui.AddControl(_mainWindow);
 
-				// Create main menu window
-				_mainWindow = new Window
-				{
-					Title = "Main Menu",
-					Position = windowPos,
-					Size = windowSize,
-					IsResizable = false,
-					ShowCloseButton = false
-				};
-				_gui.AddControl(_mainWindow);
+			// Create ScrollablePane for buttons
+			var scrollPane = new ScrollablePane();
+			scrollPane.Position = new Vector2(0, 0);
+			scrollPane.Size = _mainWindow.GetContentSize();
+			scrollPane.Anchor = FishUIAnchor.All;
+			_mainWindow.AddChild(scrollPane);
 
-				// Create ScrollablePane for buttons
-				var scrollPane = new ScrollablePane();
-				scrollPane.Position = new Vector2(0, 0);
-				scrollPane.Size = _mainWindow.GetContentSize();
-				scrollPane.Anchor = FishUIAnchor.All;
-				_mainWindow.AddChild(scrollPane);
+			// Button layout settings
+			float buttonHeight = 50f;
+			float buttonSpacing = 10f;
+			float margin = 20f;
+			float contentWidth = windowSize.X - 60; // Account for window borders and scrollbar
 
-				// Button layout settings
-				float buttonHeight = 50f;
-				float buttonSpacing = 10f;
-				float margin = 20f;
-				float contentWidth = windowSize.X - 60; // Account for window borders and scrollbar
+			// New Game button
+			var btnNewGame = new Button();
+			btnNewGame.Text = "New Game";
+			btnNewGame.Position = new Vector2(margin, margin);
+			btnNewGame.Size = new Vector2(contentWidth, buttonHeight);
+			btnNewGame.TooltipText = "Start a new game";
+			btnNewGame.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.GameState);
+			};
+			scrollPane.AddChild(btnNewGame);
 
-				// New Game button
-				var btnNewGame = new Button();
-				btnNewGame.Text = "New Game";
-				btnNewGame.Position = new Vector2(margin, margin);
-				btnNewGame.Size = new Vector2(contentWidth, buttonHeight);
-				btnNewGame.TooltipText = "Start a new game";
-				btnNewGame.OnButtonPressed += (sender, mbtn, pos) =>
-				{
-					Program.Window.SetState(Program.GameState);
-				};
-				scrollPane.AddChild(btnNewGame);
+			// NPC Preview button
+			var btnNPCPreview = new Button();
+			btnNPCPreview.Text = "NPC Preview";
+			btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 1);
+			btnNPCPreview.Size = new Vector2(contentWidth, buttonHeight);
+			btnNPCPreview.TooltipText = "Preview NPC models and animations";
+			btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.NPCPreviewState);
+			};
+			scrollPane.AddChild(btnNPCPreview);
 
-				// NPC Preview button
-				var btnNPCPreview = new Button();
-				btnNPCPreview.Text = "NPC Preview";
-				btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 1);
-				btnNPCPreview.Size = new Vector2(contentWidth, buttonHeight);
-				btnNPCPreview.TooltipText = "Preview NPC models and animations";
-				btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
-				{
-					Program.Window.SetState(Program.NPCPreviewState);
-				};
-				scrollPane.AddChild(btnNPCPreview);
+			// Options button
+			var btnOptions = new Button();
+			btnOptions.Text = "Options";
+			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
+			btnOptions.Size = new Vector2(contentWidth, buttonHeight);
+			btnOptions.TooltipText = "Configure game settings";
+			btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				_optionsWindow.Visible = true;
+				_optionsWindow.BringToFront();
+			};
+			scrollPane.AddChild(btnOptions);
 
-				// Options button
-				var btnOptions = new Button();
-				btnOptions.Text = "Options";
-				btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
-				btnOptions.Size = new Vector2(contentWidth, buttonHeight);
-				btnOptions.TooltipText = "Configure game settings";
-				btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
-				{
-					_optionsWindow.Visible = true;
-					_optionsWindow.BringToFront();
-				};
-				scrollPane.AddChild(btnOptions);
-
-				// Quit button
-				var btnQuit = new Button();
-				btnQuit.Text = "Quit";
-				btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
-				btnQuit.Size = new Vector2(contentWidth, buttonHeight);
-				btnQuit.TooltipText = "Exit the game";
-				btnQuit.OnButtonPressed += (sender, mbtn, pos) =>
-				{
-					Program.Window.Close();
-				};
-				scrollPane.AddChild(btnQuit);
-			}
+			// Quit button
+			var btnQuit = new Button();
+			btnQuit.Text = "Quit";
+			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+			btnQuit.Size = new Vector2(contentWidth, buttonHeight);
+			btnQuit.TooltipText = "Exit the game";
+			btnQuit.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				Eng.DI.GetRequiredService<IGameWindow>().Close();
+			};
+			scrollPane.AddChild(btnQuit);
+		}
 
 		private void CreateOptionsWindow()
 		{
@@ -178,7 +179,7 @@ namespace RaylibGame.States
 			};
 
 			// Add config options
-			var configVars = Program.Cfg.GetVariables().ToArray();
+			var configVars = Eng.DI.GetRequiredService<GameConfig>().GetVariables().ToArray();
 			foreach (var varRef in configVars)
 			{
 				var label = new Label
@@ -199,7 +200,7 @@ namespace RaylibGame.States
 				{
 					try
 					{
-						var currentVar = Program.Cfg.GetVariables().FirstOrDefault(v => v.FieldName == fieldName);
+						var currentVar = Eng.DI.GetRequiredService<GameConfig>().GetVariables().FirstOrDefault(v => v.FieldName == fieldName);
 						if (currentVar != null)
 						{
 							currentVar.SetValueString(newText);
@@ -223,9 +224,9 @@ namespace RaylibGame.States
 			};
 			btnReset.Clicked += (sender, args) =>
 			{
-				Program.Cfg.SetDefaults();
-				Program.Cfg.GenerateDefaultKeybinds();
-				Program.Cfg.SaveToJson();
+				Eng.DI.GetRequiredService<GameConfig>().SetDefaults();
+				Eng.DI.GetRequiredService<GameConfig>().GenerateDefaultKeybinds();
+				Eng.DI.GetRequiredService<GameConfig>().SaveToJson();
 				// Refresh text boxes
 				RefreshOptionsValues();
 			};
@@ -237,7 +238,7 @@ namespace RaylibGame.States
 			};
 			btnSave.Clicked += (sender, args) =>
 			{
-				Program.Cfg.SaveToJson();
+				Eng.DI.GetRequiredService<GameConfig>().SaveToJson();
 				Voxelgine.Utils.RestartGame();
 			};
 
@@ -262,7 +263,7 @@ namespace RaylibGame.States
 
 		private void RefreshOptionsValues()
 		{
-			var configVars = Program.Cfg.GetVariables().ToArray();
+			var configVars = Eng.DI.GetRequiredService<GameConfig>().GetVariables().ToArray();
 			foreach (var varRef in configVars)
 			{
 				var textBox = _gui.FindControl<Textbox>($"opt_{varRef.FieldName}");

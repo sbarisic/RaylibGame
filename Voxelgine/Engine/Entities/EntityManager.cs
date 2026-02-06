@@ -6,27 +6,40 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
-	public class EntityManager {
+namespace Voxelgine.Engine
+{
+	public class EntityManager
+	{
 		List<VoxEntity> Entities;
 
-		public EntityManager() {
+		IGameWindow window;
+		IFishEngineRunner Eng;
+
+		public EntityManager(IGameWindow window, IFishEngineRunner eng)
+		{
 			Entities = new List<VoxEntity>();
+
+			this.window = window;
+			this.Eng = eng;
 		}
 
-		public void Spawn(GameState GState, VoxEntity Ent) {
+		public void Spawn(GameState GState, VoxEntity Ent)
+		{
 			if (Ent == null)
 				return;
 
+			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
 			Ent.SetEntityManager(this);
 			Ent.SetGameState(GState);
 			Entities.Add(Ent);
+			Ent.OnInit();
 		}
 
-		void UpdateEntityPhysics(VoxEntity Ent, float Dt) {
+		void UpdateEntityPhysics(VoxEntity Ent, float Dt)
+		{
 			GameState GS = Ent.GetGameState();
 			ChunkMap map = GS.Map;
 
@@ -37,23 +50,29 @@ namespace Voxelgine.Engine {
 			Ent.Position = PhysicsUtils.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
 			// --- Player collision check using AABB ---
-			if (GS?.Ply != null) {
+			if (GS?.Ply != null)
+			{
 				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(GS.Ply.Position);
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
 
 				bool touching = playerAABB.Overlaps(entityAABB);
 
-				if (touching && !Ent._WasPlayerTouching) {
+				if (touching && !Ent._WasPlayerTouching)
+				{
 					Ent.OnPlayerTouch(GS.Ply);
 					Ent._WasPlayerTouching = true;
-				} else if (!touching) {
+				}
+				else if (!touching)
+				{
 					Ent._WasPlayerTouching = false;
 				}
 			}
 		}
 
-		public void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr) {
-			for (int i = 0; i < Entities.Count; i++) {
+		public void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+		{
+			for (int i = 0; i < Entities.Count; i++)
+			{
 				VoxEntity Ent = Entities[i];
 
 				if (Ent == null)
@@ -65,8 +84,10 @@ namespace Voxelgine.Engine {
 			}
 		}
 
-		public void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame) {
-			for (int i = 0; i < Entities.Count; i++) {
+		public void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame)
+		{
+			for (int i = 0; i < Entities.Count; i++)
+			{
 				VoxEntity Ent = Entities[i];
 
 				if (Ent == null)
@@ -79,8 +100,10 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Returns all entities that emit light (LightEmission > 0).
 		/// </summary>
-		public IEnumerable<VoxEntity> GetLightEmittingEntities() {
-			for (int i = 0; i < Entities.Count; i++) {
+		public IEnumerable<VoxEntity> GetLightEmittingEntities()
+		{
+			for (int i = 0; i < Entities.Count; i++)
+			{
 				VoxEntity Ent = Entities[i];
 				if (Ent != null && Ent.EmitsLight())
 					yield return Ent;
@@ -90,8 +113,10 @@ namespace Voxelgine.Engine {
 		/// <summary>
 		/// Returns all entities in the manager.
 		/// </summary>
-		public IEnumerable<VoxEntity> GetAllEntities() {
-			for (int i = 0; i < Entities.Count; i++) {
+		public IEnumerable<VoxEntity> GetAllEntities()
+		{
+			for (int i = 0; i < Entities.Count; i++)
+			{
 				if (Entities[i] != null)
 					yield return Entities[i];
 			}
@@ -105,7 +130,8 @@ namespace Voxelgine.Engine {
 		/// <param name="maxDistance">Maximum distance to check.</param>
 		/// <param name="excludeEntity">Optional entity to exclude from testing.</param>
 		/// <returns>RaycastHit with closest hit information, or RaycastHit.None if no hit.</returns>
-		public RaycastHit Raycast(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null) {
+		public RaycastHit Raycast(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null)
+		{
 			return Engine.Raycast.CastAgainstEntities(rayOrigin, rayDir, Entities, maxDistance, excludeEntity);
 		}
 
@@ -117,7 +143,8 @@ namespace Voxelgine.Engine {
 		/// <param name="maxDistance">Maximum distance to check.</param>
 		/// <param name="excludeEntity">Optional entity to exclude from testing.</param>
 		/// <returns>List of all hits sorted by distance (closest first).</returns>
-		public List<RaycastHit> RaycastAll(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null) {
+		public List<RaycastHit> RaycastAll(Vector3 rayOrigin, Vector3 rayDir, float maxDistance = 1000f, VoxEntity excludeEntity = null)
+		{
 			return Engine.Raycast.CastAgainstEntitiesAll(rayOrigin, rayDir, Entities, maxDistance, excludeEntity);
 		}
 	}

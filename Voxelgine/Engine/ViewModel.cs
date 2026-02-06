@@ -11,17 +11,21 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
+using Voxelgine.Engine.DI;
 
 
-namespace Voxelgine.Engine {
-	public enum ViewModelRotationMode {
+namespace Voxelgine.Engine
+{
+	public enum ViewModelRotationMode
+	{
 		Block,
 		Tool,
 		Gun,
 		GunIronsight,
 	}
 
-	public class ViewModel {
+	public class ViewModel
+	{
 		// Viewmodel fields
 		Model VModel; // Non-animated viewmodel
 		const string DefaultViewModelName = "gun/gun.obj";
@@ -44,41 +48,61 @@ namespace Voxelgine.Engine {
 		LerpVec3 LrpKickback;
 		Vector3 KickbackOffset = Vector3.Zero;
 
-		public ViewModel() {
+		// Swing animation for melee weapons
+		LerpFloat LrpSwing;
+		float SwingAngle = 0f;
+		bool IsSwinging = false;
+
+		IFishEngineRunner Eng;
+
+		public ViewModel(IFishEngineRunner Eng)
+		{
+			this.Eng = Eng;
+
 			SetModel(DefaultViewModelName);
 			IsActive = true;
 
-			if (VModel.MeshCount == 0) {
+			if (VModel.MeshCount == 0)
+			{
 				IsActive = false;
 				Console.WriteLine("======================== Warning! Zero meshes in model {0}", DefaultViewModelName);
 			}
 
-			LrpOffset = new LerpVec3();
+			LrpOffset = new LerpVec3(Eng);
 			LrpOffset.Easing = Easing.Linear;
 			LrpOffset.Loop = false;
 			LrpOffset.StartLerp(1, Vector3.Zero, Vector3.Zero);
 
-			LrpRot = new LerpQuat();
+			LrpRot = new LerpQuat(Eng);
 			LrpRot.Easing = Easing.Linear;
 			LrpRot.Loop = false;
 			LrpRot.StartLerp(1, Quaternion.CreateFromYawPitchRoll(0, 0, 0), Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
 
-			LrpKickback = new LerpVec3();
+			LrpKickback = new LerpVec3(Eng);
 			LrpKickback.Easing = Easing.EaseOutQuad;
 			LrpKickback.Loop = false;
 			LrpKickback.StartLerp(0.01f, Vector3.Zero, Vector3.Zero);
+
+			LrpSwing = new LerpFloat(Eng);
+			LrpSwing.Easing = Easing.EaseOutQuad;
+			LrpSwing.Loop = false;
+			LrpSwing.StartLerp(0.01f, 0f, 0f);
 		}
 
-		public void SetModel(string ModelName) {
+		public void SetModel(string ModelName)
+		{
 			VModel = ResMgr.GetModel(ModelName);
 		}
 
-		public void SetModel(Model Mdl) {
+		public void SetModel(Model Mdl)
+		{
 			VModel = Mdl;
 		}
 
-		public void SetRotationMode(ViewModelRotationMode Mode) {
-			if (ViewMdlRotMode != Mode) {
+		public void SetRotationMode(ViewModelRotationMode Mode)
+		{
+			if (ViewMdlRotMode != Mode)
+			{
 				ViewMdlRotMode = Mode;
 				// TODO: Toggle animation
 
@@ -90,7 +114,8 @@ namespace Voxelgine.Engine {
 		/// Applies a kickback animation to the view model (e.g., when firing a weapon).
 		/// The weapon moves backward briefly then returns to its original position.
 		/// </summary>
-		public void ApplyKickback() {
+		public void ApplyKickback()
+		{
 			// Kickback moves the weapon backward (negative forward direction)
 			// The kickback amount is applied in local camera space
 			const float KickbackAmount = 0.08f;
@@ -99,7 +124,8 @@ namespace Voxelgine.Engine {
 			// Start kickback animation: move back then return to zero
 			LrpKickback.Easing = Easing.EaseOutQuad;
 			LrpKickback.StartLerp(KickbackDuration * 0.3f, Vector3.Zero, new Vector3(0, 0, -KickbackAmount));
-			LrpKickback.OnComplete = (lerp) => {
+			LrpKickback.OnComplete = (lerp) =>
+			{
 				// Return to original position
 				LrpKickback.Easing = Easing.EaseOutQuad;
 				LrpKickback.StartLerp(KickbackDuration * 0.7f, new Vector3(0, 0, -KickbackAmount), Vector3.Zero);
@@ -107,7 +133,37 @@ namespace Voxelgine.Engine {
 			};
 		}
 
-		public void Update(Player Ply) {
+		/// <summary>
+		/// Applies a swing animation to the view model (e.g., for melee weapons like hammer).
+		/// The weapon swings forward and down, then returns to idle position.
+		/// </summary>
+		public void ApplySwing()
+		{
+			if (IsSwinging)
+				return;
+
+			IsSwinging = true;
+			const float SwingAmount = 60f; // Degrees to swing
+			const float SwingDuration = 0.35f;
+
+			// Swing forward (wind up slightly, then swing down)
+			LrpSwing.Easing = Easing.EaseOutCubic;
+			LrpSwing.StartLerp(SwingDuration * 0.4f, 0f, SwingAmount);
+			LrpSwing.OnComplete = (lerp) =>
+			{
+				// Return to original position
+				LrpSwing.Easing = Easing.EaseOutQuad;
+				LrpSwing.StartLerp(SwingDuration * 0.6f, SwingAmount, 0f);
+				LrpSwing.OnComplete = (lerp2) =>
+				{
+					IsSwinging = false;
+					LrpSwing.OnComplete = null;
+				};
+			};
+		}
+
+		public void Update(Player Ply)
+		{
 			// Camera basis
 			var cam = Ply.Cam;
 			Vector3 worldUp = Vector3.UnitY;
@@ -118,7 +174,8 @@ namespace Voxelgine.Engine {
 			// Calculate offset from camera based on mode (not absolute position)
 			Vector3 newDesiredOffset;
 			Quaternion newDesiredRotOffset;
-			switch (ViewMdlRotMode) {
+			switch (ViewMdlRotMode)
+			{
 				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
 					newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
@@ -137,11 +194,13 @@ namespace Voxelgine.Engine {
 			}
 
 			// Start lerps if desired offset/rotation changed
-			if (DesiredViewModelOffset != newDesiredOffset) {
+			if (DesiredViewModelOffset != newDesiredOffset)
+			{
 				LrpOffset.StartLerp(0.2f, ViewModelOffset, newDesiredOffset);
 				DesiredViewModelOffset = newDesiredOffset;
 			}
-			if (LrpRot.GetQuat() != newDesiredRotOffset) {
+			if (LrpRot.GetQuat() != newDesiredRotOffset)
+			{
 				LrpRot.StartLerp(0.2f, LrpRot.GetQuat(), newDesiredRotOffset);
 			}
 
@@ -150,6 +209,9 @@ namespace Voxelgine.Engine {
 
 			// Apply kickback offset in camera space
 			KickbackOffset = LrpKickback.GetVec3();
+
+			// Update swing angle
+			SwingAngle = LrpSwing.GetFloat();
 
 			// Calculate absolute position for GameFrameInfo capture
 			ViewModelPos = cam.Position + ViewModelOffset;
@@ -168,7 +230,8 @@ namespace Voxelgine.Engine {
 			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
 
 			DesiredVMRot = qPitch * qYaw;
-			switch (ViewMdlRotMode) {
+			switch (ViewMdlRotMode)
+			{
 				case ViewModelRotationMode.Block:
 				case ViewModelRotationMode.Tool:
 					DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
@@ -190,17 +253,26 @@ namespace Voxelgine.Engine {
 
 
 		// TODO: Make animation system for viewmodels better, lerp between rotations and positions instead of using a switch statement?
-		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame) {
+		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame)
+		{
 			if (!IsActive)
 				return;
 
 			// Calculate kickback in world space using camera basis
 			Vector3 camForward = Ply.GetForward();
+			Vector3 camRight = -Ply.GetLeft();
 			Vector3 KickbackWorld = camForward * KickbackOffset.Z;
 
 			// Calculate final position using interpolated render camera position + offset + kickback
 			Vector3 P = Ply.RenderCam.Position + ViewModelOffset + KickbackWorld;
 			Quaternion R = VMRot;
+
+			// Apply swing rotation around the right axis (pitches the weapon forward)
+			if (SwingAngle != 0f)
+			{
+				Quaternion swingRot = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(SwingAngle));
+				R = swingRot * R;
+			}
 
 			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;
 			float s = MathF.Sqrt(1 - R.W * R.W);
@@ -208,8 +280,9 @@ namespace Voxelgine.Engine {
 
 			// Sample light level at player position and apply to view model
 			Color lightColor = Color.White;
-			if (Program.GameState?.Map != null) {
-				lightColor = Program.GameState.Map.GetLightColor(Ply.Position);
+			if (Eng.GameState?.Map != null)
+			{
+				lightColor = Eng.GameState.Map.GetLightColor(Ply.Position);
 			}
 
 			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), lightColor);

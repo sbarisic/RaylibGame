@@ -8,9 +8,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 
-namespace Voxelgine.Graphics {
-	public struct Frustum {
+namespace Voxelgine.Graphics
+{
+	public struct Frustum
+	{
 		public Vector4 Left;
 		public Vector4 Right;
 		public Vector4 Top;
@@ -24,7 +27,8 @@ namespace Voxelgine.Graphics {
 
 		public Vector3[] Corners;
 
-		public Frustum(ref Camera3D Cam) {
+		public Frustum(IFishEngineRunner Eng, ref Camera3D Cam)
+		{
 			Vector3 up = Raylib.GetCameraUp(ref Cam);
 			Vector3 forward = Raylib.GetCameraForward(ref Cam);
 			Vector3 right = Raylib.GetCameraRight(ref Cam);
@@ -36,12 +40,13 @@ namespace Voxelgine.Graphics {
 
 			// Build projection matrix
 			float fovYRad = Utils.ToRad(Cam.FovY);
-			float aspect = Program.Window.AspectRatio;
+			float aspect = Eng.DI.GetRequiredService<IGameWindow>().AspectRatio;
 			//float near = NearPlane;
 			//float far = FarPlane;
 
 
-			if (Cam.Projection == CameraProjection.Perspective) {
+			if (Cam.Projection == CameraProjection.Perspective)
+			{
 				Matrix4x4 proj = Raylib.GetCameraProjectionMatrix(ref Cam, aspect);
 				Matrix4x4 vp = proj * view; // Correct order: projection * view
 
@@ -52,7 +57,9 @@ namespace Voxelgine.Graphics {
 				Top = new Vector4(vp.M41 - vp.M21, vp.M42 - vp.M22, vp.M43 - vp.M23, vp.M44 - vp.M24);
 				Near = new Vector4(vp.M41 + vp.M31, vp.M42 + vp.M32, vp.M43 + vp.M33, vp.M44 + vp.M34);
 				Far = new Vector4(vp.M41 - vp.M31, vp.M42 - vp.M32, vp.M43 - vp.M33, vp.M44 - vp.M34);
-			} else {
+			}
+			else
+			{
 				throw new NotImplementedException();
 			}
 
@@ -67,7 +74,8 @@ namespace Voxelgine.Graphics {
 			Update();
 		}
 
-		public void Update() {
+		public void Update()
+		{
 			// Calculate the 8 corners of the frustum by intersecting 3 planes at a time
 			// The planes are: Left, Right, Top, Bottom, Near, Far
 			// The corners are:
@@ -87,11 +95,13 @@ namespace Voxelgine.Graphics {
 			Corners[7] = IntersectPlanes(Far, Left, Bottom);  // left-bottom-far
 		}
 
-		public bool IsInside(Vector3 point) {
+		public bool IsInside(Vector3 point)
+		{
 			// Check if point is inside all 6 planes
 			Vector4[] planes = { Left, Right, Top, Bottom, Near, Far };
 
-			foreach (var plane in planes) {
+			foreach (var plane in planes)
+			{
 				Vector3 normal = new Vector3(plane.X, plane.Y, plane.Z);
 				float d = plane.W;
 				float dist = Vector3.Dot(normal, point) + d;
@@ -102,7 +112,8 @@ namespace Voxelgine.Graphics {
 			return true;
 		}
 
-		public bool IsInside(AABB box) {
+		public bool IsInside(AABB box)
+		{
 			if (box.IsEmpty)
 				return false;
 
@@ -112,14 +123,16 @@ namespace Voxelgine.Graphics {
 			// Check if AABB is inside the frustum
 			Vector3[] BoxCorners = box.GetCorners();
 
-			foreach (Vector3 Corner in BoxCorners) {
+			foreach (Vector3 Corner in BoxCorners)
+			{
 				if (IsInside(Corner))
 					return true; // At least one corner is inside the frustum
 			}
 
 			Ray[] CornerRays = GetCornerRays();
 
-			foreach (Ray ray in CornerRays) {
+			foreach (Ray ray in CornerRays)
+			{
 				RayCollision col = Raylib.GetRayCollisionBox(ray, box.ToBoundingBox());
 
 				if (col.Hit && col.Distance < FarPlane && col.Distance > NearPlane)
@@ -129,11 +142,13 @@ namespace Voxelgine.Graphics {
 			return false;
 		}
 
-		public override string ToString() {
+		public override string ToString()
+		{
 			return $"(L: {Left}; R: {Right}; T: {Top}; B: {Bottom}; N: {Near}; F: {Far};)";
 		}
 
-		static Vector3 IntersectPlanes(Vector4 p1, Vector4 p2, Vector4 p3) {
+		static Vector3 IntersectPlanes(Vector4 p1, Vector4 p2, Vector4 p3)
+		{
 			// Ax + By + Cz + D = 0
 			// See: https://stackoverflow.com/questions/2824478/shortest-distance-between-two-lines-in-3d
 			// and https://github.com/erich666/GraphicsGems/blob/master/gems/Frustum.c
@@ -153,7 +168,8 @@ namespace Voxelgine.Graphics {
 			return result;
 		}
 
-		public void Draw() {
+		public void Draw()
+		{
 			// Draw frustum edges
 			Color color = Color.Pink;
 			// Near plane edges
@@ -173,12 +189,14 @@ namespace Voxelgine.Graphics {
 			Raylib.DrawLine3D(Corners[3], Corners[7], color);
 		}
 
-		Ray ToRay(Vector3 a, Vector3 b) {
+		Ray ToRay(Vector3 a, Vector3 b)
+		{
 			Ray R = new Ray(a, Vector3.Normalize(b - a));
 			return R;
 		}
 
-		public Ray[] GetCornerRays() {
+		public Ray[] GetCornerRays()
+		{
 			Ray[] Rays = new Ray[4];
 
 			Rays[0] = ToRay(Corners[0], Corners[4]);

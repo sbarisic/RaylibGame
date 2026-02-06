@@ -10,15 +10,42 @@ using System.Numerics;
 using System.Runtime.Intrinsics;
 using System.Text;
 using System.Threading.Tasks;
-
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
 namespace Voxelgine.Engine
 {
-	public unsafe class GameWindow
+	public interface IGameWindow
 	{
-		public InputMgr InMgr;
+		public InputMgr InMgr { get; }
+
+		public RenderTexture2D ViewmodelRT { get; }
+
+		public int Width { get; }
+
+		public int Height { get; }
+
+		public float AspectRatio { get; }
+
+		public GBuffer WindowG { get; }
+
+		public void UpdateLockstep(float TotalTime, float Dt);
+
+		public void Tick(float GameTime);
+
+		public void Close();
+
+		public bool IsOpen();
+
+		public void SetState(GameStateImpl State);
+
+		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame);
+	}
+
+	public unsafe class GameWindow : IGameWindow
+	{
+		public InputMgr InMgr { get; private set; }
 
 		public int Width
 		{
@@ -45,36 +72,43 @@ namespace Voxelgine.Engine
 
 		bool Open;
 		bool HasWindowRT;
-		public GBuffer WindowG;
+		public GBuffer WindowG
+		{
+			get; private set;
+		}
 
-		public RenderTexture2D ViewmodelRT;
+		public RenderTexture2D ViewmodelRT { get; private set; }
 		bool HasViewmodelRT = false;
 
 		// SSAA has a screen space rendering bug, scale UI accordingly?
 		bool Enable_SSAA = false;
 
 		Shader DefaultShader;
+		IFishEngineRunner Eng;
 
-		public GameWindow(int W, int H, string Title)
+		public GameWindow(IFishConfig Cfg, IFishEngineRunner Eng)
 		{
+			this.Eng = Eng;
 			Open = true;
+			int W = Cfg.WindowWidth;
+			int H = Cfg.WindowHeight;
 
-			if (Program.Cfg.HighDpiWindow)
+			if (Eng.DI.GetRequiredService<GameConfig>().HighDpiWindow)
 				Raylib.SetWindowState(ConfigFlags.HighDpiWindow);
 
-			if (Program.Cfg.VSync)
+			if (Eng.DI.GetRequiredService<GameConfig>().VSync)
 				Raylib.SetWindowState(ConfigFlags.VSyncHint);
 
-			if (Program.Cfg.Borderless)
+			if (Eng.DI.GetRequiredService<GameConfig>().Borderless)
 				Raylib.SetWindowState(ConfigFlags.BorderlessWindowMode);
 
-			if (Program.Cfg.Resizable)
+			if (Eng.DI.GetRequiredService<GameConfig>().Resizable)
 				Raylib.SetWindowState(ConfigFlags.ResizableWindow);
 
-			if (Program.Cfg.Fullscreen && !Program.Cfg.Borderless)
+			if (Eng.DI.GetRequiredService<GameConfig>().Fullscreen && !Eng.DI.GetRequiredService<GameConfig>().Borderless)
 				Raylib.SetWindowState(ConfigFlags.FullscreenMode);
 
-			if (Program.Cfg.Msaa)
+			if (Eng.DI.GetRequiredService<GameConfig>().Msaa)
 			{
 				Enable_SSAA = true;
 				//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
@@ -86,18 +120,18 @@ namespace Voxelgine.Engine
 			//Raylib.SetWindowState(ConfigFlags.Msaa4xHint);
 			//Raylib.SetWindowState(ConfigFlags.)
 
-			Raylib.InitWindow(Width = W, Height = H, Title);
+			Raylib.InitWindow(Width = W, Height = H, Cfg.Title);
 
 			int MonCount = Raylib.GetMonitorCount();
 			int UseMon = 0;
 
-			if (Program.Cfg.Monitor >= 0 && Program.Cfg.Monitor < MonCount)
+			if (Eng.DI.GetRequiredService<GameConfig>().Monitor >= 0 && Eng.DI.GetRequiredService<GameConfig>().Monitor < MonCount)
 			{
-				UseMon = Program.Cfg.Monitor;
+				UseMon = Eng.DI.GetRequiredService<GameConfig>().Monitor;
 			}
 			else
 			{
-				Program.Cfg.Monitor = 0;
+				Eng.DI.GetRequiredService<GameConfig>().Monitor = 0;
 			}
 
 			int MW = Raylib.GetMonitorWidth(UseMon);
@@ -113,7 +147,7 @@ namespace Voxelgine.Engine
 				H = MH;
 
 
-			int FPS = Program.Cfg.TargetFPS;
+			int FPS = Eng.DI.GetRequiredService<GameConfig>().TargetFPS;
 			if (FPS <= 0)
 			{
 				FPS = MFPS;
@@ -124,16 +158,16 @@ namespace Voxelgine.Engine
 			Raylib.SetExitKey(0);
 
 
-			if (Program.Cfg.Borderless)
+			if (Eng.DI.GetRequiredService<GameConfig>().Borderless)
 			{
 				Raylib.ToggleBorderlessWindowed();
 				Raylib.SetWindowSize(W, H);
 				Raylib.SetWindowPosition(MW / 2 - W / 2, MH / 2 - H / 2);
 			}
 
-			if (Program.Cfg.Fullscreen)
+			if (Eng.DI.GetRequiredService<GameConfig>().Fullscreen)
 			{
-				if (Program.Cfg.Borderless)
+				if (Eng.DI.GetRequiredService<GameConfig>().Borderless)
 				{
 					Raylib.SetWindowSize(MW, MH);
 				}
@@ -141,11 +175,11 @@ namespace Voxelgine.Engine
 				{
 					Raylib.SetWindowMonitor(UseMon);
 
-					if (Program.Cfg.UseFSDesktopRes)
+					if (Eng.DI.GetRequiredService<GameConfig>().UseFSDesktopRes)
 					{
-						Width = W = MW;
-						Height = H = MH;
-						Raylib.SetWindowSize(W, H);
+						Width = Cfg.WindowWidth = MW;
+						Height = Cfg.WindowHeight = MH;
+						Raylib.SetWindowSize(Cfg.WindowWidth, Cfg.WindowHeight);
 					}
 
 					Raylib.ToggleFullscreen();
@@ -154,7 +188,7 @@ namespace Voxelgine.Engine
 
 			Raylib.SetWindowFocused();
 
-			InMgr = new InputMgr();
+			InMgr = new InputMgr(Eng);
 
 			HasWindowRT = true;
 			ReloadRT();
@@ -298,7 +332,7 @@ namespace Voxelgine.Engine
 
 			BeginShaderMode(ShaderName);
 			SetShaderValue("resolution", new Vector2(Width, Height));
-			SetShaderValue("time", Program.TotalTime);
+			SetShaderValue("time", Eng.TotalTime);
 
 			Raylib.DrawTexturePro(WindowG.Target.Texture, Src, Dst, Vector2.Zero, 0, Color.White);
 
@@ -315,7 +349,7 @@ namespace Voxelgine.Engine
 			FInfo.Cam = GState.Ply.Cam;
 			FInfo.CamAngle = GState.Ply.GetCamAngle();
 			FInfo.FeetPosition = GState.Ply.FeetPosition;
-			FInfo.Frustum = new Frustum(ref FInfo.Cam);
+			FInfo.Frustum = new Frustum(Eng, ref FInfo.Cam);
 
 			FInfo.ViewModelOffset = GState.Ply.ViewMdl.ViewModelOffset;
 			FInfo.ViewModelRot = GState.Ply.ViewMdl.VMRot;

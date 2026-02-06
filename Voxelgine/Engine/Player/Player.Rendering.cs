@@ -13,7 +13,7 @@ namespace Voxelgine.Engine
 			if (LocalPlayer)
 			{
 
-				RenderTexture2D RT = Program.Window.ViewmodelRT;
+				RenderTexture2D RT = Eng.DI.GetRequiredService<IGameWindow>().ViewmodelRT;
 				Raylib.BeginTextureMode(RT);
 				{
 					Raylib.ClearBackground(new Color(0, 0, 0, 0));
@@ -29,7 +29,7 @@ namespace Voxelgine.Engine
 
 				}
 				Raylib.EndTextureMode();
-				Raylib.BeginTextureMode(Program.Window.WindowG.Target);
+				Raylib.BeginTextureMode(Eng.DI.GetRequiredService<IGameWindow>().WindowG.Target);
 
 				Rectangle Src = new Rectangle(0, 0, RT.Texture.Width, -RT.Texture.Height);
 				Rectangle Dst = new Rectangle(0, 0, RT.Texture.Width, RT.Texture.Height);

@@ -8,18 +8,25 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.Engine.DI;
 
-namespace Voxelgine.Engine {
-	public class WeaponPicker : Weapon {
+namespace Voxelgine.Engine
+{
+	public class WeaponPicker : Weapon
+	{
 
-		public WeaponPicker(Player ParentPlayer, string Name) : base(ParentPlayer, Name, IconType.Hammer) {
+		public WeaponPicker(IFishEngineRunner Eng, Player ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Hammer)
+		{
 			SetViewModelInfo(ViewModelRotationMode.Tool);
 			SetupModel("hammer/hammer.obj");
 		}
 
-		public override void OnLeftClick(InventoryClickEventArgs E) {
-			return;
+		public override void OnLeftClick(InventoryClickEventArgs E)
+		{
+			// Apply swing animation to the view model
+			ParentPlayer.ViewMdl.ApplySwing();
 
+			// TODO: Add hit detection and effects
 			/*
 			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
 
@@ -29,7 +36,7 @@ namespace Voxelgine.Engine {
 				GameState GState = ((GameState)Program.GameState);
 				GState.Particle.SpawnSmoke(Pos, Norm * 1.6f, Color.White);
 			}
-			//*/
+			*/
 		}
 	}
 }

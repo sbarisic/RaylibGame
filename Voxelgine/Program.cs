@@ -1,55 +1,73 @@
-﻿using System.Diagnostics;
+﻿using FishUI.Controls;
+using Microsoft.Extensions.Hosting;
+using MoonSharp.Interpreter.CoreLib;
+using Raylib_cs;
+using RaylibGame.States;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-
-using Raylib_cs;
-
-using RaylibGame.States;
-
 using TextCopy;
-
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
 namespace Voxelgine
 {
+	class FEngineRunner : IFishEngineRunner
+	{
+		public FishDI DI { get; set; }
+
+		public int ChunkDrawCalls { get; set; }
+		public bool DebugMode { get; set; }
+		public float TotalTime { get; set; }
+
+		public MainMenuStateFishUI MainMenuState { get; set; }
+		public GameState GameState { get; set; }
+		public NPCPreviewState NPCPreviewState { get; set; }
+
+		public FEngineRunner()
+		{
+		}
+
+		public void Run()
+		{
+		}
+	}
+
 	internal class Program
 	{
-		// Fancy info
-		public static int ChunkDrawCalls;
-
-		public static GameConfig Cfg;
-
-		public static bool DebugMode;
-
-		public static GameWindow Window;
-
-		public static MainMenuStateFishUI MainMenuState;
-		public static GameState GameState;
-		public static NPCPreviewState NPCPreviewState;
-
-		public static Clipboard Clipb;
-
-		public static float TotalTime;
-		public static LerpManager LerpMgr;
-
 		static void Main(string[] args)
 		{
-			DebugMode = Debugger.IsAttached;
+			FishDI FDI = new FishDI();
+			FDI.AddSingleton<IFishEngineRunner, FEngineRunner>();
+			FDI.AddSingleton<IFishConfig, GameConfig>();
+			FDI.AddSingleton<IClipboard, Clipboard>();
+			FDI.AddSingleton<ILerpManager, LerpManager>();
+			FDI.AddSingleton<IGameWindow, GameWindow>();
+			FDI.AddSingleton<IFishDebug, Engine.Debug>();
+
+			IHost Host = FDI.Build();
+			FDI.CreateScope();
+			//Host.Run();
+
+
+			IFishEngineRunner Eng = FDI.GetRequiredService<IFishEngineRunner>();
+			Eng.DI = FDI;
+			Eng.DebugMode = Debugger.IsAttached;
 
 			Console.WriteLine("Aurora Falls - Voxelgine Engine");
 			Console.WriteLine("Running on {0}", Utils.GetOSName());
 
-			Cfg = new GameConfig();
+			//Cfg = new GameConfig();
+			GameConfig Cfg = FDI.GetRequiredService<GameConfig>();
 			Cfg.LoadFromJson();
 
 			// Apply mouse sensitivity from config
 			FPSCamera.MouseMoveSen = Cfg.MouseSensitivity;
 
-			Clipb = new Clipboard();
-			LerpMgr = new LerpManager();
+			//Window = new GameWindow(Cfg.WindowWidth, Cfg.WindowHeight, Cfg.Title);
 
-			Window = new GameWindow(Cfg.WindowWidth, Cfg.WindowHeight, "Aurora Falls");
+			IGameWindow Window = FDI.GetRequiredService<IGameWindow>();
 			ResMgr.InitResources();
 			ResMgr.InitHotReload();
 
@@ -79,11 +97,11 @@ namespace Voxelgine
 			GraphicsUtils.Init();
 			Scripting.Init();
 
-			MainMenuState = new MainMenuStateFishUI(Window);
-			GameState = new GameState(Window);
-			NPCPreviewState = new NPCPreviewState(Window);
+			Eng.MainMenuState = new MainMenuStateFishUI(Window, Eng);
+			Eng.GameState = new GameState(Window, Eng);
+			Eng.NPCPreviewState = new NPCPreviewState(Window, Eng);
 
-			Window.SetState(MainMenuState);
+			Window.SetState(Eng.MainMenuState);
 
 
 			Stopwatch SWatch = Stopwatch.StartNew();
@@ -101,9 +119,11 @@ namespace Voxelgine
 			GameFrameInfo LastFrame = new GameFrameInfo();
 			Rlgl.EnableBackfaceCulling();
 
+			ILerpManager LerpMgr = FDI.GetRequiredService<ILerpManager>();
+
 			while (Window.IsOpen())
 			{
-				TotalTime = (float)Raylib.GetTime();
+				Eng.TotalTime = (float)Raylib.GetTime();
 				ResMgr.HandleHotReload();
 
 				float NewTime = (float)SWatch.Elapsed.TotalSeconds;
@@ -135,7 +155,7 @@ namespace Voxelgine
 				float TimeAlpha = Accumulator / DeltaTime;
 
 				// Interpolation between physics frames for smooth rendering
-				ChunkDrawCalls = 0;
+				Eng.ChunkDrawCalls = 0;
 				LastFrame = Window.Draw(TimeAlpha, LastFrame);
 			}
 		}

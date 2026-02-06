@@ -670,7 +670,7 @@ namespace Voxelgine.Engine
 				CModel.LookDirection = _lookDirection;
 				CModel.Draw();
 
-				if (Program.DebugMode)
+				if (Eng.DebugMode)
 				{
 					Raylib.DrawBoundingBox(BBox, Color.Blue);
 

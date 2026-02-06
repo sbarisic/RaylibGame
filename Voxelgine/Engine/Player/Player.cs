@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -77,13 +78,16 @@ namespace Voxelgine.Engine
 		Vector3 Left;
 		Vector3 Up;
 
-		public Player(FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
+		IFishEngineRunner Eng;
+
+		public Player(IFishEngineRunner Eng, FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
 		{
+			this.Eng = Eng;
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
 
-			ViewMdl = new ViewModel();
+			ViewMdl = new ViewModel(Eng);
 
 			Position = Vector3.Zero;
 			ToggleMouse(false);

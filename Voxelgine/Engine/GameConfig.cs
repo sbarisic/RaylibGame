@@ -8,59 +8,84 @@ using System.IO;
 using Newtonsoft.Json;
 using Raylib_cs;
 using System.Reflection;
+using Voxelgine.Engine.DI;
 
-namespace Voxelgine.Engine {
-	public class ConfigValueRef {
+namespace Voxelgine.Engine
+{
+	public class ConfigValueRef
+	{
 		public string FieldName;
 		public FieldInfo Field;
 
 		string LastValueString = null;
 
-		public ConfigValueRef(FieldInfo field, string fieldName) {
+		IFishEngineRunner Eng;
+
+		public ConfigValueRef(IFishEngineRunner Eng, FieldInfo field, string fieldName)
+		{
+			this.Eng = Eng;
 			Field = field;
 			FieldName = fieldName;
 			GetValueString();
 		}
 
-		public string GetValueString() {
-			LastValueString = Field.GetValue(Program.Cfg)?.ToString() ?? "null";
+		public string GetValueString()
+		{
+			LastValueString = Field.GetValue(Eng.DI.GetRequiredService<GameConfig>())?.ToString() ?? "null";
 			return LastValueString;
 		}
 
-		public void SetValueString(string value) {
+		public void SetValueString(string value)
+		{
 			LastValueString = value;
 
-			if (value == "null") {
-				Field.SetValue(Program.Cfg, null);
+			if (value == "null")
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), null);
 				return;
 			}
 
-			if (Field.FieldType == typeof(int)) {
-				Field.SetValue(Program.Cfg, int.Parse(value));
-			} else if (Field.FieldType == typeof(float)) {
-				Field.SetValue(Program.Cfg, float.Parse(value));
-			} else if (Field.FieldType == typeof(bool)) {
-				Field.SetValue(Program.Cfg, bool.Parse(value));
-			} else if (Field.FieldType == typeof(string)) {
-				Field.SetValue(Program.Cfg, value);
-			} else if (Field.FieldType.IsEnum) {
-				Field.SetValue(Program.Cfg, Enum.Parse(Field.FieldType, value));
-			} else {
+			if (Field.FieldType == typeof(int))
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), int.Parse(value));
+			}
+			else if (Field.FieldType == typeof(float))
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), float.Parse(value));
+			}
+			else if (Field.FieldType == typeof(bool))
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), bool.Parse(value));
+			}
+			else if (Field.FieldType == typeof(string))
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), value);
+			}
+			else if (Field.FieldType.IsEnum)
+			{
+				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), Enum.Parse(Field.FieldType, value));
+			}
+			else
+			{
 				throw new NotSupportedException($"Unsupported field type: {Field.FieldType}");
 			}
 		}
 
-		public override string ToString() {
+		public override string ToString()
+		{
 			return string.Format("{0} = '{1}'", FieldName, LastValueString);
 		}
 	}
 
-	public class GameConfig {
+	public class GameConfig : IFishConfig
+	{
 		const string ConfigFileName = "data/config.json";
 
 		public int Monitor;
-		public int WindowWidth;
-		public int WindowHeight;
+		public int WindowWidth { get; set; }
+
+		public int WindowHeight { get; set; }
+
 		public bool Fullscreen;
 		public bool UseFSDesktopRes;
 		public bool Borderless;
@@ -69,6 +94,8 @@ namespace Voxelgine.Engine {
 
 		public int TargetFPS;
 		public float MouseSensitivity;
+
+		public string Title { get; set; } = "Aurora Falls";
 
 		[SettingsHidden]
 		public bool HighDpiWindow;
@@ -97,7 +124,8 @@ namespace Voxelgine.Engine {
 		[SettingsHidden]
 		public KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] TwoKeysDown;
 
-		public void SetDefaults() {
+		public void SetDefaults()
+		{
 			Monitor = -1;
 			WindowWidth = 1920;
 			WindowHeight = 1080;
@@ -119,7 +147,12 @@ namespace Voxelgine.Engine {
 			LastOptWnd_H = 0;
 		}
 
-		public GameConfig() {
+		[SettingsHidden]
+		IFishEngineRunner Eng;
+
+		public GameConfig(IFishEngineRunner Eng)
+		{
+			this.Eng = Eng;
 			SetDefaults();
 
 			MouseButtonDown = new KeyValuePair<InputKey, MouseButton>[] { };
@@ -127,26 +160,30 @@ namespace Voxelgine.Engine {
 			TwoKeysDown = new KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>[] { };
 		}
 
-		public IEnumerable<ConfigValueRef> GetVariables() {
+		public IEnumerable<ConfigValueRef> GetVariables()
+		{
 			Type T = GetType();
 
 			FieldInfo[] Fields = T.GetFields(BindingFlags.Public | BindingFlags.Instance);
-			foreach (FieldInfo F in Fields) {
+			foreach (FieldInfo F in Fields)
+			{
 				if (F.GetCustomAttribute<SettingsHiddenAttribute>() != null)
 					continue;
 
-				yield return new ConfigValueRef(F, F.Name);
+				yield return new ConfigValueRef(Eng, F, F.Name);
 			}
 		}
 
-		public void SaveToJson() {
+		public void SaveToJson()
+		{
 			JsonSerializerSettings JSS = new JsonSerializerSettings();
 			JSS.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
 			string json = JsonConvert.SerializeObject(this, Formatting.Indented, JSS);
 			File.WriteAllText(ConfigFileName, json);
 		}
 
-		public void LoadFromJson() {
+		public void LoadFromJson()
+		{
 			if (!File.Exists(ConfigFileName))
 				return;
 			string json = File.ReadAllText(ConfigFileName);
@@ -154,7 +191,8 @@ namespace Voxelgine.Engine {
 
 		}
 
-		public void GenerateDefaultKeybinds() {
+		public void GenerateDefaultKeybinds()
+		{
 			List<KeyValuePair<InputKey, MouseButton>> MouseButtonDown = new List<KeyValuePair<InputKey, MouseButton>>();
 			List<KeyValuePair<InputKey, KeyboardKey>> KeyDown = new List<KeyValuePair<InputKey, KeyboardKey>>();
 			List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>> TwoKeysDown = new List<KeyValuePair<InputKey, KeyValuePair<KeyboardKey, KeyboardKey>>>();

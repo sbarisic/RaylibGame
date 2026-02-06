@@ -156,7 +156,7 @@ namespace Voxelgine.Engine
 
 		protected override void DrawCollisionBox()
 		{
-			if (!Program.DebugMode)
+			if (!Eng.DebugMode)
 				return;
 
 			Vector3 min = Position;

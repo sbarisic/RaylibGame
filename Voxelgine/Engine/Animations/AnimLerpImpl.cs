@@ -4,11 +4,16 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine {
 	public class LerpVec3 : AnimLerp {
 		Vector3 Start;
 		Vector3 End;
+
+		public LerpVec3(IFishEngineRunner Eng) : base(Eng)
+		{
+		}
 
 		public override void StartLerp(float Duration, object StartVal, object EndVal) {
 			base.StartLerp(Duration, StartVal, EndVal);
@@ -32,9 +37,13 @@ namespace Voxelgine.Engine {
 		}
 	}
 
-	public class  LerpQuat : AnimLerp {
+	public class LerpQuat : AnimLerp {
 		Quaternion Start;
 		Quaternion End;
+
+		public LerpQuat(IFishEngineRunner Eng) : base(Eng)
+		{
+		}
 
 		public override void StartLerp(float Duration, object StartVal, object EndVal) {
 			base.StartLerp(Duration, StartVal, EndVal);
@@ -53,6 +62,37 @@ namespace Voxelgine.Engine {
 
 		public override void SwapStartAndEnd() {
 			Quaternion Tmp = End;
+			End = Start;
+			Start = Tmp;
+		}
+	}
+
+	public class LerpFloat : AnimLerp {
+		float Start;
+		float End;
+
+		public LerpFloat(IFishEngineRunner Eng) : base(Eng)
+		{
+
+		}
+
+		public override void StartLerp(float Duration, object StartVal, object EndVal) {
+			base.StartLerp(Duration, StartVal, EndVal);
+
+			Start = (float)StartVal;
+			End = (float)EndVal;
+		}
+
+		public virtual float GetFloat() {
+			return Start + (End - Start) * LerpVal;
+		}
+
+		public override object GetValue() {
+			return GetFloat();
+		}
+
+		public override void SwapStartAndEnd() {
+			float Tmp = End;
 			End = Start;
 			Start = Tmp;
 		}

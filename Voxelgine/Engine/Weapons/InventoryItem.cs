@@ -6,7 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
@@ -16,6 +16,8 @@ namespace Voxelgine.Engine
 
 	public class InventoryItem
 	{
+		protected IFishEngineRunner Eng;
+
 		public Player ParentPlayer;
 
 		public string Name;
@@ -61,7 +63,12 @@ namespace Voxelgine.Engine
 		// TODO: Maybe draw that item as disabled when count is 0?
 		public int Count = -1; // -1 means infinite, 0 means no items left, >0 item count
 
-		public InventoryItem(Player ParentPlayer, string Name, BlockType BlockIcon)
+		InventoryItem(IFishEngineRunner Eng)
+		{
+			this.Eng = Eng;
+		}
+
+		public InventoryItem(IFishEngineRunner Eng, Player ParentPlayer, string Name, BlockType BlockIcon) : this(Eng)
 		{
 			this.ParentPlayer = ParentPlayer;
 			this.Name = Name;
@@ -77,7 +84,7 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public InventoryItem(Player ParentPlayer, string Name, IconType Icon)
+		public InventoryItem(IFishEngineRunner Eng, Player ParentPlayer, string Name, IconType Icon) : this(Eng)
 		{
 			this.ParentPlayer = ParentPlayer;
 			this.Name = Name;

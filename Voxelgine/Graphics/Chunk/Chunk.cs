@@ -5,6 +5,7 @@ using Voxelgine.Engine;
 
 using System;
 using System.Collections.Generic;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Graphics
 {
@@ -82,10 +83,14 @@ namespace Voxelgine.Graphics
 		public Vector3 GlobalChunkIndex;
 		ChunkMap WorldMap;
 
-		public Chunk(Vector3 GlobalChunkIndex, ChunkMap WorldMap)
+		IFishEngineRunner Eng;
+
+		public Chunk(IFishEngineRunner Eng, Vector3 GlobalChunkIndex, ChunkMap WorldMap)
 		{
 			this.GlobalChunkIndex = GlobalChunkIndex;
 			this.WorldMap = WorldMap;
+
+			this.Eng = Eng;
 
 			Blocks = new PlacedBlock[ChunkSize * ChunkSize * ChunkSize];
 			for (int i = 0; i < Blocks.Length; i++)

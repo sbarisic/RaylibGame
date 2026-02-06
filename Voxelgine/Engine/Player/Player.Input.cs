@@ -25,7 +25,7 @@ namespace Voxelgine.Engine
 				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
 			});
 
-			AddOnKeyPressed(InputKey.F3, (E) => { Program.DebugMode = !Program.DebugMode; });
+			AddOnKeyPressed(InputKey.F3, (E) => { Eng.DebugMode = !Eng.DebugMode; });
 
 			AddOnKeyPressed(InputKey.F4, (E) => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
 
@@ -47,7 +47,7 @@ namespace Voxelgine.Engine
 
 			AddOnKeyPressed(InputKey.I, (K) =>
 			{
-				if (Program.DebugMode)
+				if (Eng.DebugMode)
 				{
 					FreezeFrustum = !FreezeFrustum;
 				}

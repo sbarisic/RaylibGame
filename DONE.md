@@ -34,6 +34,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Audio: Gun shooting sound** � Added shoot1 sound combo for weapon firing.
 - **Weapons: Automatic fire** - Gun fires continuously while left mouse held (via `SupportsAutoFire` property).
 - **Physics: Player bounding box** - Added `BBox` property with automatic recalculation on position change.
+- **Weapons: Hammer swing animation** - Added `ApplySwing()` method to ViewModel and `LerpFloat` animation class.
 - **Physics: Jump height** — Increased player jump impulse by 10% (5.5 → 6.05).
 - **Graphics: Glass backface rendering** — Added double-sided rendering for glass/ice blocks, skipping backfaces between adjacent same-type blocks.
 - **Physics Utils** — Created `PhysicsUtils` class with shared collision functions (`ClipVelocity`, `MoveWithCollision`, `Accelerate`, `AirAccelerate`, `ApplyFriction`, `ApplyGravity`). Enhanced `AABB` with `Overlaps()` and helper properties. Refactored `EntityManager` and `Player` to use shared utilities.

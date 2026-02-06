@@ -117,7 +117,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- **HIGHEST PRIORITY** Some form of DI system has been implemented, find all calls to Console.* and replace them with IFishLogging.WriteLine. Check out EntityManager.cs how it's used. Update this TODO and README file with new changes.
 
 ---
 

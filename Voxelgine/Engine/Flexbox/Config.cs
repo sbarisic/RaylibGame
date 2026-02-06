@@ -17,14 +17,14 @@ namespace Flexbox
             {
                 case LogLevel.Error:
                 case LogLevel.Fatal:
-                    System.Console.WriteLine(format, args);
+                    Flex.Logging?.WriteLine(string.Format(format, args));
                     return 0;
                 case LogLevel.Warn:
                 case LogLevel.Info:
                 case LogLevel.Debug:
                 case LogLevel.Verbose:
                 default:
-                    System.Console.WriteLine(format, args);
+                    Flex.Logging?.WriteLine(string.Format(format, args));
                     break;
             }
 

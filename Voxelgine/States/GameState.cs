@@ -102,12 +102,14 @@ namespace RaylibGame.States
 		private VEntNPC _testNpc;
 
 		IGameWindow _gameWindow;
+		IFishLogging Logging;
 
 		public GameState(IGameWindow window, IFishEngineRunner eng) : base(window, eng)
 		{
 			_gameWindow = window;
+			Logging = eng.DI.GetRequiredService<IFishLogging>();
 
-			GUI = new FishUIManager(window);
+			GUI = new FishUIManager(window, Logging);
 			EntMgr = new EntityManager(window, eng);
 			Snd = new SoundMgr();
 			PhysicsData = new PhysData();
@@ -329,7 +331,7 @@ namespace RaylibGame.States
 			btnSave.Clicked += (sender, args) =>
 			{
 				SaveGame();
-				Console.WriteLine("Game saved!");
+				Logging.WriteLine("Game saved!");
 			};
 			stack.AddChild(btnSave);
 
@@ -342,7 +344,7 @@ namespace RaylibGame.States
 			btnLoad.Clicked += (sender, args) =>
 			{
 				LoadGame();
-				Console.WriteLine("Game loaded!");
+				Logging.WriteLine("Game loaded!");
 			};
 			stack.AddChild(btnLoad);
 
@@ -356,7 +358,7 @@ namespace RaylibGame.States
 			{
 				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
 				Ply.SetPosition(PlayerPos);
-				Console.WriteLine("World regenerated!");
+				Logging.WriteLine("World regenerated!");
 			};
 			stack.AddChild(btnRegen);
 
@@ -371,7 +373,7 @@ namespace RaylibGame.States
 				if (_testNpc != null)
 				{
 					bool pathFound = _testNpc.NavigateTo(Ply.Position);
-					Console.WriteLine(pathFound ? "NPC navigating to player!" : "NPC could not find path to player!");
+					Logging.WriteLine(pathFound ? "NPC navigating to player!" : "NPC could not find path to player!");
 				}
 			};
 			stack.AddChild(btnNpcNavigate);
@@ -384,7 +386,7 @@ namespace RaylibGame.States
 			};
 			btnExportAnims.Clicked += (sender, args) =>
 			{
-				NPCAnimations.ExportAllDefaults();
+				NPCAnimations.ExportAllDefaults(Logging);
 			};
 			stack.AddChild(btnExportAnims);*/
 
@@ -934,7 +936,7 @@ namespace RaylibGame.States
 
 		private void SaveGameState()
 		{
-			Console.WriteLine("Saving map and player!");
+			Logging.WriteLine("Saving map and player!");
 
 			// Save map
 			using MemoryStream memoryStream = new MemoryStream();
@@ -946,7 +948,7 @@ namespace RaylibGame.States
 			using BinaryWriter writer = new BinaryWriter(fileStream);
 			Ply.Write(writer);
 
-			Console.WriteLine("Save complete!");
+			Logging.WriteLine("Save complete!");
 		}
 	}
 }

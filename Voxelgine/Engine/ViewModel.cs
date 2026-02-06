@@ -54,10 +54,12 @@ namespace Voxelgine.Engine
 		bool IsSwinging = false;
 
 		IFishEngineRunner Eng;
+		IFishLogging Logging;
 
 		public ViewModel(IFishEngineRunner Eng)
 		{
 			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 
 			SetModel(DefaultViewModelName);
 			IsActive = true;
@@ -65,7 +67,7 @@ namespace Voxelgine.Engine
 			if (VModel.MeshCount == 0)
 			{
 				IsActive = false;
-				Console.WriteLine("======================== Warning! Zero meshes in model {0}", DefaultViewModelName);
+				Logging.WriteLine($"======================== Warning! Zero meshes in model {DefaultViewModelName}");
 			}
 
 			LrpOffset = new LerpVec3(Eng);
@@ -106,7 +108,7 @@ namespace Voxelgine.Engine
 				ViewMdlRotMode = Mode;
 				// TODO: Toggle animation
 
-				Console.WriteLine("Toggle anim!");
+				Logging.WriteLine("Toggle anim!");
 			}
 		}
 

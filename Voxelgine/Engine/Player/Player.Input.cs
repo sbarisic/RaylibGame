@@ -18,21 +18,21 @@ namespace Voxelgine.Engine
 
 			AddOnKeyPressed(InputKey.F2, (E) =>
 			{
-				Console.WriteLine("Compute light!");
+				Logging.WriteLine("Compute light!");
 				SWatch.Restart();
 				Map.ComputeLighting();
 				SWatch.Stop();
-				Console.Title = $"> {SWatch.ElapsedMilliseconds / 1000.0f} s";
+				Logging.WriteLine($"> {SWatch.ElapsedMilliseconds / 1000.0f} s");
 			});
 
 			AddOnKeyPressed(InputKey.F3, (E) => { Eng.DebugMode = !Eng.DebugMode; });
 
-			AddOnKeyPressed(InputKey.F4, (E) => { Console.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
+			AddOnKeyPressed(InputKey.F4, (E) => { Logging.WriteLine("Clearing records"); Utils.ClearRaycastRecord(); });
 
 			AddOnKeyPressed(InputKey.C, (E) =>
 			{
 				NoClip = !NoClip;
-				Console.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
+				Logging.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
 			});
 
 			AddOnKeyPressed(InputKey.Num1, (K) => { Inventory?.SetSelectedIndex(0); });

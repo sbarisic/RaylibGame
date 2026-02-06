@@ -195,7 +195,7 @@ namespace Voxelgine.Engine
 			BBox = CModel.GetBoundingBox();
 
 			// Initialize animator with standard animations
-			Animator = new NPCAnimator(CModel);
+			Animator = new NPCAnimator(CModel, Logging);
 			Animator.LoadAllClips();
 			/*Animator.AddClips(
 				NPCAnimations.CreateIdleAnimation(),
@@ -244,7 +244,7 @@ namespace Voxelgine.Engine
 						if (_isUnstuckWandering)
 						{
 							// Successfully unstuck - return to original target
-							Console.WriteLine("NPC unstuck, resuming original navigation");
+							Logging.WriteLine("NPC unstuck, resuming original navigation");
 							_isUnstuckWandering = false;
 							_stuckRecalculateAttempts = 0;
 							_triedJumpingToUnstuck = false;
@@ -394,7 +394,7 @@ namespace Voxelgine.Engine
 			// First, try jumping if we haven't yet and we're grounded
 			if (!_triedJumpingToUnstuck && isGrounded)
 			{
-				Console.WriteLine("NPC stuck, trying to jump out");
+				Logging.WriteLine("NPC stuck, trying to jump out");
 				_triedJumpingToUnstuck = true;
 				Jump();
 				return;
@@ -416,13 +416,13 @@ namespace Voxelgine.Engine
 				_isUnstuckWandering = true;
 				_triedJumpingToUnstuck = false; // Reset jump flag for next attempt
 				Vector3 randomTarget = GetRandomWanderTarget();
-				Console.WriteLine($"NPC stuck, wandering to random position (attempt {_stuckRecalculateAttempts}/{MaxRecalculateAttempts})");
+				Logging.WriteLine($"NPC stuck, wandering to random position (attempt {_stuckRecalculateAttempts}/{MaxRecalculateAttempts})");
 				_pathFollower.SetTarget(Position, randomTarget);
 			}
 			else
 			{
 				// Give up after max attempts
-				Console.WriteLine("NPC giving up on navigation after max attempts");
+				Logging.WriteLine("NPC giving up on navigation after max attempts");
 				StopNavigation();
 			}
 		}

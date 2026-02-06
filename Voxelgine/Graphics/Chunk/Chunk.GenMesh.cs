@@ -97,7 +97,7 @@ namespace Voxelgine.Graphics
 
 
 
-									Console.WriteLine("!");
+									Logging.WriteLine("!");
 
 								}
 							}

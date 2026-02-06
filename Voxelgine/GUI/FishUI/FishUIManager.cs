@@ -3,6 +3,7 @@ using FishUI.Controls;
 using Raylib_cs;
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.GUI {
     /// <summary>
@@ -16,14 +17,16 @@ namespace Voxelgine.GUI {
         private readonly RaylibFishUIGfx _gfx;
         private readonly RaylibFishUIInput _input;
         private readonly RaylibFishUIEvents _events;
+        private readonly IFishLogging _logging;
 
         public int Width => UI.Width;
         public int Height => UI.Height;
 
-        public FishUIManager(IGameWindow window) {
+        public FishUIManager(IGameWindow window, IFishLogging logging) {
+            _logging = logging;
             _gfx = new RaylibFishUIGfx();
             _input = new RaylibFishUIInput();
-            _events = new RaylibFishUIEvents();
+            _events = new RaylibFishUIEvents(logging);
 
             Settings = new FishUISettings();
             UI = new FishUI.FishUI(Settings, _gfx, _input, _events, null);
@@ -37,7 +40,7 @@ namespace Voxelgine.GUI {
                 try {
                     Settings.LoadTheme(themePath, true);
                 } catch (Exception ex) {
-                    Console.WriteLine($"[FishUIManager] Failed to load theme: {ex.Message}");
+                    _logging.WriteLine($"[FishUIManager] Failed to load theme: {ex.Message}");
                 }
             }
         }

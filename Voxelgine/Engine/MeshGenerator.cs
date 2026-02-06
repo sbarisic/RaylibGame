@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine {
 	/// <summary>
@@ -141,6 +142,7 @@ namespace Voxelgine.Engine {
 	/// Supports animation via NPCAnimator.
 	/// </summary>
 	public class CustomModel {
+		public static IFishLogging Logging;
 		public Vector3 Position;
 		public Vector3 LookDirection;
 		public List<CustomMesh> Meshes = new List<CustomMesh>();
@@ -196,7 +198,7 @@ namespace Voxelgine.Engine {
 
 				RayCollision Col = Raylib.GetRayCollisionMesh(R, CM.Mesh, Matrix4x4.Transpose(World));
 				if (Col.Hit) {
-					Console.WriteLine("Hit!");
+					Logging?.WriteLine("Hit!");
 
 					HitMesh = CM;
 					return Col;

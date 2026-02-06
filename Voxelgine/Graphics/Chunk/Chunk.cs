@@ -84,6 +84,7 @@ namespace Voxelgine.Graphics
 		ChunkMap WorldMap;
 
 		IFishEngineRunner Eng;
+		IFishLogging Logging;
 
 		public Chunk(IFishEngineRunner Eng, Vector3 GlobalChunkIndex, ChunkMap WorldMap)
 		{
@@ -91,6 +92,7 @@ namespace Voxelgine.Graphics
 			this.WorldMap = WorldMap;
 
 			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 
 			Blocks = new PlacedBlock[ChunkSize * ChunkSize * ChunkSize];
 			for (int i = 0; i < Blocks.Length; i++)

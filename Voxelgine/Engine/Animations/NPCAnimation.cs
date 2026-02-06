@@ -5,6 +5,7 @@ using System.Numerics;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -492,23 +493,23 @@ namespace Voxelgine.Engine
 		/// Exports all default animations to .npcanim.json files in the animations folder.
 		/// Useful for creating initial animation files that can be edited externally.
 		/// </summary>
-		public static void ExportAllDefaults()
+		public static void ExportAllDefaults(IFishLogging logging)
 		{
-			Console.WriteLine("[NPCAnimations] Exporting default animations...");
+			logging.WriteLine("[NPCAnimations] Exporting default animations...");
 
 			CreateWalkAnimation().Save("walk");
-			Console.WriteLine("  - Exported walk.npcanim.json");
+			logging.WriteLine("  - Exported walk.npcanim.json");
 
 			CreateIdleAnimation().Save("idle");
-			Console.WriteLine("  - Exported idle.npcanim.json");
+			logging.WriteLine("  - Exported idle.npcanim.json");
 
 			CreateAttackAnimation().Save("attack");
-			Console.WriteLine("  - Exported attack.npcanim.json");
+			logging.WriteLine("  - Exported attack.npcanim.json");
 
 			CreateCrouchAnimation().Save("crouch");
-			Console.WriteLine("  - Exported crouch.npcanim.json");
+			logging.WriteLine("  - Exported crouch.npcanim.json");
 
-			Console.WriteLine($"[NPCAnimations] Exported 4 animations to {NPCAnimationClip.AnimationsFolder}/");
+			logging.WriteLine($"[NPCAnimations] Exported 4 animations to {NPCAnimationClip.AnimationsFolder}/");
 		}//*/
 	}
 }

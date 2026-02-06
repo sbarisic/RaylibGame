@@ -44,6 +44,7 @@ namespace Voxelgine.Engine
 
 		public void WriteLine(string message)
 		{
+			Console.WriteLine(message);
 			SWriter.WriteLine(GetPrefix() + message);
 			Flush();
 		}

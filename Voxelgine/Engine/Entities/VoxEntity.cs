@@ -50,7 +50,17 @@ namespace Voxelgine.Engine
 		public bool IsRotating = false;
 		public float RotationSpeed = 30;
 
-		public IFishEngineRunner Eng { get; set; }
+		private IFishEngineRunner _eng;
+		public IFishEngineRunner Eng
+		{
+			get => _eng;
+			set
+			{
+				_eng = value;
+				Logging = value.DI.GetRequiredService<IFishLogging>();
+			}
+		}
+		protected IFishLogging Logging;
 		EntityManager EntMgr;
 		GameState GameState;
 
@@ -128,7 +138,7 @@ namespace Voxelgine.Engine
 
 		public virtual void OnPlayerTouch(Player Ply)
 		{
-			Console.WriteLine("Player touched me!");
+			Logging.WriteLine("Player touched me!");
 		}
 
 		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)

@@ -19,10 +19,12 @@ namespace RaylibGame.States
 		private Window _optionsWindow;
 		private ImageBox _titleLogo;
 		private float _totalTime;
+		private IFishLogging Logging;
 
 		public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
-			_gui = new FishUIManager(window);
+			Logging = Eng.DI.GetRequiredService<IFishLogging>();
+			_gui = new FishUIManager(window, Logging);
 
 			CreateTitleLogo();
 			CreateMainMenu();
@@ -208,7 +210,7 @@ namespace RaylibGame.States
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"Error setting {fieldName}: {ex.Message}");
+						Logging.WriteLine($"Error setting {fieldName}: {ex.Message}");
 					}
 				};
 

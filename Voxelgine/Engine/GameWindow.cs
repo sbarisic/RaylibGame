@@ -85,10 +85,12 @@ namespace Voxelgine.Engine
 
 		Shader DefaultShader;
 		IFishEngineRunner Eng;
+		IFishLogging Logging;
 
 		public GameWindow(IFishConfig Cfg, IFishEngineRunner Eng)
 		{
 			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 			Open = true;
 			int W = Cfg.WindowWidth;
 			int H = Cfg.WindowHeight;
@@ -139,7 +141,7 @@ namespace Voxelgine.Engine
 			int MFPS = Raylib.GetMonitorRefreshRate(UseMon);
 			string MonName = new string(Raylib.GetMonitorName(UseMon));
 
-			Console.WriteLine("Using monitor '{0}' ({1}x{2})", MonName, MW, MH);
+			Logging.WriteLine($"Using monitor '{MonName}' ({MW}x{MH})");
 
 			if (MW < W)
 				W = MW;
@@ -153,7 +155,7 @@ namespace Voxelgine.Engine
 				FPS = MFPS;
 			}
 
-			Console.WriteLine("Target FPS: {0}", FPS);
+			Logging.WriteLine($"Target FPS: {FPS}");
 			Raylib.SetTargetFPS(FPS);
 			Raylib.SetExitKey(0);
 

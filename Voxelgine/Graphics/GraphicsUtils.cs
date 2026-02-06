@@ -1,6 +1,7 @@
 ﻿using Raylib_cs;
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +12,10 @@ using System.Runtime.CompilerServices;
 namespace Voxelgine.Graphics {
 	static class GraphicsUtils {
 		static Dictionary<Vector3, List<Vertex3>> CubeSides;
+		static IFishLogging Logging;
 
-		public static void Init() {
+		public static void Init(IFishLogging logging) {
+			Logging = logging;
 			Vertex3[] CubeVertices = Obj.LoadRaw(@"o Cube
 				v 0.500000 -0.500000 -0.500000
 				v 0.500000 -0.500000 0.500000
@@ -84,7 +87,7 @@ namespace Voxelgine.Graphics {
 			for (int i = 0; i < Side.Count; i++) {
 				Vertex3 V = Side[i];
 
-				Console.WriteLine(Utils.ToString(V.UV));
+				Logging.WriteLine(Utils.ToString(V.UV));
 
 				V.Position = V.Position * Size + Pos;
 				V.UV = V.UV * UVSize + UVPos;

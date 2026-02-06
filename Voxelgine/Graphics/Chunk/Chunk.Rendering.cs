@@ -107,7 +107,7 @@ namespace Voxelgine.Graphics
 			// Debug: log transparent mesh vertex count
 			if (ModelValidTransp && Eng.DebugMode)
 			{
-				Console.WriteLine($"[Chunk {GlobalChunkIndex}] Transparent mesh: {CachedMeshTransp.VertexCount} vertices");
+				Logging.WriteLine($"[Chunk {GlobalChunkIndex}] Transparent mesh: {CachedMeshTransp.VertexCount} vertices");
 			}
 
 			// Generate transparent faces for depth-sorted rendering

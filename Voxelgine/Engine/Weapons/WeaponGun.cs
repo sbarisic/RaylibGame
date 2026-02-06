@@ -98,14 +98,14 @@ namespace Voxelgine.Engine
 						// Use the more precise mesh hit position/normal
 						hitPos = partHitPos;
 						hitNormal = partHitNormal;
-						Console.WriteLine($"Hit NPC body part: {bodyPart} at distance {entityHit.Distance:F2}");
+						Logging.WriteLine($"Hit NPC body part: {bodyPart} at distance {entityHit.Distance:F2}");
 
 						// Apply twitch effect to the hit body part
 						npc.TwitchBodyPart(bodyPart, E.Dir);
 					}
 					else
 					{
-						Console.WriteLine($"Hit NPC (AABB) at distance {entityHit.Distance:F2}");
+						Logging.WriteLine($"Hit NPC (AABB) at distance {entityHit.Distance:F2}");
 					}
 
 					// Spawn blood particles for NPC hits
@@ -116,7 +116,7 @@ namespace Voxelgine.Engine
 				}
 				else
 				{
-					Console.WriteLine($"Hit entity: {hitEntity.GetType().Name} at distance {entityHit.Distance:F2}");
+					Logging.WriteLine($"Hit entity: {hitEntity.GetType().Name} at distance {entityHit.Distance:F2}");
 				}
 			}
 			else if (worldHitPos != Vector3.Zero)
@@ -124,7 +124,7 @@ namespace Voxelgine.Engine
 				// World hit is closer (or no entity hit)
 				hitPos = worldHitPos;
 				hitNormal = worldNorm;
-				Console.WriteLine("Hit world!");
+				Logging.WriteLine("Hit world!");
 			}
 			else
 			{

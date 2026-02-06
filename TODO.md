@@ -105,7 +105,9 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-*No Code Refactoring items*
+#### High Priority
+
+- [ ] **Logging: Replace Console.* with IFishLogging** — Replace all `Console.WriteLine`/`Console.Write` calls with `IFishLogging.WriteLine` via DI across ~10 files (`InventoryItem.cs`, `WeaponGun.cs`, `WeaponPicker.cs`, `GraphicsUtils.cs`, `Chunk.GenMesh.cs`, `Chunk.Rendering.cs`, `FishUIManager.cs`, `RaylibFishUIEvents.cs`, `GameState.cs`, `MainMenuStateFishUI.cs`). Reference `EntityManager.cs` for the DI pattern. Update README.md with changes. **[CPX: 3]**
 
 ---
 
@@ -117,7 +119,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- **HIGHEST PRIORITY** Some form of DI system has been implemented, find all calls to Console.* and replace them with IFishLogging.WriteLine. Check out EntityManager.cs how it's used. Update this TODO and README file with new changes.
+*No uncategorized items*
 
 ---
 

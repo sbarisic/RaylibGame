@@ -55,15 +55,19 @@ namespace Voxelgine
 			Eng.DI = FDI;
 			//Host.Run();
 
-			Console.WriteLine("Aurora Falls - Voxelgine Engine");
-			Console.WriteLine("Running on {0}", Utils.GetOSName());
-
 			//Cfg = new GameConfig();
 			GameConfig Cfg = FDI.GetRequiredService<GameConfig>();
 			Cfg.LoadFromJson();
 
 			IFishLogging Logging = FDI.GetRequiredService<IFishLogging>();
 			Logging.Init();
+
+			Logging.WriteLine("Aurora Falls - Voxelgine Engine");
+			Logging.WriteLine($"Running on {Utils.GetOSName()}");
+
+			// Set logging on static classes
+			ResMgr.Logging = Logging;
+			CustomModel.Logging = Logging;
 
 			// Apply mouse sensitivity from config
 			FPSCamera.MouseMoveSen = Cfg.MouseSensitivity;
@@ -97,7 +101,8 @@ namespace Voxelgine
 			}
 			ResMgr.CreateCollection("blood", BloodTexList.ToArray());
 
-			GraphicsUtils.Init();
+			GraphicsUtils.Init(Eng.DI.GetRequiredService<IFishLogging>());
+			Flexbox.Flex.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 			Scripting.Init();
 
 			Eng.DebugMode = Debugger.IsAttached;

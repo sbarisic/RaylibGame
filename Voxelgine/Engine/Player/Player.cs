@@ -79,10 +79,12 @@ namespace Voxelgine.Engine
 		Vector3 Up;
 
 		IFishEngineRunner Eng;
+		IFishLogging Logging;
 
 		public Player(IFishEngineRunner Eng, FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
 		{
 			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;

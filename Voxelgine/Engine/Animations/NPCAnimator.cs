@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -47,6 +48,7 @@ namespace Voxelgine.Engine
 	public class NPCAnimator
 	{
 		private CustomModel _model;
+		private IFishLogging _logging;
 		private Dictionary<string, NPCAnimationClip> _clips = new Dictionary<string, NPCAnimationClip>();
 
 		// Legacy single-animation state (maps to "base" layer for compatibility)
@@ -81,9 +83,10 @@ namespace Voxelgine.Engine
 		/// <summary>
 		/// Creates a new animator for the specified model.
 		/// </summary>
-		public NPCAnimator(CustomModel model)
+		public NPCAnimator(CustomModel model, IFishLogging logging)
 		{
 			_model = model;
+			_logging = logging;
 		}
 
 		/// <summary>
@@ -147,7 +150,7 @@ namespace Voxelgine.Engine
 			}
 			else
 			{
-				Console.WriteLine($"[NPCAnimator] Animation '{animationName}' not found");
+				_logging.WriteLine($"[NPCAnimator] Animation '{animationName}' not found");
 			}
 		}
 
@@ -212,7 +215,7 @@ namespace Voxelgine.Engine
 		{
 			if (!_clips.TryGetValue(animationName, out var clip))
 			{
-				Console.WriteLine($"[NPCAnimator] Animation '{animationName}' not found");
+				_logging.WriteLine($"[NPCAnimator] Animation '{animationName}' not found");
 				return;
 			}
 

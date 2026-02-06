@@ -17,6 +17,7 @@ namespace Voxelgine.Engine
 	public class InventoryItem
 	{
 		protected IFishEngineRunner Eng;
+		protected IFishLogging Logging;
 
 		public Player ParentPlayer;
 
@@ -66,6 +67,7 @@ namespace Voxelgine.Engine
 		InventoryItem(IFishEngineRunner Eng)
 		{
 			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 		}
 
 		public InventoryItem(IFishEngineRunner Eng, Player ParentPlayer, string Name, BlockType BlockIcon) : this(Eng)
@@ -151,7 +153,7 @@ namespace Voxelgine.Engine
 
 		public virtual void OnSelected(ViewModel CurViewModel)
 		{
-			Console.WriteLine("Selected '{0}'", Name);
+			Logging.WriteLine($"Selected '{Name}'");
 
 			if (UseViewmodel)
 			{
@@ -181,12 +183,12 @@ namespace Voxelgine.Engine
 
 		public virtual void OnDeselected(ViewModel CurViewModel)
 		{
-			Console.WriteLine("Deselected '{0}'", Name);
+			Logging.WriteLine($"Deselected '{Name}'");
 		}
 
 		public virtual void OnLeftClick(InventoryClickEventArgs E)
 		{
-			Console.WriteLine("Left click '{0}'", Name);
+			Logging.WriteLine($"Left click '{Name}'");
 
 			if (UseViewmodel && (UseBlockIcon || (!UseBlockIcon && Icon == IconType.Hammer)))
 			{
@@ -196,11 +198,11 @@ namespace Voxelgine.Engine
 
 		public virtual void OnRightClick(InventoryClickEventArgs E)
 		{
-			Console.WriteLine("Right click '{0}'", Name);
+			Logging.WriteLine($"Right click '{Name}'");
 
 			if (UseViewmodel && UseBlockIcon && (Count > 0 || Count == -1))
 			{
-				Console.WriteLine("Use block: {0}", Name);
+				Logging.WriteLine($"Use block: {Name}");
 
 				if (PlaceBlock(E.Map, E.Start, E.Dir, E.MaxLen, BlockIcon))
 				{
@@ -285,7 +287,7 @@ namespace Voxelgine.Engine
 
 		public virtual void OnMiddleClick(InventoryClickEventArgs E)
 		{
-			Console.WriteLine("Middle click '{0}'", Name);
+			Logging.WriteLine($"Middle click '{Name}'");
 		}
 	}
 

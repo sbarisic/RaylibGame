@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Numerics;
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine {
@@ -31,6 +32,7 @@ namespace Voxelgine.Engine {
 	}
 
 	unsafe static class ResMgr {
+		public static IFishLogging Logging;
 		static FileSystemWatcher FSW;
 
 		static Dictionary<string, Texture2D> Textures = new Dictionary<string, Texture2D>();
@@ -69,10 +71,10 @@ namespace Voxelgine.Engine {
 						if ((DateTime.Now - R.LastUpdate).TotalSeconds > 1) {
 
 							try {
-								Console.WriteLine("Reloading shader '{0}'", FName);
+								Logging.WriteLine($"Reloading shader '{FName}'");
 								GetShader(FName, true);
 							} catch (Exception E) {
-								Console.WriteLine("Failed to reload shader: {0}", E.Message);
+								Logging.WriteLine($"Failed to reload shader: {E.Message}");
 							}
 						}
 					}

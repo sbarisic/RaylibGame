@@ -31,7 +31,7 @@ namespace RaylibGame.States
 
 		public NPCPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
-			_gui = new FishUIManager(window);
+			_gui = new FishUIManager(window, Eng.DI.GetRequiredService<IFishLogging>());
 
 			// Setup camera
 			_camera = new Camera3D(

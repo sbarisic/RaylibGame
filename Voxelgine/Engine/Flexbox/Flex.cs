@@ -1,7 +1,10 @@
-﻿namespace Flexbox
+﻿using Voxelgine.Engine.DI;
+
+namespace Flexbox
 {
     public partial class Flex
     {
+        public static IFishLogging Logging;
         //private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         // FloatsEqual returns true if floats are approx. equal
         public static bool FloatsEqual(float a, float b)
@@ -129,7 +132,7 @@
                 if (gPrintTree)
                 {
                     // NodePrint(node, PrintOptionsLayout|PrintOptionsChildren|PrintOptionsStyle);
-                    System.Console.WriteLine("NodePrint(node, PrintOptionsLayout|PrintOptionsChildren|PrintOptionsStyle);");
+                    Logging?.WriteLine("NodePrint(node, PrintOptionsLayout|PrintOptionsChildren|PrintOptionsStyle);");
                 }
             }
         }
@@ -3031,7 +3034,7 @@
                 if (gPrintChanges && gPrintSkips)
                 {
                     // fmt.Printf("%s%d.{[skipped] ", spacer(gDepth), gDepth);
-                    System.Console.WriteLine($"{spacer(gDepth)}{gDepth}.{{[skipped]");
+                    Logging?.WriteLine($"{spacer(gDepth)}{gDepth}.{{[skipped]");
                     if (node.printFunc != null)
                     {
                         node.printFunc(node);
@@ -3044,7 +3047,7 @@
                     //     cachedResults.computedWidth,
                     //     cachedResults.computedHeight,
                     //     reason);
-                    System.Console.WriteLine("wm: {0}, hm: {1}, aw: {2} ah: {3} => d: ({4}, {5}) {6}\n",
+                    Logging?.WriteLine(string.Format("wm: {0}, hm: {1}, aw: {2} ah: {3} => d: ({4}, {5}) {6}",
                         measureModeName(widthMeasureMode, performLayout),
                         measureModeName(heightMeasureMode, performLayout),
                         availableWidth,
@@ -3052,7 +3055,7 @@
                         cachedResults.computedWidth,
                         cachedResults.computedHeight,
                         reason
-                    );
+                    ));
                 }
             }
             else
@@ -3065,7 +3068,7 @@
                         s = "*";
                     }
                     // fmt.Printf("%s%d.{%s", spacer(gDepth), gDepth, s);
-                    System.Console.WriteLine($"{spacer(gDepth)}{gDepth}.{{{s}");
+                    Logging?.WriteLine($"{spacer(gDepth)}{gDepth}.{{{s}");
                     if (node.printFunc != null)
                     {
                         node.printFunc(node);
@@ -3076,13 +3079,13 @@
                     //     availableWidth,
                     //     availableHeight,
                     //     reason);
-                    System.Console.WriteLine("wm: {0}, hm: {1}, aw: {2} ah: {3} {4}\n",
+                    Logging?.WriteLine(string.Format("wm: {0}, hm: {1}, aw: {2} ah: {3} {4}",
                         measureModeName(widthMeasureMode, performLayout),
                         measureModeName(heightMeasureMode, performLayout),
                         availableWidth,
                         availableHeight,
                         reason
-                    );
+                    ));
                 }
 
                 nodelayoutImpl(node,
@@ -3104,7 +3107,7 @@
                         s = "*";
                     }
                     // fmt.Printf("%s%d.}%s", spacer(gDepth), gDepth, s);
-                    System.Console.WriteLine($"{spacer(gDepth)}{gDepth}.}}{s}");
+                    Logging?.WriteLine($"{spacer(gDepth)}{gDepth}.}}{s}");
                     if (node.printFunc != null)
                     {
                         node.printFunc(node);
@@ -3115,13 +3118,13 @@
                     //     layout.measuredDimensions[Dimension.Width],
                     //     layout.measuredDimensions[Dimension.Height],
                     //     reason);
-                    System.Console.WriteLine("wm: {0}, hm: {1}, d: ({2}, {3}) {4}\n",
+                    Logging?.WriteLine(string.Format("wm: {0}, hm: {1}, d: ({2}, {3}) {4}",
                         measureModeName(widthMeasureMode, performLayout),
                         measureModeName(heightMeasureMode, performLayout),
                         layout.measuredDimensions[(int)Dimension.Width],
                         layout.measuredDimensions[(int)Dimension.Height],
                         reason
-                    );
+                    ));
                 }
 
                 layout.lastParentDirection = parentDirection;
@@ -3132,7 +3135,7 @@
                     {
                         if (gPrintChanges)
                         {
-                            System.Console.WriteLine("Out of cache entries!\n");
+                            Logging?.WriteLine("Out of cache entries!");
                         }
                         layout.nextCachedMeasurementsIndex = 0;
                     }
@@ -3291,7 +3294,7 @@
 
         internal static void log(Node node, LogLevel level, string format, params object[] args)
         {
-            System.Console.WriteLine(format, args);
+            Logging?.WriteLine(string.Format(format, args));
         }
 
         internal static void assertCond(bool cond, string format, params object[] args)

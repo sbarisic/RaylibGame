@@ -186,7 +186,7 @@ namespace Voxelgine.Engine
 
 					if (Blk.Type == BlockType.CraftingTable)
 					{
-						Console.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
+						Logging.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
 						return;
 					}
 					Inventory.SelectNext();

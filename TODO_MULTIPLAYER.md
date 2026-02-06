@@ -121,6 +121,7 @@ Game Tick Flow (Client):
 | **PhysData** | Physics constants | Server sends PhysData on connect so all clients match |
 | **GameFrameInfo** | Frame interpolation struct | Extend for remote player interpolation |
 | **FishDI** | 7 singletons, local services | Add network services (NetServer/NetClient) as DI singletons |
+| **Project structure** | All code in single `Voxelgine` project with Raylib dependency | Split into `VoxelgineEngine` (Raylib-free library) + `Voxelgine` (client) + `VoxelgineServer` (headless). Projects already scaffolded. |
 | **Program.cs** | Single entry point, local game loop | Add CLI args for dedicated server mode; branch into server-only or client+server loop |
 | **GBuffer/Rendering** | Local rendering pipeline | No changes — client-only, server skips rendering |
 | **GUI/FishUI** | Local UI | Add multiplayer UI (server browser, player list, chat) — client-only |
@@ -143,11 +144,13 @@ Game Tick Flow (Client):
 
 - [ ] **ChunkMap: Block change tracking** — Add a `BlockChangeLog` to `ChunkMap` that records all `SetPlacedBlock` calls as `(Vector3Int position, BlockType newType, BlockType oldType)` entries. Provide `GetPendingChanges()` and `ClearPendingChanges()` methods. This is the foundation for delta world sync — server reads and broadcasts pending changes each tick. Does not affect existing save/load. **[CPX: 2]**
 
-### Medium Priority
-
 - [ ] **GameState: Separate simulation from presentation** — Introduce `GameSimulation` class that owns the authoritative game state: `ChunkMap`, `PlayerManager`, `EntityManager`, `DayNightCycle`, `PhysData`. `GameState` (the Raylib state) holds a `GameSimulation` reference plus client-only systems: `ParticleSystem`, `SoundMgr`, `FishUIManager`, `ViewModel`, rendering logic. This separation allows a headless server to run `GameSimulation` without any Raylib/rendering dependencies. Single-player creates both; dedicated server creates only `GameSimulation`. **[CPX: 5]**
 
-- [ ] **EntityManager: Network entity IDs** — Add `int NetworkId` property to `VoxEntity`. `EntityManager.Spawn()` assigns a unique network ID (server-authoritative counter). Add `GetEntityByNetworkId(int id)` lookup. Add `SpawnWithId(int networkId, VoxEntity entity)` for clients receiving server-spawned entities. This enables entity synchronization without relying on list indices. **[CPX: 2]**
+- [ ] **Project split: Move Raylib-independent code to VoxelgineEngine** — The `VoxelgineEngine` (class library) and `VoxelgineServer` (exe) projects already exist as empty scaffolds. Move all Raylib-independent code from `Voxelgine` into `VoxelgineEngine`; both `Voxelgine` (client) and `VoxelgineServer` reference it. **Phase 1 — pure logic (no Raylib imports):** DI interfaces (`IFishLogging`, `IFishConfig`, `IFishDebug`, `IFishClipboard`, `IFishProgram`), `FishDI`, physics (`AABB`, `PhysData`, `PhysicsUtils`, `Raycast`), data types (`PlacedBlock`, `BlockInfo`, `BlockLayout`), `SpatialHashGrid`, `Noise`, `Utils`, `ThreadWorker`, `GameFrameInfo`, `OnKeyPressedEventArg`, `SettingsHiddenAttribute`, pathfinding (`VoxelPathfinder`, `PathFollower`), animation data/logic (`AnimLerp`, `LerpManager`, `NPCAnimation`). **Phase 2 — needs Raylib abstraction/splitting (depends on earlier refactoring tasks):** `VoxEntity` (has Raylib `Model` field — extract rendering into client-side partial class), `ChunkMap`/`Chunk` (mixed logic/rendering — split into engine-side data+serialization+lighting and client-side mesh generation+rendering), `DayNightCycle` (uses Raylib `Color` — replace with `System.Numerics.Vector4` or custom struct), `GameConfig` (uses Raylib `KeyboardKey` — abstract key mapping), `EntityManager`, `Player` (core/physics/serialization vs rendering/input/GUI), weapons (logic vs visual effects), `NPCAnimator`/`BoneInformation` (may reference Raylib model types). Game must remain fully functional in single-player after the split. **[CPX: 5]**
+
+### Medium Priority
+
+- [ ] **EntityManager: Network entity IDs**
 
 - [ ] **Player.Serialization: Network snapshot format** — Extend player serialization with a lightweight `WriteSnapshot(BinaryWriter)`/`ReadSnapshot(BinaryReader)` that writes only the frequently-changing state (position, velocity, camera angle, animation state, current weapon index) in a compact binary format. The existing `Write()`/`Read()` remain for save files. Snapshot format includes a tick number for ordering. **[CPX: 2]**
 
@@ -364,7 +367,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Highest priority - split everything you can that is not Raylib-dependent into VoxelgineEngine project. The server does not need rendering functions.
+*No uncategorized items*
 
 ---
 
@@ -390,25 +393,27 @@ Game Tick Flow (Client):
 3. **InputMgr abstraction** → unblocks per-player input
 4. **ChunkMap block change tracking** → unblocks world delta sync
 5. **GameState simulation separation** → unblocks headless server
-6. **Entity network IDs** → unblocks entity sync
-7. **Serialization extensions** → unblocks network packets
-8. **UDP transport + packet framework** → networking foundation
-9. **Reliable delivery layer** → required for reliable messages
-10. **Connection manager** → required for server/client
-11. **NetServer + NetClient cores** → server and client networking
-12. **Server game loop + player management** → playable server
-13. **Client input sending + world loading** → client can connect and see world
-14. **Player position sync + remote rendering** → see other players
-15. **Client-side prediction + reconciliation** → responsive local movement
-16. **Remote player interpolation** → smooth remote player movement
-17. **Block sync + entity sync** → full world synchronization
-18. **Weapon fire authority** → combat works in multiplayer
-19. **Player health + respawn** → PvP gameplay
-20. **Chat + UI** → social features and menus
-21. **Listen server mode** → host-and-play
-22. **Bandwidth management + fragmentation** → production-ready networking
-23. **Testing tools** → network simulation, loopback
-24. **Documentation** → guides and references
+6. **Project split phase 1** → move pure-logic files to `VoxelgineEngine` (no Raylib imports)
+7. **Project split phase 2** → split mixed Raylib/logic classes, complete `VoxelgineEngine` migration
+8. **Entity network IDs** → unblocks entity sync
+9. **Serialization extensions** → unblocks network packets
+10. **UDP transport + packet framework** → networking foundation (in `VoxelgineEngine`)
+11. **Reliable delivery layer** → required for reliable messages
+12. **Connection manager** → required for server/client
+13. **NetServer + NetClient cores** → server and client networking
+14. **Server game loop + player management** → playable `VoxelgineServer`
+15. **Client input sending + world loading** → client can connect and see world
+16. **Player position sync + remote rendering** → see other players
+17. **Client-side prediction + reconciliation** → responsive local movement
+18. **Remote player interpolation** → smooth remote player movement
+19. **Block sync + entity sync** → full world synchronization
+20. **Weapon fire authority** → combat works in multiplayer
+21. **Player health + respawn** → PvP gameplay
+22. **Chat + UI** → social features and menus
+23. **Listen server mode** → host-and-play
+24. **Bandwidth management + fragmentation** → production-ready networking
+25. **Testing tools** → network simulation, loopback
+26. **Documentation** → guides and references
 
 ---
 

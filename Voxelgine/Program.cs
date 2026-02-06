@@ -69,9 +69,6 @@ namespace Voxelgine
 			ResMgr.Logging = Logging;
 			CustomModel.Logging = Logging;
 
-			// Apply mouse sensitivity from config
-			FPSCamera.MouseMoveSen = Cfg.MouseSensitivity;
-
 			//Window = new GameWindow(Cfg.WindowWidth, Cfg.WindowHeight, Cfg.Title);
 
 			IGameWindow Window = FDI.GetRequiredService<IGameWindow>();

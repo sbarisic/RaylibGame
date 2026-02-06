@@ -302,8 +302,8 @@ namespace Voxelgine.Engine
 			if (activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
 			{
 				LastSwimSound = LegTimer.ElapsedMilliseconds;
-				Vector3 Fwd = FPSCamera.GetForward();
-				Snd.PlayCombo("swim", FPSCamera.Position, Fwd, Position);
+				Vector3 Fwd = Camera.GetForward();
+				Snd.PlayCombo("swim", Camera.Position, Fwd, Position);
 			}
 
 			// --- Apply buoyancy and gravity in water ---
@@ -648,13 +648,13 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump)
 		{
-			Vector3 Fwd = FPSCamera.GetForward();
+			Vector3 Fwd = Camera.GetForward();
 			if (Walk)
 			{
 				if (LegTimer.ElapsedMilliseconds > LastWalkSound + 350)
 				{
 					LastWalkSound = LegTimer.ElapsedMilliseconds;
-					Snd.PlayCombo("walk", FPSCamera.Position, Fwd, Pos);
+					Snd.PlayCombo("walk", Camera.Position, Fwd, Pos);
 				}
 			}
 			else if (Jump)
@@ -662,7 +662,7 @@ namespace Voxelgine.Engine
 				if (LegTimer.ElapsedMilliseconds > LastJumpSound + 350)
 				{
 					LastJumpSound = LegTimer.ElapsedMilliseconds;
-					Snd.PlayCombo("jump", FPSCamera.Position, Fwd, Pos);
+					Snd.PlayCombo("jump", Camera.Position, Fwd, Pos);
 				}
 			}
 			else if (Feet && !Side)
@@ -670,7 +670,7 @@ namespace Voxelgine.Engine
 				if (LegTimer.ElapsedMilliseconds > LastCrashSound + 350)
 				{
 					LastCrashSound = LegTimer.ElapsedMilliseconds;
-					Snd.PlayCombo("crash1", FPSCamera.Position, Fwd, Pos);
+					Snd.PlayCombo("crash1", Camera.Position, Fwd, Pos);
 				}
 			}
 		}

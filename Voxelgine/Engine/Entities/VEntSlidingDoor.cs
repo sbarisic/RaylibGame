@@ -64,12 +64,12 @@ namespace Voxelgine.Engine
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
 			GameState gs = GetGameState();
-			if (gs?.Ply == null)
+			if (gs?.LocalPlayer == null)
 				return;
 
 			// Check distance to player
 			Vector3 doorCenter = Position + Size * 0.5f;
-			Vector3 playerPos = gs.Ply.Position;
+			Vector3 playerPos = gs.LocalPlayer.Position;
 			float distanceToPlayer = Vector3.Distance(doorCenter, playerPos);
 			bool playerInRange = distanceToPlayer <= TriggerRadius;
 

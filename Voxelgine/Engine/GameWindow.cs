@@ -346,14 +346,14 @@ namespace Voxelgine.Engine
 				return;
 
 			FInfo.Empty = false;
-			FInfo.Pos = FPSCamera.Position;
-			FInfo.Cam = GState.Ply.Cam;
-			FInfo.CamAngle = GState.Ply.GetCamAngle();
-			FInfo.FeetPosition = GState.Ply.FeetPosition;
+			FInfo.Pos = GState.LocalPlayer.Camera.Position;
+			FInfo.Cam = GState.LocalPlayer.Cam;
+			FInfo.CamAngle = GState.LocalPlayer.GetCamAngle();
+			FInfo.FeetPosition = GState.LocalPlayer.FeetPosition;
 			FInfo.Frustum = new Frustum(Eng, ref FInfo.Cam);
 
-			FInfo.ViewModelOffset = GState.Ply.ViewMdl.ViewModelOffset;
-			FInfo.ViewModelRot = GState.Ply.ViewMdl.VMRot;
+			FInfo.ViewModelOffset = GState.LocalPlayer.ViewMdl.ViewModelOffset;
+			FInfo.ViewModelRot = GState.LocalPlayer.ViewMdl.VMRot;
 		}
 
 		// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
@@ -370,19 +370,19 @@ namespace Voxelgine.Engine
 				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
 
 				// Apply interpolated camera to RenderCam only (don't modify physics Cam)
-				GS.Ply.RenderCam = Interp.Cam;
+				GS.LocalPlayer.RenderCam = Interp.Cam;
 				GS.PlayerCollisionBoxPos = Interp.FeetPosition;
 
 				// Apply interpolated view model offset (position calculated at draw time from camera + offset)
-				GS.Ply.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
-				GS.Ply.ViewMdl.VMRot = Interp.ViewModelRot;
+				GS.LocalPlayer.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
+				GS.LocalPlayer.ViewMdl.VMRot = Interp.ViewModelRot;
 			}
 			else
 			{
 				// First frame - use physics camera as render camera
 				if (State is GameState GS2)
 				{
-					GS2.Ply.RenderCam = GS2.Ply.Cam;
+					GS2.LocalPlayer.RenderCam = GS2.LocalPlayer.Cam;
 				}
 			}
 

@@ -34,6 +34,9 @@ namespace Voxelgine.Engine
 
 		FishUIManager GUI;
 
+		/// <summary>The first-person camera instance for this player.</summary>
+		public FPSCamera Camera;
+
 		/// <summary>The first-person view model (weapon/tool) renderer.</summary>
 		public ViewModel ViewMdl;
 
@@ -51,6 +54,9 @@ namespace Voxelgine.Engine
 		Vector3 PreviousPosition;
 		bool LocalPlayer;
 		SoundMgr Snd;
+
+		/// <summary>Unique player identifier. 0 for local player in single-player.</summary>
+		public int PlayerId { get; private set; }
 
 		/// <summary>Player collision cylinder height in world units.</summary>
 		public const float PlayerHeight = 1.7f;
@@ -80,13 +86,17 @@ namespace Voxelgine.Engine
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
 
-		public Player(IFishEngineRunner Eng, FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd)
+		public Player(IFishEngineRunner Eng, FishUIManager GUI, string ModelName, bool LocalPlayer, SoundMgr Snd, int playerId = 0)
 		{
 			this.Eng = Eng;
 			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 			this.GUI = GUI;
 			this.Snd = Snd;
 			this.LocalPlayer = LocalPlayer;
+			this.PlayerId = playerId;
+
+			var cfg = Eng.DI.GetRequiredService<IFishConfig>() as GameConfig;
+			Camera = new FPSCamera(cfg?.MouseSensitivity ?? 0.35f);
 
 			ViewMdl = new ViewModel(Eng);
 
@@ -98,7 +108,7 @@ namespace Voxelgine.Engine
 
 		public void SetPosition(int X, int Y, int Z)
 		{
-			Position = FPSCamera.Position = new Vector3(X, Y, Z);
+			Position = Camera.Position = new Vector3(X, Y, Z);
 			UpdateBoundingBox();
 		}
 
@@ -108,7 +118,7 @@ namespace Voxelgine.Engine
 				return;
 
 			PreviousPosition = Position;
-			Position = FPSCamera.Position = Pos;
+			Position = Camera.Position = Pos;
 			UpdateBoundingBox();
 		}
 
@@ -135,19 +145,19 @@ namespace Voxelgine.Engine
 
 		public void SetCamAngle(Vector3 CamAngle)
 		{
-			FPSCamera.CamAngle = CamAngle;
+			Camera.CamAngle = CamAngle;
 		}
 
 		public Vector3 GetCamAngle()
 		{
-			return FPSCamera.CamAngle;
+			return Camera.CamAngle;
 		}
 
 		public void UpdateFPSCamera(ref GameFrameInfo FInfo)
 		{
-			Fwd = FPSCamera.GetForward();
-			Left = FPSCamera.GetLeft();
-			Up = FPSCamera.GetUp();
+			Fwd = Camera.GetForward();
+			Left = Camera.GetLeft();
+			Up = Camera.GetUp();
 		}
 
 		/// <summary>

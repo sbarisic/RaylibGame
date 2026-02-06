@@ -38,11 +38,14 @@ namespace Voxelgine.States
 			get; private set;
 		}
 
-		/// <summary>The local player instance.</summary>
-		public Player Ply
+		/// <summary>Manages all players in the game.</summary>
+		public PlayerManager Players
 		{
 			get; private set;
 		}
+
+		/// <summary>Convenience property to get the local player instance.</summary>
+		public Player LocalPlayer => Players.LocalPlayer;
 
 		/// <summary>Positional audio manager.</summary>
 		public SoundMgr Snd
@@ -158,12 +161,14 @@ namespace Voxelgine.States
 
 
 			// ====================================== Init player ====================================================
-			Ply = new Player(Eng, GUI, "snoutx10k", true, Snd);
-			Ply.InitGUI(window, GUI);
-			Ply.Init(Map);
+			Players = new PlayerManager();
+			var ply = new Player(Eng, GUI, "snoutx10k", true, Snd, 0);
+			Players.AddLocalPlayer(0, ply);
+			ply.InitGUI(window, GUI);
+			ply.Init(Map);
 
 			// Connect menu toggle event
-			Ply.OnMenuToggled = (cursorDisabled) =>
+			ply.OnMenuToggled = (cursorDisabled) =>
 			{
 				//Console.WriteLine($"OnMenuToggled - {cursorDisabled}");
 
@@ -182,11 +187,11 @@ namespace Voxelgine.States
 			{
 				using var fileStream = File.OpenRead(PLAYER_FILE);
 				using var reader = new BinaryReader(fileStream);
-				Ply.Read(reader);
+				ply.Read(reader);
 			}
 			else
 			{
-				Ply.SetPosition(PlayerPos);
+				ply.SetPosition(PlayerPos);
 			}
 
 			CreateDebugMenu();
@@ -215,7 +220,7 @@ namespace Voxelgine.States
 			_debugMenu.OnClosed += (w) =>
 			{
 				_debugMenu.Visible = false;
-				Ply.ToggleMouse(false); // Re-lock cursor
+				LocalPlayer.ToggleMouse(false); // Re-lock cursor
 			};
 
 			var stack = new StackLayout
@@ -277,12 +282,12 @@ namespace Voxelgine.States
 
 			_noclipCheckbox = new CheckBox
 			{
-				IsChecked = Ply.NoClip,
+				IsChecked = LocalPlayer.NoClip,
 				Size = new Vector2(24, 24)
 			};
 			_noclipCheckbox.OnCheckedChanged += (sender, isChecked) =>
 			{
-				Ply.NoClip = isChecked;
+				LocalPlayer.NoClip = isChecked;
 			};
 			stack.AddChild(_noclipCheckbox);
 
@@ -356,7 +361,7 @@ namespace Voxelgine.States
 			btnRegen.Clicked += (sender, args) =>
 			{
 				Map.GenerateFloatingIsland(ISLAND_SIZE, ISLAND_SIZE);
-				Ply.SetPosition(PlayerPos);
+				LocalPlayer.SetPosition(PlayerPos);
 				Logging.WriteLine("World regenerated!");
 			};
 			stack.AddChild(btnRegen);
@@ -371,7 +376,7 @@ namespace Voxelgine.States
 			{
 				if (_testNpc != null)
 				{
-					bool pathFound = _testNpc.NavigateTo(Ply.Position);
+					bool pathFound = _testNpc.NavigateTo(LocalPlayer.Position);
 					Logging.WriteLine(pathFound ? "NPC navigating to player!" : "NPC could not find path to player!");
 				}
 			};
@@ -417,7 +422,7 @@ namespace Voxelgine.States
 			using (var fileStream = File.Create(PLAYER_FILE))
 			using (var writer = new BinaryWriter(fileStream))
 			{
-				Ply.Write(writer);
+				LocalPlayer.Write(writer);
 			}
 		}
 
@@ -432,7 +437,7 @@ namespace Voxelgine.States
 			{
 				using var fileStream = File.OpenRead(PLAYER_FILE);
 				using var reader = new BinaryReader(fileStream);
-				Ply.Read(reader);
+				LocalPlayer.Read(reader);
 			}
 		}
 
@@ -456,7 +461,7 @@ namespace Voxelgine.States
 		public override void OnResize(GameWindow Window)
 		{
 			base.OnResize(Window);
-			Ply.RecalcGUI(Window);
+			LocalPlayer.RecalcGUI(Window);
 		}
 
 		public override void Tick(float GameTime)
@@ -489,20 +494,20 @@ namespace Voxelgine.States
 
 			// Update game systems
 			Map.Tick();
-			Ply.Tick(Window.InMgr);
-			Ply.TickGUI(Window.InMgr, Map);
-			Ply.UpdateGUI();
+			LocalPlayer.Tick(Window.InMgr);
+			LocalPlayer.TickGUI(Window.InMgr, Map);
+			LocalPlayer.UpdateGUI();
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
 		{
-			Ply.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
+			LocalPlayer.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
 			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
 		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
 		{
-			Ply.UpdateFPSCamera(ref FInfo);
+			LocalPlayer.UpdateFPSCamera(ref FInfo);
 
 			// Use sky color from day/night cycle
 			Raylib.ClearBackground(DayNight.SkyColor);
@@ -511,7 +516,7 @@ namespace Voxelgine.States
 			CalculateCelestialPositions();
 			DrawCelestialBodies();
 
-			Raylib.BeginMode3D(Ply.RenderCam); // Use interpolated render camera
+			Raylib.BeginMode3D(LocalPlayer.RenderCam); // Use interpolated render camera
 
 			Shader defaultShader = ResMgr.GetShader("default");
 			Raylib.BeginShaderMode(defaultShader);
@@ -598,7 +603,7 @@ namespace Voxelgine.States
 		private void DrawUnderwaterOverlay()
 		{
 			// Check if player's eye position is inside a water block
-			BlockType blockAtCamera = Map.GetBlock(Ply.Position);
+			BlockType blockAtCamera = Map.GetBlock(LocalPlayer.Position);
 			if (blockAtCamera != BlockType.Water)
 				return;
 
@@ -638,8 +643,8 @@ namespace Voxelgine.States
 
 		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
 		{
-			if (!Ply.FreezeFrustum)
-				ViewFrustum = new Frustum(Eng, ref Ply.Cam);
+			if (!LocalPlayer.FreezeFrustum)
+				ViewFrustum = new Frustum(Eng, ref LocalPlayer.Cam);
 
 			// Draw world geometry
 			Map.Draw(ref ViewFrustum);
@@ -654,9 +659,9 @@ namespace Voxelgine.States
 			DrawTransparent();
 
 			// Draw particles BEFORE transparent blocks so they appear behind glass/water
-			Particle.Draw(Ply, ref ViewFrustum);
+			Particle.Draw(LocalPlayer, ref ViewFrustum);
 
-			Ply.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
+			LocalPlayer.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
 
 		}
 
@@ -707,16 +712,16 @@ namespace Voxelgine.States
 			if (DayNight.SunElevation > 0 && _sunTexture.HasValue)
 			{
 				Vector3 sunDir = DayNight.GetSunDirection();
-				Vector3 sunWorldPos = Ply.RenderCam.Position + sunDir * CelestialDistance;
+				Vector3 sunWorldPos = LocalPlayer.RenderCam.Position + sunDir * CelestialDistance;
 
 				// Check if sun is in front of camera
-				Vector3 toSun = Vector3.Normalize(sunWorldPos - Ply.RenderCam.Position);
-				Vector3 camForward = Vector3.Normalize(Ply.RenderCam.Target - Ply.RenderCam.Position);
+				Vector3 toSun = Vector3.Normalize(sunWorldPos - LocalPlayer.RenderCam.Position);
+				Vector3 camForward = Vector3.Normalize(LocalPlayer.RenderCam.Target - LocalPlayer.RenderCam.Position);
 				float dot = Vector3.Dot(toSun, camForward);
 
 				if (dot > 0) // Sun is in front of camera
 				{
-					_sunScreenPos = Raylib.GetWorldToScreen(sunWorldPos, Ply.RenderCam);
+					_sunScreenPos = Raylib.GetWorldToScreen(sunWorldPos, LocalPlayer.RenderCam);
 
 					// Sun size (larger when near horizon for dramatic effect)
 					float horizonScale = 1f + (1f - Math.Min(1f, DayNight.SunElevation / 0.5f)) * 0.3f;
@@ -741,16 +746,16 @@ namespace Voxelgine.States
 					cosElev * MathF.Sin(moonAzimuth)
 				);
 
-				Vector3 moonWorldPos = Ply.RenderCam.Position + moonDir * CelestialDistance;
+				Vector3 moonWorldPos = LocalPlayer.RenderCam.Position + moonDir * CelestialDistance;
 
 				// Check if moon is in front of camera
-				Vector3 toMoon = Vector3.Normalize(moonWorldPos - Ply.RenderCam.Position);
-				Vector3 camForward = Vector3.Normalize(Ply.RenderCam.Target - Ply.RenderCam.Position);
+				Vector3 toMoon = Vector3.Normalize(moonWorldPos - LocalPlayer.RenderCam.Position);
+				Vector3 camForward = Vector3.Normalize(LocalPlayer.RenderCam.Target - LocalPlayer.RenderCam.Position);
 				float dot = Vector3.Dot(toMoon, camForward);
 
 				if (dot > 0) // Moon is in front of camera
 				{
-					_moonScreenPos = Raylib.GetWorldToScreen(moonWorldPos, Ply.RenderCam);
+					_moonScreenPos = Raylib.GetWorldToScreen(moonWorldPos, LocalPlayer.RenderCam);
 					_moonScreenSize = BaseMoonScreenSize;
 					_moonVisible = true;
 				}
@@ -760,7 +765,7 @@ namespace Voxelgine.States
 		private void DrawTransparent()
 		{
 			// Transparent rendering now handled inside ChunkMap with depth sorting
-			Map.DrawTransparent(ref ViewFrustum, Ply.Position);
+			Map.DrawTransparent(ref ViewFrustum, LocalPlayer.Position);
 		}
 
 		private void DrawDebugLines()
@@ -808,7 +813,7 @@ namespace Voxelgine.States
 		private void DrawBlockPlacementPreview()
 		{
 			// Get the active inventory item
-			InventoryItem activeItem = Ply.GetActiveItem();
+			InventoryItem activeItem = LocalPlayer.GetActiveItem();
 			if (activeItem == null)
 				return;
 
@@ -816,8 +821,8 @@ namespace Voxelgine.States
 				return;
 
 			// Calculate where the block would be placed
-			Vector3 start = Ply.Position;
-			Vector3 dir = Ply.GetForward();
+			Vector3 start = LocalPlayer.Position;
+			Vector3 dir = LocalPlayer.GetForward();
 			const float maxLen = 20f;
 
 			Vector3? placementPos = activeItem.GetBlockPlacementPosition(Map, start, dir, maxLen);
@@ -945,7 +950,7 @@ namespace Voxelgine.States
 			// Save player
 			using FileStream fileStream = File.Open(PLAYER_FILE, FileMode.Create, FileAccess.Write);
 			using BinaryWriter writer = new BinaryWriter(fileStream);
-			Ply.Write(writer);
+			LocalPlayer.Write(writer);
 
 			Logging.WriteLine("Save complete!");
 		}

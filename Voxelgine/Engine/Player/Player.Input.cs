@@ -64,7 +64,7 @@ namespace Voxelgine.Engine
 			{
 				Raylib_cs.Raylib.DisableCursor();
 
-				Vector2 MPos = FPSCamera.GetPreviousMousePos();
+				Vector2 MPos = Camera.GetPreviousMousePos();
 				Raylib_cs.Raylib.SetMousePosition((int)MPos.X, (int)MPos.Y);
 			}
 
@@ -74,7 +74,7 @@ namespace Voxelgine.Engine
 		public void Tick(InputMgr InMgr)
 		{
 			ActiveSelection?.Tick(ViewMdl, InMgr);
-			FPSCamera.Update(CursorDisabled, ref Cam);
+			Camera.Update(CursorDisabled, ref Cam);
 
 			// Use InputMgr for F1
 			if (InMgr.IsInputPressed(InputKey.F1))
@@ -90,7 +90,7 @@ namespace Voxelgine.Engine
 					KV.Value(new OnKeyPressedEventArg(KV.Key));
 			}
 
-			Position = FPSCamera.Position;
+			Position = Camera.Position;
 
 			ViewMdl.Update(this);
 		}

@@ -1,39 +1,34 @@
 ﻿using Raylib_cs;
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-
-using Voxelgine.Graphics;
-
-
 
 namespace Voxelgine.Engine {
-	static class FPSCamera {
-		//const bool UseCameraMove = false;
-
-		public static float MouseMoveSen = 0.35f; // Default sensitivity (can be modified at runtime)
+	public class FPSCamera {
 		const float PlyMoveSen = 0.2f;
 		const float FocusDist = 25.0f;
 
-		static Vector2 MousePrev;
-		static bool MousePrevInit = false;
+		static readonly Vector3 UpNormal = Vector3.UnitY;
+		static readonly Vector3 LeftNormal = Vector3.UnitX;
+		static readonly Vector3 ForwardNormal = Vector3.UnitZ;
 
-		public static Vector3 CamAngle;
-		public static Vector3 Position;
+		public float MouseMoveSen = 0.35f;
 
-		static Vector3 UpNormal = Vector3.UnitY;
-		static Vector3 LeftNormal = Vector3.UnitX;
-		static Vector3 ForwardNormal = Vector3.UnitZ;
+		Vector2 MousePrev;
+		bool MousePrevInit = false;
 
-		public static Vector2 GetPreviousMousePos() {
+		public Vector3 CamAngle;
+		public Vector3 Position;
+
+		public FPSCamera(float mouseSensitivity = 0.35f) {
+			MouseMoveSen = mouseSensitivity;
+		}
+
+		public Vector2 GetPreviousMousePos() {
 			return MousePrev;
 		}
 
-		public static void Update(bool HandleRotation, ref Camera3D Cam) {
+		public void Update(bool HandleRotation, ref Camera3D Cam) {
 			Vector2 MousePos = new Vector2(Raylib.GetMouseX(), Raylib.GetMouseY());
 
 			if (!HandleRotation) {
@@ -65,29 +60,26 @@ namespace Voxelgine.Engine {
 
 			Cam.Position = Position;
 			Cam.Target = Position + (Forward * FocusDist);
-
-			//Frustum F = new Frustum(ref Cam);
-			//Console.WriteLine(F.ToString());
 		}
 
-		public static Matrix4x4 GetRotationMatrix() {
+		public Matrix4x4 GetRotationMatrix() {
 			Vector3 CamAngleRad = CamAngle * ((float)Math.PI / 180.0f);
 			return Matrix4x4.CreateFromYawPitchRoll(CamAngleRad.X, CamAngleRad.Y, CamAngleRad.Z);
 		}
 
-		public static Vector3 GetForward() {
+		public Vector3 GetForward() {
 			return Vector3.Transform(ForwardNormal, GetRotationMatrix());
 		}
 
-		public static Vector3 GetLeft() {
+		public Vector3 GetLeft() {
 			return Vector3.Transform(LeftNormal, GetRotationMatrix());
 		}
 
-		public static Vector3 GetUp() {
+		public Vector3 GetUp() {
 			return Vector3.Transform(UpNormal, GetRotationMatrix());
 		}
 
-		public static void LookAt(Vector3 Target) {
+		public void LookAt(Vector3 Target) {
 			CamAngle = Utils.EulerBetweenVectors(Position, Target);
 		}
 	}

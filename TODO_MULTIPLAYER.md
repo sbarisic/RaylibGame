@@ -107,8 +107,8 @@ Game Tick Flow (Client):
 
 | System | Multiplayer Impact | Refactoring Needed |
 |--------|-------------------|-------------------|
-| **FPSCamera** | Currently fully static — cannot support multiple players | Convert to instance-based; local player uses instance, remote players track angle without FPSCamera |
-| **Player** | Single instance in `GameState.Ply` — need player list | Add `PlayerManager`, player ID, remote player representation |
+| **FPSCamera** | ✅ Converted to instance-based — owned by `Player.Camera` | Each player has own `FPSCamera` instance; remote players can track angle independently |
+| **Player** | ✅ `PlayerManager` with `Dictionary<int, Player>`, `PlayerId` on Player, `GameState.LocalPlayer` convenience property | `GameState.Ply` replaced with `Players.LocalPlayer`; all callers updated |
 | **InputMgr** | Polls Raylib directly — server needs networked input | Abstract input source; local reads Raylib, remote reads from network packets |
 | **GameState** | Owns all systems as single instance | Split into shared simulation state and client presentation state |
 | **EntityManager** | Single instance, no network IDs | Add network entity IDs, sync entity spawn/remove |
@@ -136,11 +136,7 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **FPSCamera: Convert from static to instance-based** — Refactor `FPSCamera` from a static class to an instantiable class. Move all static fields (`Position`, `CamAngle`, `MousePrev`, `MousePrevInit`, `MouseMoveSen`) to instance fields. Update `Update()`, `GetForward()`, `GetLeft()`, `GetUp()`, `GetRotationMatrix()`, `LookAt()` to use instance state. Update all references in `Player`, `Player.Physics`, `Player.Input`, `Player.Serialization`, `GameState`, `WeaponGun`, `ViewModel`, and any other callers to use an `FPSCamera` instance (owned by `Player`). The static directional normals (`UpNormal`, `LeftNormal`, `ForwardNormal`) and constants (`PlyMoveSen`, `FocusDist`) can remain static/const. **[CPX: 4]**
-
-- [ ] **Player: Add player ID and PlayerManager** — Add `int PlayerId` property to `Player`. Create `PlayerManager` class that holds a `Dictionary<int, Player>` of all players. `GameState` replaces `Player Ply` with `PlayerManager Players` and has a `LocalPlayer` convenience property pointing to the local player instance. Provide `GetPlayer(id)`, `AddPlayer(id, name)`, `RemovePlayer(id)`, `GetAllPlayers()`, and `GetLocalPlayer()`. Update all `GameState.Ply` references to use `Players.LocalPlayer`. Single-player creates one player with ID 0. **[CPX: 4]**
-
-- [ ] **InputMgr: Abstract input source** — Create `IInputSource` interface with `InputState GetCurrentState()`. Implement `LocalInputSource` that wraps the current Raylib polling logic. Implement `NetworkInputSource` (stub for now) that stores the last received `InputState`. `InputMgr` takes an `IInputSource` parameter or has `SetInputSource()`. Player references its own `InputMgr` (or input source) so each player can have different input. For single-player, the local player uses `LocalInputSource`. **[CPX: 3]**
+- [ ] **InputMgr: Abstract input source**
 
 - [ ] **ChunkMap: Block change tracking** — Add a `BlockChangeLog` to `ChunkMap` that records all `SetPlacedBlock` calls as `(Vector3Int position, BlockType newType, BlockType oldType)` entries. Provide `GetPendingChanges()` and `ClearPendingChanges()` methods. This is the foundation for delta world sync — server reads and broadcasts pending changes each tick. Does not affect existing save/load. **[CPX: 2]**
 
@@ -388,8 +384,8 @@ Game Tick Flow (Client):
 
 ## Suggested Implementation Order
 
-1. **FPSCamera instance refactoring** → unblocks multiple player support
-2. **Player ID + PlayerManager** → unblocks player management
+1. ~~**FPSCamera instance refactoring**~~ → ✅ Done
+2. ~~**Player ID + PlayerManager**~~ → ✅ Done
 3. **InputMgr abstraction** → unblocks per-player input
 4. **ChunkMap block change tracking** → unblocks world delta sync
 5. **GameState simulation separation** → unblocks headless server
@@ -419,4 +415,5 @@ Game Tick Flow (Client):
 
 ## Completed
 
-*No completed items yet.*
+- **FPSCamera: Convert from static to instance-based** — Refactored `FPSCamera` to instantiable class with instance fields. `Player` owns `Camera` field, created in constructor with config sensitivity. Updated all references in `Player.cs`, `Player.Input.cs`, `Player.Physics.cs`, `GameWindow.cs`, `Program.cs`. Build verified.
+- **Player: Add player ID and PlayerManager** — Added `int PlayerId` property to `Player` (constructor parameter, default 0). Created `PlayerManager` class with `Dictionary<int, Player>`, `AddPlayer()`, `AddLocalPlayer()`, `RemovePlayer()`, `GetPlayer()`, `GetAllPlayers()`, `GetLocalPlayer()`, and `LocalPlayer` convenience property. `GameState` now holds `PlayerManager Players` with `LocalPlayer` shortcut property. All `Ply` references updated across `GameState.cs`, `GameWindow.cs`, `EntityManager.cs`, `VEntSlidingDoor.cs`. Single-player creates player with ID 0. Build verified.

@@ -53,16 +53,16 @@ namespace Voxelgine.Engine
 			Ent.Position = PhysicsUtils.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
 			// --- Player collision check using AABB ---
-			if (GS?.Ply != null)
+			if (GS?.LocalPlayer != null)
 			{
-				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(GS.Ply.Position);
+				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(GS.LocalPlayer.Position);
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
 
 				bool touching = playerAABB.Overlaps(entityAABB);
 
 				if (touching && !Ent._WasPlayerTouching)
 				{
-					Ent.OnPlayerTouch(GS.Ply);
+					Ent.OnPlayerTouch(GS.LocalPlayer);
 					Ent._WasPlayerTouching = true;
 				}
 				else if (!touching)

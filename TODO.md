@@ -40,6 +40,7 @@ A list of planned features, improvements, and tasks for this project.
 | **NPC/AI** | ⬜ | Basic `VEntNPC` exists, no AI/pathfinding |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented |
+| **Multiplayer** | ⬜ | Architecture planned — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) |
 
 Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
@@ -49,7 +50,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+*No high priority items — Multiplayer and Mod System tracked in [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) and [TODO_MODS.md](TODO_MODS.md)*
 
 ### Medium Priority
 
@@ -60,12 +61,10 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Lower Priority
 
 - [ ] **Voxel World: Procedural world generation, floating islands, but not infinite. There should be a single but big floating island. Maybe a few other floating islands stacked vertically? Trees, water, caves...**
-- [ ] **Mod System: Expose functionality** — Create mod API exposing game systems for external mods, create a separate category with all the planned subtasks, analyze the project before making decisions **[CPX: 5]**
 
 ### On Hold
 
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
-- [ ] **Mod System: Example mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 
 ---
 
@@ -88,10 +87,13 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ## Documentation
 
+### High Priority
+
+*No high priority items*
+
 ### Medium Priority
 
 - [ ] **README.md update** — Update with newest project changes, architecture overview and project status table **[CPX: 2]**
-- [ ] **WORLDBUILDING.md: Multiplayer review** — Analyze and update worldbuilding document for multiplayer support (up to 10 players), consider cooperative/competitive elements, shared resources, base building **[CPX: 2]**
 
 ### Lower Priority
 

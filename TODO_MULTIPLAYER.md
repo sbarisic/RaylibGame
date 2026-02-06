@@ -109,7 +109,7 @@ Game Tick Flow (Client):
 |--------|-------------------|-------------------|
 | **FPSCamera** | ✅ Converted to instance-based — owned by `Player.Camera` | Each player has own `FPSCamera` instance; remote players can track angle independently |
 | **Player** | ✅ `PlayerManager` with `Dictionary<int, Player>`, `PlayerId` on Player, `GameState.LocalPlayer` convenience property | `GameState.Ply` replaced with `Players.LocalPlayer`; all callers updated |
-| **InputMgr** | Polls Raylib directly — server needs networked input | Abstract input source; local reads Raylib, remote reads from network packets |
+| **InputMgr** | ✅ Abstracted via `IInputSource` interface — `LocalInputSource` (Raylib), `NetworkInputSource` (stub) | `InputMgr` no longer has Raylib dependency; takes `IInputSource` in constructor, `SetInputSource()` for swapping |
 | **GameState** | Owns all systems as single instance | Split into shared simulation state and client presentation state |
 | **EntityManager** | Single instance, no network IDs | Add network entity IDs, sync entity spawn/remove |
 | **ChunkMap** | Single instance, no change tracking | Add block change event/log for delta sync |
@@ -136,9 +136,7 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **InputMgr: Abstract input source**
-
-- [ ] **ChunkMap: Block change tracking** — Add a `BlockChangeLog` to `ChunkMap` that records all `SetPlacedBlock` calls as `(Vector3Int position, BlockType newType, BlockType oldType)` entries. Provide `GetPendingChanges()` and `ClearPendingChanges()` methods. This is the foundation for delta world sync — server reads and broadcasts pending changes each tick. Does not affect existing save/load. **[CPX: 2]**
+- [ ] **ChunkMap: Block change tracking**
 
 - [ ] **GameState: Separate simulation from presentation** — Introduce `GameSimulation` class that owns the authoritative game state: `ChunkMap`, `PlayerManager`, `EntityManager`, `DayNightCycle`, `PhysData`. `GameState` (the Raylib state) holds a `GameSimulation` reference plus client-only systems: `ParticleSystem`, `SoundMgr`, `FishUIManager`, `ViewModel`, rendering logic. This separation allows a headless server to run `GameSimulation` without any Raylib/rendering dependencies. Single-player creates both; dedicated server creates only `GameSimulation`. **[CPX: 5]**
 
@@ -386,7 +384,7 @@ Game Tick Flow (Client):
 
 1. ~~**FPSCamera instance refactoring**~~ → ✅ Done
 2. ~~**Player ID + PlayerManager**~~ → ✅ Done
-3. **InputMgr abstraction** → unblocks per-player input
+3. ~~**InputMgr abstraction**~~ → ✅ Done
 4. **ChunkMap block change tracking** → unblocks world delta sync
 5. **GameState simulation separation** → unblocks headless server
 6. **Project split phase 1** → move pure-logic files to `VoxelgineEngine` (no Raylib imports)
@@ -417,3 +415,4 @@ Game Tick Flow (Client):
 
 - **FPSCamera: Convert from static to instance-based** — Refactored `FPSCamera` to instantiable class with instance fields. `Player` owns `Camera` field, created in constructor with config sensitivity. Updated all references in `Player.cs`, `Player.Input.cs`, `Player.Physics.cs`, `GameWindow.cs`, `Program.cs`. Build verified.
 - **Player: Add player ID and PlayerManager** — Added `int PlayerId` property to `Player` (constructor parameter, default 0). Created `PlayerManager` class with `Dictionary<int, Player>`, `AddPlayer()`, `AddLocalPlayer()`, `RemovePlayer()`, `GetPlayer()`, `GetAllPlayers()`, `GetLocalPlayer()`, and `LocalPlayer` convenience property. `GameState` now holds `PlayerManager Players` with `LocalPlayer` shortcut property. All `Ply` references updated across `GameState.cs`, `GameWindow.cs`, `EntityManager.cs`, `VEntSlidingDoor.cs`. Single-player creates player with ID 0. Build verified.
+- **InputMgr: Abstract input source** — Created `IInputSource` interface with `Poll(float gameTime)` method. Implemented `LocalInputSource` (wraps Raylib keyboard/mouse polling via `GameConfig` key mappings) and `NetworkInputSource` stub (stores last received `InputState` from network). Refactored `InputMgr` to take `IInputSource` in constructor with `SetInputSource()` for runtime swapping. Moved Raylib polling out of `InputMgr` — it now has zero Raylib dependency. `GameWindow` creates `LocalInputSource` and passes it to `InputMgr`. All existing consumers unchanged. Build verified.

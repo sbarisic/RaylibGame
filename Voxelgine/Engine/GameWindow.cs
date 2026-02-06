@@ -189,7 +189,7 @@ namespace Voxelgine.Engine
 
 			Raylib.SetWindowFocused();
 
-			InMgr = new InputMgr(Eng);
+			InMgr = new InputMgr(new LocalInputSource(Eng));
 
 			HasWindowRT = true;
 			ReloadRT();

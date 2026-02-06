@@ -74,7 +74,7 @@ namespace Voxelgine.Engine
 		public void Tick(InputMgr InMgr)
 		{
 			ActiveSelection?.Tick(ViewMdl, InMgr);
-			Camera.Update(CursorDisabled, ref Cam);
+			Camera.Update(CursorDisabled, ref Cam, InMgr.GetMousePos());
 
 			// Use InputMgr for F1
 			if (InMgr.IsInputPressed(InputKey.F1))

@@ -5,9 +5,6 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-using Raylib_cs;
-using Voxelgine.Engine.DI;
-
 namespace Voxelgine.Engine
 {
 	public enum InputKey : int
@@ -85,41 +82,25 @@ namespace Voxelgine.Engine
 	{
 		InputState InputState_Cur;
 		InputState InputState_Last;
-		IFishEngineRunner Eng;
+		IInputSource _inputSource;
 
-		public InputMgr(IFishEngineRunner Eng)
+		public InputMgr(IInputSource inputSource)
 		{
-			this.Eng = Eng;
+			_inputSource = inputSource;
+		}
+
+		/// <summary>
+		/// Replaces the current input source. Used to switch between local and network input.
+		/// </summary>
+		public void SetInputSource(IInputSource inputSource)
+		{
+			_inputSource = inputSource;
 		}
 
 		public void Tick(float GameTime)
 		{
 			InputState_Last = InputState_Cur;
-			InputState_Cur = new InputState();
-			InputState_Cur.GameTime = GameTime;
-
-			// TODO: Input mapping
-
-			InputState_Cur.MousePos = Raylib.GetMousePosition();
-			InputState_Cur.MouseWheel = Raylib.GetMouseWheelMove();
-
-			for (int i = 0; i < Eng.DI.GetRequiredService<GameConfig>().MouseButtonDown.Length; i++)
-			{
-				var KV = Eng.DI.GetRequiredService<GameConfig>().MouseButtonDown[i];
-				InputState_Cur.KeysDown[(int)KV.Key] = Raylib.IsMouseButtonDown(KV.Value);
-			}
-
-			for (int i = 0; i < Eng.DI.GetRequiredService<GameConfig>().KeyDown.Length; i++)
-			{
-				var KV = Eng.DI.GetRequiredService<GameConfig>().KeyDown[i];
-				InputState_Cur.KeysDown[(int)KV.Key] = Raylib.IsKeyDown(KV.Value);
-			}
-
-			for (int i = 0; i < Eng.DI.GetRequiredService<GameConfig>().TwoKeysDown.Length; i++)
-			{
-				var KV = Eng.DI.GetRequiredService<GameConfig>().TwoKeysDown[i];
-				InputState_Cur.KeysDown[(int)KV.Key] = Raylib.IsKeyDown(KV.Value.Key) || Raylib.IsKeyDown(KV.Value.Value);
-			}
+			InputState_Cur = _inputSource.Poll(GameTime);
 		}
 
 		public bool IsInputPressed(InputKey K)

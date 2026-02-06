@@ -1,7 +1,6 @@
-﻿using Raylib_cs;
-
-using System;
+﻿using System;
 using System.Numerics;
+using Raylib_cs;
 
 namespace Voxelgine.Engine {
 	public class FPSCamera {
@@ -28,20 +27,18 @@ namespace Voxelgine.Engine {
 			return MousePrev;
 		}
 
-		public void Update(bool HandleRotation, ref Camera3D Cam) {
-			Vector2 MousePos = new Vector2(Raylib.GetMouseX(), Raylib.GetMouseY());
-
+		public void Update(bool HandleRotation, ref Camera3D Cam, Vector2 mousePos) {
 			if (!HandleRotation) {
-				MousePos = MousePrev;
+				mousePos = MousePrev;
 			}
 
 			if (!MousePrevInit) {
 				MousePrevInit = true;
-				MousePrev = MousePos;
+				MousePrev = mousePos;
 			}
 
-			Vector2 MouseDelta = MousePos - MousePrev;
-			MousePrev = MousePos;
+			Vector2 MouseDelta = mousePos - MousePrev;
+			MousePrev = mousePos;
 
 			CamAngle += new Vector3(-MouseDelta.X, MouseDelta.Y, 0) * MouseMoveSen;
 

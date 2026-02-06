@@ -78,3 +78,4 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Player class file split** â€” Split `Player.cs` into 6 partial class files: `Player.cs` (core), `Player.Physics.cs`, `Player.Input.cs`, `Player.GUI.cs`, `Player.Rendering.cs`, `Player.Serialization.cs`
 - **Chunk class file split** â€” Split `Chunk` into 6 partial class files: `Chunk.Base.cs` (core), `Chunk.Lighting.cs`, `Chunk.Rendering.cs`, `Chunk.Serialization.cs`, `Chunk.GenMesh.cs` (opaque), `Chunk.GenMeshTransparent.cs` (transparent)
 - **Particles: Transparent block sorting** — Fixed particles rendering in front of glass/water by reordering draw calls: particles now render before transparent blocks
+- **Logging: Replace Console.* with IFishLogging** — Replaced all `Console.WriteLine` calls with `IFishLogging.WriteLine` via DI across all engine files. Removed unused Flexbox library. Updated README.md.

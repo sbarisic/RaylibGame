@@ -22,6 +22,8 @@ Players can explore, build, and modify a procedurally generated floating island 
 - **Particle System** — Smoke and visual effects with depth-sorted rendering
 - **FishUI-Based GUI** — Custom inventory, item boxes, and in-game menus
 - **Save/Load System** — GZip-compressed world and player state persistence
+- **Dependency Injection** — `FishDI` container with interface-based services (`IFishLogging`, `IFishConfig`, `IFishDebug`, etc.)
+- **Structured Logging** — `IFishLogging` with timestamped file output and console mirroring, replacing all direct `Console.*` calls
 - **Hot-Reload Shaders** — Edit shaders at runtime for rapid iteration
 - **Frame Interpolation** — Smooth camera and position rendering independent of physics tick rate
 
@@ -53,6 +55,8 @@ RaylibGame.sln
 | **SoundMgr** | `SoundMgr.cs` | Positional audio, sound combos (randomized effects) |
 | **ResMgr** | `ResMgr.cs` | Resource loading (textures, models, shaders) with hot-reload |
 | **GameConfig** | `GameConfig.cs` | JSON-based configuration (resolution, vsync, sensitivity) |
+| **FishDI** | `Engine/DI/FishDI.cs` | Dependency injection container (singleton/scoped/transient services) |
+| **FishLogging** | `Engine/FishLogging.cs` | Timestamped file + console logging via `IFishLogging` interface |
 
 ### Graphics Pipeline
 
@@ -166,7 +170,7 @@ dotnet test
 
 | System | Status | Notes |
 |--------|--------|-------|
-| Core Engine | ✅ Complete | Window, input, audio, resources |
+| Core Engine | ✅ Complete | Window, input, audio, resources, DI, logging |
 | Graphics | ✅ Complete | Chunks, lighting, frustum culling |
 | Voxel World | ✅ Complete | Generation, block types, dual lighting |
 | Player | ✅ Complete | Movement, physics, inventory |

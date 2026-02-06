@@ -27,7 +27,7 @@ A list of planned features, improvements, and tasks for this project.
 
 | System | Status | Description |
 |--------|--------|-------------|
-| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr` |
+| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr`, `FishDI`, `FishLogging` |
 | **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
 | **Voxel World** | ✅ | Procedural island generation via simplex noise, block types, dual-channel lighting (skylight/block light) |
 | **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
@@ -105,9 +105,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-#### High Priority
-
-- [ ] **Logging: Replace Console.* with IFishLogging** — Replace all `Console.WriteLine`/`Console.Write` calls with `IFishLogging.WriteLine` via DI across ~10 files (`InventoryItem.cs`, `WeaponGun.cs`, `WeaponPicker.cs`, `GraphicsUtils.cs`, `Chunk.GenMesh.cs`, `Chunk.Rendering.cs`, `FishUIManager.cs`, `RaylibFishUIEvents.cs`, `GameState.cs`, `MainMenuStateFishUI.cs`). Reference `EntityManager.cs` for the DI pattern. Update README.md with changes. **[CPX: 3]**
+*No Code Refactoring items*
 
 ---
 

@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
-using Voxelgine.States;
 
 namespace Voxelgine.Engine
 {
@@ -61,7 +60,7 @@ namespace Voxelgine.Engine
 		}
 		protected IFishLogging Logging;
 		EntityManager EntMgr;
-		GameState GameState;
+		GameSimulation _simulation;
 
 		public virtual void OnInit()
 		{
@@ -125,14 +124,14 @@ namespace Voxelgine.Engine
 			this.EntMgr = EntMgr;
 		}
 
-		public virtual GameState GetGameState()
+		public virtual GameSimulation GetSimulation()
 		{
-			return GameState;
+			return _simulation;
 		}
 
-		public virtual void SetGameState(GameState State)
+		public virtual void SetSimulation(GameSimulation simulation)
 		{
-			GameState = State;
+			_simulation = simulation;
 		}
 
 		public virtual void OnPlayerTouch(Player Ply)

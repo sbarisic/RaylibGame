@@ -110,9 +110,9 @@ Game Tick Flow (Client):
 | **FPSCamera** | ✅ Converted to instance-based — owned by `Player.Camera` | Each player has own `FPSCamera` instance; remote players can track angle independently |
 | **Player** | ✅ `PlayerManager` with `Dictionary<int, Player>`, `PlayerId` on Player, `GameState.LocalPlayer` convenience property | `GameState.Ply` replaced with `Players.LocalPlayer`; all callers updated |
 | **InputMgr** | ✅ Abstracted via `IInputSource` interface — `LocalInputSource` (Raylib), `NetworkInputSource` (stub) | `InputMgr` no longer has Raylib dependency; takes `IInputSource` in constructor, `SetInputSource()` for swapping |
-| **GameState** | Owns all systems as single instance | Split into shared simulation state and client presentation state |
+| **GameState** | ✅ Separated: `GameSimulation` owns authoritative state (`ChunkMap`, `PlayerManager`, `EntityManager`, `DayNightCycle`, `PhysData`); `GameState` holds `Simulation` reference + client-only systems (`ParticleSystem`, `SoundMgr`, `FishUIManager`, rendering) | `GameState` properties delegate to `Simulation`; `VoxEntity`/`EntityManager` use `GameSimulation` directly; headless server can run `GameSimulation` without `GameState` |
 | **EntityManager** | Single instance, no network IDs | Add network entity IDs, sync entity spawn/remove |
-| **ChunkMap** | Single instance, no change tracking | Add block change event/log for delta sync |
+| **ChunkMap** | ✅ Block change tracking via `BlockChange` struct and `_blockChangeLog` in `ChunkMap` | `GetPendingChanges()` / `ClearPendingChanges()` for network delta sync; `SetPlacedBlock()` logs old→new type changes |
 | **WeaponGun** | Raycast is local, affects entities directly | Server-authoritative hit detection; client sends fire intent, server validates |
 | **ParticleSystem** | Visual only, no gameplay impact | Client-only, triggered by network events (fire effects, blood, etc.) |
 | **SoundMgr** | Positional audio is local | Client-only, triggered by network events |
@@ -136,11 +136,7 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **ChunkMap: Block change tracking**
-
-- [ ] **GameState: Separate simulation from presentation** — Introduce `GameSimulation` class that owns the authoritative game state: `ChunkMap`, `PlayerManager`, `EntityManager`, `DayNightCycle`, `PhysData`. `GameState` (the Raylib state) holds a `GameSimulation` reference plus client-only systems: `ParticleSystem`, `SoundMgr`, `FishUIManager`, `ViewModel`, rendering logic. This separation allows a headless server to run `GameSimulation` without any Raylib/rendering dependencies. Single-player creates both; dedicated server creates only `GameSimulation`. **[CPX: 5]**
-
-- [ ] **Project split: Move Raylib-independent code to VoxelgineEngine** — The `VoxelgineEngine` (class library) and `VoxelgineServer` (exe) projects already exist as empty scaffolds. Move all Raylib-independent code from `Voxelgine` into `VoxelgineEngine`; both `Voxelgine` (client) and `VoxelgineServer` reference it. **Phase 1 — pure logic (no Raylib imports):** DI interfaces (`IFishLogging`, `IFishConfig`, `IFishDebug`, `IFishClipboard`, `IFishProgram`), `FishDI`, physics (`AABB`, `PhysData`, `PhysicsUtils`, `Raycast`), data types (`PlacedBlock`, `BlockInfo`, `BlockLayout`), `SpatialHashGrid`, `Noise`, `Utils`, `ThreadWorker`, `GameFrameInfo`, `OnKeyPressedEventArg`, `SettingsHiddenAttribute`, pathfinding (`VoxelPathfinder`, `PathFollower`), animation data/logic (`AnimLerp`, `LerpManager`, `NPCAnimation`). **Phase 2 — needs Raylib abstraction/splitting (depends on earlier refactoring tasks):** `VoxEntity` (has Raylib `Model` field — extract rendering into client-side partial class), `ChunkMap`/`Chunk` (mixed logic/rendering — split into engine-side data+serialization+lighting and client-side mesh generation+rendering), `DayNightCycle` (uses Raylib `Color` — replace with `System.Numerics.Vector4` or custom struct), `GameConfig` (uses Raylib `KeyboardKey` — abstract key mapping), `EntityManager`, `Player` (core/physics/serialization vs rendering/input/GUI), weapons (logic vs visual effects), `NPCAnimator`/`BoneInformation` (may reference Raylib model types). Game must remain fully functional in single-player after the split. **[CPX: 5]**
+- [ ] **Project split: Move Raylib-independent code to VoxelgineEngine**
 
 ### Medium Priority
 
@@ -385,8 +381,8 @@ Game Tick Flow (Client):
 1. ~~**FPSCamera instance refactoring**~~ → ✅ Done
 2. ~~**Player ID + PlayerManager**~~ → ✅ Done
 3. ~~**InputMgr abstraction**~~ → ✅ Done
-4. **ChunkMap block change tracking** → unblocks world delta sync
-5. **GameState simulation separation** → unblocks headless server
+4. ~~**ChunkMap block change tracking**~~ → ✅ Done
+5. ~~**GameState simulation separation**~~ → ✅ Done
 6. **Project split phase 1** → move pure-logic files to `VoxelgineEngine` (no Raylib imports)
 7. **Project split phase 2** → split mixed Raylib/logic classes, complete `VoxelgineEngine` migration
 8. **Entity network IDs** → unblocks entity sync
@@ -416,3 +412,5 @@ Game Tick Flow (Client):
 - **FPSCamera: Convert from static to instance-based** — Refactored `FPSCamera` to instantiable class with instance fields. `Player` owns `Camera` field, created in constructor with config sensitivity. Updated all references in `Player.cs`, `Player.Input.cs`, `Player.Physics.cs`, `GameWindow.cs`, `Program.cs`. Build verified.
 - **Player: Add player ID and PlayerManager** — Added `int PlayerId` property to `Player` (constructor parameter, default 0). Created `PlayerManager` class with `Dictionary<int, Player>`, `AddPlayer()`, `AddLocalPlayer()`, `RemovePlayer()`, `GetPlayer()`, `GetAllPlayers()`, `GetLocalPlayer()`, and `LocalPlayer` convenience property. `GameState` now holds `PlayerManager Players` with `LocalPlayer` shortcut property. All `Ply` references updated across `GameState.cs`, `GameWindow.cs`, `EntityManager.cs`, `VEntSlidingDoor.cs`. Single-player creates player with ID 0. Build verified.
 - **InputMgr: Abstract input source** — Created `IInputSource` interface with `Poll(float gameTime)` method. Implemented `LocalInputSource` (wraps Raylib keyboard/mouse polling via `GameConfig` key mappings) and `NetworkInputSource` stub (stores last received `InputState` from network). Refactored `InputMgr` to take `IInputSource` in constructor with `SetInputSource()` for runtime swapping. Moved Raylib polling out of `InputMgr` — it now has zero Raylib dependency. `GameWindow` creates `LocalInputSource` and passes it to `InputMgr`. All existing consumers unchanged. Build verified.
+- **ChunkMap: Block change tracking** — Created `BlockChange` readonly struct (`X`, `Y`, `Z`, `OldType`, `NewType`) in `Voxelgine/Graphics/Chunk/BlockChange.cs`. Added `_blockChangeLog` (`List<BlockChange>`) field to `ChunkMap` with `GetPendingChanges()` (returns `IReadOnlyList<BlockChange>`) and `ClearPendingChanges()` methods. `SetPlacedBlock()` now reads the old block type before modification and logs the change if the type differs. `SetPlacedBlockNoLighting()` (internal chunk operations) intentionally excluded from logging. World generation changes can be cleared after generation. Build verified.
+- **GameState: Separate simulation from presentation** — Created `GameSimulation` class (`Voxelgine/Engine/GameSimulation.cs`) that owns authoritative game state: `ChunkMap Map`, `PlayerManager Players`, `EntityManager Entities`, `DayNightCycle DayNight`, `PhysData PhysicsData`. `GameState` now holds `GameSimulation Simulation` with delegate properties (`Map`, `Players`, `LocalPlayer`, `DayNight`, `Entities`) for backward compatibility, plus client-only systems (`ParticleSystem`, `SoundMgr`, `FishUIManager`, rendering). `VoxEntity` stores `GameSimulation` instead of `GameState` (`GetSimulation()`/`SetSimulation()`). `EntityManager.Spawn()` takes `GameSimulation`. Removed unused `IGameWindow` dependency from `EntityManager`. Removed `using Voxelgine.States` from entity classes. Headless server can now run `GameSimulation` without any presentation layer. Build verified.

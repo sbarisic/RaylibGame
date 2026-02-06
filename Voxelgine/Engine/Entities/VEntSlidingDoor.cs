@@ -4,7 +4,6 @@ using System;
 using System.Numerics;
 
 using Voxelgine.Graphics;
-using Voxelgine.States;
 
 namespace Voxelgine.Engine
 {
@@ -63,13 +62,13 @@ namespace Voxelgine.Engine
 		{
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 
-			GameState gs = GetGameState();
-			if (gs?.LocalPlayer == null)
-				return;
+			GameSimulation sim = GetSimulation();
+				if (sim?.LocalPlayer == null)
+					return;
 
-			// Check distance to player
-			Vector3 doorCenter = Position + Size * 0.5f;
-			Vector3 playerPos = gs.LocalPlayer.Position;
+				// Check distance to player
+				Vector3 doorCenter = Position + Size * 0.5f;
+				Vector3 playerPos = sim.LocalPlayer.Position;
 			float distanceToPlayer = Vector3.Distance(doorCenter, playerPos);
 			bool playerInRange = distanceToPlayer <= TriggerRadius;
 

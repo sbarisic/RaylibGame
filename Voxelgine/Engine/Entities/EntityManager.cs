@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
-using Voxelgine.States;
 
 namespace Voxelgine.Engine
 {
@@ -14,20 +13,18 @@ namespace Voxelgine.Engine
 	{
 		List<VoxEntity> Entities;
 
-		IGameWindow window;
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
 
-		public EntityManager(IGameWindow window, IFishEngineRunner eng)
+		public EntityManager(IFishEngineRunner eng)
 		{
 			Entities = new List<VoxEntity>();
 			Logging = eng.DI.GetRequiredService<IFishLogging>();
 
-			this.window = window;
 			this.Eng = eng;
 		}
 
-		public void Spawn(GameState GState, VoxEntity Ent)
+		public void Spawn(GameSimulation simulation, VoxEntity Ent)
 		{
 			Logging.WriteLine($"[Spawn] {(Ent == null ? "NULL" : Ent.GetType().Name)}");
 
@@ -36,15 +33,15 @@ namespace Voxelgine.Engine
 
 			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
 			Ent.SetEntityManager(this);
-			Ent.SetGameState(GState);
+			Ent.SetSimulation(simulation);
 			Entities.Add(Ent);
 			Ent.OnInit();
 		}
 
 		void UpdateEntityPhysics(VoxEntity Ent, float Dt)
 		{
-			GameState GS = Ent.GetGameState();
-			ChunkMap map = GS.Map;
+			GameSimulation sim = Ent.GetSimulation();
+			ChunkMap map = sim.Map;
 
 			// Apply gravity
 			PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
@@ -53,16 +50,16 @@ namespace Voxelgine.Engine
 			Ent.Position = PhysicsUtils.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
 			// --- Player collision check using AABB ---
-			if (GS?.LocalPlayer != null)
+			if (sim?.LocalPlayer != null)
 			{
-				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(GS.LocalPlayer.Position);
+				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(sim.LocalPlayer.Position);
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
 
 				bool touching = playerAABB.Overlaps(entityAABB);
 
 				if (touching && !Ent._WasPlayerTouching)
 				{
-					Ent.OnPlayerTouch(GS.LocalPlayer);
+					Ent.OnPlayerTouch(sim.LocalPlayer);
 					Ent._WasPlayerTouching = true;
 				}
 				else if (!touching)

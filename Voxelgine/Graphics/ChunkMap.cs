@@ -45,11 +45,27 @@ namespace Voxelgine.Graphics
 
 		IFishEngineRunner Eng;
 
+		/// <summary>
+		/// Log of block changes since last clear. Used for network delta sync —
+		/// server reads and broadcasts pending changes each tick.
+		/// </summary>
+		private readonly List<BlockChange> _blockChangeLog = new();
+
 		public ChunkMap(IFishEngineRunner Eng)
 		{
 			this.Eng = Eng;
 			Chunks = new SpatialHashGrid<Chunk>(1);
 		}
+
+		/// <summary>
+		/// Returns all block changes recorded since the last call to <see cref="ClearPendingChanges"/>.
+		/// </summary>
+		public IReadOnlyList<BlockChange> GetPendingChanges() => _blockChangeLog;
+
+		/// <summary>
+		/// Clears the block change log. Called by the server after broadcasting deltas each tick.
+		/// </summary>
+		public void ClearPendingChanges() => _blockChangeLog.Clear();
 
 		public void Write(Stream Output)
 		{
@@ -230,6 +246,12 @@ namespace Voxelgine.Graphics
 				Chunks.Add(ChunkIndex, new Chunk(Eng, ChunkIndex, this));
 
 			Chunks.TryGetValue(ChunkIndex, out var targetChunk);
+
+			// Record the change for network delta sync
+			BlockType oldType = targetChunk.GetBlock(XX, YY, ZZ).Type;
+			if (oldType != Block.Type)
+				_blockChangeLog.Add(new BlockChange(X, Y, Z, oldType, Block.Type));
+
 			targetChunk.SetBlock(XX, YY, ZZ, Block);
 
 			// Recompute lighting if a light-emitting or light-blocking block was placed/removed

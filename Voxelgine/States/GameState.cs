@@ -32,20 +32,17 @@ namespace Voxelgine.States
 		Vector3 NPCPos = new Vector3(32, 66, 14);
 		Vector3 PlayerPos = new Vector3(32, 73, 19);
 
+		/// <summary>The authoritative game simulation (world, players, entities, day/night, physics).</summary>
+		public GameSimulation Simulation { get; private set; }
+
 		/// <summary>The voxel world chunk manager.</summary>
-		public ChunkMap Map
-		{
-			get; private set;
-		}
+		public ChunkMap Map => Simulation.Map;
 
 		/// <summary>Manages all players in the game.</summary>
-		public PlayerManager Players
-		{
-			get; private set;
-		}
+		public PlayerManager Players => Simulation.Players;
 
 		/// <summary>Convenience property to get the local player instance.</summary>
-		public Player LocalPlayer => Players.LocalPlayer;
+		public Player LocalPlayer => Simulation.Players.LocalPlayer;
 
 		/// <summary>Positional audio manager.</summary>
 		public SoundMgr Snd
@@ -60,22 +57,17 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>Day/night cycle manager.</summary>
-		public DayNightCycle DayNight
-		{
-			get; private set;
-		}
+		public DayNightCycle DayNight => Simulation.DayNight;
 
 		public Vector3 PlayerCollisionBoxPos;
 
 		private readonly List<Tuple<Vector3, Vector3>> MarkerList = new();
 		private readonly FishUIManager GUI;
-		private readonly PhysData PhysicsData;
-		private readonly EntityManager EntMgr;
 		private Frustum ViewFrustum;
 		private float _totalTime;
 
 		/// <summary>Gets the entity manager for this game state.</summary>
-		public EntityManager Entities => EntMgr;
+		public EntityManager Entities => Simulation.Entities;
 
 		// Water overlay
 		private Texture2D? _waterOverlayTexture;
@@ -112,14 +104,11 @@ namespace Voxelgine.States
 			Logging = eng.DI.GetRequiredService<IFishLogging>();
 
 			GUI = new FishUIManager(window, Logging);
-			EntMgr = new EntityManager(window, eng);
+			Simulation = new GameSimulation(eng);
 			Snd = new SoundMgr();
-			PhysicsData = new PhysData();
-			DayNight = new DayNightCycle();
 
 			// =========================================== Init Systems ==============================================
 			Snd.Init();
-			Map = new ChunkMap(eng);
 
 			Particle = new ParticleSystem();
 			Particle.Init(
@@ -134,14 +123,14 @@ namespace Voxelgine.States
 			pickup.SetPosition(PickupPos);
 			pickup.SetSize(Vector3.One);
 			pickup.SetModel("orb_xp/orb_xp.obj");
-			EntMgr.Spawn(this, pickup);
+			Entities.Spawn(Simulation, pickup);
 
 			// Create NPC entity  
 			_testNpc = new VEntNPC();
 			_testNpc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			_testNpc.SetPosition(NPCPos);
 			_testNpc.SetModel("npc/humanoid.json");
-			EntMgr.Spawn(this, _testNpc);
+			Entities.Spawn(Simulation, _testNpc);
 
 			// ======================================= Create rest of the world ======================================
 			if (File.Exists(MAP_FILE))
@@ -161,7 +150,6 @@ namespace Voxelgine.States
 
 
 			// ====================================== Init player ====================================================
-			Players = new PlayerManager();
 			var ply = new Player(Eng, GUI, "snoutx10k", true, Snd, 0);
 			Players.AddLocalPlayer(0, ply);
 			ply.InitGUI(window, GUI);
@@ -501,8 +489,8 @@ namespace Voxelgine.States
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
 		{
-			LocalPlayer.UpdatePhysics(Map, PhysicsData, Dt, InMgr);
-			EntMgr.UpdateLockstep(TotalTime, Dt, InMgr);
+			LocalPlayer.UpdatePhysics(Map, Simulation.PhysicsData, Dt, InMgr);
+			Entities.UpdateLockstep(TotalTime, Dt, InMgr);
 		}
 
 		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
@@ -650,7 +638,7 @@ namespace Voxelgine.States
 			Map.Draw(ref ViewFrustum);
 
 			// Draw entities and effects
-			EntMgr.Draw3D(TimeAlpha, ref LastFrame);
+			Entities.Draw3D(TimeAlpha, ref LastFrame);
 
 			DrawBlockPlacementPreview();
 

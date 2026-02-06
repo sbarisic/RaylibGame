@@ -1,6 +1,7 @@
 using Raylib_cs;
 
 using System;
+using System.IO;
 using System.Numerics;
 
 using Voxelgine.Graphics;
@@ -150,6 +151,30 @@ namespace Voxelgine.Engine
 			if (!CollisionEnabled)
 				return AABB.Empty;
 			return new AABB(Position, Position + Size);
+		}
+
+		protected override void WriteSnapshotExtra(BinaryWriter writer)
+		{
+			// Door state (1 byte)
+			writer.Write((byte)State);
+
+			// Slide progress (4 bytes)
+			writer.Write(SlideProgress);
+		}
+
+		protected override void ReadSnapshotExtra(BinaryReader reader)
+		{
+			// Door state
+			State = (DoorState)reader.ReadByte();
+
+			// Slide progress
+			SlideProgress = reader.ReadSingle();
+
+			// Update collision state based on door state
+			CollisionEnabled = State == DoorState.Closed || State == DoorState.Closing;
+
+			// Recalculate position from slide progress
+			UpdateDoorPosition();
 		}
 
 		protected override void DrawCollisionBox()

@@ -18,6 +18,9 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public InventoryItem GetActiveItem() => ActiveSelection;
 
+		public int GetSelectedInventoryIndex() => Inventory?.GetSelectedIndex() ?? 0;
+		public void SetSelectedInventoryIndex(int index) => Inventory?.SetSelectedIndex(index);
+
 		public void RecalcGUI(IGameWindow Window)
 		{
 			// FishUI handles positioning via control properties

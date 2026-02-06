@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -657,6 +658,28 @@ namespace Voxelgine.Engine
 					}
 				}
 			}
+
+		protected override void WriteSnapshotExtra(BinaryWriter writer)
+		{
+			// Look direction (12 bytes)
+			writer.Write(_lookDirection.X);
+			writer.Write(_lookDirection.Y);
+			writer.Write(_lookDirection.Z);
+
+			// Current animation name (string, length-prefixed)
+			writer.Write(Animator?.CurrentAnimation ?? "");
+		}
+
+		protected override void ReadSnapshotExtra(BinaryReader reader)
+		{
+			// Look direction
+			_lookDirection = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+
+			// Current animation name
+			string animName = reader.ReadString();
+			if (Animator != null && Animator.CurrentAnimation != animName && !string.IsNullOrEmpty(animName))
+				Animator.Play(animName);
+		}
 
 		protected override void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
 		{

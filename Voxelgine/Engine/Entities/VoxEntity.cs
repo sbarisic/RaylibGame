@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -21,6 +22,12 @@ namespace Voxelgine.Engine
 	/// </remarks>
 	public abstract class VoxEntity
 	{
+		/// <summary>
+		/// Unique network identifier assigned by <see cref="EntityManager.Spawn"/>.
+		/// 0 means unassigned. Used for network synchronization (entity spawn/remove/snapshot).
+		/// </summary>
+		public int NetworkId { get; internal set; }
+
 		/// <summary>World position of the entity (bottom-center for physics).</summary>
 		public Vector3 Position;
 		/// <summary>Entity bounding box size for collision.</summary>
@@ -187,6 +194,58 @@ namespace Voxelgine.Engine
 		}
 
 		// Draws the collision box at Position with Size
+		/// <summary>
+		/// Writes a compact network snapshot of this entity's state.
+		/// Subclasses should override <see cref="WriteSnapshotExtra"/> to include type-specific state.
+		/// </summary>
+		public void WriteSnapshot(BinaryWriter writer)
+		{
+			// Position (12 bytes)
+			writer.Write(Position.X);
+			writer.Write(Position.Y);
+			writer.Write(Position.Z);
+
+			// Velocity (12 bytes)
+			writer.Write(Velocity.X);
+			writer.Write(Velocity.Y);
+			writer.Write(Velocity.Z);
+
+			// Rotation state (5 bytes)
+			writer.Write(IsRotating);
+			writer.Write(ModelRotationDeg);
+
+			WriteSnapshotExtra(writer);
+		}
+
+		/// <summary>
+		/// Reads a network snapshot and applies it to this entity's state.
+		/// Subclasses should override <see cref="ReadSnapshotExtra"/> to read type-specific state.
+		/// </summary>
+		public void ReadSnapshot(BinaryReader reader)
+		{
+			// Position
+			Position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+
+			// Velocity
+			Velocity = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+
+			// Rotation state
+			IsRotating = reader.ReadBoolean();
+			ModelRotationDeg = reader.ReadSingle();
+
+			ReadSnapshotExtra(reader);
+		}
+
+		/// <summary>
+		/// Override to write subclass-specific state in the network snapshot.
+		/// </summary>
+		protected virtual void WriteSnapshotExtra(BinaryWriter writer) { }
+
+		/// <summary>
+		/// Override to read subclass-specific state from the network snapshot.
+		/// </summary>
+		protected virtual void ReadSnapshotExtra(BinaryReader reader) { }
+
 		protected virtual void DrawCollisionBox()
 		{
 			if (!Eng.DebugMode)

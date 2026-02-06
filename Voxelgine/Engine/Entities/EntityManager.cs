@@ -12,6 +12,8 @@ namespace Voxelgine.Engine
 	public class EntityManager
 	{
 		List<VoxEntity> Entities;
+		Dictionary<int, VoxEntity> EntitiesById;
+		int _nextNetworkId = 1;
 
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
@@ -19,6 +21,7 @@ namespace Voxelgine.Engine
 		public EntityManager(IFishEngineRunner eng)
 		{
 			Entities = new List<VoxEntity>();
+			EntitiesById = new Dictionary<int, VoxEntity>();
 			Logging = eng.DI.GetRequiredService<IFishLogging>();
 
 			this.Eng = eng;
@@ -31,12 +34,55 @@ namespace Voxelgine.Engine
 			if (Ent == null)
 				return;
 
+			Ent.NetworkId = _nextNetworkId++;
 			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
 			Ent.SetEntityManager(this);
 			Ent.SetSimulation(simulation);
 			Entities.Add(Ent);
+			EntitiesById[Ent.NetworkId] = Ent;
 			Ent.OnInit();
 		}
+
+		/// <summary>
+		/// Returns the entity with the given network ID, or null if not found.
+		/// </summary>
+		public VoxEntity GetEntityByNetworkId(int networkId)
+		{
+			EntitiesById.TryGetValue(networkId, out VoxEntity ent);
+			return ent;
+		}
+
+		/// <summary>
+		/// Removes the entity with the given network ID. Returns the removed entity, or null if not found.
+		/// </summary>
+		public VoxEntity Remove(int networkId)
+		{
+			if (!EntitiesById.TryGetValue(networkId, out VoxEntity ent))
+				return null;
+
+			EntitiesById.Remove(networkId);
+			Entities.Remove(ent);
+			return ent;
+		}
+
+		/// <summary>
+		/// Removes the given entity. Returns true if the entity was found and removed.
+		/// </summary>
+		public bool Remove(VoxEntity entity)
+		{
+			if (entity == null)
+				return false;
+
+			if (entity.NetworkId != 0)
+				EntitiesById.Remove(entity.NetworkId);
+
+			return Entities.Remove(entity);
+		}
+
+		/// <summary>
+		/// Returns the total number of active entities.
+		/// </summary>
+		public int GetEntityCount() => Entities.Count;
 
 		void UpdateEntityPhysics(VoxEntity Ent, float Dt)
 		{

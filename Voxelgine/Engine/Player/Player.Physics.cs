@@ -641,6 +641,7 @@ namespace Voxelgine.Engine
 
 		// Add accessors for velocity and ground state
 		public Vector3 GetVelocity() => PlyVelocity;
+		public void SetVelocity(Vector3 velocity) => PlyVelocity = velocity;
 		public bool GetWasLastLegsOnFloor() => WasLastLegsOnFloor;
 
 		/// <summary>

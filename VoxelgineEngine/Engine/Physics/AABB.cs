@@ -1,4 +1,3 @@
-﻿using Raylib_cs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,21 +33,9 @@ namespace Voxelgine.Engine
 			Calc();
 		}
 
-		public AABB(BoundingBox BB)
-		{
-			Position = BB.Min;
-			Size = BB.Max - BB.Min;
-			Calc();
-		}
-
 		public AABB Offset(Vector3 Offset)
 		{
 			return new AABB(Position + Offset, Size);
-		}
-
-		public BoundingBox ToBoundingBox()
-		{
-			return new BoundingBox(Position, Position + Size);
 		}
 
 		public bool Contains(Vector3 Point)

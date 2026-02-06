@@ -68,22 +68,24 @@ namespace Voxelgine.Engine
 				Logging.WriteLine($"======================== Warning! Zero meshes in model {DefaultViewModelName}");
 			}
 
-			LrpOffset = new LerpVec3(Eng);
+			var lerpMgr = Eng.DI.GetRequiredService<ILerpManager>();
+
+			LrpOffset = new LerpVec3(lerpMgr);
 			LrpOffset.Easing = Easing.Linear;
 			LrpOffset.Loop = false;
 			LrpOffset.StartLerp(1, Vector3.Zero, Vector3.Zero);
 
-			LrpRot = new LerpQuat(Eng);
+			LrpRot = new LerpQuat(lerpMgr);
 			LrpRot.Easing = Easing.Linear;
 			LrpRot.Loop = false;
 			LrpRot.StartLerp(1, Quaternion.CreateFromYawPitchRoll(0, 0, 0), Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0));
 
-			LrpKickback = new LerpVec3(Eng);
+			LrpKickback = new LerpVec3(lerpMgr);
 			LrpKickback.Easing = Easing.EaseOutQuad;
 			LrpKickback.Loop = false;
 			LrpKickback.StartLerp(0.01f, Vector3.Zero, Vector3.Zero);
 
-			LrpSwing = new LerpFloat(Eng);
+			LrpSwing = new LerpFloat(lerpMgr);
 			LrpSwing.Easing = Easing.EaseOutQuad;
 			LrpSwing.Loop = false;
 			LrpSwing.StartLerp(0.01f, 0f, 0f);

@@ -1,17 +1,16 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine {
 	public class LerpVec3 : AnimLerp {
 		Vector3 Start;
 		Vector3 End;
 
-		public LerpVec3(IFishEngineRunner Eng) : base(Eng)
+		public LerpVec3(ILerpManager lerpMgr) : base(lerpMgr)
 		{
 		}
 
@@ -41,7 +40,7 @@ namespace Voxelgine.Engine {
 		Quaternion Start;
 		Quaternion End;
 
-		public LerpQuat(IFishEngineRunner Eng) : base(Eng)
+		public LerpQuat(ILerpManager lerpMgr) : base(lerpMgr)
 		{
 		}
 
@@ -71,7 +70,7 @@ namespace Voxelgine.Engine {
 		float Start;
 		float End;
 
-		public LerpFloat(IFishEngineRunner Eng) : base(Eng)
+		public LerpFloat(ILerpManager lerpMgr) : base(lerpMgr)
 		{
 
 		}

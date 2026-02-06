@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +14,7 @@ namespace Voxelgine.Engine
 		public void Update(float Dt);
 	}
 
-	class LerpManager : ILerpManager
+	public class LerpManager : ILerpManager
 	{
 		List<AnimLerp> LerpList = new List<AnimLerp>();
 

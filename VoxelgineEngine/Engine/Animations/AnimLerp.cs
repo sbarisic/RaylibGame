@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -23,10 +22,10 @@ namespace Voxelgine.Engine
 		bool TriggeredOnComplete;
 		public Action<AnimLerp> OnComplete;
 
-		public AnimLerp(IFishEngineRunner Eng)
+		public AnimLerp(ILerpManager lerpMgr)
 		{
 			Easing = Engine.Easing.Linear;
-			Eng.DI.GetRequiredService<ILerpManager>().AddLerp(this);
+			lerpMgr.AddLerp(this);
 		}
 
 		public virtual void StartLerp(float Duration, object StartVal, object EndVal)

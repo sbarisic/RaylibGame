@@ -33,7 +33,7 @@ namespace Voxelgine.Engine
 		{
 			base.OnInit();
 
-			BobbingLerp = new LerpVec3(Eng);
+			BobbingLerp = new LerpVec3(Eng.DI.GetRequiredService<ILerpManager>());
 			BobbingLerp.Loop = true;
 			BobbingLerp.Easing = Easing.EaseInOutQuart;
 			BobbingLerp.StartLerp(1, new Vector3(0, -BobAmplitude, 0), new Vector3(0, BobAmplitude, 0));

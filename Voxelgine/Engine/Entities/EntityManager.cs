@@ -47,7 +47,7 @@ namespace Voxelgine.Engine
 			PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
 
 			// Move with axis-separated collision
-			Ent.Position = PhysicsUtils.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
+				Ent.Position = WorldCollision.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
 			// --- Player collision check using AABB ---
 			if (sim?.LocalPlayer != null)

@@ -123,16 +123,16 @@ namespace Voxelgine.Graphics
 			{
 				if (!ModelValidOpaque)
 				{
-					ModelAABB = new AABB(Raylib.GetMeshBoundingBox(CachedMeshTransp));
+					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshTransp).ToAABB();
 				}
 				else if (!ModelValidTransp)
 				{
-					ModelAABB = new AABB(Raylib.GetMeshBoundingBox(CachedMeshOpaque));
+					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshOpaque).ToAABB();
 				}
 				else
 				{
-					AABB BBOpaque = new AABB(Raylib.GetMeshBoundingBox(CachedMeshOpaque));
-					AABB BBTransp = new AABB(Raylib.GetMeshBoundingBox(CachedMeshTransp));
+					AABB BBOpaque = Raylib.GetMeshBoundingBox(CachedMeshOpaque).ToAABB();
+					AABB BBTransp = Raylib.GetMeshBoundingBox(CachedMeshTransp).ToAABB();
 					ModelAABB = AABB.Union(BBOpaque, BBTransp);
 				}
 			}

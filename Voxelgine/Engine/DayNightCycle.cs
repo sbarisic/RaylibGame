@@ -33,6 +33,12 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public float TimeScale { get; set; } = 1f;
 
+		/// <summary>
+		/// When true (default), time advances locally in <see cref="Update"/>.
+		/// When false (client in multiplayer), time only updates via <see cref="SetTime"/> from server sync.
+		/// </summary>
+		public bool IsAuthority { get; set; } = true;
+
 		// Time constants (in hours)
 		const float SunriseStart = 5f;    // Dawn begins
 		const float SunriseEnd = 7f;      // Full daylight
@@ -89,7 +95,7 @@ namespace Voxelgine.Engine
 		/// <param name="deltaTime">Frame delta time in seconds.</param>
 		public void Update(float deltaTime)
 		{
-			if (IsPaused || DayLengthSeconds <= 0)
+			if (!IsAuthority || IsPaused || DayLengthSeconds <= 0)
 				return;
 
 			// Calculate hours per real second

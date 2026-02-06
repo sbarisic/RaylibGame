@@ -102,7 +102,6 @@ namespace Voxelgine
 			ResMgr.CreateCollection("blood", BloodTexList.ToArray());
 
 			GraphicsUtils.Init(Eng.DI.GetRequiredService<IFishLogging>());
-			Flexbox.Flex.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 			Scripting.Init();
 
 			Eng.DebugMode = Debugger.IsAttached;

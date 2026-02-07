@@ -2,6 +2,7 @@ using Voxelgine.Engine;
 using Raylib_cs;
 using Voxelgine.Graphics;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Voxelgine.GUI;
@@ -39,6 +40,9 @@ namespace Voxelgine.States
 		private string _statusText = "";
 		private string _errorText = "";
 		private bool _initialized;
+
+		// Buffer for PlayerJoined packets received before simulation is created
+		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
 
 		// Water overlay
 		private Texture2D? _waterOverlayTexture;
@@ -461,12 +465,23 @@ namespace Voxelgine.States
 				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
 				_logging.WriteLine("MultiplayerGameState: SetPosition complete");
 
-				// Finish loading
-				_logging.WriteLine("MultiplayerGameState: FinishLoading...");
-				_client.FinishLoading();
-				_initialized = true;
-				_statusText = "";
-				_errorText = "";
+				// Process any PlayerJoined packets that arrived before the simulation was created
+					if (_pendingPlayerJoins.Count > 0)
+					{
+						_logging.WriteLine($"MultiplayerGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
+						foreach (var pending in _pendingPlayerJoins)
+						{
+							HandlePlayerJoined(pending);
+						}
+						_pendingPlayerJoins.Clear();
+					}
+
+					// Finish loading
+					_logging.WriteLine("MultiplayerGameState: FinishLoading...");
+					_client.FinishLoading();
+					_initialized = true;
+					_statusText = "";
+					_errorText = "";
 
 				Raylib.DisableCursor();
 
@@ -562,7 +577,11 @@ namespace Voxelgine.States
 				return; // That's us
 
 			if (_simulation == null)
+			{
+				// World not loaded yet — buffer for later processing
+				_pendingPlayerJoins.Add(joined);
 				return;
+			}
 
 			_logging.WriteLine($"MultiplayerGameState: Player joined: {joined.PlayerName} (ID {joined.PlayerId})");
 
@@ -616,6 +635,7 @@ namespace Voxelgine.States
 			_gui = null;
 			_snd = null;
 			_particle = null;
+			_pendingPlayerJoins.Clear();
 		}
 
 		// ====================================== Rendering Helpers ===============================================

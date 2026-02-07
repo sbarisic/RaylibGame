@@ -115,7 +115,7 @@ Game Tick Flow (Client):
 | **ChunkMap** | ✅ Block change tracking via `BlockChange` struct and `_blockChangeLog` in `ChunkMap` | `GetPendingChanges()` / `ClearPendingChanges()` for network delta sync; `SetPlacedBlock()` logs old→new type changes |
 | **WeaponGun** | ✅ Separated into `FireIntent` (origin, direction, weapon type) → `ResolveFireIntent()` (raycast) → `ApplyFireEffects()`/`ApplyHitEffects()`. `FireResult` struct carries hit type, position, normal, entity, body part. | Client creates intent + plays immediate effects; server resolves authoritatively; client applies hit effects on confirmation |
 | **ParticleSystem** | Visual only, no gameplay impact | Client-only, triggered by network events (fire effects, blood, etc.) |
-| **SoundMgr** | Positional audio is local | Client-only, triggered by network events |
+| **SoundMgr** | ✅ `Init()` guarded against double `InitAudioDevice()` (native crash). Positional audio is local | Client-only, triggered by network events. Safe to instantiate multiple times. |
 | **DayNightCycle** | ✅ `IsAuthority` flag gates local time advancement; `SetTime()` for server sync | Server sets `IsAuthority = true`, clients set `false` — time only updates via `SetTime()` from server |
 | **PhysicsUtils** | ✅ Split: pure math (`PhysicsUtils` in `VoxelgineEngine`) + world collision (`WorldCollision` in `Voxelgine`). `RayMath` (ray-AABB intersection) extracted to `VoxelgineEngine`. | Server uses `PhysicsUtils` + `RayMath` for authoritative physics and hit detection without Raylib dependency |
 | **PhysData** | Physics constants | Server sends PhysData on connect so all clients match |
@@ -181,10 +181,10 @@ Game Tick Flow (Client):
 - [x] **Server player management** ✅
 - [x] **Server input processing** ✅
 - [x] **Server world transfer** ✅
+- [ ] **Server block change authority** — Receive `BlockPlaceRequest`/`BlockRemoveRequest` from clients. Validate: is block position reachable from player position? Is player allowed to place this block type? If valid, apply to `ChunkMap`, broadcast `BlockChange` to all clients. If invalid, silently reject (client prediction will be corrected). **[CPX: 2]**
 
 ### Medium Priority
 
-- [ ] **Server block change authority** — Receive `BlockPlaceRequest`/`BlockRemoveRequest` from clients. Validate: is block position reachable from player position? Is player allowed to place this block type? If valid, apply to `ChunkMap`, broadcast `BlockChange` to all clients. If invalid, silently reject (client prediction will be corrected). **[CPX: 2]**
 - [ ] **Server combat authority** — Receive `WeaponFire` from clients. Server performs authoritative raycast against world and all player AABBs / entity AABBs using same raycasting code. Apply damage to hit entity/player. Broadcast `WeaponFireEffect` (for tracer/particle effects on all clients) and `PlayerDamage` if a player was hit. **[CPX: 3]**
 - [ ] **Server entity synchronization** — Each tick, for entities that moved, build `EntitySnapshot` packets and broadcast. On entity spawn/remove, send `EntitySpawn`/`EntityRemove` reliably. Clients only spawn/remove entities when told by server. NPC AI runs on server only. **[CPX: 3]**
 - [x] **Server time sync** ✅
@@ -207,11 +207,11 @@ Game Tick Flow (Client):
 - [x] **Client-side prediction** ✅
 - [x] **Client world loading** ✅
 - [x] **Remote player rendering** ✅
+- [ ] **Client block change handling** — Receive `BlockChange` from server, apply to local `ChunkMap`. For local player block actions: apply optimistically (client prediction), revert if server rejects (no `BlockChange` received within timeout). Trigger chunk mesh rebuild on change. **[CPX: 2]**
 
 ### Medium Priority
 
 - [ ] **Remote player interpolation buffer** — Implement `SnapshotBuffer<T>` that stores timestamped snapshots and interpolates between the two surrounding the render time (current time - interpolation delay). Use for remote player positions, angles, and entity positions. Leverages `Vector3.Lerp` and angle lerp. **[CPX: 3]**
-- [ ] **Client block change handling** — Receive `BlockChange` from server, apply to local `ChunkMap`. For local player block actions: apply optimistically (client prediction), revert if server rejects (no `BlockChange` received within timeout). Trigger chunk mesh rebuild on change. **[CPX: 2]**
 - [ ] **Client entity synchronization** — Receive `EntitySpawn`: create entity locally with given network ID and properties. Receive `EntityRemove`: remove entity. Receive `EntitySnapshot`: update entity position in interpolation buffer. Client does not run entity AI — only interpolates visual positions. **[CPX: 3]**
 - [ ] **Client combat effects** — Receive `WeaponFireEffect`: play tracer line, muzzle flash, impact particles (fire/blood) at the positions specified by server. Receive `PlayerDamage`: show damage indicator on HUD if local player was hit. Local player's own weapon fire plays immediate effects for responsiveness, server confirmation adds hit effects. **[CPX: 2]**
 
@@ -228,7 +228,7 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **Player position sync** — Server broadcasts `WorldSnapshot` (all player positions in one packet) at tick rate. Clients use this for remote player interpolation. Local player uses prediction + reconciliation (see Client Implementation). Position, velocity, and camera angle are the minimum sync fields. **[CPX: 3]**
+- [x] **Player position sync** ✅
 - [ ] **World block sync** — Server tracks `ChunkMap.BlockChangeLog`. Each tick, collect pending changes, broadcast `BlockChange` packets to all clients, clear log. On client connect, full world transfer (see Server world transfer). During play, only deltas. **[CPX: 2]**
 
 ### Medium Priority
@@ -323,6 +323,10 @@ Game Tick Flow (Client):
 
 *No active bugs*
 
+### Resolved Bugs
+
+- ~~**Newly connected player does not see existing players' avatars** — `PlayerJoinedPacket` for existing players was sent before world data, but `MultiplayerGameState.HandlePlayerJoined()` discarded them because `_simulation` was null. Fixed by buffering `PlayerJoinedPacket` arrivals in `_pendingPlayerJoins` list and replaying them after world loading completes in `OnWorldDataReady()`.~~
+
 ### Uncategorized
 
 *No uncategorized items*
@@ -363,15 +367,17 @@ Game Tick Flow (Client):
 15. ~~**Client input sending + world loading**~~ → ✅ Done
 16. ~~**Player position sync + remote rendering**~~ → ✅ Done
 17. ~~**Client-side prediction + reconciliation**~~ → ✅ Done
-18. **Remote player interpolation** → smooth remote player movement
-19. **Block sync + entity sync** → full world synchronization
-20. **Weapon fire authority** → combat works in multiplayer
-21. **Player health + respawn** → PvP gameplay
-22. **Chat + UI** → social features and menus
-23. **Listen server mode** → host-and-play
-24. **Bandwidth management + fragmentation** → production-ready networking
-25. **Testing tools** → network simulation, loopback
-26. **Documentation** → guides and references
+18. ~~**Multiplayer game state + end-to-end demo**~~ → ✅ Done
+19. **Block sync (server + client)** → blocks work in multiplayer (priority bumped)
+20. **Remote player interpolation** → smooth remote player movement
+21. **Entity sync** → full entity synchronization
+22. **Weapon fire authority** → combat works in multiplayer
+23. **Player health + respawn** → PvP gameplay
+24. **Chat + UI** → social features and menus
+25. **Listen server mode** → host-and-play
+26. **Bandwidth management + fragmentation** → production-ready networking
+27. **Testing tools** → network simulation, loopback
+28. **Documentation** → guides and references
 
 ---
 
@@ -404,3 +410,8 @@ Game Tick Flow (Client):
 - **Remote player rendering** — Created `RemotePlayer` class in `Voxelgine/Engine/Player/RemotePlayer.cs` as a lightweight client-side representation of other players. Stores `PlayerId`, `PlayerName`, interpolated `Position`, `Velocity`, `CameraAngle`. Loads the humanoid `CustomModel` (same `npc/humanoid.json` used by `VEntNPC`) with `NPCAnimator` for walk/idle animations. Implements a simple two-snapshot interpolation buffer with 100ms delay: `ApplySnapshot(position, velocity, cameraAngle, currentTime)` shifts current→previous and stores new snapshot; `Update(currentTime, deltaTime)` interpolates between snapshots using time-based lerp factor (clamped 0–1) with proper angle wrapping via `LerpAngleSingle`. `Draw3D()` positions the model at feet level (eye position - `PlayerEyeOffset`), converts camera yaw to `LookDirection` for model facing, and draws. Falls back to wireframe placeholder if model fails to load. Debug mode renders bounding box (green) and look direction line. `SetPosition()` for initial placement from `PlayerJoinedPacket`. Extended `PlayerManager` with remote player tracking: `Dictionary<int, RemotePlayer>` with `AddRemotePlayer()`, `RemoveRemotePlayer()`, `GetRemotePlayer()`, `GetAllRemotePlayers()`, `RemotePlayerCount`, `ClearRemotePlayers()`, and `LocalPlayerId` property. `RemovePlayer()` now also cleans up the remote player entry. Integrated into `GameState.Draw()`: remote players are updated (interpolation + animation) each frame using `Raylib.GetTime()`/`GetFrameTime()`, then rendered in `Draw3D()` after entities and before transparent blocks. Build verified.
 - **Client-side prediction** — Created `ClientPrediction` class in `VoxelgineEngine/Engine/Net/ClientPrediction.cs` implementing the prediction state tracking system. `PredictedState` struct stores tick number, position, and velocity. Circular buffer of 128 entries (matching `ClientInputBuffer.BufferSize`) indexed by `tickNumber % BufferSize`. `RecordPrediction(tick, position, velocity)` stores predicted state after each tick's `Player.UpdatePhysics()`. `ProcessServerSnapshot(serverTick, serverPosition, serverVelocity)` compares server-authoritative state with predicted state at that tick — returns true if position error exceeds `CorrectionThreshold` (0.01 units), indicating reconciliation is needed. Ignores old/duplicate snapshots via `LastServerTick` tracking. Exposes `ReconciliationCount` and `LastCorrectionDistance` for network diagnostics. `Reset()` for disconnect/reconnect cleanup. Created `PredictionReconciler` static class in `Voxelgine/Engine/Player/PredictionReconciler.cs` (in Voxelgine project for `ChunkMap` access) that performs the actual input replay. Uses reusable `NetworkInputSource` + `InputMgr` to avoid allocation. `Reconcile(player, serverPosition, serverVelocity, serverTick, currentTick, inputBuffer, prediction, map, physData, dt)` snaps the player to server state via `SetPosition()`/`SetVelocity()`, retrieves buffered inputs via `GetInputsInRange(serverTick, currentTick)`, and for each input: restores camera angle via `SetCamAngle()`, updates direction vectors via `UpdateDirectionVectors()`, feeds input state through `NetworkInputSource`/`InputMgr`, calls `Player.UpdatePhysics()` for authoritative Quake-style replay, and records the new predicted state via `RecordPrediction()`. Preserves responsive strafe-jumping/bunny-hopping feel while ensuring server authority. Build verified.
 - **Server time sync** — Added periodic `DayTimeSync` broadcasting to `ServerLoop`. Server broadcasts `DayTimeSyncPacket` (containing `DayNightCycle.TimeOfDay`) to all connected clients every 5 seconds (`TimeSyncInterval` constant). Added `_lastTimeSyncTime` field to track the last broadcast time. `BroadcastTimeSync(float currentTime)` method checks the interval, creates the packet, and calls `_server.Broadcast()` reliably. Integrated into `Tick()` as step 5, called after `DayNightCycle.Update()` so the broadcasted time reflects the current tick's advancement. New clients also receive a `DayTimeSyncPacket` immediately on connect (sent in `OnClientConnected` before world transfer begins) so they have the correct time of day before world data arrives. Tick step numbering updated (5→time sync, 6→entities, 7→player snapshots). Build verified.
+- **Player position sync** — Server broadcasts `WorldSnapshotPacket` containing all player positions, velocities, and camera angles at tick rate via `BroadcastPlayerSnapshots()` in `ServerLoop`. Clients receive snapshots in `MultiplayerGameState.HandleWorldSnapshot()`: local player uses `ClientPrediction.ProcessServerSnapshot()` to compare against predicted state and triggers `PredictionReconciler.Reconcile()` when correction threshold exceeded; remote players receive positions via `RemotePlayer.ApplySnapshot()` for interpolated rendering. Position, velocity, and camera angle are synced. Build verified.
+- **MultiplayerGameState: End-to-end multiplayer client** — Created `MultiplayerGameState` class in `Voxelgine/States/MultiplayerGameState.cs` (~730 lines) as the full multiplayer client gameplay state. Manages the complete client lifecycle: `NetClient` connection to server, world loading via `WorldReceiver` with progress bar UI, `GameSimulation` creation from received world data, local `Player` instantiation with full GUI/SoundMgr/ViewModel, client-side prediction via `ClientInputBuffer` + `ClientPrediction` + `PredictionReconciler`, remote player management via `PlayerManager` + `RemotePlayer` instances, and `DayNightCycle` with `IsAuthority = false` (server-synced time). `UpdateLockstep()` increments `LocalTick`, records input, sends `InputStatePacket`, runs local player physics prediction and records predicted state. `Draw()` populates `GameFrameInfo` from physics camera state, applies frame interpolation between ticks, sets `RenderCam` for rendering pipeline, and draws world/entities/remote players/local player. `Draw2D()` renders loading screen with progress bar during world transfer, or in-game HUD with ping/tick/player count during gameplay. Handles `PlayerJoinedPacket`, `PlayerLeftPacket`, `WorldSnapshotPacket`, and `DayTimeSyncPacket`. Added "Multiplayer" button to `MainMenuStateFishUI` (connects to 127.0.0.1:7777). Added `MultiplayerGameState` property to `IFishEngineRunner` interface and implementations (`FEngineRunner` in `Program.cs`, `ServerEngineRunner` in `ServerLoop.cs`). Added `InputMgr.State` property for reading current input state. Build verified.
+- **Server world persistence** — Added `MapFile = "server_world.bin"` constant to `ServerLoop`. Server `Start()` now checks if `MapFile` exists: if found, loads the world via `ChunkMap.Read()` from file; if not, generates a new world via `ChunkMap.GenerateFloatingIsland()` and saves it via `ChunkMap.Write()`. Changed default world size from 16×16 to 32×32 chunks (`DefaultWorldWidth`/`DefaultWorldLength`). Updated `DefaultSpawnPosition` to (16, 73, 16) to match world center. Build verified.
+- **SoundMgr: Double initialization crash fix** — Added `if (!Raylib.IsAudioDeviceReady())` guard before `Raylib.InitAudioDevice()` in `SoundMgr.Init()`. The native Raylib crash (calling `InitAudioDevice()` twice) bypassed managed try-catch blocks, causing hard crashes when `MultiplayerGameState` created a `SoundMgr` instance after `GameState` had already initialized the audio device. Build verified.
+- **Remote player visibility on connect fix** — `PlayerJoinedPacket` for existing players was sent by the server before world data, but `MultiplayerGameState.HandlePlayerJoined()` discarded them because `_simulation` was null (only created after world loading). Fixed by adding `_pendingPlayerJoins` buffer (`List<PlayerJoinedPacket>`) — packets arriving before `_simulation` exists are buffered and replayed in `OnWorldDataReady()` after world loading completes. `Cleanup()` clears the buffer. Build verified.

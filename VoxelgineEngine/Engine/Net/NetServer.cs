@@ -171,16 +171,17 @@ namespace Voxelgine.Engine
 				var retransmissions = connection.Channel.GetRetransmissions(currentTime);
 				foreach (var rawData in retransmissions)
 				{
-					_transport.SendTo(rawData, connection.RemoteEndPoint);
+					connection.QueueSend(rawData, true);
 				}
 
 				if (connection.State == ConnectionState.Connected && connection.ShouldSendPing(currentTime))
 				{
 					var ping = connection.CreatePing(currentTime);
-					SendRaw(connection, ping, false, currentTime);
+					QueuePacket(connection, ping, false, currentTime);
 				}
 			}
 
+			FlushAllConnections(currentTime);
 			ServerTick++;
 		}
 
@@ -195,7 +196,7 @@ namespace Voxelgine.Engine
 		{
 			if (_playerConnections.TryGetValue(playerId, out var connection))
 			{
-				SendRaw(connection, packet, reliable, currentTime);
+				QueuePacket(connection, packet, reliable, currentTime);
 			}
 		}
 
@@ -211,7 +212,7 @@ namespace Voxelgine.Engine
 			{
 				if (connection.State == ConnectionState.Connected)
 				{
-					SendRaw(connection, packet, reliable, currentTime);
+					QueuePacket(connection, packet, reliable, currentTime);
 				}
 			}
 		}
@@ -229,7 +230,7 @@ namespace Voxelgine.Engine
 			{
 				if (connection.State == ConnectionState.Connected && connection.PlayerId != excludePlayerId)
 				{
-					SendRaw(connection, packet, reliable, currentTime);
+					QueuePacket(connection, packet, reliable, currentTime);
 				}
 			}
 		}
@@ -285,11 +286,20 @@ namespace Voxelgine.Engine
 		{
 			if (_connections.TryGetValue(sender, out var connection))
 			{
-				Packet packet = connection.UnwrapPacket(data, currentTime);
-				if (packet == null)
-					return;
+				connection.Bandwidth.RecordReceived(data.Length);
 
-				HandlePacket(connection, packet, currentTime);
+				var subPackets = PacketBatcher.UnbatchDatagram(data);
+				foreach (var sub in subPackets)
+				{
+					Packet packet = connection.UnwrapPacket(sub, currentTime);
+					if (packet == null)
+						continue;
+
+					HandlePacket(connection, packet, currentTime);
+
+					if (connection.State == ConnectionState.Disconnected)
+						break;
+				}
 			}
 			else
 			{
@@ -353,7 +363,7 @@ namespace Voxelgine.Engine
 					ServerTick = ServerTick,
 					WorldSeed = WorldSeed,
 				};
-			SendRaw(tempConnection, accept, true, currentTime);
+			QueuePacket(tempConnection, accept, true, currentTime);
 
 			OnClientConnected?.Invoke(tempConnection);
 		}
@@ -368,7 +378,7 @@ namespace Voxelgine.Engine
 
 				case PingPacket ping:
 						var pongReply = connection.CreatePong(ping.Timestamp);
-						SendRaw(connection, pongReply, false, currentTime);
+						QueuePacket(connection, pongReply, false, currentTime);
 						break;
 
 					case PongPacket pong:
@@ -387,7 +397,7 @@ namespace Voxelgine.Engine
 				return;
 
 			var disconnectPacket = new DisconnectPacket { Reason = reason };
-			SendRaw(connection, disconnectPacket, true, currentTime);
+			SendDirect(connection, disconnectPacket, true, currentTime);
 
 			connection.Disconnect();
 
@@ -413,10 +423,40 @@ namespace Voxelgine.Engine
 			return -1;
 		}
 
-		private void SendRaw(NetConnection connection, Packet packet, bool reliable, float currentTime)
+		/// <summary>
+		/// Sends a packet immediately without batching. Used for disconnect packets
+		/// and other cases where the connection may be removed before the next flush.
+		/// </summary>
+		private void SendDirect(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
 			byte[] raw = connection.WrapPacket(packet, reliable, currentTime);
 			_transport.SendTo(raw, connection.RemoteEndPoint);
+			connection.Bandwidth.RecordSent(raw.Length);
+		}
+
+		/// <summary>
+		/// Queues a packet for batched sending at the next <see cref="FlushAllConnections"/> call.
+		/// </summary>
+		private void QueuePacket(NetConnection connection, Packet packet, bool reliable, float currentTime)
+		{
+			byte[] raw = connection.WrapPacket(packet, reliable, currentTime);
+			connection.QueueSend(raw, reliable);
+		}
+
+		/// <summary>
+		/// Flushes all queued outgoing packets for every connection as batched datagrams.
+		/// Called at the end of each <see cref="Tick"/> to combine small packets into
+		/// MTU-sized datagrams, reducing per-packet UDP/IP overhead.
+		/// </summary>
+		private void FlushAllConnections(float currentTime)
+		{
+			foreach (var connection in _connections.Values)
+			{
+				if (connection.State != ConnectionState.Disconnected)
+				{
+					connection.FlushOutgoing(_transport, currentTime);
+				}
+			}
 		}
 	}
 }

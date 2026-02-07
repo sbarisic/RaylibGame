@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 
 namespace Voxelgine.Engine
@@ -235,13 +236,25 @@ namespace Voxelgine.Engine
 			if (State == ClientState.Disconnected || _connection == null)
 				return;
 
+			_connection.Bandwidth.Update(currentTime);
+
 			while (_receiveQueue.TryDequeue(out var data))
 			{
-				Packet packet = _connection.UnwrapPacket(data, currentTime);
-				if (packet == null)
-					continue;
+				_connection.Bandwidth.RecordReceived(data.Length);
 
-				HandlePacket(packet, currentTime);
+				var subPackets = PacketBatcher.UnbatchDatagram(data);
+				foreach (var sub in subPackets)
+				{
+					Packet packet = _connection.UnwrapPacket(sub, currentTime);
+					if (packet == null)
+						continue;
+
+					HandlePacket(packet, currentTime);
+
+					// HandlePacket may trigger Cleanup() which nulls _connection
+					if (_connection == null || State == ClientState.Disconnected)
+						return;
+				}
 			}
 
 			if (_connection.HasTimedOut(currentTime))
@@ -260,6 +273,7 @@ namespace Voxelgine.Engine
 			foreach (var rawData in retransmissions)
 			{
 				_transport.SendTo(rawData, _serverEndPoint);
+				_connection.Bandwidth.RecordSent(rawData.Length);
 			}
 
 			if (_connection.State == ConnectionState.Connected && _connection.ShouldSendPing(currentTime))
@@ -384,6 +398,7 @@ namespace Voxelgine.Engine
 		{
 			byte[] raw = _connection.WrapPacket(packet, reliable, currentTime);
 			_transport.SendTo(raw, _serverEndPoint);
+			_connection.Bandwidth.RecordSent(raw.Length);
 		}
 
 		private void Cleanup()

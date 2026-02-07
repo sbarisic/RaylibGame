@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 
 namespace Voxelgine.Engine
@@ -62,6 +63,9 @@ namespace Voxelgine.Engine
 		private float _rtt;
 		private bool _rttInitialized;
 
+		private readonly BandwidthTracker _bandwidth = new();
+		private readonly List<QueuedPacket> _outgoing = new();
+
 		/// <summary>
 		/// The remote endpoint this connection communicates with.
 		/// </summary>
@@ -97,6 +101,11 @@ namespace Voxelgine.Engine
 		/// The underlying reliability channel for this connection.
 		/// </summary>
 		public ReliableChannel Channel => _channel;
+
+		/// <summary>
+		/// Per-connection bandwidth diagnostics tracker.
+		/// </summary>
+		public BandwidthTracker Bandwidth => _bandwidth;
 
 		/// <summary>
 		/// Creates a new connection to the specified remote endpoint.
@@ -223,9 +232,87 @@ namespace Voxelgine.Engine
 			State = ConnectionState.Disconnected;
 		}
 
+		/// <summary>
+		/// Queues a wrapped packet for batched sending at tick end.
+		/// </summary>
+		/// <param name="rawData">Raw bytes from <see cref="WrapPacket"/>.</param>
+		/// <param name="isReliable">Whether this packet requires reliable delivery.</param>
+		public void QueueSend(byte[] rawData, bool isReliable)
+		{
+			_outgoing.Add(new QueuedPacket(rawData, isReliable));
+		}
+
+		/// <summary>
+		/// Flushes all queued packets as batched datagrams via the transport.
+		/// Unreliable packets are added first; if a byte budget is set, excess
+		/// unreliable packets are dropped. Reliable packets are always sent.
+		/// </summary>
+		/// <param name="transport">The UDP transport to send through.</param>
+		/// <param name="currentTime">Current time for bandwidth tracking.</param>
+		/// <param name="maxBytesPerTick">Maximum bytes to send this tick (0 = unlimited).</param>
+		public void FlushOutgoing(UdpTransport transport, float currentTime, int maxBytesPerTick = 0)
+		{
+			if (_outgoing.Count == 0)
+				return;
+
+			_bandwidth.Update(currentTime);
+
+			var toSend = new List<byte[]>();
+			int bytesBudget = maxBytesPerTick > 0 ? maxBytesPerTick : int.MaxValue;
+			int bytesQueued = 0;
+
+			// Reliable packets always sent
+			foreach (var q in _outgoing)
+			{
+				if (q.IsReliable)
+				{
+					toSend.Add(q.RawData);
+					bytesQueued += q.RawData.Length;
+				}
+			}
+
+			// Unreliable packets with budget check
+			foreach (var q in _outgoing)
+			{
+				if (!q.IsReliable)
+				{
+					if (bytesQueued + q.RawData.Length <= bytesBudget)
+					{
+						toSend.Add(q.RawData);
+						bytesQueued += q.RawData.Length;
+					}
+					// else: drop this unreliable packet (bandwidth limit)
+				}
+			}
+
+			_outgoing.Clear();
+
+			var datagrams = PacketBatcher.CreateBatchedDatagrams(toSend);
+			foreach (var dg in datagrams)
+			{
+				transport.SendTo(dg, RemoteEndPoint);
+				_bandwidth.RecordSent(dg.Length);
+			}
+		}
+
+		/// <summary>
+		/// A queued outgoing packet awaiting batch flush.
+		/// </summary>
+		private readonly struct QueuedPacket
+		{
+			public readonly byte[] RawData;
+			public readonly bool IsReliable;
+
+			public QueuedPacket(byte[] rawData, bool isReliable)
+			{
+				RawData = rawData;
+				IsReliable = isReliable;
+			}
+		}
+
 		public override string ToString()
 		{
-			return $"[NetConnection {RemoteEndPoint} PlayerId={PlayerId} State={State} RTT={RoundTripTimeMs}ms Pending={_channel.PendingCount}]";
+			return $"[NetConnection {RemoteEndPoint} PlayerId={PlayerId} State={State} RTT={RoundTripTimeMs}ms Pending={_channel.PendingCount} Out={_bandwidth.BytesSentPerSec}B/s In={_bandwidth.BytesReceivedPerSec}B/s]";
 		}
 	}
 }

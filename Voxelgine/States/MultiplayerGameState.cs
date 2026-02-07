@@ -221,6 +221,27 @@ namespace Voxelgine.States
 			{
 				_simulation.LocalPlayer.UpdateFPSCamera(ref FInfo);
 
+				// Sync render camera from physics camera (GameWindow interpolation only handles single-player GameState)
+				_simulation.LocalPlayer.RenderCam = _simulation.LocalPlayer.Cam;
+
+				// Populate frame info for GameWindow interpolation
+				FInfo.Empty = false;
+				FInfo.Pos = _simulation.LocalPlayer.Camera.Position;
+				FInfo.Cam = _simulation.LocalPlayer.Cam;
+				FInfo.CamAngle = _simulation.LocalPlayer.GetCamAngle();
+				FInfo.FeetPosition = _simulation.LocalPlayer.FeetPosition;
+				FInfo.ViewModelOffset = _simulation.LocalPlayer.ViewMdl.ViewModelOffset;
+				FInfo.ViewModelRot = _simulation.LocalPlayer.ViewMdl.VMRot;
+
+				// Apply interpolation if we have a previous frame
+				if (!LastFrame.Empty)
+				{
+					GameFrameInfo interp = FInfo.Interpolate(LastFrame, TimeAlpha);
+					_simulation.LocalPlayer.RenderCam = interp.Cam;
+					_simulation.LocalPlayer.ViewMdl.ViewModelOffset = interp.ViewModelOffset;
+					_simulation.LocalPlayer.ViewMdl.VMRot = interp.ViewModelRot;
+				}
+
 				// Update remote player interpolation
 				float frameTime = Raylib.GetFrameTime();
 				float currentTime = (float)Raylib.GetTime();

@@ -33,7 +33,7 @@ namespace VoxelgineServer
 		/// <summary>
 		/// Default spawn position for connecting players (center of island, above surface).
 		/// </summary>
-		public static readonly Vector3 DefaultSpawnPosition = new Vector3(16, 73, 16);
+		public static readonly Vector3 DefaultSpawnPosition = new Vector3(30, 66, 24);
 
 		/// <summary>
 		/// File path for the persisted server world.

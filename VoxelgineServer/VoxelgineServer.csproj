@@ -13,4 +13,10 @@
     <ProjectReference Include="..\VoxelgineEngine\VoxelgineEngine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="server_world.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

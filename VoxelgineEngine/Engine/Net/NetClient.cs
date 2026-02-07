@@ -276,6 +276,8 @@ namespace Voxelgine.Engine
 				_connection.Bandwidth.RecordSent(rawData.Length);
 			}
 
+			_connection.CleanupStaleFragments(currentTime);
+
 			if (_connection.State == ConnectionState.Connected && _connection.ShouldSendPing(currentTime))
 			{
 				var ping = _connection.CreatePing(currentTime);
@@ -396,9 +398,7 @@ namespace Voxelgine.Engine
 
 		private void SendInternal(Packet packet, bool reliable, float currentTime)
 		{
-			byte[] raw = _connection.WrapPacket(packet, reliable, currentTime);
-			_transport.SendTo(raw, _serverEndPoint);
-			_connection.Bandwidth.RecordSent(raw.Length);
+			_connection.SendImmediate(packet, reliable, currentTime, _transport);
 		}
 
 		private void Cleanup()

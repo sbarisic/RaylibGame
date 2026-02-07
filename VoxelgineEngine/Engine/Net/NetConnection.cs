@@ -56,6 +56,7 @@ namespace Voxelgine.Engine
 		private const float RttSmoothFactor = 0.8f;
 
 		private readonly ReliableChannel _channel;
+		private readonly PacketFragmenter _fragmenter = new();
 
 		private float _lastReceiveTime;
 		private float _lastPingSentTime;
@@ -103,6 +104,11 @@ namespace Voxelgine.Engine
 		public ReliableChannel Channel => _channel;
 
 		/// <summary>
+		/// The packet fragmenter for splitting large packets and reassembling received fragments.
+		/// </summary>
+		public PacketFragmenter Fragmenter => _fragmenter;
+
+		/// <summary>
 		/// Per-connection bandwidth diagnostics tracker.
 		/// </summary>
 		public BandwidthTracker Bandwidth => _bandwidth;
@@ -136,11 +142,13 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Unwraps a received raw datagram through the reliable channel and
-		/// deserializes the contained packet.
+		/// deserializes the contained packet. Handles fragment reassembly — if the
+		/// unwrapped data is a fragment, it is buffered and null is returned until
+		/// all fragments for the group arrive.
 		/// </summary>
 		/// <param name="rawData">Raw bytes received from UDP.</param>
 		/// <param name="currentTime">Current time in seconds for receive tracking.</param>
-		/// <returns>The deserialized packet, or null if the data was a duplicate, malformed, or empty.</returns>
+		/// <returns>The deserialized packet, or null if the data was a duplicate, malformed, empty, or a partial fragment.</returns>
 		public Packet UnwrapPacket(byte[] rawData, float currentTime)
 		{
 			byte[] packetData = _channel.Unwrap(rawData);
@@ -149,9 +157,13 @@ namespace Voxelgine.Engine
 
 			_lastReceiveTime = currentTime;
 
+			byte[] reassembled = _fragmenter.HandleReceived(packetData, currentTime);
+			if (reassembled == null)
+				return null;
+
 			try
 			{
-				return Packet.Deserialize(packetData);
+				return Packet.Deserialize(reassembled);
 			}
 			catch
 			{
@@ -240,6 +252,75 @@ namespace Voxelgine.Engine
 		public void QueueSend(byte[] rawData, bool isReliable)
 		{
 			_outgoing.Add(new QueuedPacket(rawData, isReliable));
+		}
+
+		/// <summary>
+		/// Serializes, fragments if necessary, wraps through the reliable channel, and
+		/// queues a packet for batched sending at tick end. Large reliable packets are
+		/// automatically split into fragments that each fit within the MTU.
+		/// </summary>
+		/// <param name="packet">The packet to send.</param>
+		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
+		/// <param name="currentTime">Current time in seconds.</param>
+		public void QueuePacket(Packet packet, bool reliable, float currentTime)
+		{
+			byte[] serialized = packet.Serialize();
+
+			if (reliable && _fragmenter.NeedsFragmentation(serialized))
+			{
+				var fragments = _fragmenter.Split(serialized);
+				foreach (var fragment in fragments)
+				{
+					byte[] raw = _channel.Wrap(fragment, true, currentTime);
+					QueueSend(raw, true);
+				}
+			}
+			else
+			{
+				byte[] raw = _channel.Wrap(serialized, reliable, currentTime);
+				QueueSend(raw, reliable);
+			}
+		}
+
+		/// <summary>
+		/// Serializes, fragments if necessary, wraps through the reliable channel, and
+		/// sends a packet immediately through the transport without batching. Used by the
+		/// client for direct sends and the server for disconnect packets.
+		/// </summary>
+		/// <param name="packet">The packet to send.</param>
+		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
+		/// <param name="currentTime">Current time in seconds.</param>
+		/// <param name="transport">The UDP transport to send through.</param>
+		public void SendImmediate(Packet packet, bool reliable, float currentTime, UdpTransport transport)
+		{
+			byte[] serialized = packet.Serialize();
+
+			if (reliable && _fragmenter.NeedsFragmentation(serialized))
+			{
+				var fragments = _fragmenter.Split(serialized);
+				foreach (var fragment in fragments)
+				{
+					byte[] raw = _channel.Wrap(fragment, true, currentTime);
+					transport.SendTo(raw, RemoteEndPoint);
+					_bandwidth.RecordSent(raw.Length);
+				}
+			}
+			else
+			{
+				byte[] raw = _channel.Wrap(serialized, reliable, currentTime);
+				transport.SendTo(raw, RemoteEndPoint);
+				_bandwidth.RecordSent(raw.Length);
+			}
+		}
+
+		/// <summary>
+		/// Cleans up incomplete fragment groups that have exceeded the stale timeout.
+		/// Should be called periodically (e.g., once per tick).
+		/// </summary>
+		/// <param name="currentTime">Current time in seconds.</param>
+		public void CleanupStaleFragments(float currentTime)
+		{
+			_fragmenter.CleanupStaleGroups(currentTime);
 		}
 
 		/// <summary>

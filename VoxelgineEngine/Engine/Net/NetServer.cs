@@ -174,6 +174,8 @@ namespace Voxelgine.Engine
 					connection.QueueSend(rawData, true);
 				}
 
+				connection.CleanupStaleFragments(currentTime);
+
 				if (connection.State == ConnectionState.Connected && connection.ShouldSendPing(currentTime))
 				{
 					var ping = connection.CreatePing(currentTime);
@@ -429,9 +431,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void SendDirect(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
-			byte[] raw = connection.WrapPacket(packet, reliable, currentTime);
-			_transport.SendTo(raw, connection.RemoteEndPoint);
-			connection.Bandwidth.RecordSent(raw.Length);
+			connection.SendImmediate(packet, reliable, currentTime, _transport);
 		}
 
 		/// <summary>
@@ -439,8 +439,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void QueuePacket(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
-			byte[] raw = connection.WrapPacket(packet, reliable, currentTime);
-			connection.QueueSend(raw, reliable);
+			connection.QueuePacket(packet, reliable, currentTime);
 		}
 
 		/// <summary>

@@ -23,6 +23,8 @@ namespace Voxelgine.Engine.DI
 
 		public NPCPreviewState NPCPreviewState { get; set; }
 
+		public MultiplayerGameState MultiplayerGameState { get; set; }
+
 		//public IFishLogging Logging { get; set; }
 
 		public void Init();

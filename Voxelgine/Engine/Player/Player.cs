@@ -106,6 +106,20 @@ namespace Voxelgine.Engine
 
 		}
 
+		/// <summary>
+		/// Server-side constructor. Creates a player instance for authoritative simulation
+		/// without any presentation dependencies (no GUI, sound, viewmodel, or Raylib calls).
+		/// </summary>
+		public Player(IFishEngineRunner Eng, int playerId)
+		{
+			this.Eng = Eng;
+			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
+			this.LocalPlayer = false;
+			this.PlayerId = playerId;
+			Camera = new FPSCamera(0.35f);
+			Position = Vector3.Zero;
+		}
+
 		public void SetPosition(int X, int Y, int Z)
 		{
 			Position = Camera.Position = new Vector3(X, Y, Z);
@@ -154,6 +168,17 @@ namespace Voxelgine.Engine
 		}
 
 		public void UpdateFPSCamera(ref GameFrameInfo FInfo)
+		{
+			Fwd = Camera.GetForward();
+			Left = Camera.GetLeft();
+			Up = Camera.GetUp();
+		}
+
+		/// <summary>
+		/// Updates cached direction vectors (Forward, Left, Up) from the FPSCamera.
+		/// Used by the server where <see cref="GameFrameInfo"/> is not available.
+		/// </summary>
+		public void UpdateDirectionVectors()
 		{
 			Fwd = Camera.GetForward();
 			Left = Camera.GetLeft();

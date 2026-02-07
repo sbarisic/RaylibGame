@@ -497,6 +497,14 @@ namespace Voxelgine.States
 		{
 			LocalPlayer.UpdateFPSCamera(ref FInfo);
 
+			// Update remote player interpolation
+			float frameTime = Raylib.GetFrameTime();
+			float currentTime = (float)Raylib.GetTime();
+			foreach (var remotePlayer in Players.GetAllRemotePlayers())
+			{
+				remotePlayer.Update(currentTime, frameTime);
+			}
+
 			// Use sky color from day/night cycle
 			Raylib.ClearBackground(DayNight.SkyColor);
 
@@ -639,6 +647,12 @@ namespace Voxelgine.States
 
 			// Draw entities and effects
 			Entities.Draw3D(TimeAlpha, ref LastFrame);
+
+			// Draw remote players
+			foreach (var remotePlayer in Players.GetAllRemotePlayers())
+			{
+				remotePlayer.Draw3D();
+			}
 
 			DrawBlockPlacementPreview();
 

@@ -10,6 +10,7 @@ namespace Voxelgine.Engine
 	public class PlayerManager
 	{
 		private readonly Dictionary<int, Player> _players = new();
+		private readonly Dictionary<int, RemotePlayer> _remotePlayers = new();
 		private int _localPlayerId;
 
 		/// <summary>
@@ -40,6 +41,7 @@ namespace Voxelgine.Engine
 		/// <returns>True if the player was found and removed.</returns>
 		public bool RemovePlayer(int id)
 		{
+			_remotePlayers.Remove(id);
 			return _players.Remove(id);
 		}
 
@@ -72,5 +74,57 @@ namespace Voxelgine.Engine
 		/// Gets the number of connected players.
 		/// </summary>
 		public int Count => _players.Count;
+
+		/// <summary>
+		/// Gets the local player's ID.
+		/// </summary>
+		public int LocalPlayerId => _localPlayerId;
+
+		/// <summary>
+		/// Adds a remote player for client-side rendering.
+		/// </summary>
+		public void AddRemotePlayer(RemotePlayer remotePlayer)
+		{
+			_remotePlayers[remotePlayer.PlayerId] = remotePlayer;
+		}
+
+		/// <summary>
+		/// Removes a remote player by ID.
+		/// </summary>
+		/// <returns>True if the remote player was found and removed.</returns>
+		public bool RemoveRemotePlayer(int id)
+		{
+			return _remotePlayers.Remove(id);
+		}
+
+		/// <summary>
+		/// Gets a remote player by ID, or null if not found.
+		/// </summary>
+		public RemotePlayer GetRemotePlayer(int id)
+		{
+			_remotePlayers.TryGetValue(id, out RemotePlayer player);
+			return player;
+		}
+
+		/// <summary>
+		/// Returns all remote players (for rendering).
+		/// </summary>
+		public IEnumerable<RemotePlayer> GetAllRemotePlayers()
+		{
+			return _remotePlayers.Values;
+		}
+
+		/// <summary>
+		/// Gets the number of remote players.
+		/// </summary>
+		public int RemotePlayerCount => _remotePlayers.Count;
+
+		/// <summary>
+		/// Removes all remote players (e.g., on disconnect).
+		/// </summary>
+		public void ClearRemotePlayers()
+		{
+			_remotePlayers.Clear();
+		}
 	}
 }

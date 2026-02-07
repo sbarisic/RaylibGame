@@ -90,6 +90,12 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public int ServerTick { get; private set; }
 
+		/// <summary>
+		/// World generation seed sent to connecting clients in <see cref="ConnectAcceptPacket"/>.
+		/// Set this before calling <see cref="Start"/> so clients receive the correct seed.
+		/// </summary>
+		public int WorldSeed { get; set; }
+
 		public NetServer()
 		{
 			_transport = new UdpTransport();
@@ -342,11 +348,11 @@ namespace Voxelgine.Engine
 			_usedPlayerIds.Add(playerId);
 
 			var accept = new ConnectAcceptPacket
-			{
-				PlayerId = playerId,
-				ServerTick = ServerTick,
-				WorldSeed = 0,
-			};
+				{
+					PlayerId = playerId,
+					ServerTick = ServerTick,
+					WorldSeed = WorldSeed,
+				};
 			SendRaw(tempConnection, accept, true, currentTime);
 
 			OnClientConnected?.Invoke(tempConnection);

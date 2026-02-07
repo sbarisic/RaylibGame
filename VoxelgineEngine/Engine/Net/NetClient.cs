@@ -54,6 +54,7 @@ namespace Voxelgine.Engine
 	{
 		private readonly UdpTransport _transport;
 		private readonly ConcurrentQueue<byte[]> _receiveQueue = new();
+		private readonly WorldReceiver _worldReceiver = new();
 
 		private NetConnection _connection;
 		private IPEndPoint _serverEndPoint;
@@ -79,10 +80,27 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Fired for each non-system packet received from the server.
-		/// System packets (ConnectAccept, ConnectReject, Disconnect, Ping, Pong) are handled internally.
+		/// System packets (ConnectAccept, ConnectReject, Disconnect, Ping, Pong) and
+		/// world data packets (WorldData, WorldDataComplete) are handled internally.
 		/// Called on the game thread during <see cref="Tick"/>.
 		/// </summary>
 		public event Action<Packet> OnPacketReceived;
+
+		/// <summary>
+		/// Fired when all world data fragments have been received and checksum-verified.
+		/// The parameter is the GZip-compressed world data byte array, ready to be loaded
+		/// via <c>ChunkMap.Read(new MemoryStream(data))</c>. The game loop should load the
+		/// world and then call <see cref="FinishLoading"/> to transition to Playing state.
+		/// Called on the game thread during <see cref="Tick"/>.
+		/// </summary>
+		public event Action<byte[]> OnWorldDataReady;
+
+		/// <summary>
+		/// Fired when the world data transfer fails (checksum mismatch, missing fragments, etc.).
+		/// The parameter is a human-readable error message.
+		/// Called on the game thread during <see cref="Tick"/>.
+		/// </summary>
+		public event Action<string> OnWorldTransferFailed;
 
 		/// <summary>
 		/// The current client connection state.
@@ -115,9 +133,26 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public bool IsConnected => State != ClientState.Disconnected;
 
+		/// <summary>
+		/// The local tick counter. Initialized from the server tick on connection acceptance.
+		/// The game loop should increment this each fixed timestep and use it to label
+		/// outgoing <see cref="InputStatePacket"/> packets.
+		/// </summary>
+		public int LocalTick { get; set; }
+
+		/// <summary>
+		/// The world data receiver for tracking loading progress.
+		/// Use <see cref="WorldReceiver.Progress"/> (0.0–1.0) and
+		/// <see cref="WorldReceiver.FragmentsReceived"/> / <see cref="WorldReceiver.TotalFragments"/>
+		/// to display loading status.
+		/// </summary>
+		public WorldReceiver WorldReceiver => _worldReceiver;
+
 		public NetClient()
 		{
 			_transport = new UdpTransport();
+			_worldReceiver.OnWorldDataReady += HandleWorldDataReady;
+			_worldReceiver.OnTransferFailed += HandleWorldTransferFailed;
 		}
 
 		/// <summary>
@@ -298,6 +333,16 @@ namespace Voxelgine.Engine
 					_connection.ProcessPong(pong);
 					break;
 
+				case WorldDataPacket worldData:
+					_worldReceiver.HandleWorldData(worldData);
+					// Try assembly after each fragment in case complete packet arrived first
+					_worldReceiver.TryAssemble();
+					break;
+
+				case WorldDataCompletePacket worldComplete:
+					_worldReceiver.HandleWorldDataComplete(worldComplete);
+					break;
+
 				default:
 					OnPacketReceived?.Invoke(packet);
 					break;
@@ -311,6 +356,7 @@ namespace Voxelgine.Engine
 
 			_connection.PlayerId = accept.PlayerId;
 			_connection.State = ConnectionState.Connected;
+			LocalTick = accept.ServerTick;
 			State = ClientState.Loading;
 
 			OnConnected?.Invoke(accept);
@@ -324,6 +370,16 @@ namespace Voxelgine.Engine
 			OnDisconnected?.Invoke(reject.Reason);
 		}
 
+		private void HandleWorldDataReady(byte[] worldData)
+		{
+			OnWorldDataReady?.Invoke(worldData);
+		}
+
+		private void HandleWorldTransferFailed(string error)
+		{
+			OnWorldTransferFailed?.Invoke(error);
+		}
+
 		private void SendInternal(Packet packet, bool reliable, float currentTime)
 		{
 			byte[] raw = _connection.WrapPacket(packet, reliable, currentTime);
@@ -333,9 +389,12 @@ namespace Voxelgine.Engine
 		private void Cleanup()
 		{
 			State = ClientState.Disconnected;
+			LocalTick = 0;
 
 			_transport.OnDataReceived -= QueueReceivedData;
 			_transport.Close();
+
+			_worldReceiver.Reset();
 
 			_connection = null;
 			_serverEndPoint = null;

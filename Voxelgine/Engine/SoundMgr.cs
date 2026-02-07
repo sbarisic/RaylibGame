@@ -49,7 +49,8 @@ namespace Voxelgine.Engine
 
 		public void Init()
 		{
-			Raylib.InitAudioDevice();
+			if (!Raylib.IsAudioDeviceReady())
+				Raylib.InitAudioDevice();
 
 			Raylib.SetMasterVolume(0.7f);
 

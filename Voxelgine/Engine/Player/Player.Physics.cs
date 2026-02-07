@@ -299,7 +299,7 @@ namespace Voxelgine.Engine
 			bool activelySwimming = wishdir != Vector3.Zero;
 
 			// --- Play swimming sound when actively moving in water ---
-			if (activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
+			if (Snd != null && activelySwimming && LegTimer.ElapsedMilliseconds > LastSwimSound + 600)
 			{
 				LastSwimSound = LegTimer.ElapsedMilliseconds;
 				Vector3 Fwd = Camera.GetForward();
@@ -649,6 +649,9 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void PhysicsHit(Vector3 Pos, float Force, bool Side, bool Feet, bool Walk, bool Jump)
 		{
+			if (Snd == null)
+				return;
+
 			Vector3 Fwd = Camera.GetForward();
 			if (Walk)
 			{

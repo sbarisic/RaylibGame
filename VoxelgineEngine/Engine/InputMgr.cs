@@ -84,6 +84,11 @@ namespace Voxelgine.Engine
 		InputState InputState_Last;
 		IInputSource _inputSource;
 
+		/// <summary>
+		/// Gets the current input state snapshot.
+		/// </summary>
+		public InputState State => InputState_Cur;
+
 		public InputMgr(IInputSource inputSource)
 		{
 			_inputSource = inputSource;

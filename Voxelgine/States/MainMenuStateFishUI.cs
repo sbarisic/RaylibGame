@@ -7,6 +7,8 @@ using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.GUI;
 
+using Thread = System.Threading.Thread;
+
 namespace Voxelgine.States
 {
 	/// <summary>
@@ -18,9 +20,17 @@ namespace Voxelgine.States
 		private Window _mainWindow;
 		private Window _optionsWindow;
 		private Window _connectWindow;
+		private Window _hostWindow;
 		private ImageBox _titleLogo;
 		private float _totalTime;
 		private IFishLogging Logging;
+
+		/// <summary>
+		/// The hosted server instance when the player is hosting a game.
+		/// Null when not hosting.
+		/// </summary>
+		private ServerLoop _hostedServer;
+		private Thread _hostThread;
 
 		public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
@@ -31,6 +41,7 @@ namespace Voxelgine.States
 			CreateMainMenu();
 			CreateOptionsWindow();
 			CreateConnectWindow();
+			CreateHostWindow();
 		}
 
 		private void CreateTitleLogo()
@@ -62,7 +73,7 @@ namespace Voxelgine.States
 		private void CreateMainMenu()
 		{
 			// Calculate centered position
-			var windowSize = new Vector2(320, 400);
+			var windowSize = new Vector2(320, 460);
 			var windowPos = new Vector2(
 				(Window.Width / 2f) - (windowSize.X / 2f),
 				(Window.Height / 1.65f) - (windowSize.Y / 2f)
@@ -117,10 +128,23 @@ namespace Voxelgine.States
 			};
 			scrollPane.AddChild(btnMultiplayer);
 
+			// Host Game button
+			var btnHost = new Button();
+			btnHost.Text = "Host Game";
+			btnHost.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
+			btnHost.Size = new Vector2(contentWidth, buttonHeight);
+			btnHost.TooltipText = "Host a multiplayer game";
+			btnHost.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				_hostWindow.Visible = true;
+				_hostWindow.BringToFront();
+			};
+			scrollPane.AddChild(btnHost);
+
 			// NPC Preview button
 			var btnNPCPreview = new Button();
 			btnNPCPreview.Text = "NPC Preview";
-			btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
+			btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
 			btnNPCPreview.Size = new Vector2(contentWidth, buttonHeight);
 			btnNPCPreview.TooltipText = "Preview NPC models and animations";
 			btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
@@ -132,7 +156,7 @@ namespace Voxelgine.States
 			// Options button
 			var btnOptions = new Button();
 			btnOptions.Text = "Options";
-			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
 			btnOptions.Size = new Vector2(contentWidth, buttonHeight);
 			btnOptions.TooltipText = "Configure game settings";
 			btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
@@ -145,7 +169,7 @@ namespace Voxelgine.States
 			// Quit button
 			var btnQuit = new Button();
 			btnQuit.Text = "Quit";
-			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
+			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 5);
 			btnQuit.Size = new Vector2(contentWidth, buttonHeight);
 			btnQuit.TooltipText = "Exit the game";
 			btnQuit.OnButtonPressed += (sender, mbtn, pos) =>
@@ -442,6 +466,220 @@ namespace Voxelgine.States
 			_gui.AddControl(_connectWindow);
 		}
 
+		private void CreateHostWindow()
+		{
+			var windowSize = new Vector2(360, 360);
+			var windowPos = new Vector2(
+				(Window.Width / 2f) - (windowSize.X / 2f),
+				(Window.Height / 2f) - (windowSize.Y / 2f)
+			);
+
+			_hostWindow = new Window
+			{
+				Title = "Host Game",
+				Position = windowPos,
+				Size = windowSize,
+				IsResizable = false,
+				ShowCloseButton = true,
+				Visible = false
+			};
+
+			_hostWindow.OnClosed += (window) =>
+			{
+				_hostWindow.Visible = false;
+			};
+
+			float labelW = 100f;
+			float inputW = windowSize.X - labelW - 50f;
+			float rowH = 28f;
+			float rowSpacing = 12f;
+			float marginX = 15f;
+			float startY = 15f;
+
+			// Port label + input
+			var lblPort = new Label
+			{
+				Text = "Port:",
+				Position = new Vector2(marginX, startY),
+				Size = new Vector2(labelW, rowH)
+			};
+			_hostWindow.AddChild(lblPort);
+
+			var txtPort = new Textbox
+			{
+				Text = "7777",
+				Position = new Vector2(marginX + labelW, startY),
+				Size = new Vector2(inputW, rowH),
+				ID = "host_port"
+			};
+			_hostWindow.AddChild(txtPort);
+
+			// Player name label + input
+			float row2Y = startY + rowH + rowSpacing;
+			var lblName = new Label
+			{
+				Text = "Name:",
+				Position = new Vector2(marginX, row2Y),
+				Size = new Vector2(labelW, rowH)
+			};
+			_hostWindow.AddChild(lblName);
+
+			var txtName = new Textbox
+			{
+				Text = "Player",
+				Position = new Vector2(marginX + labelW, row2Y),
+				Size = new Vector2(inputW, rowH),
+				ID = "host_name"
+			};
+			_hostWindow.AddChild(txtName);
+
+			// World seed label + input
+			float row3Y = row2Y + rowH + rowSpacing;
+			var lblSeed = new Label
+			{
+				Text = "World Seed:",
+				Position = new Vector2(marginX, row3Y),
+				Size = new Vector2(labelW, rowH)
+			};
+			_hostWindow.AddChild(lblSeed);
+
+			var txtSeed = new Textbox
+			{
+				Text = "666",
+				Position = new Vector2(marginX + labelW, row3Y),
+				Size = new Vector2(inputW, rowH),
+				ID = "host_seed"
+			};
+			_hostWindow.AddChild(txtSeed);
+
+			// Status label
+			float statusY = row3Y + rowH + rowSpacing * 2;
+			var lblStatus = new Label
+			{
+				Text = "",
+				Position = new Vector2(marginX, statusY),
+				Size = new Vector2(windowSize.X - marginX * 2 - 20, rowH),
+				ID = "host_status"
+			};
+			_hostWindow.AddChild(lblStatus);
+
+			// Host button
+			float btnY = statusY + rowH + rowSpacing;
+			float btnW = 120f;
+			float btnH = 40f;
+			float btnSpacing = 15f;
+			float totalBtnW = btnW * 2 + btnSpacing;
+			float btnStartX = (windowSize.X - totalBtnW - 20) / 2f;
+
+			var btnHost = new Button
+			{
+				Text = "Host",
+				Position = new Vector2(btnStartX, btnY),
+				Size = new Vector2(btnW, btnH),
+				ID = "host_btn"
+			};
+			btnHost.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				var portBox = _gui.FindControl<Textbox>("host_port");
+				var nameBox = _gui.FindControl<Textbox>("host_name");
+				var seedBox = _gui.FindControl<Textbox>("host_seed");
+				var statusLabel = _gui.FindControl<Label>("host_status");
+
+				string portStr = portBox?.Text?.Trim() ?? "7777";
+				string playerName = nameBox?.Text?.Trim() ?? "Player";
+				string seedStr = seedBox?.Text?.Trim() ?? "666";
+
+				if (!int.TryParse(portStr, out int port) || port < 1 || port > 65535)
+				{
+					if (statusLabel != null) statusLabel.Text = "Error: Invalid port (1-65535)";
+					return;
+				}
+
+				if (string.IsNullOrEmpty(playerName))
+				{
+					playerName = "Player";
+				}
+
+				if (!int.TryParse(seedStr, out int seed))
+				{
+					seed = new Random().Next();
+				}
+
+				// Stop any previously hosted server
+				StopHostedServer();
+
+				if (statusLabel != null) statusLabel.Text = "Starting server...";
+
+				try
+				{
+					_hostedServer = new ServerLoop();
+					int capturedPort = port;
+					int capturedSeed = seed;
+
+					_hostThread = new Thread(() =>
+					{
+						try
+						{
+							_hostedServer.Start(capturedPort, capturedSeed);
+						}
+						catch (Exception ex)
+						{
+							Logging?.WriteLine($"Hosted server error: {ex.Message}");
+						}
+					});
+					_hostThread.IsBackground = true;
+					_hostThread.Name = "HostedServer";
+					_hostThread.Start();
+
+					// Wait briefly for the server to start listening
+					Thread.Sleep(500);
+
+					_hostWindow.Visible = false;
+
+					// Connect the local client to the hosted server
+					var mpState = Eng.MultiplayerGameState;
+					Eng.DI.GetRequiredService<IGameWindow>().SetState(mpState);
+					mpState.Connect("127.0.0.1", port, playerName);
+				}
+				catch (Exception ex)
+				{
+					if (statusLabel != null) statusLabel.Text = $"Error: {ex.Message}";
+					StopHostedServer();
+				}
+			};
+			_hostWindow.AddChild(btnHost);
+
+			// Cancel button
+			var btnCancel = new Button
+			{
+				Text = "Cancel",
+				Position = new Vector2(btnStartX + btnW + btnSpacing, btnY),
+				Size = new Vector2(btnW, btnH)
+			};
+			btnCancel.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				_hostWindow.Visible = false;
+			};
+			_hostWindow.AddChild(btnCancel);
+
+			_gui.AddControl(_hostWindow);
+		}
+
+		/// <summary>
+		/// Stops the hosted server if one is running.
+		/// </summary>
+		public void StopHostedServer()
+		{
+			if (_hostedServer != null)
+			{
+				_hostedServer.Stop();
+				_hostThread?.Join(3000);
+				_hostedServer.Dispose();
+				_hostedServer = null;
+				_hostThread = null;
+			}
+		}
+
 		private void RefreshOptionsValues()
 		{
 			var configVars = Eng.DI.GetRequiredService<GameConfig>().GetVariables().ToArray();
@@ -458,6 +696,9 @@ namespace Voxelgine.States
 		public override void SwapTo()
 		{
 			Raylib.EnableCursor();
+
+			// Stop any hosted server when returning to the main menu
+			StopHostedServer();
 		}
 
 		public override void Tick(float GameTime)
@@ -496,6 +737,12 @@ namespace Voxelgine.States
 			_connectWindow.Position = new Vector2(
 				(window.Width / 2f) - (conSize.X / 2f),
 				(window.Height / 2f) - (conSize.Y / 2f)
+			);
+
+			var hostSize = _hostWindow.Size;
+			_hostWindow.Position = new Vector2(
+				(window.Width / 2f) - (hostSize.X / 2f),
+				(window.Height / 2f) - (hostSize.Y / 2f)
 			);
 		}
 	}

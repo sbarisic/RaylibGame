@@ -6,7 +6,7 @@ using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.States;
 
-namespace VoxelgineServer
+namespace Voxelgine.Engine
 {
 	/// <summary>
 	/// Dedicated headless server loop. Owns a <see cref="NetServer"/> and <see cref="GameSimulation"/>,

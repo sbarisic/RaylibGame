@@ -1,4 +1,6 @@
-﻿namespace VoxelgineServer
+﻿using Voxelgine.Engine;
+
+namespace VoxelgineServer
 {
 	internal class Program
 	{

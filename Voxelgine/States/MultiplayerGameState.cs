@@ -79,6 +79,12 @@ namespace Voxelgine.States
 		IGameWindow _gameWindow;
 		IFishLogging _logging;
 
+		/// <summary>
+		/// Returns true when the multiplayer client is actively connected and in-game.
+		/// Used by weapon/gameplay code to decide whether to use the multiplayer path.
+		/// </summary>
+		public bool IsActive => _initialized && _client != null && _client.IsConnected;
+
 		public MultiplayerGameState(IGameWindow window, IFishEngineRunner eng) : base(window, eng)
 		{
 			_gameWindow = window;
@@ -217,15 +223,19 @@ namespace Voxelgine.States
 				);
 				_client.Send(inputPacket, false, currentTime);
 
-				// Apply local prediction (same physics as server)
-				_simulation.LocalPlayer.UpdatePhysics(_simulation.Map, _simulation.PhysicsData, Dt, InMgr);
+				// Skip prediction for dead players — server won't process input
+				if (!_simulation.LocalPlayer.IsDead)
+				{
+					// Apply local prediction (same physics as server)
+					_simulation.LocalPlayer.UpdatePhysics(_simulation.Map, _simulation.PhysicsData, Dt, InMgr);
 
-				// Record predicted state
-				_prediction.RecordPrediction(
-					_client.LocalTick,
-					_simulation.LocalPlayer.Position,
-					_simulation.LocalPlayer.GetVelocity()
-				);
+					// Record predicted state
+					_prediction.RecordPrediction(
+						_client.LocalTick,
+						_simulation.LocalPlayer.Position,
+						_simulation.LocalPlayer.GetVelocity()
+					);
+				}
 
 				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
 				// UpdateLockstep is still called for any non-authoritative cleanup.
@@ -389,6 +399,15 @@ namespace Voxelgine.States
 			// Network info
 			string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
 			Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
+
+			// Health bar
+			DrawHealthBar();
+
+			// Death screen overlay
+			if (_simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead)
+			{
+				DrawDeathOverlay();
+			}
 		  }
 		  catch (Exception ex)
 		  {
@@ -591,10 +610,14 @@ namespace Voxelgine.States
 								HandleEntitySnapshot(entitySnapshot, currentTime);
 								break;
 
-							case WeaponFireEffectPacket fireEffect:
-								HandleWeaponFireEffect(fireEffect);
-								break;
-						}
+								case WeaponFireEffectPacket fireEffect:
+									HandleWeaponFireEffect(fireEffect);
+									break;
+
+								case PlayerDamagePacket damage:
+									HandlePlayerDamage(damage);
+									break;
+							}
 		}
 
 		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, float currentTime)
@@ -606,6 +629,9 @@ namespace Voxelgine.States
 			{
 				if (entry.PlayerId == _client.PlayerId)
 				{
+					// Sync health from server
+					_simulation.LocalPlayer.Health = entry.Health;
+
 					// Local player — reconciliation
 					bool needsCorrection = _prediction.ProcessServerSnapshot(
 						snapshot.TickNumber,
@@ -946,6 +972,14 @@ namespace Voxelgine.States
 					}
 					break;
 
+				case FireHitType.Player:
+					// Blood particles for player hits
+					for (int i = 0; i < 8; i++)
+					{
+						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+					}
+					break;
+
 				case FireHitType.World:
 					// Spark particles
 					for (int i = 0; i < 6; i++)
@@ -964,6 +998,90 @@ namespace Voxelgine.States
 					}
 					break;
 			}
+		}
+
+		/// <summary>
+		/// Handles a <see cref="PlayerDamagePacket"/> from the server.
+		/// Updates local player health and logs damage events.
+		/// </summary>
+		private void HandlePlayerDamage(PlayerDamagePacket packet)
+		{
+			if (_simulation == null)
+				return;
+
+			if (packet.TargetPlayerId == _client.PlayerId)
+			{
+				// Local player took damage — health is synced via WorldSnapshot
+				_logging.WriteLine($"MultiplayerGameState: Took {packet.DamageAmount} damage from player [{packet.SourcePlayerId}]. Health: {_simulation.LocalPlayer.Health}");
+			}
+		}
+
+		/// <summary>
+		/// Draws the player health bar in the bottom-center of the screen.
+		/// </summary>
+		private void DrawHealthBar()
+		{
+			if (_simulation?.LocalPlayer == null)
+				return;
+
+			float health = _simulation.LocalPlayer.Health;
+			float maxHealth = _simulation.LocalPlayer.MaxHealth;
+			float ratio = Math.Clamp(health / maxHealth, 0f, 1f);
+
+			int screenW = _gameWindow.Width;
+			int screenH = _gameWindow.Height;
+
+			int barW = 200;
+			int barH = 16;
+			int barX = (screenW - barW) / 2;
+			int barY = screenH - 40;
+
+			// Background
+			Raylib.DrawRectangle(barX - 1, barY - 1, barW + 2, barH + 2, new Color(0, 0, 0, 180));
+
+			// Health fill — green > 60%, yellow > 30%, red otherwise
+			Color barColor;
+			if (ratio > 0.6f)
+				barColor = new Color(50, 200, 50, 230);
+			else if (ratio > 0.3f)
+				barColor = new Color(220, 200, 30, 230);
+			else
+				barColor = new Color(220, 40, 40, 230);
+
+			Raylib.DrawRectangle(barX, barY, (int)(barW * ratio), barH, barColor);
+
+			// Border
+			Raylib.DrawRectangleLines(barX, barY, barW, barH, Color.White);
+
+			// Text
+			string healthText = $"{(int)health} / {(int)maxHealth}";
+			int textW = Raylib.MeasureText(healthText, 14);
+			Raylib.DrawText(healthText, barX + (barW - textW) / 2, barY + 1, 14, Color.White);
+		}
+
+		/// <summary>
+		/// Draws a death screen overlay when the local player is dead.
+		/// Shows a dark red tint, "YOU DIED" text, and a respawn countdown.
+		/// </summary>
+		private void DrawDeathOverlay()
+		{
+			int screenW = _gameWindow.Width;
+			int screenH = _gameWindow.Height;
+
+			// Dark red tint over entire screen
+			Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(100, 0, 0, 140));
+
+			// "YOU DIED" text
+			string deathText = "YOU DIED";
+			int deathFontSize = 60;
+			int deathTextW = Raylib.MeasureText(deathText, deathFontSize);
+			Raylib.DrawText(deathText, (screenW - deathTextW) / 2, screenH / 2 - 50, deathFontSize, new Color(220, 30, 30, 255));
+
+			// Respawn message
+			string respawnText = "Respawning...";
+			int respawnFontSize = 24;
+			int respawnTextW = Raylib.MeasureText(respawnText, respawnFontSize);
+			Raylib.DrawText(respawnText, (screenW - respawnTextW) / 2, screenH / 2 + 30, respawnFontSize, new Color(200, 200, 200, 200));
 		}
 
 		// ======================================= Helper Methods =================================================

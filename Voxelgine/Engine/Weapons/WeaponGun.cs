@@ -67,7 +67,7 @@ namespace Voxelgine.Engine
 
 			// In multiplayer, send fire packet to server for authoritative hit resolution
 			var mpState = Eng.MultiplayerGameState;
-			if (mpState != null)
+			if (mpState != null && mpState.IsActive)
 			{
 				mpState.SendWeaponFire(E.Start, E.Dir);
 				return;

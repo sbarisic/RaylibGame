@@ -86,6 +86,9 @@ namespace Voxelgine.Engine
 		World = 1,
 
 		/// <summary>Hit an entity (NPC, pickup, door, etc.).</summary>
-		Entity = 2
+		Entity = 2,
+
+		/// <summary>Hit another player.</summary>
+		Player = 3
 	}
 }

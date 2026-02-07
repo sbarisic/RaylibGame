@@ -58,6 +58,33 @@ namespace Voxelgine.Engine
 		/// <summary>Unique player identifier. 0 for local player in single-player.</summary>
 		public int PlayerId { get; private set; }
 
+		/// <summary>Current health. Server-authoritative in multiplayer.</summary>
+		public float Health { get; set; } = 100f;
+
+		/// <summary>Maximum health value.</summary>
+		public float MaxHealth { get; set; } = 100f;
+
+		/// <summary>True when health is at or below zero.</summary>
+		public bool IsDead => Health <= 0f;
+
+		/// <summary>
+		/// Applies damage to the player, clamping health to zero.
+		/// </summary>
+		public void TakeDamage(float amount)
+		{
+			if (IsDead)
+				return;
+			Health = MathF.Max(0f, Health - amount);
+		}
+
+		/// <summary>
+		/// Resets health to <see cref="MaxHealth"/> (used on respawn).
+		/// </summary>
+		public void ResetHealth()
+		{
+			Health = MaxHealth;
+		}
+
 		/// <summary>Player collision cylinder height in world units.</summary>
 		public const float PlayerHeight = 1.7f;
 		/// <summary>Eye position offset from feet (camera height).</summary>

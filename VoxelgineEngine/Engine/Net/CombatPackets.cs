@@ -47,6 +47,9 @@ namespace Voxelgine.Engine
 		/// <summary>Network ID of the entity that was hit (0 = none).</summary>
 		public int EntityNetworkId { get; set; }
 
+		/// <summary>Player ID of the player that was hit (-1 = none).</summary>
+		public int HitPlayerId { get; set; } = -1;
+
 		public override void Write(BinaryWriter writer)
 		{
 			writer.Write(PlayerId);
@@ -57,6 +60,7 @@ namespace Voxelgine.Engine
 			writer.WriteVector3(HitNormal);
 			writer.Write(HitType);
 			writer.Write(EntityNetworkId);
+			writer.Write(HitPlayerId);
 		}
 
 		public override void Read(BinaryReader reader)
@@ -69,6 +73,7 @@ namespace Voxelgine.Engine
 			HitNormal = reader.ReadVector3();
 			HitType = reader.ReadByte();
 			EntityNetworkId = reader.ReadInt32();
+			HitPlayerId = reader.ReadInt32();
 		}
 	}
 

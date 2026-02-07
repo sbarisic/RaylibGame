@@ -17,6 +17,7 @@ namespace Voxelgine.States
 		private FishUIManager _gui;
 		private Window _mainWindow;
 		private Window _optionsWindow;
+		private Window _connectWindow;
 		private ImageBox _titleLogo;
 		private float _totalTime;
 		private IFishLogging Logging;
@@ -29,6 +30,7 @@ namespace Voxelgine.States
 			CreateTitleLogo();
 			CreateMainMenu();
 			CreateOptionsWindow();
+			CreateConnectWindow();
 		}
 
 		private void CreateTitleLogo()
@@ -107,12 +109,11 @@ namespace Voxelgine.States
 			btnMultiplayer.Text = "Multiplayer";
 			btnMultiplayer.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 1);
 			btnMultiplayer.Size = new Vector2(contentWidth, buttonHeight);
-			btnMultiplayer.TooltipText = "Connect to a multiplayer server (localhost)";
+			btnMultiplayer.TooltipText = "Connect to a multiplayer server";
 			btnMultiplayer.OnButtonPressed += (sender, mbtn, pos) =>
 			{
-				var mpState = Eng.MultiplayerGameState;
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(mpState);
-				mpState.Connect("127.0.0.1", 7777, "Player");
+				_connectWindow.Visible = true;
+				_connectWindow.BringToFront();
 			};
 			scrollPane.AddChild(btnMultiplayer);
 
@@ -277,6 +278,170 @@ namespace Voxelgine.States
 			_gui.AddControl(_optionsWindow);
 		}
 
+		private void CreateConnectWindow()
+		{
+			var windowSize = new Vector2(360, 300);
+			var windowPos = new Vector2(
+				(Window.Width / 2f) - (windowSize.X / 2f),
+				(Window.Height / 2f) - (windowSize.Y / 2f)
+			);
+
+			_connectWindow = new Window
+			{
+				Title = "Connect to Server",
+				Position = windowPos,
+				Size = windowSize,
+				IsResizable = false,
+				ShowCloseButton = true,
+				Visible = false
+			};
+
+			_connectWindow.OnClosed += (window) =>
+			{
+				_connectWindow.Visible = false;
+			};
+
+			float labelW = 100f;
+			float inputW = windowSize.X - labelW - 50f;
+			float rowH = 28f;
+			float rowSpacing = 12f;
+			float marginX = 15f;
+			float startY = 15f;
+
+			// Server IP label + input
+			var lblHost = new Label
+			{
+				Text = "Server IP:",
+				Position = new Vector2(marginX, startY),
+				Size = new Vector2(labelW, rowH)
+			};
+			_connectWindow.AddChild(lblHost);
+
+			var txtHost = new Textbox
+			{
+				Text = "127.0.0.1",
+				Position = new Vector2(marginX + labelW, startY),
+				Size = new Vector2(inputW, rowH),
+				ID = "connect_host"
+			};
+			_connectWindow.AddChild(txtHost);
+
+			// Port label + input
+			float row2Y = startY + rowH + rowSpacing;
+			var lblPort = new Label
+			{
+				Text = "Port:",
+				Position = new Vector2(marginX, row2Y),
+				Size = new Vector2(labelW, rowH)
+			};
+			_connectWindow.AddChild(lblPort);
+
+			var txtPort = new Textbox
+			{
+				Text = "7777",
+				Position = new Vector2(marginX + labelW, row2Y),
+				Size = new Vector2(inputW, rowH),
+				ID = "connect_port"
+			};
+			_connectWindow.AddChild(txtPort);
+
+			// Player name label + input
+			float row3Y = row2Y + rowH + rowSpacing;
+			var lblName = new Label
+			{
+				Text = "Name:",
+				Position = new Vector2(marginX, row3Y),
+				Size = new Vector2(labelW, rowH)
+			};
+			_connectWindow.AddChild(lblName);
+
+			var txtName = new Textbox
+			{
+				Text = "Player",
+				Position = new Vector2(marginX + labelW, row3Y),
+				Size = new Vector2(inputW, rowH),
+				ID = "connect_name"
+			};
+			_connectWindow.AddChild(txtName);
+
+			// Status label
+			float statusY = row3Y + rowH + rowSpacing * 2;
+			var lblStatus = new Label
+			{
+				Text = "",
+				Position = new Vector2(marginX, statusY),
+				Size = new Vector2(windowSize.X - marginX * 2 - 20, rowH),
+				ID = "connect_status"
+			};
+			_connectWindow.AddChild(lblStatus);
+
+			// Connect button
+			float btnY = statusY + rowH + rowSpacing;
+			float btnW = 120f;
+			float btnH = 40f;
+			float btnSpacing = 15f;
+			float totalBtnW = btnW * 2 + btnSpacing;
+			float btnStartX = (windowSize.X - totalBtnW - 20) / 2f;
+
+			var btnConnect = new Button
+			{
+				Text = "Connect",
+				Position = new Vector2(btnStartX, btnY),
+				Size = new Vector2(btnW, btnH),
+				ID = "connect_btn"
+			};
+			btnConnect.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				var hostBox = _gui.FindControl<Textbox>("connect_host");
+				var portBox = _gui.FindControl<Textbox>("connect_port");
+				var nameBox = _gui.FindControl<Textbox>("connect_name");
+				var statusLabel = _gui.FindControl<Label>("connect_status");
+
+				string host = hostBox?.Text?.Trim() ?? "127.0.0.1";
+				string portStr = portBox?.Text?.Trim() ?? "7777";
+				string playerName = nameBox?.Text?.Trim() ?? "Player";
+
+				if (string.IsNullOrEmpty(host))
+				{
+					if (statusLabel != null) statusLabel.Text = "Error: Server IP is required";
+					return;
+				}
+
+				if (!int.TryParse(portStr, out int port) || port < 1 || port > 65535)
+				{
+					if (statusLabel != null) statusLabel.Text = "Error: Invalid port (1-65535)";
+					return;
+				}
+
+				if (string.IsNullOrEmpty(playerName))
+				{
+					playerName = "Player";
+				}
+
+				_connectWindow.Visible = false;
+
+				var mpState = Eng.MultiplayerGameState;
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(mpState);
+				mpState.Connect(host, port, playerName);
+			};
+			_connectWindow.AddChild(btnConnect);
+
+			// Cancel button
+			var btnCancel = new Button
+			{
+				Text = "Cancel",
+				Position = new Vector2(btnStartX + btnW + btnSpacing, btnY),
+				Size = new Vector2(btnW, btnH)
+			};
+			btnCancel.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				_connectWindow.Visible = false;
+			};
+			_connectWindow.AddChild(btnCancel);
+
+			_gui.AddControl(_connectWindow);
+		}
+
 		private void RefreshOptionsValues()
 		{
 			var configVars = Eng.DI.GetRequiredService<GameConfig>().GetVariables().ToArray();
@@ -325,6 +490,12 @@ namespace Voxelgine.States
 			_optionsWindow.Position = new Vector2(
 				(window.Width / 2f) - (optSize.X / 2f),
 				(window.Height / 2f) - (optSize.Y / 2f)
+			);
+
+			var conSize = _connectWindow.Size;
+			_connectWindow.Position = new Vector2(
+				(window.Width / 2f) - (conSize.X / 2f),
+				(window.Height / 2f) - (conSize.Y / 2f)
 			);
 		}
 	}

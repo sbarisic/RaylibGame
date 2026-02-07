@@ -19,8 +19,10 @@ namespace Voxelgine.Engine
 		public float Distance;
 		/// <summary>True if the ray hit something.</summary>
 		public bool Hit;
+		/// <summary>Player ID of the player that was hit (-1 if not a player hit).</summary>
+		public int HitPlayerId;
 
-		public static readonly RaycastHit None = new() { Hit = false };
+		public static readonly RaycastHit None = new() { Hit = false, HitPlayerId = -1 };
 	}
 
 	/// <summary>

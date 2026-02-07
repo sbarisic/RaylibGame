@@ -66,6 +66,11 @@ namespace VoxelgineServer
 		private const float MaxBlockReach = 25f;
 
 		/// <summary>
+		/// Time in seconds before a dead player respawns.
+		/// </summary>
+		private const float RespawnDelay = 3f;
+
+		/// <summary>
 		/// Per-player input managers. Each player's <see cref="InputMgr"/> is backed by a
 		/// <see cref="NetworkInputSource"/> that receives input from the client's <see cref="InputStatePacket"/>.
 		/// </summary>
@@ -73,6 +78,11 @@ namespace VoxelgineServer
 		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
 
 		private float _lastTimeSyncTime;
+
+		/// <summary>
+		/// Tracks death time for each dead player. Key = playerId, Value = time of death.
+		/// </summary>
+		private readonly Dictionary<int, float> _respawnTimers = new();
 
 		private volatile bool _running;
 		private bool _disposed;
@@ -220,27 +230,30 @@ namespace VoxelgineServer
 			// 2. Send pending world data fragments to connecting clients
 			_worldTransfer.Tick(totalTime);
 
-			// 3. Process player input and run authoritative physics
+			// 3. Process player respawns
+			ProcessRespawns();
+
+			// 4. Process player input and run authoritative physics
 			ProcessPlayerPhysics(dt);
 
-			// 4. Update day/night cycle
+			// 5. Update day/night cycle
 			_simulation.DayNight.Update(dt);
 
-			// 5. Broadcast time sync periodically
+			// 6. Broadcast time sync periodically
 			BroadcastTimeSync(totalTime);
 
-			// 6. Update entity simulation
+			// 7. Update entity simulation
 			// Note: Entity UpdateLockstep requires InputMgr; on the server, entities run
 			// their own AI and don't process player input, so we pass null.
 			_simulation.Entities.UpdateLockstep(totalTime, dt, null);
 
-			// 7. Broadcast authoritative player positions to all clients
+			// 8. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
 
-			// 8. Broadcast pending block changes to all clients
+			// 9. Broadcast pending block changes to all clients
 			BroadcastBlockChanges(totalTime);
 
-			// 9. Broadcast entity snapshots to all clients
+			// 10. Broadcast entity snapshots to all clients
 			BroadcastEntitySnapshots(totalTime);
 		}
 
@@ -410,6 +423,9 @@ namespace VoxelgineServer
 			_playerInputMgrs.Remove(playerId);
 			_playerInputSources.Remove(playerId);
 
+			// Clean up respawn timer
+			_respawnTimers.Remove(playerId);
+
 			// Remove from simulation
 			_simulation.Players.RemovePlayer(playerId);
 
@@ -519,6 +535,11 @@ namespace VoxelgineServer
 		private const float MaxWeaponRange = 25f;
 
 		/// <summary>
+		/// Damage dealt per weapon hit.
+		/// </summary>
+		private const float WeaponDamage = 25f;
+
+		/// <summary>
 		/// Handles a <see cref="WeaponFirePacket"/> from a client.
 		/// Performs server-authoritative raycast against world blocks, entities, and other players.
 		/// Broadcasts the resolved <see cref="WeaponFireEffectPacket"/> to all clients.
@@ -577,13 +598,16 @@ namespace VoxelgineServer
 				hitEntityNetworkId = entityHit.Entity?.NetworkId ?? 0;
 			}
 
+			int hitPlayerId = -1;
+
 			if (playerHit.Hit && playerHit.Distance < closestDist)
 			{
 				closestDist = playerHit.Distance;
-				hitType = (byte)FireHitType.Entity;
+				hitType = (byte)FireHitType.Player;
 				hitPos = playerHit.HitPosition;
 				hitNormal = playerHit.HitNormal;
 				hitEntityNetworkId = 0;
+				hitPlayerId = playerHit.HitPlayerId;
 			}
 
 			if (worldDist < closestDist)
@@ -593,6 +617,33 @@ namespace VoxelgineServer
 				hitPos = worldHitPos;
 				hitNormal = worldHitNormal;
 				hitEntityNetworkId = 0;
+				hitPlayerId = -1;
+			}
+
+			// Apply damage if a player was hit
+			if (hitPlayerId >= 0)
+			{
+				Player hitPlayer = _simulation.Players.GetPlayer(hitPlayerId);
+				if (hitPlayer != null && !hitPlayer.IsDead)
+				{
+					float damage = WeaponDamage;
+					hitPlayer.TakeDamage(damage);
+
+					// Broadcast damage notification
+					var damagePacket = new PlayerDamagePacket
+					{
+						TargetPlayerId = hitPlayerId,
+						DamageAmount = damage,
+						SourcePlayerId = playerId,
+					};
+					_server.Broadcast(damagePacket, true, CurrentTime);
+
+					if (hitPlayer.IsDead)
+					{
+						_logging.WriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
+						_respawnTimers[hitPlayerId] = CurrentTime;
+					}
+				}
 			}
 
 			// Broadcast fire effect to all clients
@@ -606,6 +657,7 @@ namespace VoxelgineServer
 				HitNormal = hitNormal,
 				HitType = hitType,
 				EntityNetworkId = hitEntityNetworkId,
+				HitPlayerId = hitPlayerId,
 			};
 			_server.Broadcast(effectPacket, true, CurrentTime);
 		}
@@ -624,6 +676,9 @@ namespace VoxelgineServer
 				if (player.PlayerId == excludePlayerId)
 					continue;
 
+				if (player.IsDead)
+					continue;
+
 				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(player.Position);
 
 				if (RayMath.RayIntersectsAABB(origin, direction, playerAABB, closestDist, out float dist, out Vector3 normal))
@@ -638,6 +693,7 @@ namespace VoxelgineServer
 							Distance = dist,
 							HitPosition = origin + direction * dist,
 							HitNormal = normal,
+							HitPlayerId = player.PlayerId,
 						};
 					}
 				}
@@ -672,6 +728,44 @@ namespace VoxelgineServer
 		}
 
 		/// <summary>
+		/// Checks all dead players and respawns those whose respawn timer has expired.
+		/// Resets health, teleports to spawn point, clears velocity, and logs the respawn.
+		/// </summary>
+		private void ProcessRespawns()
+		{
+			if (_respawnTimers.Count == 0)
+				return;
+
+			List<int> toRespawn = null;
+			foreach (var kvp in _respawnTimers)
+			{
+				if (CurrentTime - kvp.Value >= RespawnDelay)
+				{
+					toRespawn ??= new List<int>();
+					toRespawn.Add(kvp.Key);
+				}
+			}
+
+			if (toRespawn == null)
+				return;
+
+			foreach (int playerId in toRespawn)
+			{
+				_respawnTimers.Remove(playerId);
+
+				Player player = _simulation.Players.GetPlayer(playerId);
+				if (player == null)
+					continue;
+
+				player.ResetHealth();
+				player.SetPosition(DefaultSpawnPosition);
+				player.SetVelocity(Vector3.Zero);
+
+				_logging.WriteLine($"Player [{playerId}] \"{GetPlayerName(playerId)}\" respawned.");
+			}
+		}
+
+		/// <summary>
 		/// Runs authoritative physics for all connected players.
 		/// For each player: ticks their <see cref="InputMgr"/> (which reads from <see cref="NetworkInputSource"/>),
 		/// updates direction vectors from the camera angle, and runs <see cref="Player.UpdatePhysics"/>.
@@ -686,6 +780,9 @@ namespace VoxelgineServer
 			foreach (Player player in _simulation.Players.GetAllPlayers())
 			{
 				int playerId = player.PlayerId;
+
+				if (player.IsDead)
+					continue;
 
 				if (!_playerInputMgrs.TryGetValue(playerId, out InputMgr inputMgr))
 					continue;
@@ -727,6 +824,7 @@ namespace VoxelgineServer
 					Position = p.Position,
 					Velocity = p.GetVelocity(),
 					CameraAngle = new Vector2(camAngle.X, camAngle.Y),
+					Health = p.Health,
 				};
 			}
 

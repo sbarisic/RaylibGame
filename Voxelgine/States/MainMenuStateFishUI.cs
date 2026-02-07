@@ -32,6 +32,7 @@ namespace Voxelgine.States
 		/// </summary>
 		private ServerLoop _hostedServer;
 		private Thread _hostThread;
+		private bool _forceNewWorld;
 
 		public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
@@ -457,7 +458,7 @@ namespace Voxelgine.States
 
 		private void CreateHostWindow()
 		{
-			var windowSize = new Vector2(360, 360);
+			var windowSize = new Vector2(360, 400);
 			var windowPos = new Vector2(
 				(Window.Width / 2f) - (windowSize.X / 2f),
 				(Window.Height / 2f) - (windowSize.Y / 2f)
@@ -541,8 +542,26 @@ namespace Voxelgine.States
 			};
 			_hostWindow.AddChild(txtSeed);
 
+			// Force new world toggle button
+			float row4Y = row3Y + rowH + rowSpacing;
+			_forceNewWorld = false;
+			var btnForceRegen = new Button
+			{
+				Text = "[ ] Force New World",
+				Position = new Vector2(marginX, row4Y),
+				Size = new Vector2(windowSize.X - marginX * 2 - 20, rowH),
+				ID = "host_force_regen"
+			};
+			btnForceRegen.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				_forceNewWorld = !_forceNewWorld;
+				if (sender is Button btn)
+					btn.Text = _forceNewWorld ? "[X] Force New World" : "[ ] Force New World";
+			};
+			_hostWindow.AddChild(btnForceRegen);
+
 			// Status label
-			float statusY = row3Y + rowH + rowSpacing * 2;
+			float statusY = row4Y + rowH + rowSpacing * 2;
 			var lblStatus = new Label
 			{
 				Text = "",
@@ -604,12 +623,13 @@ namespace Voxelgine.States
 					_hostedServer = new ServerLoop();
 					int capturedPort = port;
 					int capturedSeed = seed;
+					bool capturedForceRegen = _forceNewWorld;
 
 					_hostThread = new Thread(() =>
 					{
 						try
 						{
-							_hostedServer.Start(capturedPort, capturedSeed);
+							_hostedServer.Start(capturedPort, capturedSeed, capturedForceRegen);
 						}
 						catch (Exception ex)
 						{

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Raylib_cs;
 using Voxelgine.Engine;
 using System.Data;
@@ -132,11 +133,31 @@ namespace Voxelgine.Graphics
 			Vector3 Center = new Vector3(Width, 0, Length) / 2;
 			float CenterRadius = Math.Min(Width / 2, Length / 2);
 
-			for (int x = 0; x < Width; x++)
+			// Pre-create all chunks for direct O(1) access during generation,
+			// bypassing SetPlacedBlock overhead (neighbor tracking, change logging,
+			// and lighting updates per block).
+			const int CS = Chunk.ChunkSize;
+			int chunksX = (Width + CS - 1) / CS;
+			int chunksY = (WorldHeight + CS - 1) / CS;
+			int chunksZ = (Length + CS - 1) / CS;
+
+			Chunk[,,] chunkGrid = new Chunk[chunksX, chunksY, chunksZ];
+			for (int cx = 0; cx < chunksX; cx++)
+				for (int cy = 0; cy < chunksY; cy++)
+					for (int cz = 0; cz < chunksZ; cz++)
+					{
+						Vector3 chunkIndex = new Vector3(cx, cy, cz);
+						Chunk chunk = new Chunk(Eng, chunkIndex, this);
+						chunkGrid[cx, cy, cz] = chunk;
+						Chunks.Add(chunkIndex, chunk);
+					}
+
+			// Noise pass — each XZ column is independent, parallelized across X
+			Parallel.For(0, Width, x =>
+			{
 				for (int z = 0; z < Length; z++)
 					for (int y = 0; y < WorldHeight; y++)
 					{
-
 						Vector3 Pos = new Vector3(x, (WorldHeight - y), z);
 
 						float CenterFalloff = 1.0f - Utils.Clamp(((Center - Pos).Length() / CenterRadius) / 1.2f, 0, 1);
@@ -153,32 +174,130 @@ namespace Voxelgine.Graphics
 						{
 							float Caves = Simplex(1, x, y, z, Scale * 4) * HeightFalloff;
 							if (Caves < 0.65f)
-								SetBlock(x, y, z, BlockType.Stone);
+								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Stone));
 						}
 					}
+			});
 
-			for (int x = 0; x < Width; x++)
+			// Surface pass — replace top stone with grass/dirt
+			Parallel.For(0, Width, x =>
+			{
 				for (int z = 0; z < Length; z++)
 				{
 					int DownRayHits = 0;
 					for (int y = WorldHeight - 1; y >= 0; y--)
 					{
-						if (GetBlock(x, y, z) != BlockType.None)
+						if (chunkGrid[x / CS, y / CS, z / CS].GetBlock(x % CS, y % CS, z % CS).Type != BlockType.None)
 						{
 							DownRayHits++;
 
 							if (DownRayHits == 1)
-								SetBlock(x, y, z, BlockType.Grass);
+								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Grass));
 							else if (DownRayHits < 5)
-								SetBlock(x, y, z, BlockType.Dirt);
+								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Dirt));
 
 						}
 						else if (DownRayHits != 0)
 							break;
 					}
 				}
+			});
 
 			ComputeLighting();
+		}
+
+		/// <summary>
+		/// Scans the world for valid spawn points on the surface.
+		/// A valid spawn point has a solid ground block with at least 2 air blocks above it.
+		/// Points are selected with minimum spacing, prioritized by proximity to the world center.
+		/// </summary>
+		/// <param name="count">Number of spawn points to find.</param>
+		/// <param name="minSpacing">Minimum distance in blocks between spawn points.</param>
+		/// <returns>List of world positions suitable for spawning (2 blocks above ground surface).</returns>
+		public List<Vector3> FindSpawnPoints(int count, int minSpacing = 5)
+		{
+			// Compute world bounds from loaded chunks
+			int minX = int.MaxValue, maxX = int.MinValue;
+			int minY = int.MaxValue, maxY = int.MinValue;
+			int minZ = int.MaxValue, maxZ = int.MinValue;
+
+			foreach (var kvp in Chunks.Items)
+			{
+				int cx = (int)kvp.Key.X, cy = (int)kvp.Key.Y, cz = (int)kvp.Key.Z;
+				int bx = cx * Chunk.ChunkSize;
+				int by = cy * Chunk.ChunkSize;
+				int bz = cz * Chunk.ChunkSize;
+
+				if (bx < minX) minX = bx;
+				if (bx + Chunk.ChunkSize > maxX) maxX = bx + Chunk.ChunkSize;
+				if (by < minY) minY = by;
+				if (by + Chunk.ChunkSize > maxY) maxY = by + Chunk.ChunkSize;
+				if (bz < minZ) minZ = bz;
+				if (bz + Chunk.ChunkSize > maxZ) maxZ = bz + Chunk.ChunkSize;
+			}
+
+			if (minX == int.MaxValue)
+				return new List<Vector3>();
+
+			float centerX = (minX + maxX) / 2f;
+			float centerZ = (minZ + maxZ) / 2f;
+
+			var candidates = new List<Vector3>();
+
+			// Scan each XZ column top-down for the topmost surface block
+			for (int x = minX; x < maxX; x++)
+				for (int z = minZ; z < maxZ; z++)
+				{
+					for (int y = maxY - 1; y >= minY; y--)
+					{
+						if (BlockInfo.IsSolid(GetBlock(x, y, z)) &&
+							GetBlock(x, y + 1, z) == BlockType.None &&
+							GetBlock(x, y + 2, z) == BlockType.None)
+						{
+							candidates.Add(new Vector3(x, y + 2, z));
+							break;
+						}
+					}
+				}
+
+			if (candidates.Count == 0)
+				return new List<Vector3>();
+
+			// Sort by distance to world center (XZ plane)
+			candidates.Sort((a, b) =>
+			{
+				float distA = (a.X - centerX) * (a.X - centerX) + (a.Z - centerZ) * (a.Z - centerZ);
+				float distB = (b.X - centerX) * (b.X - centerX) + (b.Z - centerZ) * (b.Z - centerZ);
+				return distA.CompareTo(distB);
+			});
+
+			// Select points with minimum spacing
+			var result = new List<Vector3>();
+			float minSpacingSq = minSpacing * minSpacing;
+
+			foreach (var candidate in candidates)
+			{
+				bool tooClose = false;
+				foreach (var selected in result)
+				{
+					float dx = candidate.X - selected.X;
+					float dz = candidate.Z - selected.Z;
+					if (dx * dx + dz * dz < minSpacingSq)
+					{
+						tooClose = true;
+						break;
+					}
+				}
+
+				if (!tooClose)
+				{
+					result.Add(candidate);
+					if (result.Count >= count)
+						break;
+				}
+			}
+
+			return result;
 		}
 
 		float Simplex(int Octaves, float X, float Y, float Z, float Scale)
@@ -186,7 +305,10 @@ namespace Voxelgine.Graphics
 			float Val = 0.0f;
 
 			for (int i = 0; i < Octaves; i++)
-				Val += Noise.CalcPixel3D(X * Math.Pow(2, i), Y * Math.Pow(2, i), Z * Math.Pow(2, i), Scale);
+			{
+				float freq = 1 << i;
+				Val += Noise.CalcPixel3D(X * freq, Y * freq, Z * freq, Scale);
+			}
 
 			return (Val / Octaves) / 255;
 		}

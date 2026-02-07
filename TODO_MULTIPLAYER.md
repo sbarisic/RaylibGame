@@ -186,12 +186,14 @@ Game Tick Flow (Client):
 ### Medium Priority
 
 - [x] **ServerLoop: Split into partial class files** ✅
+- [x] **Optimize world generation** ✅
+- [x] **Dynamic spawn points & force world regeneration** ✅
 
 ### Lower Priority
 
 - [x] **Listen server mode / Remove single-player state** ✅
 - [x] **Server world save on shutdown** ✅
-- [ ] **Player state persistence** — Player position, health, and inventory are not saved across sessions. When a player disconnects and reconnects, they start at `DefaultSpawnPosition` with full health and default inventory. Add server-side player data file (JSON or binary per player name) that saves position, health, inventory on disconnect and restores on reconnect. **[CPX: 2]**
+- [ ] **Player state persistence** — Player position, health, and inventory are not saved across sessions. When a player disconnects and reconnects, they start at `PlayerSpawnPosition` with full health and default inventory. Add server-side player data file (JSON or binary per player name) that saves position, health, inventory on disconnect and restores on reconnect. **[CPX: 2]**
 - [ ] **Server console/admin commands** — Headless server reads stdin for commands: `kick <player>`, `ban <player>`, `say <message>`, `time <hours>`, `save`, `quit`. For listen server, these are available via the debug menu (F1). **[CPX: 2]**
 
 ---
@@ -333,7 +335,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Revise world generation, it is currently slow
+*No uncategorized items*
 
 ---
 
@@ -438,3 +440,4 @@ Game Tick Flow (Client):
 - **Packet fragmentation** — Created `PacketFragmenter` class in `VoxelgineEngine/Engine/Net/PacketFragmenter.cs` implementing transport-layer fragmentation for large reliable packets. Fragment wire format: `[0xFE][groupId:2][index:1][total:1][payload...]`
 - **ServerLoop: Split into partial class files** — Split `ServerLoop.cs` (922 lines) into 6 partial class files in `Voxelgine/Engine/Server/` by responsibility. **`ServerLoop.cs`** (363 lines) — core lifecycle (`Start`, `Stop`, `RunLoop`, `Tick`, `Shutdown`), constructor, all fields/constants/properties, `ProcessPlayerPhysics`, `SerializeWorld`, `GetPlayerName`, `Dispose`, and inner DI classes (`ServerConfig`, `ServerEngineRunner`). **`ServerLoop.Connections.cs`** (101 lines) — `OnClientConnected` (player creation, existing player/entity sync, world transfer), `OnClientDisconnected` (cleanup, broadcast PlayerLeft), `OnWorldTransferComplete`. **`ServerLoop.Packets.cs`** (98 lines) — `OnPacketReceived` dispatch switch, `HandleInputState` (unpack bitmask, feed NetworkInputSource), `HandleBlockPlaceRequest`/`HandleBlockRemoveRequest` (validation + ChunkMap). **`ServerLoop.Combat.cs`** (218 lines) — `MaxWeaponRange`/`WeaponDamage` constants, `HandleWeaponFire` (server-authoritative raycast against world/entities/players, damage, kill tracking), `RaycastPlayers` (AABB intersection), `ProcessRespawns` (timer-based respawn). **`ServerLoop.Broadcasting.cs`** (103 lines) — `BroadcastPlayerSnapshots` (WorldSnapshotPacket), `BroadcastEntitySnapshots` (EntitySnapshotPacket), `BroadcastBlockChanges` (BlockChangePacket), `BroadcastTimeSync` (DayTimeSyncPacket). **`ServerLoop.Entities.cs`** (76 lines) — `SpawnEntities` (pickup + NPC), `GetEntityAnimationState` (NPC animator → byte), `BuildEntitySpawnPacket` (serialize spawn properties). Follows established partial class patterns from Player and Chunk splits. Build verified.
 - **Server world save on shutdown** — Added world persistence to `ServerLoop`. `SaveWorld()` private method writes `_simulation.Map` to `MapFile` (`data/map.bin`) via `File.Create` + `ChunkMap.Write()` with try-catch error handling and logging. Called in `Shutdown()` before `_server.Stop()` so block changes made during gameplay are persisted when the server stops. Added periodic auto-save: `AutoSaveInterval` constant (300 seconds / 5 minutes) and `_lastAutoSaveTime` field. Tick step 11 checks if the interval has elapsed and calls `SaveWorld()`. Ensures world data is not lost during long play sessions even without explicit shutdown. Build verified.
+- **Optimize world generation** — Rewrote `ChunkMap.GenerateFloatingIsland()` to eliminate per-block `SetPlacedBlock()` overhead during generation. Previously, every block placement called `SetPlacedBlock()` which performed: `TranslateChunkPos` coordinate translation, `SpatialHashGrid.TryGetValue` for chunk lookup, neighbor chunk detection and dirty-marking (up to 8 neighbors), block change logging for network sync, and per-block lighting evaluation — all unnecessary during initial generation. **Optimization 1: Pre-created chunk grid** — All chunks are created upfront into a flat `Chunk[,,]` array (indexed by chunk coordinates) and registered with `SpatialHashGrid` before any block writes. During generation, blocks are written directly via `chunkGrid[x/CS, y/CS, z/CS].SetBlock(x%CS, y%CS, z%CS, block)`, bypassing `SetPlacedBlock` entirely. **Optimization 2: Parallel noise computation** — Both the noise pass (stone placement from simplex density) and surface pass (grass/dirt replacement) are wrapped in `Parallel.For` across the X axis. Each XZ column is independent; `Noise.CalcPixel3D` is thread-safe (read-only `_perm` array); `Chunk.SetBlock` writes to distinct `Blocks[]` indices from different threads (reference writes are atomic); `Dirty`/`SkyExposureCacheValid` bool writes are idempotent. **Optimization 3: Integer bit shift** — Replaced `Math.Pow(2, i)` with `(1 << i)` in `Simplex()` for octave frequency scaling, avoiding floating-point power computation for integer exponents. Lighting is computed once after all blocks are placed via `ComputeLighting()` (unchanged). Block change log remains empty during generation (no `SetPlacedBlock` calls). Build verified. **[CPX: 2]**

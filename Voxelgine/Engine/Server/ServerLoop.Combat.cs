@@ -208,8 +208,8 @@ namespace Voxelgine.Engine.Server
 					continue;
 
 				player.ResetHealth();
-				player.SetPosition(DefaultSpawnPosition);
-				player.SetVelocity(Vector3.Zero);
+					player.SetPosition(PlayerSpawnPosition);
+					player.SetVelocity(Vector3.Zero);
 
 				_logging.WriteLine($"Player [{playerId}] \"{GetPlayerName(playerId)}\" respawned.");
 			}

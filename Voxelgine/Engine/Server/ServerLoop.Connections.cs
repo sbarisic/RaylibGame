@@ -13,7 +13,7 @@ namespace Voxelgine.Engine.Server
 
 			// Create server-side player instance (no GUI, sound, or rendering)
 			Player player = new Player(_eng, playerId);
-			player.SetPosition(DefaultSpawnPosition);
+			player.SetPosition(PlayerSpawnPosition);
 
 			// Create per-player input pipeline: NetworkInputSource → InputMgr
 			var inputSource = new NetworkInputSource();
@@ -48,7 +48,7 @@ namespace Voxelgine.Engine.Server
 			{
 				PlayerId = playerId,
 				PlayerName = playerName,
-				Position = DefaultSpawnPosition,
+				Position = PlayerSpawnPosition,
 			};
 			_server.BroadcastExcept(playerId, joinedPacket, true, CurrentTime);
 
@@ -59,7 +59,7 @@ namespace Voxelgine.Engine.Server
 			byte[] worldData = SerializeWorld();
 			_worldTransfer.BeginTransfer(playerId, worldData);
 			int totalFragments = (worldData.Length + WorldTransferManager.FragmentSize - 1) / WorldTransferManager.FragmentSize;
-			_logging.WriteLine($"Player [{playerId}] \"{playerName}\" spawned at {DefaultSpawnPosition}. Streaming world ({worldData.Length:N0} bytes, {totalFragments} fragments). Players online: {_simulation.Players.Count}");
+			_logging.WriteLine($"Player [{playerId}] \"{playerName}\" spawned at {PlayerSpawnPosition}. Streaming world ({worldData.Length:N0} bytes, {totalFragments} fragments). Players online: {_simulation.Players.Count}");
 		}
 
 		private void OnClientDisconnected(NetConnection connection, string reason)

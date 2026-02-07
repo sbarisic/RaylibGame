@@ -8,6 +8,7 @@ namespace VoxelgineServer
 		{
 			int port = 7777;
 			int seed = 666;
+			bool forceRegen = false;
 
 			for (int i = 0; i < args.Length; i++)
 			{
@@ -23,11 +24,16 @@ namespace VoxelgineServer
 							seed = s;
 						break;
 
+					case "--force-regen":
+						forceRegen = true;
+						break;
+
 					case "--help":
 						Console.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 						Console.WriteLine("Usage: VoxelgineServer [options]");
 						Console.WriteLine("  --port <port>   UDP port to listen on (default: 7777)");
 						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
+						Console.WriteLine("  --force-regen   Force world regeneration even if save file exists");
 						Console.WriteLine("  --help          Show this help message");
 						return;
 				}
@@ -41,7 +47,7 @@ namespace VoxelgineServer
 				server.Stop();
 			};
 
-			server.Start(port, seed);
+			server.Start(port, seed, forceRegen);
 		}
 	}
 }

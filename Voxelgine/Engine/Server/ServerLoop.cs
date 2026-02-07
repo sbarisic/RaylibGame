@@ -35,15 +35,15 @@ namespace Voxelgine.Engine.Server
 		public const int DefaultWorldLength = 32;
 
 		/// <summary>
-		/// Default spawn position for connecting players (center of island, above surface).
+		/// Spawn position for connecting players. Computed from world surface after generation/load.
 		/// </summary>
-		public static readonly Vector3 DefaultSpawnPosition = new Vector3(30, 66, 24);
+		public Vector3 PlayerSpawnPosition { get; private set; } = new Vector3(30, 66, 24);
 
 		/// <summary>
-		/// Spawn positions for server-side entities.
+		/// Spawn positions for server-side entities. Computed from world surface after generation/load.
 		/// </summary>
-		private static readonly Vector3 PickupSpawnPos = new Vector3(37, 66, 15);
-		private static readonly Vector3 NPCSpawnPos = new Vector3(32, 66, 14);
+		private Vector3 _pickupSpawnPos = new Vector3(37, 66, 15);
+		private Vector3 _npcSpawnPos = new Vector3(32, 66, 14);
 
 		/// <summary>
 		/// File path for the persisted server world.
@@ -146,12 +146,12 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		/// <param name="port">UDP port to bind.</param>
 		/// <param name="worldSeed">Seed for world generation.</param>
-		public void Start(int port, int worldSeed = 666)
+		public void Start(int port, int worldSeed = 666, bool forceRegenerate = false)
 		{
 			_worldSeed = worldSeed;
 			_logging.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 
-			if (File.Exists(MapFile))
+			if (File.Exists(MapFile) && !forceRegenerate)
 			{
 				_logging.WriteLine($"Loading world from '{MapFile}'...");
 				using var fileStream = File.OpenRead(MapFile);
@@ -160,6 +160,9 @@ namespace Voxelgine.Engine.Server
 			}
 			else
 			{
+				if (forceRegenerate && File.Exists(MapFile))
+					_logging.WriteLine("Force regeneration requested, ignoring existing world file.");
+
 				_logging.WriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
 				_simulation.Map.GenerateFloatingIsland(DefaultWorldWidth, DefaultWorldLength, worldSeed);
 				_simulation.Map.ClearPendingChanges();
@@ -170,6 +173,10 @@ namespace Voxelgine.Engine.Server
 				_simulation.Map.Write(fileStream);
 				_logging.WriteLine("World saved.");
 			}
+
+			// Find valid spawn points on the world surface
+			FindAndSetSpawnPoints();
+
 			_logging.WriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
 
 			// Spawn server-side entities
@@ -350,6 +357,24 @@ namespace Voxelgine.Engine.Server
 		{
 			var conn = _server.GetConnection(playerId);
 			return conn?.PlayerName ?? string.Empty;
+		}
+
+		/// <summary>
+		/// Scans the world surface for valid spawn points and assigns them to the spawn position fields.
+		/// Falls back to hardcoded defaults if not enough valid positions are found.
+		/// </summary>
+		private void FindAndSetSpawnPoints()
+		{
+			var spawnPoints = _simulation.Map.FindSpawnPoints(3, 5);
+
+			if (spawnPoints.Count >= 1)
+				PlayerSpawnPosition = spawnPoints[0];
+			if (spawnPoints.Count >= 2)
+				_pickupSpawnPos = spawnPoints[1];
+			if (spawnPoints.Count >= 3)
+				_npcSpawnPos = spawnPoints[2];
+
+			_logging.WriteLine($"Spawn points: Player={PlayerSpawnPosition}, Pickup={_pickupSpawnPos}, NPC={_npcSpawnPos} ({spawnPoints.Count} found)");
 		}
 
 		public void Dispose()

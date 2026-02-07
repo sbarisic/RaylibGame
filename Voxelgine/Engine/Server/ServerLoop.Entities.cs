@@ -12,7 +12,7 @@ namespace Voxelgine.Engine.Server
 		{
 			// Spawn pickup entity (use SetModelName to avoid Raylib GPU calls on headless server)
 			var pickup = new VEntPickup();
-			pickup.SetPosition(PickupSpawnPos);
+			pickup.SetPosition(_pickupSpawnPos);
 			pickup.SetSize(Vector3.One);
 			pickup.SetModelName("orb_xp/orb_xp.obj");
 			_simulation.Entities.Spawn(_simulation, pickup);
@@ -20,7 +20,7 @@ namespace Voxelgine.Engine.Server
 			// Spawn NPC entity (use SetModelName to avoid Raylib GPU calls on headless server)
 			var npc = new VEntNPC();
 			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-			npc.SetPosition(NPCSpawnPos);
+			npc.SetPosition(_npcSpawnPos);
 			npc.SetModelName("npc/humanoid.json");
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);

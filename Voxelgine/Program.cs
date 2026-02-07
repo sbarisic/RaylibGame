@@ -22,7 +22,6 @@ namespace Voxelgine
 		public float TotalTime { get; set; }
 
 		public MainMenuStateFishUI MainMenuState { get; set; }
-		public GameState GameState { get; set; }
 		public NPCPreviewState NPCPreviewState { get; set; }
 		public MultiplayerGameState MultiplayerGameState { get; set; }
 
@@ -112,7 +111,6 @@ namespace Voxelgine
 
 			Eng.DebugMode = Debugger.IsAttached;
 			Eng.MainMenuState = new MainMenuStateFishUI(Window, Eng);
-			Eng.GameState = new GameState(Window, Eng);
 			Eng.NPCPreviewState = new NPCPreviewState(Window, Eng);
 			Eng.MultiplayerGameState = new MultiplayerGameState(Window, Eng);
 

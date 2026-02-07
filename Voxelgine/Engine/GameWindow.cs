@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
-using Voxelgine.States;
 
 namespace Voxelgine.Engine
 {
@@ -340,51 +339,13 @@ namespace Voxelgine.Engine
 			EndShaderMode();
 		}
 
-		void GetCurrentFrame(ref GameFrameInfo FInfo, GameState GState)
-		{
-			if (GState == null)
-				return;
-
-			FInfo.Empty = false;
-			FInfo.Pos = GState.LocalPlayer.Camera.Position;
-			FInfo.Cam = GState.LocalPlayer.Cam;
-			FInfo.CamAngle = GState.LocalPlayer.GetCamAngle();
-			FInfo.FeetPosition = GState.LocalPlayer.FeetPosition;
-			FInfo.Frustum = new Frustum(Eng, ref FInfo.Cam);
-
-			FInfo.ViewModelOffset = GState.LocalPlayer.ViewMdl.ViewModelOffset;
-			FInfo.ViewModelRot = GState.LocalPlayer.ViewMdl.VMRot;
-		}
-
 		// State = CurrentState * TimeAlpha + PreviousState * (1.0f - TimeAlpha);
 		public GameFrameInfo Draw(float TimeAlpha, GameFrameInfo LastFrame)
 		{
 			GameFrameInfo FInfo = new GameFrameInfo();
-			GetCurrentFrame(ref FInfo, State as GameState);
 
 			// Store the original physics state to return (before interpolation modifies anything)
 			GameFrameInfo PhysicsFrame = FInfo;
-
-			if (State is GameState GS && !LastFrame.Empty)
-			{
-				GameFrameInfo Interp = FInfo.Interpolate(LastFrame, TimeAlpha);
-
-				// Apply interpolated camera to RenderCam only (don't modify physics Cam)
-				GS.LocalPlayer.RenderCam = Interp.Cam;
-				GS.PlayerCollisionBoxPos = Interp.FeetPosition;
-
-				// Apply interpolated view model offset (position calculated at draw time from camera + offset)
-				GS.LocalPlayer.ViewMdl.ViewModelOffset = Interp.ViewModelOffset;
-				GS.LocalPlayer.ViewMdl.VMRot = Interp.ViewModelRot;
-			}
-			else
-			{
-				// First frame - use physics camera as render camera
-				if (State is GameState GS2)
-				{
-					GS2.LocalPlayer.RenderCam = GS2.LocalPlayer.Cam;
-				}
-			}
 
 			if (Raylib.IsWindowResized())
 			{

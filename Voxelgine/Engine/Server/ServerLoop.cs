@@ -43,7 +43,7 @@ namespace Voxelgine.Engine.Server
 		/// <summary>
 		/// File path for the persisted server world.
 		/// </summary>
-		private const string MapFile = "server_world.bin";
+		private const string MapFile = "data/map.bin";
 
 		private readonly NetServer _server;
 		private readonly WorldTransferManager _worldTransfer;
@@ -903,7 +903,7 @@ namespace Voxelgine.Engine.Server
 
 		/// <summary>
 		/// Minimal <see cref="IFishEngineRunner"/> implementation for the dedicated server.
-		/// Presentation properties (MainMenuState, GameState, NPCPreviewState) are null —
+		/// Presentation properties (MainMenuState, NPCPreviewState) are null —
 		/// the server has no rendering or UI.
 		/// </summary>
 		private class ServerEngineRunner : IFishEngineRunner
@@ -913,7 +913,6 @@ namespace Voxelgine.Engine.Server
 			public bool DebugMode { get; set; }
 			public float TotalTime { get; set; }
 			public MainMenuStateFishUI MainMenuState { get; set; }
-			public GameState GameState { get; set; }
 			public NPCPreviewState NPCPreviewState { get; set; }
 			public MultiplayerGameState MultiplayerGameState { get; set; }
 

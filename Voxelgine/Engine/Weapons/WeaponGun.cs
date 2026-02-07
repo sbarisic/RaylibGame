@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using Voxelgine;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
-using Voxelgine.States;
 
 namespace Voxelgine.Engine
 {
@@ -65,17 +64,12 @@ namespace Voxelgine.Engine
 			// Apply immediate fire effects (kickback, sound) — these play regardless of hit result
 			ApplyFireEffects(intent);
 
-			// In multiplayer, send fire packet to server for authoritative hit resolution
+			// Send fire packet to server for authoritative hit resolution
 			var mpState = Eng.MultiplayerGameState;
 			if (mpState != null && mpState.IsActive)
 			{
 				mpState.SendWeaponFire(E.Start, E.Dir);
-				return;
 			}
-
-			// Single-player: resolve hit locally
-			FireResult result = ResolveFireIntent(intent, E.Map);
-			ApplyHitEffects(intent, result);
 		}
 
 		/// <summary>
@@ -94,14 +88,16 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public FireResult ResolveFireIntent(FireIntent intent, ChunkMap map)
 		{
-			GameState GState = ((GameState)Eng.GameState);
+			var entities = Eng.MultiplayerGameState?.Entities;
 
 			// Raycast against world (blocks)
 			Vector3 worldHitPos = Raycast(map, intent.Origin, intent.Direction, intent.MaxRange, out Vector3 worldNorm);
 			float worldDist = worldHitPos != Vector3.Zero ? Vector3.Distance(intent.Origin, worldHitPos) : float.MaxValue;
 
 			// Raycast against entities
-			RaycastHit entityHit = GState.Entities.Raycast(intent.Origin, intent.Direction, intent.MaxRange);
+			RaycastHit entityHit = entities != null
+				? entities.Raycast(intent.Origin, intent.Direction, intent.MaxRange)
+				: default;
 
 			if (entityHit.Hit && entityHit.Distance < worldDist)
 			{
@@ -137,13 +133,15 @@ namespace Voxelgine.Engine
 		/// </summary>
 		void ApplyHitEffects(FireIntent intent, FireResult result)
 		{
-			GameState GState = ((GameState)Eng.GameState);
+			var particle = Eng.MultiplayerGameState?.Particle;
+			if (particle == null)
+				return;
 
 			// Muzzle position (slightly in front of camera)
 			Vector3 muzzlePos = intent.Origin + intent.Direction * 0.5f;
 
 			// Tracer line from muzzle to hit point
-			GState.Particle.SpawnTracer(muzzlePos, result.HitPosition);
+			particle.SpawnTracer(muzzlePos, result.HitPosition);
 
 			switch (result.HitType)
 			{
@@ -161,12 +159,28 @@ namespace Voxelgine.Engine
 						// Blood particles
 						for (int i = 0; i < 8; i++)
 						{
-							GState.Particle.SpawnBlood(result.HitPosition, result.HitNormal * 0.5f, (0.8f + (float)Utils.Rnd.NextDouble() * 0.4f) * 0.85f);
+							particle.SpawnBlood(result.HitPosition, result.HitNormal * 0.5f, (0.8f + (float)Utils.Rnd.NextDouble() * 0.4f) * 0.85f);
 						}
 					}
 					else
 					{
 						Logging.WriteLine($"Hit entity: {result.HitEntity.GetType().Name} at distance {result.HitDistance:F2}");
+
+						// Spark particles for non-NPC entities
+						for (int i = 0; i < 6; i++)
+						{
+							float ForceFactor = 10.6f;
+							float RandomUnitFactor = 0.6f;
+
+							if (result.HitNormal.Y == 0)
+							{
+								ForceFactor *= 2;
+								RandomUnitFactor = 0.4f;
+							}
+
+							Vector3 RndDir = Vector3.Normalize(result.HitNormal + Utils.GetRandomUnitVector() * RandomUnitFactor);
+							particle.SpawnSpark(result.HitPosition, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
+						}
 					}
 					break;
 
@@ -185,7 +199,7 @@ namespace Voxelgine.Engine
 						}
 
 						Vector3 RndDir = Vector3.Normalize(result.HitNormal + Utils.GetRandomUnitVector() * RandomUnitFactor);
-						GState.Particle.SpawnFire(result.HitPosition, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
+						particle.SpawnFire(result.HitPosition, RndDir * ForceFactor, Color.White, (float)(Utils.Rnd.NextDouble() + 0.5));
 					}
 					break;
 			}

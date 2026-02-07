@@ -85,6 +85,15 @@ namespace Voxelgine.States
 		/// </summary>
 		public bool IsActive => _initialized && _client != null && _client.IsConnected;
 
+		/// <summary>The world chunk map (available after world data is loaded).</summary>
+		public ChunkMap Map => _simulation?.Map;
+
+		/// <summary>The particle system for visual effects.</summary>
+		public ParticleSystem Particle => _particle;
+
+		/// <summary>The entity manager (available after world data is loaded).</summary>
+		public EntityManager Entities => _simulation?.Entities;
+
 		public MultiplayerGameState(IGameWindow window, IFishEngineRunner eng) : base(window, eng)
 		{
 			_gameWindow = window;
@@ -189,13 +198,13 @@ namespace Voxelgine.States
 				}
 
 				// Update game systems
-					_simulation.Map.Tick();
-					_simulation.LocalPlayer.Tick(Window.InMgr);
-					_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);
-					_simulation.LocalPlayer.UpdateGUI();
+				_simulation.Map.Tick();
+				_simulation.LocalPlayer.Tick(Window.InMgr);
+				_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);
+				_simulation.LocalPlayer.UpdateGUI();
 
-					// Send pending block changes to server
-					SendPendingBlockChanges((float)Raylib.GetTime());
+				// Send pending block changes to server
+				SendPendingBlockChanges((float)Raylib.GetTime());
 			}
 			catch (Exception ex)
 			{
@@ -333,86 +342,86 @@ namespace Voxelgine.States
 
 		public override void Draw2D()
 		{
-		  try
-		  {
-			float deltaTime = Raylib.GetFrameTime();
-			_totalTime += deltaTime;
-
-			if (!_initialized)
+			try
 			{
-				// Draw connection/loading status screen
-				Raylib.ClearBackground(new Color(30, 30, 40, 255));
+				float deltaTime = Raylib.GetFrameTime();
+				_totalTime += deltaTime;
 
-				int screenW = _gameWindow.Width;
-				int screenH = _gameWindow.Height;
-
-				if (!string.IsNullOrEmpty(_statusText))
+				if (!_initialized)
 				{
-					int textW = Raylib.MeasureText(_statusText, 24);
-					Raylib.DrawText(_statusText, (screenW - textW) / 2, screenH / 2 - 20, 24, Color.White);
-				}
+					// Draw connection/loading status screen
+					Raylib.ClearBackground(new Color(30, 30, 40, 255));
 
-				if (!string.IsNullOrEmpty(_errorText))
-				{
-					int textW = Raylib.MeasureText(_errorText, 20);
-					Raylib.DrawText(_errorText, (screenW - textW) / 2, screenH / 2 + 20, 20, Color.Red);
+					int screenW = _gameWindow.Width;
+					int screenH = _gameWindow.Height;
 
-					string backText = "Press ESC to return to menu";
-					int backW = Raylib.MeasureText(backText, 18);
-					Raylib.DrawText(backText, (screenW - backW) / 2, screenH / 2 + 60, 18, Color.Gray);
-
-					if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+					if (!string.IsNullOrEmpty(_statusText))
 					{
-						DisconnectAndReturn("Cancelled");
+						int textW = Raylib.MeasureText(_statusText, 24);
+						Raylib.DrawText(_statusText, (screenW - textW) / 2, screenH / 2 - 20, 24, Color.White);
 					}
+
+					if (!string.IsNullOrEmpty(_errorText))
+					{
+						int textW = Raylib.MeasureText(_errorText, 20);
+						Raylib.DrawText(_errorText, (screenW - textW) / 2, screenH / 2 + 20, 20, Color.Red);
+
+						string backText = "Press ESC to return to menu";
+						int backW = Raylib.MeasureText(backText, 18);
+						Raylib.DrawText(backText, (screenW - backW) / 2, screenH / 2 + 60, 18, Color.Gray);
+
+						if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+						{
+							DisconnectAndReturn("Cancelled");
+						}
+					}
+
+					// Show loading progress bar
+					if (_client?.State == ClientState.Loading)
+					{
+						var wr = _client.WorldReceiver;
+						float progress = wr.Progress;
+						int barW = 300;
+						int barH = 20;
+						int barX = (screenW - barW) / 2;
+						int barY = screenH / 2 + 30;
+
+						Raylib.DrawRectangle(barX, barY, barW, barH, Color.DarkGray);
+						Raylib.DrawRectangle(barX, barY, (int)(barW * progress), barH, Color.Green);
+						Raylib.DrawRectangleLines(barX, barY, barW, barH, Color.White);
+					}
+
+					return;
 				}
 
-				// Show loading progress bar
-				if (_client?.State == ClientState.Loading)
+				// In-game HUD
+				DrawUnderwaterOverlay();
+
+				_gui.Tick(deltaTime, _totalTime);
+				Raylib.DrawCircleLines(_gameWindow.Width / 2, _gameWindow.Height / 2, 5, Color.White);
+				Raylib.DrawFPS(10, 10);
+
+				// Time of day
+				string timeStr = $"Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})";
+				Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
+
+				// Network info
+				string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
+				Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
+
+				// Health bar
+				DrawHealthBar();
+
+				// Death screen overlay
+				if (_simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead)
 				{
-					var wr = _client.WorldReceiver;
-					float progress = wr.Progress;
-					int barW = 300;
-					int barH = 20;
-					int barX = (screenW - barW) / 2;
-					int barY = screenH / 2 + 30;
-
-					Raylib.DrawRectangle(barX, barY, barW, barH, Color.DarkGray);
-					Raylib.DrawRectangle(barX, barY, (int)(barW * progress), barH, Color.Green);
-					Raylib.DrawRectangleLines(barX, barY, barW, barH, Color.White);
+					DrawDeathOverlay();
 				}
-
-				return;
 			}
-
-			// In-game HUD
-			DrawUnderwaterOverlay();
-
-			_gui.Tick(deltaTime, _totalTime);
-			Raylib.DrawCircleLines(_gameWindow.Width / 2, _gameWindow.Height / 2, 5, Color.White);
-			Raylib.DrawFPS(10, 10);
-
-			// Time of day
-			string timeStr = $"Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})";
-			Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
-
-			// Network info
-			string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
-			Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
-
-			// Health bar
-			DrawHealthBar();
-
-			// Death screen overlay
-			if (_simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead)
+			catch (Exception ex)
 			{
-				DrawDeathOverlay();
+				_logging.WriteLine($"MultiplayerGameState: Draw2D exception: {ex}");
 			}
-		  }
-		  catch (Exception ex)
-		  {
-			_logging.WriteLine($"MultiplayerGameState: Draw2D exception: {ex}");
-		  }
 		}
 
 		// ======================================= Network Event Handlers ==========================================
@@ -512,45 +521,45 @@ namespace Voxelgine.States
 				_simulation.Entities.IsAuthority = false;
 
 				// Process any PlayerJoined packets that arrived before the simulation was created
-					if (_pendingPlayerJoins.Count > 0)
+				if (_pendingPlayerJoins.Count > 0)
+				{
+					_logging.WriteLine($"MultiplayerGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
+					foreach (var pending in _pendingPlayerJoins)
 					{
-						_logging.WriteLine($"MultiplayerGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
-						foreach (var pending in _pendingPlayerJoins)
-						{
-							HandlePlayerJoined(pending);
-						}
-						_pendingPlayerJoins.Clear();
+						HandlePlayerJoined(pending);
 					}
+					_pendingPlayerJoins.Clear();
+				}
 
-					// Process any entity packets that arrived before the simulation was created
-					if (_pendingEntityPackets.Count > 0)
+				// Process any entity packets that arrived before the simulation was created
+				if (_pendingEntityPackets.Count > 0)
+				{
+					_logging.WriteLine($"MultiplayerGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
+					float replayTime = (float)Raylib.GetTime();
+					foreach (var pending in _pendingEntityPackets)
 					{
-						_logging.WriteLine($"MultiplayerGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
-						float replayTime = (float)Raylib.GetTime();
-						foreach (var pending in _pendingEntityPackets)
+						switch (pending)
 						{
-							switch (pending)
-							{
-								case EntitySpawnPacket spawn:
-									HandleEntitySpawn(spawn);
-									break;
-								case EntityRemovePacket remove:
-									HandleEntityRemove(remove);
-									break;
-								case EntitySnapshotPacket snapshot:
-									HandleEntitySnapshot(snapshot, replayTime);
-									break;
-							}
+							case EntitySpawnPacket spawn:
+								HandleEntitySpawn(spawn);
+								break;
+							case EntityRemovePacket remove:
+								HandleEntityRemove(remove);
+								break;
+							case EntitySnapshotPacket snapshot:
+								HandleEntitySnapshot(snapshot, replayTime);
+								break;
 						}
-						_pendingEntityPackets.Clear();
 					}
+					_pendingEntityPackets.Clear();
+				}
 
-					// Finish loading
-					_logging.WriteLine("MultiplayerGameState: FinishLoading...");
-					_client.FinishLoading();
-					_initialized = true;
-					_statusText = "";
-					_errorText = "";
+				// Finish loading
+				_logging.WriteLine("MultiplayerGameState: FinishLoading...");
+				_client.FinishLoading();
+				_initialized = true;
+				_statusText = "";
+				_errorText = "";
 
 				Raylib.DisableCursor();
 
@@ -590,34 +599,34 @@ namespace Voxelgine.States
 					break;
 
 				case DayTimeSyncPacket timeSync:
-						if (_simulation != null)
-							_simulation.DayNight.SetTime(timeSync.TimeOfDay);
-						break;
+					if (_simulation != null)
+						_simulation.DayNight.SetTime(timeSync.TimeOfDay);
+					break;
 
-						case BlockChangePacket blockChange:
-							HandleBlockChange(blockChange);
-							break;
+				case BlockChangePacket blockChange:
+					HandleBlockChange(blockChange);
+					break;
 
-						case EntitySpawnPacket entitySpawn:
-							HandleEntitySpawn(entitySpawn);
-							break;
+				case EntitySpawnPacket entitySpawn:
+					HandleEntitySpawn(entitySpawn);
+					break;
 
-						case EntityRemovePacket entityRemove:
-							HandleEntityRemove(entityRemove);
-							break;
+				case EntityRemovePacket entityRemove:
+					HandleEntityRemove(entityRemove);
+					break;
 
-							case EntitySnapshotPacket entitySnapshot:
-								HandleEntitySnapshot(entitySnapshot, currentTime);
-								break;
+				case EntitySnapshotPacket entitySnapshot:
+					HandleEntitySnapshot(entitySnapshot, currentTime);
+					break;
 
-								case WeaponFireEffectPacket fireEffect:
-									HandleWeaponFireEffect(fireEffect);
-									break;
+				case WeaponFireEffectPacket fireEffect:
+					HandleWeaponFireEffect(fireEffect);
+					break;
 
-								case PlayerDamagePacket damage:
-									HandlePlayerDamage(damage);
-									break;
-							}
+				case PlayerDamagePacket damage:
+					HandlePlayerDamage(damage);
+					break;
+			}
 		}
 
 		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, float currentTime)
@@ -955,20 +964,43 @@ namespace Voxelgine.States
 			{
 				case FireHitType.Entity:
 					// Apply NPC twitch if we hit an entity with a model
+					bool isNpcHit = false;
 					if (packet.EntityNetworkId != 0)
 					{
 						VoxEntity hitEntity = _simulation.Entities.GetEntityByNetworkId(packet.EntityNetworkId);
 						if (hitEntity is VEntNPC npc)
 						{
+							isNpcHit = true;
 							// Use AABB center as a generic twitch target
 							npc.TwitchBodyPart("body", packet.Direction);
 						}
 					}
 
-					// Blood particles
-					for (int i = 0; i < 8; i++)
+					if (isNpcHit)
 					{
-						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+						// Blood particles for NPCs
+						for (int i = 0; i < 8; i++)
+						{
+							_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+						}
+					}
+					else
+					{
+						// Spark particles for non-NPC entities
+						for (int i = 0; i < 6; i++)
+						{
+							float forceFactor = 10.6f;
+							float randomUnitFactor = 0.6f;
+
+							if (packet.HitNormal.Y == 0)
+							{
+								forceFactor *= 2;
+								randomUnitFactor = 0.4f;
+							}
+
+							Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+							_particle.SpawnSpark(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+						}
 					}
 					break;
 

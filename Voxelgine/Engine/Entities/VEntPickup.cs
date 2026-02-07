@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 
 using Raylib_cs;
 
-using Voxelgine.States;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine
@@ -56,10 +55,9 @@ namespace Voxelgine.Engine
 				SWatch.Restart();
 				NextMs = Random.Shared.Next(300, 700);
 
-				if (Eng.GameState is GameState gs)
+				if (Eng.MultiplayerGameState?.Particle is ParticleSystem part)
 				{
-					ParticleSystem Part = gs.Particle;
-					Part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
+					part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
 				}
 			}
 		}

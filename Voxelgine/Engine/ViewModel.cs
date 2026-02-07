@@ -282,9 +282,9 @@ namespace Voxelgine.Engine
 
 			// Sample light level at player position and apply to view model
 			Color lightColor = Color.White;
-			if (Eng.GameState?.Map != null)
+			if (Eng.MultiplayerGameState?.Map != null)
 			{
-				lightColor = Eng.GameState.Map.GetLightColor(Ply.Position);
+				lightColor = Eng.MultiplayerGameState.Map.GetLightColor(Ply.Position);
 			}
 
 			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), lightColor);

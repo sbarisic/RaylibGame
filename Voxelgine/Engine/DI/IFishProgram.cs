@@ -19,8 +19,6 @@ namespace Voxelgine.Engine.DI
 
 		public MainMenuStateFishUI MainMenuState { get; set; }
 
-		public GameState GameState { get; set; }
-
 		public NPCPreviewState NPCPreviewState { get; set; }
 
 		public MultiplayerGameState MultiplayerGameState { get; set; }

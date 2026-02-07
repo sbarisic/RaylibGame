@@ -104,7 +104,9 @@ namespace Voxelgine.Engine
 				InfoLbl.WriteLine("OnGround: {0}", GetWasLastLegsOnFloor() ? "YES" : "NO");
 				InfoLbl.WriteLine("ChunkDraws: {0}", Eng.ChunkDrawCalls.ToString());
 
-				Eng.GameState.Particle.GetStats(out int OnScreen, out int Drawn, out int Max);
+				int OnScreen = 0, Drawn = 0, Max = 0;
+				var particle = Eng.MultiplayerGameState?.Particle;
+				particle?.GetStats(out OnScreen, out Drawn, out Max);
 				InfoLbl.WriteLine("Particles: {0}/{1}/{2}", OnScreen, Drawn, Max);
 			}
 		}

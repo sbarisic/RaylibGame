@@ -74,7 +74,7 @@ namespace Voxelgine.States
 		private void CreateMainMenu()
 		{
 			// Calculate centered position
-			var windowSize = new Vector2(320, 460);
+			var windowSize = new Vector2(320, 400);
 			var windowPos = new Vector2(
 				(Window.Width / 2f) - (windowSize.X / 2f),
 				(Window.Height / 1.65f) - (windowSize.Y / 2f)
@@ -104,17 +104,18 @@ namespace Voxelgine.States
 			float margin = 20f;
 			float contentWidth = windowSize.X - 60; // Account for window borders and scrollbar
 
-			// New Game button
-			var btnNewGame = new Button();
-			btnNewGame.Text = "New Game";
-			btnNewGame.Position = new Vector2(margin, margin);
-			btnNewGame.Size = new Vector2(contentWidth, buttonHeight);
-			btnNewGame.TooltipText = "Start a new game";
-			btnNewGame.OnButtonPressed += (sender, mbtn, pos) =>
+			// Host Game button
+			var btnHost = new Button();
+			btnHost.Text = "Host Game";
+			btnHost.Position = new Vector2(margin, margin);
+			btnHost.Size = new Vector2(contentWidth, buttonHeight);
+			btnHost.TooltipText = "Host a multiplayer game";
+			btnHost.OnButtonPressed += (sender, mbtn, pos) =>
 			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.GameState);
+				_hostWindow.Visible = true;
+				_hostWindow.BringToFront();
 			};
-			scrollPane.AddChild(btnNewGame);
+			scrollPane.AddChild(btnHost);
 
 			// Multiplayer button
 			var btnMultiplayer = new Button();
@@ -129,23 +130,10 @@ namespace Voxelgine.States
 			};
 			scrollPane.AddChild(btnMultiplayer);
 
-			// Host Game button
-			var btnHost = new Button();
-			btnHost.Text = "Host Game";
-			btnHost.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
-			btnHost.Size = new Vector2(contentWidth, buttonHeight);
-			btnHost.TooltipText = "Host a multiplayer game";
-			btnHost.OnButtonPressed += (sender, mbtn, pos) =>
-			{
-				_hostWindow.Visible = true;
-				_hostWindow.BringToFront();
-			};
-			scrollPane.AddChild(btnHost);
-
 			// NPC Preview button
 			var btnNPCPreview = new Button();
 			btnNPCPreview.Text = "NPC Preview";
-			btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+			btnNPCPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 2);
 			btnNPCPreview.Size = new Vector2(contentWidth, buttonHeight);
 			btnNPCPreview.TooltipText = "Preview NPC models and animations";
 			btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
@@ -157,7 +145,7 @@ namespace Voxelgine.States
 			// Options button
 			var btnOptions = new Button();
 			btnOptions.Text = "Options";
-			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
+			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
 			btnOptions.Size = new Vector2(contentWidth, buttonHeight);
 			btnOptions.TooltipText = "Configure game settings";
 			btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
@@ -170,7 +158,7 @@ namespace Voxelgine.States
 			// Quit button
 			var btnQuit = new Button();
 			btnQuit.Text = "Quit";
-			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 5);
+			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
 			btnQuit.Size = new Vector2(contentWidth, buttonHeight);
 			btnQuit.TooltipText = "Exit the game";
 			btnQuit.OnButtonPressed += (sender, mbtn, pos) =>

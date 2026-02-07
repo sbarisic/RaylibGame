@@ -224,9 +224,9 @@ namespace Voxelgine.Engine
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 		}
 
-		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)
-		// Also checks for collision with the player and triggers OnPlayerTouch only once per entry
-		public bool _WasPlayerTouching = false;
+		// Tracks which players are currently overlapping this entity (by player ID).
+		// Used by EntityManager to trigger OnPlayerTouch only once per entry per player.
+		public readonly HashSet<int> _TouchingPlayerIds = new();
 
 		public virtual void OnUpdatePhysics(float Dt)
 		{

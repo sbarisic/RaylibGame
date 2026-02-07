@@ -123,24 +123,27 @@ namespace Voxelgine.Engine
 			PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
 
 			// Move with axis-separated collision
-				Ent.Position = WorldCollision.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
+			Ent.Position = WorldCollision.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
 
 			// --- Player collision check using AABB ---
-			if (sim?.LocalPlayer != null)
+			if (sim != null)
 			{
-				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(sim.LocalPlayer.Position);
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
 
-				bool touching = playerAABB.Overlaps(entityAABB);
+				foreach (Player player in sim.Players.GetAllPlayers())
+				{
+					AABB playerAABB = PhysicsUtils.CreatePlayerAABB(player.Position);
+					bool touching = playerAABB.Overlaps(entityAABB);
 
-				if (touching && !Ent._WasPlayerTouching)
-				{
-					Ent.OnPlayerTouch(sim.LocalPlayer);
-					Ent._WasPlayerTouching = true;
-				}
-				else if (!touching)
-				{
-					Ent._WasPlayerTouching = false;
+					if (touching && !Ent._TouchingPlayerIds.Contains(player.PlayerId))
+					{
+						Ent._TouchingPlayerIds.Add(player.PlayerId);
+						Ent.OnPlayerTouch(player);
+					}
+					else if (!touching)
+					{
+						Ent._TouchingPlayerIds.Remove(player.PlayerId);
+					}
 				}
 			}
 		}

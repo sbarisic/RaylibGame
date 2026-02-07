@@ -265,7 +265,7 @@ namespace Voxelgine.States
 			{
 				_simulation.LocalPlayer.UpdateFPSCamera(ref FInfo);
 
-				// Sync render camera from physics camera (GameWindow interpolation only handles single-player GameState)
+				// Sync render camera from physics camera
 				_simulation.LocalPlayer.RenderCam = _simulation.LocalPlayer.Cam;
 
 				// Populate frame info for GameWindow interpolation

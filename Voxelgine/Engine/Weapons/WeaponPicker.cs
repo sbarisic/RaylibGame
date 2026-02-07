@@ -22,18 +22,6 @@ namespace Voxelgine.Engine
 		{
 			// Apply swing animation to the view model
 			ParentPlayer.ViewMdl.ApplySwing();
-
-			// TODO: Add hit detection and effects
-			/*
-			Vector3 Pos = Raycast(E.Map, E.Start, E.Dir, E.MaxLen, out Vector3 Norm);
-
-			if (Pos != Vector3.Zero) {
-				Console.WriteLine("Hit!");
-
-				GameState GState = ((GameState)Program.GameState);
-				GState.Particle.SpawnSmoke(Pos, Norm * 1.6f, Color.White);
-			}
-			*/
 		}
 	}
 }

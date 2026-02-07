@@ -4,8 +4,7 @@ namespace Voxelgine.Engine
 {
 	/// <summary>
 	/// Represents a weapon fire intent — the player's desire to fire a weapon.
-	/// In single-player, this is immediately resolved locally.
-	/// In multiplayer, the client sends this to the server for authoritative hit detection.
+	/// The client sends this to the server for authoritative hit detection.
 	/// </summary>
 	public readonly struct FireIntent
 	{
@@ -36,7 +35,7 @@ namespace Voxelgine.Engine
 
 	/// <summary>
 	/// The result of resolving a fire intent — what was hit and where.
-	/// Produced by server-authoritative hit detection (or locally in single-player).
+	/// Produced by server-authoritative hit detection.
 	/// </summary>
 	public readonly struct FireResult
 	{

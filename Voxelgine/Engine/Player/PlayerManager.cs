@@ -4,8 +4,7 @@ using System.Linq;
 namespace Voxelgine.Engine
 {
 	/// <summary>
-	/// Manages all players in the game. In single-player, holds a single player with ID 0.
-	/// In multiplayer, holds up to 10 players keyed by their assigned player ID.
+	/// Manages all players in the game. Holds up to 10 players keyed by their server-assigned player ID.
 	/// </summary>
 	public class PlayerManager
 	{

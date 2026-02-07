@@ -55,7 +55,7 @@ namespace Voxelgine.Engine
 		bool LocalPlayer;
 		SoundMgr Snd;
 
-		/// <summary>Unique player identifier. 0 for local player in single-player.</summary>
+		/// <summary>Unique player identifier assigned by the server on connect.</summary>
 		public int PlayerId { get; private set; }
 
 		/// <summary>Current health. Server-authoritative in multiplayer.</summary>

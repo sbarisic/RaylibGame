@@ -171,7 +171,7 @@ namespace Voxelgine.Engine
 
 			if (!CursorDisabled)
 			{
-				// FishUI tick is called by GameState.Draw2D
+				// FishUI tick is called by MultiplayerGameState.Draw2D
 			}
 			else
 			{

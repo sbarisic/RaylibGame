@@ -6,8 +6,8 @@ namespace Voxelgine.Engine
 	/// <summary>
 	/// Owns the authoritative game simulation state: world, players, entities, day/night cycle, and physics data.
 	/// Can run independently of any rendering/presentation layer (Raylib).
-	/// In single-player, <see cref="Voxelgine.States.GameState"/> creates and owns a GameSimulation.
-	/// In dedicated server mode, GameSimulation runs without any presentation layer.
+	/// On the client, <see cref="Voxelgine.States.MultiplayerGameState"/> creates and owns a GameSimulation.
+	/// On a dedicated server, GameSimulation runs without any presentation layer.
 	/// </summary>
 	public class GameSimulation
 	{

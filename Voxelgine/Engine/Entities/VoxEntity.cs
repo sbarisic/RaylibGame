@@ -69,8 +69,69 @@ namespace Voxelgine.Engine
 		EntityManager EntMgr;
 		GameSimulation _simulation;
 
+		/// <summary>
+		/// Gets the entity type name used for network spawning.
+		/// Defaults to the class name (e.g., "VEntNPC", "VEntPickup").
+		/// </summary>
+		public virtual string EntityTypeName => GetType().Name;
+
 		public virtual void OnInit()
 		{
+		}
+
+		/// <summary>
+		/// Writes spawn-time properties needed to reconstruct this entity on a client.
+		/// Base implementation writes Size and model name. Subclasses override
+		/// <see cref="WriteSpawnPropertiesExtra"/> for type-specific properties.
+		/// </summary>
+		public void WriteSpawnProperties(BinaryWriter writer)
+		{
+			// Size (12 bytes)
+			writer.Write(Size.X);
+			writer.Write(Size.Y);
+			writer.Write(Size.Z);
+
+			// Model name (string, length-prefixed)
+			writer.Write(EntModelName ?? string.Empty);
+
+			WriteSpawnPropertiesExtra(writer);
+		}
+
+		/// <summary>
+		/// Reads spawn-time properties and applies them to this entity.
+		/// Base implementation reads Size and loads the model. Subclasses override
+		/// <see cref="ReadSpawnPropertiesExtra"/> for type-specific properties.
+		/// </summary>
+		public void ReadSpawnProperties(BinaryReader reader)
+		{
+			// Size
+			Size = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+
+			// Model name
+			string modelName = reader.ReadString();
+			if (!string.IsNullOrEmpty(modelName))
+				SetModel(modelName);
+
+			ReadSpawnPropertiesExtra(reader);
+		}
+
+		/// <summary>
+		/// Override to write subclass-specific spawn properties.
+		/// </summary>
+		protected virtual void WriteSpawnPropertiesExtra(BinaryWriter writer) { }
+
+		/// <summary>
+		/// Override to read subclass-specific spawn properties.
+		/// </summary>
+		protected virtual void ReadSpawnPropertiesExtra(BinaryReader reader) { }
+
+		/// <summary>
+		/// Stores the model name without loading the GPU resource.
+		/// Use this on the headless server where Raylib is not available.
+		/// </summary>
+		public void SetModelName(string mdlName)
+		{
+			EntModelName = mdlName;
 		}
 
 		public virtual void SetModel(string MdlName)
@@ -151,6 +212,16 @@ namespace Voxelgine.Engine
 			if (IsRotating)
 				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 
+		}
+
+		/// <summary>
+		/// Updates cosmetic visuals (rotation) without running AI or physics.
+		/// Used on multiplayer clients where the server is authoritative.
+		/// </summary>
+		public virtual void UpdateVisuals(float Dt)
+		{
+			if (IsRotating)
+				ModelRotationDeg = (ModelRotationDeg + RotationSpeed * Dt) % 360;
 		}
 
 		// Applies simple physics: gravity, velocity integration, and block collision (AABB sweep, no input)

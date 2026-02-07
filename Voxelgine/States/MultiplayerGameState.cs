@@ -44,6 +44,23 @@ namespace Voxelgine.States
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
 
+		// Buffer for entity packets received before simulation is created
+		private readonly List<Packet> _pendingEntityPackets = new List<Packet>();
+
+		// Entity interpolation buffers keyed by network ID
+		private readonly Dictionary<int, SnapshotBuffer<EntitySnapshot>> _entitySnapshots = new Dictionary<int, SnapshotBuffer<EntitySnapshot>>();
+
+		/// <summary>Interpolation delay for remote entities, matching remote players.</summary>
+		private const float EntityInterpolationDelay = 0.1f;
+
+		/// <summary>Snapshot data for entity interpolation.</summary>
+		private struct EntitySnapshot
+		{
+			public Vector3 Position;
+			public Vector3 Velocity;
+			public byte AnimationState;
+		}
+
 		// Water overlay
 		private Texture2D? _waterOverlayTexture;
 		private bool _waterOverlayLoaded;
@@ -210,7 +227,8 @@ namespace Voxelgine.States
 					_simulation.LocalPlayer.GetVelocity()
 				);
 
-				// Update entities
+				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
+				// UpdateLockstep is still called for any non-authoritative cleanup.
 				_simulation.Entities.UpdateLockstep(TotalTime, Dt, InMgr);
 			}
 			catch (Exception ex)
@@ -256,6 +274,9 @@ namespace Voxelgine.States
 				{
 					remotePlayer.Update(currentTime, frameTime);
 				}
+
+				// Update entity interpolation from server snapshots
+				UpdateEntityInterpolation(currentTime);
 
 				Raylib.ClearBackground(_simulation.DayNight.SkyColor);
 
@@ -468,6 +489,9 @@ namespace Voxelgine.States
 				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
 				_logging.WriteLine("MultiplayerGameState: SetPosition complete");
 
+				// Set entity manager to non-authoritative (server owns entity state)
+				_simulation.Entities.IsAuthority = false;
+
 				// Process any PlayerJoined packets that arrived before the simulation was created
 					if (_pendingPlayerJoins.Count > 0)
 					{
@@ -477,6 +501,29 @@ namespace Voxelgine.States
 							HandlePlayerJoined(pending);
 						}
 						_pendingPlayerJoins.Clear();
+					}
+
+					// Process any entity packets that arrived before the simulation was created
+					if (_pendingEntityPackets.Count > 0)
+					{
+						_logging.WriteLine($"MultiplayerGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
+						float replayTime = (float)Raylib.GetTime();
+						foreach (var pending in _pendingEntityPackets)
+						{
+							switch (pending)
+							{
+								case EntitySpawnPacket spawn:
+									HandleEntitySpawn(spawn);
+									break;
+								case EntityRemovePacket remove:
+									HandleEntityRemove(remove);
+									break;
+								case EntitySnapshotPacket snapshot:
+									HandleEntitySnapshot(snapshot, replayTime);
+									break;
+							}
+						}
+						_pendingEntityPackets.Clear();
 					}
 
 					// Finish loading
@@ -528,10 +575,22 @@ namespace Voxelgine.States
 							_simulation.DayNight.SetTime(timeSync.TimeOfDay);
 						break;
 
-					case BlockChangePacket blockChange:
-						HandleBlockChange(blockChange);
-						break;
-			}
+						case BlockChangePacket blockChange:
+							HandleBlockChange(blockChange);
+							break;
+
+						case EntitySpawnPacket entitySpawn:
+							HandleEntitySpawn(entitySpawn);
+							break;
+
+						case EntityRemovePacket entityRemove:
+							HandleEntityRemove(entityRemove);
+							break;
+
+						case EntitySnapshotPacket entitySnapshot:
+							HandleEntitySnapshot(entitySnapshot, currentTime);
+							break;
+					}
 		}
 
 		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, float currentTime)
@@ -615,6 +674,170 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Handles an <see cref="EntitySpawnPacket"/> from the server.
+		/// Creates the entity locally with the server-assigned network ID.
+		/// </summary>
+		private void HandleEntitySpawn(EntitySpawnPacket packet)
+		{
+			if (_simulation == null)
+			{
+				_pendingEntityPackets.Add(packet);
+				return;
+			}
+
+			// Don't duplicate if already exists
+			if (_simulation.Entities.GetEntityByNetworkId(packet.NetworkId) != null)
+				return;
+
+			VoxEntity entity = CreateEntityByType(packet.EntityType);
+			if (entity == null)
+			{
+				_logging.WriteLine($"MultiplayerGameState: Unknown entity type '{packet.EntityType}'");
+				return;
+			}
+
+			entity.SetPosition(packet.Position);
+
+			// Read spawn properties (size, model, subclass data)
+			if (packet.Properties.Length > 0)
+			{
+				using var ms = new MemoryStream(packet.Properties);
+				using var reader = new BinaryReader(ms);
+				entity.ReadSpawnProperties(reader);
+			}
+
+			_simulation.Entities.SpawnWithNetworkId(_simulation, entity, packet.NetworkId);
+			_logging.WriteLine($"MultiplayerGameState: Entity spawned: {packet.EntityType} (netId={packet.NetworkId})");
+		}
+
+		/// <summary>
+		/// Handles an <see cref="EntityRemovePacket"/> from the server.
+		/// Removes the entity by network ID.
+		/// </summary>
+		private void HandleEntityRemove(EntityRemovePacket packet)
+		{
+			if (_simulation == null)
+			{
+				_pendingEntityPackets.Add(packet);
+				return;
+			}
+
+			var removed = _simulation.Entities.Remove(packet.NetworkId);
+			_entitySnapshots.Remove(packet.NetworkId);
+
+			if (removed != null)
+				_logging.WriteLine($"MultiplayerGameState: Entity removed (netId={packet.NetworkId})");
+		}
+
+		/// <summary>
+		/// Handles an <see cref="EntitySnapshotPacket"/> from the server.
+		/// Stores the snapshot in the interpolation buffer for smooth rendering.
+		/// </summary>
+		private void HandleEntitySnapshot(EntitySnapshotPacket packet, float currentTime)
+		{
+			if (_simulation == null)
+			{
+				_pendingEntityPackets.Add(packet);
+				return;
+			}
+
+			var entity = _simulation.Entities.GetEntityByNetworkId(packet.NetworkId);
+			if (entity == null)
+				return;
+
+			// Add to interpolation buffer
+			if (!_entitySnapshots.TryGetValue(packet.NetworkId, out var buffer))
+			{
+				buffer = new SnapshotBuffer<EntitySnapshot>();
+				_entitySnapshots[packet.NetworkId] = buffer;
+			}
+
+			buffer.Add(new EntitySnapshot
+			{
+				Position = packet.Position,
+				Velocity = packet.Velocity,
+				AnimationState = packet.AnimationState,
+			}, currentTime);
+		}
+
+		/// <summary>
+		/// Updates entity positions from interpolation buffers. Called each frame.
+		/// </summary>
+		private void UpdateEntityInterpolation(float currentTime)
+		{
+			float renderTime = currentTime - EntityInterpolationDelay;
+
+			foreach (var kvp in _entitySnapshots)
+			{
+				int networkId = kvp.Key;
+				var buffer = kvp.Value;
+
+				var entity = _simulation.Entities.GetEntityByNetworkId(networkId);
+				if (entity == null)
+					continue;
+
+				if (buffer.Sample(renderTime, out var from, out var to, out float t))
+				{
+					entity.Position = Vector3.Lerp(from.Position, to.Position, t);
+					entity.Velocity = Vector3.Lerp(from.Velocity, to.Velocity, t);
+				}
+				else if (buffer.Count == 1)
+				{
+					// Only one snapshot — just snap to it
+					entity.Position = from.Position;
+					entity.Velocity = from.Velocity;
+				}
+
+				// Update animation from latest snapshot state
+				UpdateEntityAnimation(entity, to.AnimationState, Raylib.GetFrameTime());
+			}
+		}
+
+		/// <summary>
+		/// Applies animation state from the server to an entity.
+		/// 0 = idle, 1 = walk, 2 = attack.
+		/// </summary>
+		private static void UpdateEntityAnimation(VoxEntity entity, byte animationState, float deltaTime)
+		{
+			if (entity is VEntNPC npc)
+			{
+				var animator = npc.GetAnimator();
+				if (animator != null)
+				{
+					string targetAnim = animationState switch
+					{
+						1 => "walk",
+						2 => "attack",
+						_ => "idle",
+					};
+
+					if (animator.CurrentAnimation != targetAnim)
+						animator.Play(targetAnim);
+
+					animator.Update(deltaTime);
+				}
+			}
+
+			// Update cosmetic visuals (rotation) on the client
+			entity.UpdateVisuals(deltaTime);
+		}
+
+		/// <summary>
+		/// Creates a <see cref="VoxEntity"/> instance from a type name string.
+		/// </summary>
+		private static VoxEntity CreateEntityByType(string entityType)
+		{
+			return entityType switch
+			{
+				"VEntNPC" => new VEntNPC(),
+				"VEntPickup" => new VEntPickup(),
+				"VEntSlidingDoor" => new VEntSlidingDoor(),
+				"VEntPlayer" => new VEntPlayer(),
+				_ => null,
+			};
+		}
+
+		/// <summary>
 		/// Collects local block changes (from player placing/removing blocks) and sends them
 		/// to the server as <see cref="BlockPlaceRequestPacket"/> or <see cref="BlockRemoveRequestPacket"/>.
 		/// The local change is kept as optimistic client prediction; the server will validate
@@ -694,6 +917,8 @@ namespace Voxelgine.States
 			_snd = null;
 			_particle = null;
 			_pendingPlayerJoins.Clear();
+			_pendingEntityPackets.Clear();
+			_entitySnapshots.Clear();
 		}
 
 		// ====================================== Rendering Helpers ===============================================

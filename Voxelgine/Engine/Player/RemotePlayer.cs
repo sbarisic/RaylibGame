@@ -43,19 +43,15 @@ namespace Voxelgine.Engine
 		private IFishEngineRunner _eng;
 		private IFishLogging _logging;
 
-		// Interpolation buffer — stores two most recent snapshots
-		private Snapshot _previousSnapshot;
-		private Snapshot _currentSnapshot;
-		private bool _hasFirstSnapshot;
-		private bool _hasSecondSnapshot;
-		private float _snapshotReceiveTime;
+		// Interpolation buffer — ring buffer of timestamped snapshots
+		private readonly SnapshotBuffer<PlayerSnapshot> _snapshotBuffer = new SnapshotBuffer<PlayerSnapshot>();
 
-		private struct Snapshot
+		/// <summary>Snapshot data stored in the interpolation buffer.</summary>
+		public struct PlayerSnapshot
 		{
 			public Vector3 Position;
 			public Vector3 Velocity;
 			public Vector2 CameraAngle;
-			public float ReceiveTime;
 		}
 
 		public RemotePlayer(int playerId, string playerName, IFishEngineRunner eng)
@@ -95,40 +91,25 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Applies a snapshot from the server (from <see cref="WorldSnapshotPacket.PlayerEntry"/>).
-		/// Shifts the current snapshot to previous and stores the new one.
+		/// Adds the snapshot to the interpolation buffer.
 		/// </summary>
 		public void ApplySnapshot(Vector3 position, Vector3 velocity, Vector2 cameraAngle, float currentTime)
 		{
-			if (!_hasFirstSnapshot)
-			{
-				// First snapshot — initialize both slots to avoid interpolation glitch
-				_currentSnapshot = new Snapshot
-				{
-					Position = position,
-					Velocity = velocity,
-					CameraAngle = cameraAngle,
-					ReceiveTime = currentTime
-				};
-				_previousSnapshot = _currentSnapshot;
-				_hasFirstSnapshot = true;
-
-				// Set render position immediately
-				Position = position;
-				Velocity = velocity;
-				CameraAngle = cameraAngle;
-				return;
-			}
-
-			// Shift current → previous
-			_previousSnapshot = _currentSnapshot;
-			_currentSnapshot = new Snapshot
+			var snapshot = new PlayerSnapshot
 			{
 				Position = position,
 				Velocity = velocity,
 				CameraAngle = cameraAngle,
-				ReceiveTime = currentTime
 			};
-			_hasSecondSnapshot = true;
+			_snapshotBuffer.Add(snapshot, currentTime);
+
+			// On first snapshot, set render position immediately
+			if (_snapshotBuffer.Count == 1)
+			{
+				Position = position;
+				Velocity = velocity;
+				CameraAngle = cameraAngle;
+			}
 		}
 
 		/// <summary>
@@ -136,28 +117,18 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void Update(float currentTime, float deltaTime)
 		{
-			if (!_hasFirstSnapshot)
+			if (_snapshotBuffer.Count == 0)
 				return;
 
-			if (_hasSecondSnapshot)
+			if (_snapshotBuffer.Count >= 2)
 			{
-				// Interpolate between previous and current snapshot
-				float snapshotDelta = _currentSnapshot.ReceiveTime - _previousSnapshot.ReceiveTime;
-				if (snapshotDelta > 0)
-				{
-					float renderTime = currentTime - InterpolationDelay;
-					float t = (renderTime - _previousSnapshot.ReceiveTime) / snapshotDelta;
-					t = Math.Clamp(t, 0f, 1f);
+				float renderTime = currentTime - InterpolationDelay;
 
-					Position = Vector3.Lerp(_previousSnapshot.Position, _currentSnapshot.Position, t);
-					Velocity = Vector3.Lerp(_previousSnapshot.Velocity, _currentSnapshot.Velocity, t);
-					CameraAngle = LerpAngle(_previousSnapshot.CameraAngle, _currentSnapshot.CameraAngle, t);
-				}
-				else
+				if (_snapshotBuffer.Sample(renderTime, out var from, out var to, out float t))
 				{
-					Position = _currentSnapshot.Position;
-					Velocity = _currentSnapshot.Velocity;
-					CameraAngle = _currentSnapshot.CameraAngle;
+					Position = Vector3.Lerp(from.Position, to.Position, t);
+					Velocity = Vector3.Lerp(from.Velocity, to.Velocity, t);
+					CameraAngle = LerpAngle(from.CameraAngle, to.CameraAngle, t);
 				}
 			}
 
@@ -232,15 +203,12 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Directly sets the position (used for initial placement from <see cref="PlayerJoinedPacket"/>).
+		/// Resets the interpolation buffer and starts fresh from this position.
 		/// </summary>
 		public void SetPosition(Vector3 position)
 		{
 			Position = position;
-			if (_hasFirstSnapshot)
-			{
-				_currentSnapshot.Position = position;
-				_previousSnapshot.Position = position;
-			}
+			_snapshotBuffer.Reset();
 		}
 
 		/// <summary>

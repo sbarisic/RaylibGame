@@ -15,6 +15,12 @@ namespace Voxelgine.Engine
 		Dictionary<int, VoxEntity> EntitiesById;
 		int _nextNetworkId = 1;
 
+		/// <summary>
+		/// When true (default), entity physics and AI run during <see cref="UpdateLockstep"/>.
+		/// Set to false on multiplayer clients where the server is authoritative over entity state.
+		/// </summary>
+		public bool IsAuthority { get; set; } = true;
+
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
 
@@ -41,6 +47,30 @@ namespace Voxelgine.Engine
 			Entities.Add(Ent);
 			EntitiesById[Ent.NetworkId] = Ent;
 			Ent.OnInit();
+		}
+
+		/// <summary>
+		/// Spawns an entity with a specific network ID assigned by the server.
+		/// Used on multiplayer clients to create entities with matching IDs.
+		/// </summary>
+		public void SpawnWithNetworkId(GameSimulation simulation, VoxEntity Ent, int networkId)
+		{
+			Logging.WriteLine($"[SpawnWithNetworkId] {(Ent == null ? "NULL" : Ent.GetType().Name)} (netId={networkId})");
+
+			if (Ent == null)
+				return;
+
+			Ent.NetworkId = networkId;
+			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
+			Ent.SetEntityManager(this);
+			Ent.SetSimulation(simulation);
+			Entities.Add(Ent);
+			EntitiesById[networkId] = Ent;
+			Ent.OnInit();
+
+			// Keep _nextNetworkId above any server-assigned ID to avoid collisions
+			if (networkId >= _nextNetworkId)
+				_nextNetworkId = networkId + 1;
 		}
 
 		/// <summary>
@@ -124,9 +154,12 @@ namespace Voxelgine.Engine
 				if (Ent == null)
 					continue;
 
-				UpdateEntityPhysics(Ent, Dt);
-				Ent.UpdateLockstep(TotalTime, Dt, InMgr);
-				Ent.OnUpdatePhysics(Dt);
+				if (IsAuthority)
+				{
+					UpdateEntityPhysics(Ent, Dt);
+					Ent.UpdateLockstep(TotalTime, Dt, InMgr);
+					Ent.OnUpdatePhysics(Dt);
+				}
 			}
 		}
 

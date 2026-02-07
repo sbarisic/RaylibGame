@@ -177,6 +177,26 @@ namespace Voxelgine.Engine
 			UpdateDoorPosition();
 		}
 
+		protected override void WriteSpawnPropertiesExtra(BinaryWriter writer)
+		{
+			writer.Write(SlideDirection.X);
+			writer.Write(SlideDirection.Y);
+			writer.Write(SlideDirection.Z);
+			writer.Write(SlideDistance);
+			writer.Write(TriggerRadius);
+			writer.Write(ClosedPosition.X);
+			writer.Write(ClosedPosition.Y);
+			writer.Write(ClosedPosition.Z);
+		}
+
+		protected override void ReadSpawnPropertiesExtra(BinaryReader reader)
+		{
+			SlideDirection = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+			SlideDistance = reader.ReadSingle();
+			TriggerRadius = reader.ReadSingle();
+			ClosedPosition = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+		}
+
 		protected override void DrawCollisionBox()
 		{
 			if (!Eng.DebugMode)

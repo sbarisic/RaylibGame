@@ -27,13 +27,18 @@ namespace VoxelgineServer
 		/// <summary>
 		/// Default world size for generated worlds.
 		/// </summary>
-		public const int DefaultWorldWidth = 16;
-		public const int DefaultWorldLength = 16;
+		public const int DefaultWorldWidth = 32;
+		public const int DefaultWorldLength = 32;
 
 		/// <summary>
 		/// Default spawn position for connecting players (center of island, above surface).
 		/// </summary>
-		public static readonly Vector3 DefaultSpawnPosition = new Vector3(32, 73, 19);
+		public static readonly Vector3 DefaultSpawnPosition = new Vector3(16, 73, 16);
+
+		/// <summary>
+		/// File path for the persisted server world.
+		/// </summary>
+		private const string MapFile = "server_world.bin";
 
 		private readonly NetServer _server;
 		private readonly WorldTransferManager _worldTransfer;
@@ -118,12 +123,26 @@ namespace VoxelgineServer
 		{
 			_worldSeed = worldSeed;
 			_logging.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
-			_logging.WriteLine($"Generating world (seed: {worldSeed})...");
 
-			_simulation.Map.GenerateFloatingIsland(DefaultWorldWidth, DefaultWorldLength, worldSeed);
-			_simulation.Map.ClearPendingChanges();
+			if (File.Exists(MapFile))
+			{
+				_logging.WriteLine($"Loading world from '{MapFile}'...");
+				using var fileStream = File.OpenRead(MapFile);
+				_simulation.Map.Read(fileStream);
+				_logging.WriteLine("World loaded from file.");
+			}
+			else
+			{
+				_logging.WriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
+				_simulation.Map.GenerateFloatingIsland(DefaultWorldWidth, DefaultWorldLength, worldSeed);
+				_simulation.Map.ClearPendingChanges();
+				_logging.WriteLine("World generation complete.");
 
-			_logging.WriteLine("World generation complete.");
+				_logging.WriteLine($"Saving world to '{MapFile}'...");
+				using var fileStream = File.Create(MapFile);
+				_simulation.Map.Write(fileStream);
+				_logging.WriteLine("World saved.");
+			}
 			_logging.WriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
 
 			_server.WorldSeed = worldSeed;

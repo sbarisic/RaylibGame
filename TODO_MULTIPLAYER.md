@@ -335,7 +335,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- Light computation is slow, is there any way to refactor it and make it faster?
 
 ---
 

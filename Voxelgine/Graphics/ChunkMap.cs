@@ -138,7 +138,7 @@ namespace Voxelgine.Graphics
 			// and lighting updates per block).
 			const int CS = Chunk.ChunkSize;
 			int chunksX = (Width + CS - 1) / CS;
-			int chunksY = (WorldHeight + CS - 1) / CS;
+			int chunksY = (WorldHeight + CS - 1) / CS + 1; // +1 for an empty air chunk above the terrain
 			int chunksZ = (Length + CS - 1) / CS;
 
 			Chunk[,,] chunkGrid = new Chunk[chunksX, chunksY, chunksZ];
@@ -213,7 +213,7 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		/// <param name="count">Number of spawn points to find.</param>
 		/// <param name="minSpacing">Minimum distance in blocks between spawn points.</param>
-		/// <returns>List of world positions suitable for spawning (2 blocks above ground surface).</returns>
+		/// <returns>List of world positions suitable for spawning (3 blocks above ground surface).</returns>
 		public List<Vector3> FindSpawnPoints(int count, int minSpacing = 5)
 		{
 			// Compute world bounds from loaded chunks
@@ -254,7 +254,7 @@ namespace Voxelgine.Graphics
 							GetBlock(x, y + 1, z) == BlockType.None &&
 							GetBlock(x, y + 2, z) == BlockType.None)
 						{
-							candidates.Add(new Vector3(x, y + 2, z));
+							candidates.Add(new Vector3(x, y + 3, z));
 							break;
 						}
 					}

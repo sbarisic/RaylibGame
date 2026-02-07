@@ -56,9 +56,11 @@ namespace Voxelgine.Engine
 				SWatch.Restart();
 				NextMs = Random.Shared.Next(300, 700);
 
-				ParticleSystem Part = ((GameState)Eng.GameState).Particle;
-
-				Part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
+				if (Eng.GameState is GameState gs)
+				{
+					ParticleSystem Part = gs.Particle;
+					Part.SpawnSmoke(Position + CenterOffset, Vector3.UnitY * 2.6f, Color.White);
+				}
 			}
 		}
 	}

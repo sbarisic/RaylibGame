@@ -4,7 +4,42 @@
 	{
 		static void Main(string[] args)
 		{
-			Console.WriteLine("Hello, World!");
+			int port = 7777;
+			int seed = 666;
+
+			for (int i = 0; i < args.Length; i++)
+			{
+				switch (args[i])
+				{
+					case "--port" when i + 1 < args.Length:
+						if (int.TryParse(args[++i], out int p))
+							port = p;
+						break;
+
+					case "--seed" when i + 1 < args.Length:
+						if (int.TryParse(args[++i], out int s))
+							seed = s;
+						break;
+
+					case "--help":
+						Console.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
+						Console.WriteLine("Usage: VoxelgineServer [options]");
+						Console.WriteLine("  --port <port>   UDP port to listen on (default: 7777)");
+						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
+						Console.WriteLine("  --help          Show this help message");
+						return;
+				}
+			}
+
+			using ServerLoop server = new ServerLoop();
+
+			Console.CancelKeyPress += (_, e) =>
+			{
+				e.Cancel = true;
+				server.Stop();
+			};
+
+			server.Start(port, seed);
 		}
 	}
 }

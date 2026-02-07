@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Voxelgine\Voxelgine.csproj" />
     <ProjectReference Include="..\VoxelgineEngine\VoxelgineEngine.csproj" />
   </ItemGroup>
 

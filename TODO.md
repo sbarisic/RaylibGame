@@ -23,24 +23,26 @@ A list of planned features, improvements, and tasks for this project.
 
 **Aurora Falls** is a voxel-based 3D game engine built with **Raylib-cs** targeting **.NET 9**.
 
+Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (shared/Raylib-free), `VoxelgineServer` (dedicated headless server).
+
 ### Current Architecture
 
 | System | Status | Description |
 |--------|--------|-------------|
-| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr`, `FishDI`, `FishLogging` |
+| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameSimulation`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr`, `FishDI`, `FishLogging` |
 | **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
 | **Voxel World** | ✅ | Procedural island generation via simplex noise, block types, dual-channel lighting (skylight/block light) |
-| **Entity System** | 🔶 | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `EntityManager` with basic physics |
-| **Player** | ✅ | `Player`, `FPSCamera`, `ViewModel`, inventory system |
-| **Weapons** | ✅ | `Weapon`, `WeaponGun`, `WeaponPicker`, `InventoryItem` |
-| **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls (`FishUIItemBox`, `FishUIInventory`, `FishUIInfoLabel`) |
+| **Entity System** | ✅ | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `VEntSlidingDoor`, `EntityManager` with network IDs, authority flag, spawn properties |
+| **Player** | ✅ | `Player`, `FPSCamera` (instance-based), `PlayerManager`, `RemotePlayer`, `ViewModel`, inventory, health/respawn |
+| **Weapons** | ✅ | `Weapon`, `WeaponGun` (fire intent/resolve/effects separation), `WeaponPicker`, `InventoryItem` |
+| **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls, main menu with connect/host dialogs |
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
-| **Animation** | 🔶 | `AnimLerp`, `LerpManager`, easing functions |
-| **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` with shared collision/movement utilities; used by `EntityManager` and `Player` |
-| **NPC/AI** | ⬜ | Basic `VEntNPC` exists, no AI/pathfinding |
+| **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
+| **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
+| **Multiplayer** | 🔶 | Client-server authoritative, UDP transport, reliable delivery, client prediction, remote player interpolation, entity/block/combat sync — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) |
+| **NPC/AI** | ⬜ | Basic `VEntNPC` with pathfinding, no behavior trees |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
-| **Mod System** | ⬜ | Not implemented |
-| **Multiplayer** | ⬜ | Architecture planned — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) |
+| **Mod System** | ⬜ | Not implemented — see [TODO_MODS.md](TODO_MODS.md) |
 
 Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
@@ -54,7 +56,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Particles: Spark effect** — Add spark particle using textures (`data/textures/spark/1-4.png`), oriented in movement direction, falls slowly with gravity, lives twice as long as fire (1.2-2.0s) **[CPX: 2]**
 - [ ] **Entities: Door model** — Make `VEntSlidingDoor` use `data/models/door/door.json` model (16x32 units = 1x2 blocks) **[CPX: 2]**
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 
@@ -93,7 +94,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **README.md update** — Update with newest project changes, architecture overview and project status table **[CPX: 2]**
+*No medium priority items*
 
 ### Lower Priority
 

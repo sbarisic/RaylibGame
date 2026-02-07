@@ -99,6 +99,14 @@ namespace Voxelgine
 			}
 			ResMgr.CreateCollection("blood", BloodTexList.ToArray());
 
+			// Spark particle textures
+			List<Texture2D> SparkTexList = new List<Texture2D>();
+			for (int i = 1; i <= 4; i++)
+			{
+				SparkTexList.Add(ResMgr.GetTexture($"spark/{i}.png"));
+			}
+			ResMgr.CreateCollection("spark", SparkTexList.ToArray());
+
 			GraphicsUtils.Init(Eng.DI.GetRequiredService<IFishLogging>());
 			//Scripting.Init();
 

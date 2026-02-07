@@ -15,7 +15,8 @@ namespace Voxelgine.Engine
 	{
 		Smoke,
 		Fire,
-		Blood
+		Blood,
+		Spark
 	}
 
 	enum ParticleBlendMode
@@ -229,6 +230,52 @@ namespace Voxelgine.Engine
 							}
 
 		/// <summary>
+		/// Spawns a spark particle effect.
+		/// Sparks are oriented along their movement direction, fall slowly with gravity,
+		/// and live twice as long as fire (1.2-2.0s).
+		/// </summary>
+		/// <param name="Pos">Spawn position</param>
+		/// <param name="Direction">Initial direction of travel</param>
+		/// <param name="Clr">Tint color (use Color.White for default spark appearance)</param>
+		/// <param name="ScaleFactor">Size multiplier</param>
+		public void SpawnSpark(Vector3 Pos, Vector3 Direction, Color Clr, float ScaleFactor = 1.0f)
+		{
+			for (int i = 0; i < Particles.Length; i++)
+			{
+				ref Particle P = ref Particles[i];
+
+				if (P.Draw == false)
+				{
+					P.Draw = true;
+					P.Pos = Pos;
+					P.Color = Clr;
+
+					// Spark flies in given direction with random spread
+					float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+					float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+					float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+					float speed = 3.0f + Random.Shared.NextSingle() * 4.0f; // 3-7 units/sec
+					P.Vel = (Direction + new Vector3(spreadX, spreadY, spreadZ)) * speed;
+
+					P.SpawnedAt = lastGameTime;
+					P.LifeTime = 1.2f + Random.Shared.NextSingle() * 0.8f; // 1.2-2.0 seconds (twice fire)
+					P.MovePhysics = true;
+					P.Tex = ResMgr.GetFromCollection("spark");
+
+					P.Scaler = 0;
+					P.InitialScale = (0.3f + Random.Shared.NextSingle() * 0.2f) * ScaleFactor; // 0.3 - 0.5
+					P.Scale = P.InitialScale;
+					P.Rnd = Random.Shared.NextSingle();
+					P.Type = ParticleType.Spark;
+					P.IsEmissive = true;
+					P.BlendMode = ParticleBlendMode.Additive;
+
+					return;
+				}
+			}
+		}
+
+		/// <summary>
 		/// Spawns a tracer line effect from start to end position.
 		/// The tracer will fade out over a short duration.
 		/// </summary>
@@ -329,6 +376,18 @@ namespace Voxelgine.Engine
 							// Blood velocity decays slightly (air resistance)
 							P.Vel.X *= 0.99f;
 							P.Vel.Z *= 0.99f;
+						}
+						else if (P.Type == ParticleType.Spark)
+						{
+							// Sparks fall slowly with gravity
+							P.Vel.Y -= 3.0f * Dt;
+
+							// Spark shrinks over lifetime
+							float lifeProgress = (GameTime - P.SpawnedAt) / P.LifeTime;
+							P.Scale = P.InitialScale * (1.0f - lifeProgress * 0.9f);
+
+							// Spark velocity decays (air resistance)
+							P.Vel *= 0.98f;
 						}
 						else
 						{
@@ -458,7 +517,19 @@ namespace Voxelgine.Engine
 					);
 				}
 
-				Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, drawColor);
+				if (P.Type == ParticleType.Spark && P.Vel.LengthSquared() > 0.01f)
+				{
+					// Orient spark billboard along movement direction
+					Vector3 sparkUp = Vector3.Normalize(P.Vel);
+					Vector2 sparkSize = new Vector2(P.Scale * 0.3f, P.Scale);
+					Rectangle sparkSrc = new Rectangle(0, 0, P.Tex.Width, P.Tex.Height);
+					Vector2 sparkOrigin = sparkSize * 0.5f;
+					Raylib.DrawBillboardPro(Ply.Cam, P.Tex, sparkSrc, P.Pos, sparkUp, sparkSize, sparkOrigin, 0f, drawColor);
+				}
+				else
+				{
+					Raylib.DrawBillboard(Ply.Cam, P.Tex, P.Pos, P.Scale, drawColor);
+				}
 			}
 
 			Raylib.EndBlendMode();

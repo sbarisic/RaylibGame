@@ -18,20 +18,20 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Graphics: Improved lighting system** â€” Separated skylight and block light channels for day/night support. Added ambient light minimum, sky light multiplier, proper cross-chunk propagation, and per-block-type light emission levels.
 - **Graphics: Shadow support** â€” Added ray-traced shadow casting for block lights using 3D DDA algorithm. Entities can now emit light with `LightEmission` property. Added `ShadowTracer`, `PointLight` struct, and `ComputeLightingWithEntities()` for shadow-aware lighting.
 - **Graphics: Lighting performance optimizations** â€” Replaced heap allocations with stack-based arrays in `SetPlacedBlock`, added sky exposure caching per chunk, moved direction arrays to static readonly fields, eliminated array allocations in propagation loops. **Additional pass:** Replaced HashSet with flat bool array for visited tracking, replaced per-light Queue allocations with reusable pooled collections, cached chunk world positions to avoid repeated `GetWorldPos` calls, optimized `QueueBoundaryBlocksForExternalLight` with bounding box intersection culling to limit iteration scope.
-- **Graphics: View model lighting** — View model now samples light level at player position and renders with appropriate brightness.
-- **Graphics: Day/night cycle** — Added `DayNightCycle` class with time-based skylight adjustment, sky color transitions (dawn/day/dusk/night), configurable day length. Integrated into `GameState` with debug menu time controls (Dawn/Noon/Dusk/Night buttons) and HUD time display.
-- **Weapons: Tracer lines** — Added tracer line effect from muzzle to hit point, fades out over 0.15s with additive blending
-- **Particles: Blood effect** — Added blood particles (`SpawnBlood`) ejected from hit normal, falls with gravity, fades out after 6-10s. Spawns when shooting NPCs.
-- **Combat: Body part hit detection** — Added `VEntNPC.RaycastBodyPart()` that detects which mesh (head, body, leg_r, etc.) was hit using animation-aware mesh collision. Gun prints hit part name.
-- **Combat: Hit detection with position/normal** — Gun raycast now checks entities and world, uses closer hit with precise position/normal for particle spawning
-- **Raycasting: Entity picking utility** — Ray-AABB intersection (`Raycast.cs`) with hit position/normal for shooting, pickups, and interactions. Added `EntityManager.Raycast()` and `RaycastAll()` methods.
-- **Graphics: Sun/Moon rendering** — Added sun and moon textures rendered in screen-space with proper position calculation based on day/night cycle. Sun changes color at horizon, moon appears at night.
-- **Pathfinding: Voxel navigation** — Added A* pathfinder (`VoxelPathfinder`) for 3D voxel terrain with configurable entity height/width, jump/fall distances. Created `PathFollower` component for path following with waypoint management. Integrated into `VEntNPC` with debug path visualization. Added `ChunkMap.FindPath()` and `ChunkMap.CreatePathfinder()` utility methods.
+- **Graphics: View model lighting** ï¿½ View model now samples light level at player position and renders with appropriate brightness.
+- **Graphics: Day/night cycle** ï¿½ Added `DayNightCycle` class with time-based skylight adjustment, sky color transitions (dawn/day/dusk/night), configurable day length. Integrated into `GameState` with debug menu time controls (Dawn/Noon/Dusk/Night buttons) and HUD time display.
+- **Weapons: Tracer lines** ï¿½ Added tracer line effect from muzzle to hit point, fades out over 0.15s with additive blending
+- **Particles: Blood effect** ï¿½ Added blood particles (`SpawnBlood`) ejected from hit normal, falls with gravity, fades out after 6-10s. Spawns when shooting NPCs.
+- **Combat: Body part hit detection** ï¿½ Added `VEntNPC.RaycastBodyPart()` that detects which mesh (head, body, leg_r, etc.) was hit using animation-aware mesh collision. Gun prints hit part name.
+- **Combat: Hit detection with position/normal** ï¿½ Gun raycast now checks entities and world, uses closer hit with precise position/normal for particle spawning
+- **Raycasting: Entity picking utility** ï¿½ Ray-AABB intersection (`Raycast.cs`) with hit position/normal for shooting, pickups, and interactions. Added `EntityManager.Raycast()` and `RaycastAll()` methods.
+- **Graphics: Sun/Moon rendering** ï¿½ Added sun and moon textures rendered in screen-space with proper position calculation based on day/night cycle. Sun changes color at horizon, moon appears at night.
+- **Pathfinding: Voxel navigation** ï¿½ Added A* pathfinder (`VoxelPathfinder`) for 3D voxel terrain with configurable entity height/width, jump/fall distances. Created `PathFollower` component for path following with waypoint management. Integrated into `VEntNPC` with debug path visualization. Added `ChunkMap.FindPath()` and `ChunkMap.CreatePathfinder()` utility methods.
 - **GUI: Inventory item box textures** â€” Added state-based textures (normal, selected, hover, pressed) for `FishUIItemBox` from `data/textures/gui/`.
 - **Graphics: Glowstone light emission** â€” Fixed lighting recomputation when placing/removing light-emitting or opaque blocks.
 - **Audio: Block placement sounds** â€” Added sound effects for placing and breaking blocks.
 - **Audio: Swimming sound effect** â€” Added swim sound when player is actively swimming in water.
-- **Audio: Gun shooting sound** — Added shoot1 sound combo for weapon firing.
+- **Audio: Gun shooting sound** ï¿½ Added shoot1 sound combo for weapon firing.
 - **Weapons: Automatic fire** - Gun fires continuously while left mouse held (via `SupportsAutoFire` property).
 - **Physics: Player bounding box** - Added `BBox` property with automatic recalculation on position change.
 - **Weapons: Hammer swing animation** - Added `ApplySwing()` method to ViewModel and `LerpFloat` animation class.
@@ -40,14 +40,15 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Physics Utils** â€” Created `PhysicsUtils` class with shared collision functions (`ClipVelocity`, `MoveWithCollision`, `Accelerate`, `AirAccelerate`, `ApplyFriction`, `ApplyGravity`). Enhanced `AABB` with `Overlaps()` and helper properties. Refactored `EntityManager` and `Player` to use shared utilities.
 - **Animation System** â€” Lerp system with comprehensive easing functions (Quad, Cubic, Quart, Quint, Sine, Expo, Circ, Back, Elastic, Bounce)
 - **NPC Animation System** â€” Added keyframe-based animation for JSON models (`NPCAnimationClip`, `NPCAnimator`). Supports walk, idle, attack, crouch animations. Added `NPCPreviewState` for testing animations from main menu.
-- **NPC Animation: Save/Load clips** — Added JSON serialization for `NPCAnimationClip` with `Save()`/`Load()` methods, `EasingSerializer` for easing function mapping, and `LoadClip()`/`LoadAllClips()` on `NPCAnimator`.
-- **NPC Animation: Layered playback** — Added `AnimationLayer` class and layer-based API (`PlayOnLayer`, `StopLayer`, `PauseLayer`, `ResumeLayer`, `SetLayerWeight`) to `NPCAnimator` for playing multiple animation clips simultaneously with additive blending.
+- **NPC Animation: Save/Load clips** ï¿½ Added JSON serialization for `NPCAnimationClip` with `Save()`/`Load()` methods, `EasingSerializer` for easing function mapping, and `LoadClip()`/`LoadAllClips()` on `NPCAnimator`.
+- **NPC Animation: Layered playback** ï¿½ Added `AnimationLayer` class and layer-based API (`PlayOnLayer`, `StopLayer`, `PauseLayer`, `ResumeLayer`, `SetLayerWeight`) to `NPCAnimator` for playing multiple animation clips simultaneously with additive blending.
 - **Player Movement** â€” Quake-style physics (strafe-jumping, bunny-hopping, air control, clip velocity, swimming)
 - **Physics: Water buoyancy** â€” Added proper buoyancy force so player floats in water instead of sinking quickly
 - **Rendering** â€” Frame interpolation for smooth camera/position/view model rendering
 - **Unit Testing** â€” Tests for AABB, Easing, Utils, Noise
 - **Weapons: Require aim to fire** â€” Gun now requires right-click (aim/ironsight) to be held before firing. Moved aim handling from base `InventoryItem.Tick()` to `WeaponGun.Tick()` override with `IsAiming` property.
 - **Particles: Fire effect** â€” Added `SpawnFire()` method with fire textures (1-4.png). Fire rises upward with random drift, semi-transparent, short-lived (0.6-1.0s), shrinks over lifetime, supports initial force/direction for wall impact effects. Added `ParticleType` enum for type-specific behavior.
+- **Particles: Spark effect** â€” Added `SpawnSpark()` with spark textures (1-4.png). Sparks orient along movement direction via `DrawBillboardPro`, fall slowly with gravity, shrink over 1.2-2.0s lifetime, additive blend, emissive.
 - **Weapons: Gun fire particles** â€” Gun now spawns fire particles instead of smoke on impact, using the wall normal as initial force direction.
 
 ---
@@ -77,7 +78,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 
 - **Player class file split** â€” Split `Player.cs` into 6 partial class files: `Player.cs` (core), `Player.Physics.cs`, `Player.Input.cs`, `Player.GUI.cs`, `Player.Rendering.cs`, `Player.Serialization.cs`
 - **Chunk class file split** â€” Split `Chunk` into 6 partial class files: `Chunk.Base.cs` (core), `Chunk.Lighting.cs`, `Chunk.Rendering.cs`, `Chunk.Serialization.cs`, `Chunk.GenMesh.cs` (opaque), `Chunk.GenMeshTransparent.cs` (transparent)
-- **Particles: Transparent block sorting** — Fixed particles rendering in front of glass/water by reordering draw calls: particles now render before transparent blocks
-- **Logging: Replace Console.* with IFishLogging** — Replaced all `Console.WriteLine` calls with `IFishLogging.WriteLine` via DI across all engine files. Removed unused Flexbox library. Updated README.md.
-- **Mod System: Architecture planning** — Analyzed entire codebase (DI, entities, world, player, weapons, particles, sound, resources, input, GUI, scripting, pathfinding, day/night) and created comprehensive [TODO_MODS.md](TODO_MODS.md) with mod system architecture, API design, implementation plan, and ~30 prioritized subtasks.
-- **Multiplayer System: Architecture planning** — Deep analysis of all engine systems (game loop, FPSCamera, Player, InputMgr, GameState, EntityManager, ChunkMap, serialization, physics, rendering, DI) for multiplayer feasibility. Created comprehensive [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) with client-server authoritative architecture, UDP transport design, full packet protocol (25+ packet types), client-side prediction with server reconciliation, remote player interpolation, systems impact analysis, and ~50 prioritized subtasks across 8 categories.
+- **Particles: Transparent block sorting** ï¿½ Fixed particles rendering in front of glass/water by reordering draw calls: particles now render before transparent blocks
+- **Logging: Replace Console.* with IFishLogging** ï¿½ Replaced all `Console.WriteLine` calls with `IFishLogging.WriteLine` via DI across all engine files. Removed unused Flexbox library. Updated README.md.
+- **Mod System: Architecture planning** ï¿½ Analyzed entire codebase (DI, entities, world, player, weapons, particles, sound, resources, input, GUI, scripting, pathfinding, day/night) and created comprehensive [TODO_MODS.md](TODO_MODS.md) with mod system architecture, API design, implementation plan, and ~30 prioritized subtasks.
+- **Multiplayer System: Architecture planning** ï¿½ Deep analysis of all engine systems (game loop, FPSCamera, Player, InputMgr, GameState, EntityManager, ChunkMap, serialization, physics, rendering, DI) for multiplayer feasibility. Created comprehensive [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) with client-server authoritative architecture, UDP transport design, full packet protocol (25+ packet types), client-side prediction with server reconciliation, remote player interpolation, systems impact analysis, and ~50 prioritized subtasks across 8 categories.

@@ -1,4 +1,4 @@
-﻿using Voxelgine.Engine;
+﻿using Voxelgine.Engine.Server;
 
 namespace VoxelgineServer
 {

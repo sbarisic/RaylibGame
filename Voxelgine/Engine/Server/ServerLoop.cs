@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
-using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.States;
 
-namespace Voxelgine.Engine
+namespace Voxelgine.Engine.Server
 {
 	/// <summary>
 	/// Dedicated headless server loop. Owns a <see cref="NetServer"/> and <see cref="GameSimulation"/>,
@@ -107,7 +106,7 @@ namespace Voxelgine.Engine
 			_di = new FishDI();
 			_di.AddSingleton<IFishEngineRunner, ServerEngineRunner>();
 			_di.AddSingleton<IFishConfig, ServerConfig>();
-			_di.AddSingleton<IFishDebug, Voxelgine.Engine.Debug>();
+			_di.AddSingleton<IFishDebug, Debug>();
 			_di.AddSingleton<IFishLogging, FishLogging>();
 			_di.AddSingleton<ILerpManager, LerpManager>();
 

@@ -5,6 +5,7 @@ using System.Numerics;
 using Voxelgine;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.Engine.Server;
 using Voxelgine.GUI;
 
 using Thread = System.Threading.Thread;

@@ -2,9 +2,9 @@
 
 # Aurora Falls - Voxelgine Engine
 
-**Aurora Falls** is a voxel-based sandbox engine and game written in modern **C# (.NET 9)**, featuring real-time 3D rendering with **Raylib-cs**, a modular entity system, and a fully interactive world.
+**Aurora Falls** is a voxel-based sandbox engine and game written in modern **C# (.NET 9)**, featuring real-time 3D rendering with **Raylib-cs**, a modular entity system, client-server multiplayer (up to 10 players), and a fully interactive world.
 
-Players can explore, build, and modify a procedurally generated floating island environment, interact with blocks and entities, and use a variety of tools and weapons.
+Players can explore, build, and modify a procedurally generated floating island environment, interact with blocks and entities, and use a variety of tools and weapons — alone or with others.
 
 ![Screenshot 1](img/39Kudu88Xu.png)
 
@@ -18,12 +18,15 @@ Players can explore, build, and modify a procedurally generated floating island 
 - **Block System** — Place, destroy, and interact with 20+ block types including transparent blocks (water, glass, ice)
 - **Dual-Channel Lighting** — Separate skylight and block light propagation with real-time updates
 - **Quake-Style Physics** — Strafe-jumping, bunny-hopping, air control, water swimming with buoyancy
-- **Entity System** — Base entity class with pickup items, NPCs, and interactive doors
-- **Particle System** — Smoke and visual effects with depth-sorted rendering
-- **FishUI-Based GUI** — Custom inventory, item boxes, and in-game menus
+- **Client-Server Multiplayer** — Up to 10 players, server-authoritative with client-side prediction and remote player interpolation
+- **Entity System** — Networked entities with pickup items, NPCs with pathfinding, and interactive doors
+- **Combat System** — Server-authoritative weapon fire with raycast hit detection against world, entities, and players
+- **Player Health & Respawn** — Damage, death overlay, and timed respawn at spawn point
+- **Particle System** — Smoke, blood, fire sparks, and weapon tracer effects with depth-sorted rendering
+- **FishUI-Based GUI** — Custom inventory, item boxes, in-game menus, server connect/host dialogs
 - **Save/Load System** — GZip-compressed world and player state persistence
 - **Dependency Injection** — `FishDI` container with interface-based services (`IFishLogging`, `IFishConfig`, `IFishDebug`, etc.)
-- **Structured Logging** — `IFishLogging` with timestamped file output and console mirroring, replacing all direct `Console.*` calls
+- **Structured Logging** — `IFishLogging` with timestamped file output and console mirroring
 - **Hot-Reload Shaders** — Edit shaders at runtime for rapid iteration
 - **Frame Interpolation** — Smooth camera and position rendering independent of physics tick rate
 
@@ -35,12 +38,20 @@ Players can explore, build, and modify a procedurally generated floating island 
 
 ```
 RaylibGame.sln
-├── Voxelgine/              # Main game/engine project
-│   ├── Engine/             # Core systems
-│   ├── Graphics/           # Rendering and chunk management
-│   ├── GUI/                # FishUI integration
-│   ├── States/             # Game states (menu, gameplay)
+├── Voxelgine/              # Main client project (Raylib rendering, GUI, gameplay states)
+│   ├── Engine/             # Core systems, player, entities, weapons, physics, server loop
+│   ├── Graphics/           # Chunk rendering, GBuffer, skybox, frustum culling
+│   ├── GUI/                # FishUI integration and custom controls
+│   ├── States/             # Game states (main menu, gameplay, multiplayer, NPC preview)
 │   └── data/               # Assets (textures, models, sounds, shaders)
+├── VoxelgineEngine/        # Shared library (Raylib-free: DI, physics, input, networking)
+│   └── Engine/
+│       ├── DI/             # FishDI container, service interfaces
+│       ├── Physics/        # AABB, PhysicsUtils, RayMath (pure math)
+│       ├── Animations/     # LerpManager, AnimLerp, easing functions
+│       ├── Input/          # IInputSource, NetworkInputSource
+│       └── Net/            # UDP transport, packets, reliable delivery, client/server
+├── VoxelgineServer/        # Dedicated headless server (CLI, no Raylib)
 └── UnitTest/               # Unit tests for core systems
 ```
 
@@ -50,13 +61,16 @@ RaylibGame.sln
 |--------|-------|-------------|
 | **Program** | `Program.cs` | Entry point, game loop with fixed timestep physics |
 | **GameWindow** | `GameWindow.cs` | Window management, render targets, state switching |
-| **GameState** | `States/GameState.cs` | Main gameplay state, world/player/entity management |
-| **InputMgr** | `InputMgr.cs` | Keyboard/mouse input abstraction |
+| **GameState** | `States/GameState.cs` | Single-player gameplay state, world/player/entity management |
+| **GameSimulation** | `Engine/GameSimulation.cs` | Authoritative game state (`ChunkMap`, `PlayerManager`, `EntityManager`, `DayNightCycle`, `PhysData`) |
+| **MultiplayerGameState** | `States/MultiplayerGameState.cs` | Multiplayer client: connection, prediction, interpolation, remote players |
+| **ServerLoop** | `Engine/ServerLoop.cs` | Server game loop: input processing, physics, combat, world/entity sync |
+| **InputMgr** | `VoxelgineEngine/.../InputMgr.cs` | Input abstraction via `IInputSource` (local Raylib / network) |
 | **SoundMgr** | `SoundMgr.cs` | Positional audio, sound combos (randomized effects) |
 | **ResMgr** | `ResMgr.cs` | Resource loading (textures, models, shaders) with hot-reload |
 | **GameConfig** | `GameConfig.cs` | JSON-based configuration (resolution, vsync, sensitivity) |
-| **FishDI** | `Engine/DI/FishDI.cs` | Dependency injection container (singleton/scoped/transient services) |
-| **FishLogging** | `Engine/FishLogging.cs` | Timestamped file + console logging via `IFishLogging` interface |
+| **FishDI** | `VoxelgineEngine/.../FishDI.cs` | Dependency injection container (singleton/scoped/transient services) |
+| **FishLogging** | `VoxelgineEngine/.../FishLogging.cs` | Timestamped file + console logging via `IFishLogging` interface |
 
 ### Graphics Pipeline
 
@@ -74,22 +88,25 @@ RaylibGame.sln
 
 | Component | Files | Description |
 |-----------|-------|-------------|
-| **VoxEntity** | `Engine/Entities/VoxEntity.cs` | Base class for all entities (position, velocity, model) |
-| **EntityManager** | `Engine/Entities/EntityManager.cs` | Entity spawning, physics, player collision |
+| **VoxEntity** | `Engine/Entities/VoxEntity.cs` | Base class with network ID, spawn properties, snapshot serialization |
+| **EntityManager** | `Engine/Entities/EntityManager.cs` | Entity spawning, physics, network ID tracking, authority flag |
 | **VEntPickup** | `Engine/Entities/VEntPickup.cs` | Collectible items with rotation animation |
-| **VEntNPC** | `Engine/Entities/VEntNPC.cs` | NPC entities with JSON model support |
-| **VEntSlidingDoor** | `Engine/Entities/VEntSlidingDoor.cs` | Interactive animated doors |
+| **VEntNPC** | `Engine/Entities/VEntNPC.cs` | NPC entities with JSON model, pathfinding, animator |
+| **VEntSlidingDoor** | `Engine/Entities/VEntSlidingDoor.cs` | Interactive animated doors with network serialization |
 
 ### Player & Physics
 
 | Component | Files | Description |
 |-----------|-------|-------------|
-| **Player** | `Engine/Player.cs` | Player state, input handling, physics, inventory |
-| **FPSCamera** | `Engine/FPSCamera.cs` | First-person camera with mouse look |
+| **Player** | `Engine/Player/Player.cs` | Player state, input, physics, inventory, health/respawn |
+| **PlayerManager** | `Engine/Player/PlayerManager.cs` | `Dictionary<int, Player>` with remote player tracking |
+| **RemotePlayer** | `Engine/Player/RemotePlayer.cs` | Client-side remote player with snapshot interpolation and humanoid model |
+| **FPSCamera** | `Engine/FPSCamera.cs` | Instance-based first-person camera with mouse look |
 | **ViewModel** | `Engine/ViewModel.cs` | First-person weapon/tool rendering |
-| **PhysData** | `Engine/Physics/PhysData.cs` | Physics constants (gravity, friction, speeds) |
-| **PhysicsUtils** | `Engine/Physics/PhysicsUtils.cs` | Shared physics: ClipVelocity, collision, acceleration |
-| **AABB** | `Engine/Physics/AABB.cs` | Axis-aligned bounding box for collision |
+| **PhysicsUtils** | `VoxelgineEngine/.../PhysicsUtils.cs` | Pure math: ClipVelocity, acceleration, AABB creation |
+| **WorldCollision** | `Engine/Physics/WorldCollision.cs` | ChunkMap-dependent collision and movement |
+| **RayMath** | `VoxelgineEngine/.../RayMath.cs` | Ray-AABB intersection (slab method) |
+| **AABB** | `VoxelgineEngine/.../AABB.cs` | Axis-aligned bounding box (Raylib-free) |
 
 ### GUI System
 
@@ -116,8 +133,24 @@ RaylibGame.sln
 |-----------|-------|-------------|
 | **InventoryItem** | `Engine/Weapons/InventoryItem.cs` | Base item with block placement logic |
 | **Weapon** | `Engine/Weapons/Weapon.cs` | Base weapon class |
-| **WeaponGun** | `Engine/Weapons/WeaponGun.cs` | Firearm implementation |
+| **WeaponGun** | `Engine/Weapons/WeaponGun.cs` | Firearm with separated fire intent / resolve / effects (multiplayer-ready) |
 | **WeaponPicker** | `Engine/Weapons/WeaponPicker.cs` | Block picker tool |
+| **FireIntent** | `Engine/Weapons/FireIntent.cs` | `FireIntent`, `FireResult`, `FireHitType` structs for server-authoritative combat |
+
+### Networking
+
+| Component | Files | Description |
+|-----------|-------|-------------|
+| **UdpTransport** | `VoxelgineEngine/.../UdpTransport.cs` | Raw UDP socket wrapper with async receive loop |
+| **ReliableChannel** | `VoxelgineEngine/.../ReliableChannel.cs` | Reliability layer: sequence numbers, ACKs, retransmission |
+| **NetConnection** | `VoxelgineEngine/.../NetConnection.cs` | Per-connection state: reliable channel, RTT, timeout |
+| **NetServer** | `VoxelgineEngine/.../NetServer.cs` | Server: connection management, player IDs, broadcast |
+| **NetClient** | `VoxelgineEngine/.../NetClient.cs` | Client: connect, world loading, tick sync |
+| **Packet** | `VoxelgineEngine/.../Packet.cs` | 24 packet types with binary serialization |
+| **ClientPrediction** | `VoxelgineEngine/.../ClientPrediction.cs` | Prediction state buffer with server reconciliation |
+| **SnapshotBuffer** | `VoxelgineEngine/.../SnapshotBuffer.cs` | Generic ring buffer for remote entity interpolation |
+| **WorldTransferManager** | `VoxelgineEngine/.../WorldTransferManager.cs` | Server-side world data fragmentation and streaming |
+| **WorldReceiver** | `VoxelgineEngine/.../WorldReceiver.cs` | Client-side fragment reassembly with checksum verification |
 
 ---
 
@@ -154,8 +187,11 @@ RaylibGame.sln
 git clone https://github.com/sbarisic/RaylibGame.git
 cd RaylibGame
 
-# Build and run
+# Build and run the client
 dotnet run --project Voxelgine
+
+# Run a dedicated headless server
+dotnet run --project VoxelgineServer -- --port 7777 --seed 666
 ```
 
 ### Run Tests
@@ -171,17 +207,19 @@ dotnet test
 | System | Status | Notes |
 |--------|--------|-------|
 | Core Engine | ✅ Complete | Window, input, audio, resources, DI, logging |
-| Graphics | ✅ Complete | Chunks, lighting, frustum culling |
-| Voxel World | ✅ Complete | Generation, block types, dual lighting |
-| Player | ✅ Complete | Movement, physics, inventory |
-| Physics | ✅ Complete | Quake-style with water buoyancy |
-| GUI | ✅ Complete | FishUI-based menus and HUD |
-| Entity System | 🔶 Partial | Base entities work, AI pending |
-| Particles | 🔶 Partial | Smoke effects, more types planned |
-| Animation | 🔶 Partial | Lerp system complete, NPC anims pending |
-| NPC/AI | ⬜ Planned | Entity exists, no behavior/pathfinding |
+| Graphics | ✅ Complete | Chunks, lighting, frustum culling, deferred rendering |
+| Voxel World | ✅ Complete | Generation, block types, dual lighting, block change tracking |
+| Player | ✅ Complete | Movement, physics, inventory, health/respawn, remote rendering |
+| Physics | ✅ Complete | Quake-style with water buoyancy, split into pure math + world collision |
+| GUI | ✅ Complete | FishUI-based menus, HUD, server connect/host dialogs |
+| Entity System | ✅ Complete | Networked entities with spawn properties, authority flag |
+| Weapons | ✅ Complete | Server-authoritative fire intent/resolve/effects pipeline |
+| Animation | ✅ Complete | Lerp system, NPC animator with walk/idle/attack |
+| Multiplayer | 🔶 Partial | Client-server authoritative, prediction, interpolation, combat — chat/UI/bandwidth pending |
+| Particles | 🔶 Partial | Smoke, blood, fire effects — spark type planned |
+| NPC/AI | ⬜ Planned | Entity + pathfinding exist, no behavior trees |
+| Mod System | ⬜ Planned | Tracked in [TODO_MODS.md](TODO_MODS.md) |
 | Scripting | ⬜ Planned | Stub exists |
-| Mod System | ⬜ Planned | Not started |
 
 ---
 

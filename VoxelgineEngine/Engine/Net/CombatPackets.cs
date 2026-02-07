@@ -41,7 +41,11 @@ namespace Voxelgine.Engine
 		public Vector3 Origin { get; set; }
 		public Vector3 Direction { get; set; }
 		public Vector3 HitPosition { get; set; }
+		public Vector3 HitNormal { get; set; }
 		public byte HitType { get; set; }
+
+		/// <summary>Network ID of the entity that was hit (0 = none).</summary>
+		public int EntityNetworkId { get; set; }
 
 		public override void Write(BinaryWriter writer)
 		{
@@ -50,7 +54,9 @@ namespace Voxelgine.Engine
 			writer.WriteVector3(Origin);
 			writer.WriteVector3(Direction);
 			writer.WriteVector3(HitPosition);
+			writer.WriteVector3(HitNormal);
 			writer.Write(HitType);
+			writer.Write(EntityNetworkId);
 		}
 
 		public override void Read(BinaryReader reader)
@@ -60,7 +66,9 @@ namespace Voxelgine.Engine
 			Origin = reader.ReadVector3();
 			Direction = reader.ReadVector3();
 			HitPosition = reader.ReadVector3();
+			HitNormal = reader.ReadVector3();
 			HitType = reader.ReadByte();
+			EntityNetworkId = reader.ReadInt32();
 		}
 	}
 

@@ -597,6 +597,69 @@ namespace Voxelgine.Graphics
 			return found ? hitPos : Vector3.Zero;
 		}
 
+		/// <summary>
+		/// Raycasts against solid blocks and returns the precise intersection point on the block face,
+		/// rather than the integer block position. Returns false if no block was hit.
+		/// </summary>
+		/// <param name="Origin">Ray origin.</param>
+		/// <param name="Distance">Maximum ray distance.</param>
+		/// <param name="Dir">Ray direction (does not need to be normalized).</param>
+		/// <param name="HitPoint">Precise point on the block face where the ray intersects.</param>
+		/// <param name="FaceDir">Normal of the face that was hit.</param>
+		/// <returns>True if a solid block was hit.</returns>
+		public bool RaycastPrecise(Vector3 Origin, float Distance, Vector3 Dir, out Vector3 HitPoint, out Vector3 FaceDir)
+		{
+			Vector3 blockPos = RaycastPos(Origin, Distance, Dir, out FaceDir);
+			if (blockPos == Vector3.Zero)
+			{
+				HitPoint = Vector3.Zero;
+				return false;
+			}
+
+			// Compute the precise intersection point on the block face plane.
+			// The face normal tells us which axis-aligned plane was entered.
+			// In the DDA, face = -Step, so:
+			// face (-1,0,0) → ray was stepping +X, entered block through its -X face → plane at blockPos.X
+			// face (1,0,0)  → ray was stepping -X, entered block through its +X face → plane at blockPos.X + 1
+			// face (0,-1,0) → plane at blockPos.Y
+			// face (0,1,0)  → plane at blockPos.Y + 1
+			// face (0,0,-1) → plane at blockPos.Z
+			// face (0,0,1)  → plane at blockPos.Z + 1
+			float planeValue;
+			float dirComponent;
+			float originComponent;
+
+			if (MathF.Abs(FaceDir.X) > 0.5f)
+			{
+				planeValue = FaceDir.X > 0 ? blockPos.X + 1f : blockPos.X;
+				dirComponent = Dir.X;
+				originComponent = Origin.X;
+			}
+			else if (MathF.Abs(FaceDir.Y) > 0.5f)
+			{
+				planeValue = FaceDir.Y > 0 ? blockPos.Y + 1f : blockPos.Y;
+				dirComponent = Dir.Y;
+				originComponent = Origin.Y;
+			}
+			else
+			{
+				planeValue = FaceDir.Z > 0 ? blockPos.Z + 1f : blockPos.Z;
+				dirComponent = Dir.Z;
+				originComponent = Origin.Z;
+			}
+
+			if (MathF.Abs(dirComponent) < 1e-8f)
+			{
+				// Ray is parallel to the face plane — fall back to block center on face
+				HitPoint = blockPos + new Vector3(0.5f, 0.5f, 0.5f) + FaceDir * 0.5f;
+				return true;
+			}
+
+			float t = (planeValue - originComponent) / dirComponent;
+			HitPoint = Origin + Dir * t;
+			return true;
+		}
+
 		// Collide: Checks if the position is inside a solid block, or if moving in ProbeDir hits a block. Returns true and the collision normal if a block is hit, otherwise false.
 		public bool Collide(Vector3 Pos, Vector3 ProbeDir, out Vector3 PickNormal)
 		{

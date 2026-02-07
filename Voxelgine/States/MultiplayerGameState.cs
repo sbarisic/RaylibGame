@@ -587,10 +587,14 @@ namespace Voxelgine.States
 							HandleEntityRemove(entityRemove);
 							break;
 
-						case EntitySnapshotPacket entitySnapshot:
-							HandleEntitySnapshot(entitySnapshot, currentTime);
-							break;
-					}
+							case EntitySnapshotPacket entitySnapshot:
+								HandleEntitySnapshot(entitySnapshot, currentTime);
+								break;
+
+							case WeaponFireEffectPacket fireEffect:
+								HandleWeaponFireEffect(fireEffect);
+								break;
+						}
 		}
 
 		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, float currentTime)
@@ -878,6 +882,88 @@ namespace Voxelgine.States
 			}
 
 			_simulation.Map.ClearPendingChanges();
+		}
+
+		/// <summary>
+		/// Sends a <see cref="WeaponFirePacket"/> to the server for authoritative hit resolution.
+		/// Called by <see cref="WeaponGun.OnLeftClick"/> in multiplayer mode.
+		/// </summary>
+		public void SendWeaponFire(Vector3 origin, Vector3 direction)
+		{
+			if (_client == null || !_client.IsConnected)
+				return;
+
+			var packet = new WeaponFirePacket
+			{
+				WeaponType = 0,
+				AimOrigin = origin,
+				AimDirection = direction,
+			};
+			_client.Send(packet, true, (float)Raylib.GetTime());
+		}
+
+		/// <summary>
+		/// Handles a <see cref="WeaponFireEffectPacket"/> from the server.
+		/// Spawns tracer, blood, and spark particles based on the hit result.
+		/// For the local player, only hit effects are applied (fire effects already played on input).
+		/// For other players, fire sound is also played.
+		/// </summary>
+		private void HandleWeaponFireEffect(WeaponFireEffectPacket packet)
+		{
+			if (_simulation == null || _particle == null)
+				return;
+
+			Vector3 muzzlePos = packet.Origin + packet.Direction * 0.5f;
+
+			// Play fire sound for other players' shots
+			if (packet.PlayerId != _client.PlayerId && _snd != null)
+			{
+				_snd.PlayCombo("shoot1", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), packet.Origin);
+			}
+
+			// Tracer line from muzzle to hit point
+			_particle.SpawnTracer(muzzlePos, packet.HitPosition);
+
+			FireHitType hitType = (FireHitType)packet.HitType;
+			switch (hitType)
+			{
+				case FireHitType.Entity:
+					// Apply NPC twitch if we hit an entity with a model
+					if (packet.EntityNetworkId != 0)
+					{
+						VoxEntity hitEntity = _simulation.Entities.GetEntityByNetworkId(packet.EntityNetworkId);
+						if (hitEntity is VEntNPC npc)
+						{
+							// Use AABB center as a generic twitch target
+							npc.TwitchBodyPart("body", packet.Direction);
+						}
+					}
+
+					// Blood particles
+					for (int i = 0; i < 8; i++)
+					{
+						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+					}
+					break;
+
+				case FireHitType.World:
+					// Spark particles
+					for (int i = 0; i < 6; i++)
+					{
+						float forceFactor = 10.6f;
+						float randomUnitFactor = 0.6f;
+
+						if (packet.HitNormal.Y == 0)
+						{
+							forceFactor *= 2;
+							randomUnitFactor = 0.4f;
+						}
+
+						Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+						_particle.SpawnFire(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+					}
+					break;
+			}
 		}
 
 		// ======================================= Helper Methods =================================================

@@ -63,13 +63,18 @@ namespace Voxelgine.Engine
 			FireIntent intent = new FireIntent(E.Start, E.Dir, E.MaxLen, Name, ParentPlayer);
 
 			// Apply immediate fire effects (kickback, sound) — these play regardless of hit result
-			// In multiplayer, these provide instant feedback before server confirms the hit
 			ApplyFireEffects(intent);
 
-			// Resolve hit locally (in multiplayer, the server would resolve authoritatively instead)
-			FireResult result = ResolveFireIntent(intent, E.Map);
+			// In multiplayer, send fire packet to server for authoritative hit resolution
+			var mpState = Eng.MultiplayerGameState;
+			if (mpState != null)
+			{
+				mpState.SendWeaponFire(E.Start, E.Dir);
+				return;
+			}
 
-			// Apply hit effects based on resolution result
+			// Single-player: resolve hit locally
+			FireResult result = ResolveFireIntent(intent, E.Map);
 			ApplyHitEffects(intent, result);
 		}
 

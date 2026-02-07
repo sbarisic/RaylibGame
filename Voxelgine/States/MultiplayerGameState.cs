@@ -166,10 +166,13 @@ namespace Voxelgine.States
 				}
 
 				// Update game systems
-				_simulation.Map.Tick();
-				_simulation.LocalPlayer.Tick(Window.InMgr);
-				_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);
-				_simulation.LocalPlayer.UpdateGUI();
+					_simulation.Map.Tick();
+					_simulation.LocalPlayer.Tick(Window.InMgr);
+					_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);
+					_simulation.LocalPlayer.UpdateGUI();
+
+					// Send pending block changes to server
+					SendPendingBlockChanges((float)Raylib.GetTime());
 			}
 			catch (Exception ex)
 			{
@@ -521,9 +524,13 @@ namespace Voxelgine.States
 					break;
 
 				case DayTimeSyncPacket timeSync:
-					if (_simulation != null)
-						_simulation.DayNight.SetTime(timeSync.TimeOfDay);
-					break;
+						if (_simulation != null)
+							_simulation.DayNight.SetTime(timeSync.TimeOfDay);
+						break;
+
+					case BlockChangePacket blockChange:
+						HandleBlockChange(blockChange);
+						break;
 			}
 		}
 
@@ -597,6 +604,57 @@ namespace Voxelgine.States
 
 			_logging.WriteLine($"MultiplayerGameState: Player left (ID {left.PlayerId})");
 			_simulation.Players.RemoveRemotePlayer(left.PlayerId);
+		}
+
+		private void HandleBlockChange(BlockChangePacket blockChange)
+		{
+			if (_simulation == null)
+				return;
+
+			_simulation.Map.SetBlock(blockChange.X, blockChange.Y, blockChange.Z, (BlockType)blockChange.BlockType);
+		}
+
+		/// <summary>
+		/// Collects local block changes (from player placing/removing blocks) and sends them
+		/// to the server as <see cref="BlockPlaceRequestPacket"/> or <see cref="BlockRemoveRequestPacket"/>.
+		/// The local change is kept as optimistic client prediction; the server will validate
+		/// and broadcast authoritative <see cref="BlockChangePacket"/>s to all clients.
+		/// </summary>
+		private void SendPendingBlockChanges(float currentTime)
+		{
+			if (_simulation == null || _client == null || !_client.IsConnected)
+				return;
+
+			var changes = _simulation.Map.GetPendingChanges();
+			if (changes.Count == 0)
+				return;
+
+			foreach (var change in changes)
+			{
+				if (change.NewType == BlockType.None)
+				{
+					var packet = new BlockRemoveRequestPacket
+					{
+						X = change.X,
+						Y = change.Y,
+						Z = change.Z,
+					};
+					_client.Send(packet, true, currentTime);
+				}
+				else
+				{
+					var packet = new BlockPlaceRequestPacket
+					{
+						X = change.X,
+						Y = change.Y,
+						Z = change.Z,
+						BlockType = (byte)change.NewType,
+					};
+					_client.Send(packet, true, currentTime);
+				}
+			}
+
+			_simulation.Map.ClearPendingChanges();
 		}
 
 		// ======================================= Helper Methods =================================================

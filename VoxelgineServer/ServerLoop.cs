@@ -54,6 +54,12 @@ namespace VoxelgineServer
 		private const float TimeSyncInterval = 5f;
 
 		/// <summary>
+		/// Maximum distance a player can be from a block position to place/remove.
+		/// Slightly larger than client-side reach (20) to account for prediction lag.
+		/// </summary>
+		private const float MaxBlockReach = 25f;
+
+		/// <summary>
 		/// Per-player input managers. Each player's <see cref="InputMgr"/> is backed by a
 		/// <see cref="NetworkInputSource"/> that receives input from the client's <see cref="InputStatePacket"/>.
 		/// </summary>
@@ -221,6 +227,9 @@ namespace VoxelgineServer
 
 			// 7. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
+
+			// 8. Broadcast pending block changes to all clients
+			BroadcastBlockChanges(totalTime);
 		}
 
 		private void Shutdown()
@@ -316,8 +325,15 @@ namespace VoxelgineServer
 					HandleInputState(connection, inputPacket);
 					break;
 
+				case BlockPlaceRequestPacket placeReq:
+					HandleBlockPlaceRequest(connection, placeReq);
+					break;
+
+				case BlockRemoveRequestPacket removeReq:
+					HandleBlockRemoveRequest(connection, removeReq);
+					break;
+
 				// Future tasks:
-				// - Server block change authority (BlockPlaceRequest, BlockRemoveRequest)
 				// - Server combat authority (WeaponFire)
 			}
 		}
@@ -348,6 +364,71 @@ namespace VoxelgineServer
 
 			// Set the camera angle from the packet (Vector2 yaw/pitch → Vector3 with Z=0)
 			player.SetCamAngle(new Vector3(inputPacket.CameraAngle.X, inputPacket.CameraAngle.Y, 0));
+		}
+
+		/// <summary>
+		/// Handles a <see cref="BlockPlaceRequestPacket"/> from a client.
+		/// Validates that the player is within reach, then applies the block change to the ChunkMap.
+		/// The change is automatically logged by <see cref="ChunkMap.SetPlacedBlock"/> and
+		/// will be broadcast to all clients in <see cref="BroadcastBlockChanges"/>.
+		/// </summary>
+		private void HandleBlockPlaceRequest(NetConnection connection, BlockPlaceRequestPacket packet)
+		{
+			int playerId = connection.PlayerId;
+			Player player = _simulation.Players.GetPlayer(playerId);
+			if (player == null)
+				return;
+
+			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
+			float distance = Vector3.Distance(player.Position, blockCenter);
+			if (distance > MaxBlockReach)
+				return;
+
+			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, (BlockType)packet.BlockType);
+		}
+
+		/// <summary>
+		/// Handles a <see cref="BlockRemoveRequestPacket"/> from a client.
+		/// Validates that the player is within reach, then removes the block from the ChunkMap.
+		/// </summary>
+		private void HandleBlockRemoveRequest(NetConnection connection, BlockRemoveRequestPacket packet)
+		{
+			int playerId = connection.PlayerId;
+			Player player = _simulation.Players.GetPlayer(playerId);
+			if (player == null)
+				return;
+
+			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
+			float distance = Vector3.Distance(player.Position, blockCenter);
+			if (distance > MaxBlockReach)
+				return;
+
+			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
+		}
+
+		/// <summary>
+		/// Collects pending block changes from the ChunkMap and broadcasts them to all clients.
+		/// Called once per tick after physics and entity updates.
+		/// </summary>
+		private void BroadcastBlockChanges(float currentTime)
+		{
+			var changes = _simulation.Map.GetPendingChanges();
+			if (changes.Count == 0)
+				return;
+
+			foreach (var change in changes)
+			{
+				var packet = new BlockChangePacket
+				{
+					X = change.X,
+					Y = change.Y,
+					Z = change.Z,
+					BlockType = (byte)change.NewType,
+				};
+				_server.Broadcast(packet, true, currentTime);
+			}
+
+			_simulation.Map.ClearPendingChanges();
 		}
 
 		/// <summary>

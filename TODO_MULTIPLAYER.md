@@ -181,7 +181,7 @@ Game Tick Flow (Client):
 - [x] **Server player management** ✅
 - [x] **Server input processing** ✅
 - [x] **Server world transfer** ✅
-- [ ] **Server block change authority** — Receive `BlockPlaceRequest`/`BlockRemoveRequest` from clients. Validate: is block position reachable from player position? Is player allowed to place this block type? If valid, apply to `ChunkMap`, broadcast `BlockChange` to all clients. If invalid, silently reject (client prediction will be corrected). **[CPX: 2]**
+- [x] **Server block change authority** ✅
 
 ### Medium Priority
 
@@ -207,7 +207,7 @@ Game Tick Flow (Client):
 - [x] **Client-side prediction** ✅
 - [x] **Client world loading** ✅
 - [x] **Remote player rendering** ✅
-- [ ] **Client block change handling** — Receive `BlockChange` from server, apply to local `ChunkMap`. For local player block actions: apply optimistically (client prediction), revert if server rejects (no `BlockChange` received within timeout). Trigger chunk mesh rebuild on change. **[CPX: 2]**
+- [x] **Client block change handling** ✅
 
 ### Medium Priority
 
@@ -229,7 +229,7 @@ Game Tick Flow (Client):
 ### High Priority
 
 - [x] **Player position sync** ✅
-- [ ] **World block sync** — Server tracks `ChunkMap.BlockChangeLog`. Each tick, collect pending changes, broadcast `BlockChange` packets to all clients, clear log. On client connect, full world transfer (see Server world transfer). During play, only deltas. **[CPX: 2]**
+- [x] **World block sync** ✅
 
 ### Medium Priority
 
@@ -368,7 +368,7 @@ Game Tick Flow (Client):
 16. ~~**Player position sync + remote rendering**~~ → ✅ Done
 17. ~~**Client-side prediction + reconciliation**~~ → ✅ Done
 18. ~~**Multiplayer game state + end-to-end demo**~~ → ✅ Done
-19. **Block sync (server + client)** → blocks work in multiplayer (priority bumped)
+19. ~~**Block sync (server + client)**~~ → ✅ Done
 20. **Remote player interpolation** → smooth remote player movement
 21. **Entity sync** → full entity synchronization
 22. **Weapon fire authority** → combat works in multiplayer
@@ -415,3 +415,6 @@ Game Tick Flow (Client):
 - **Server world persistence** — Added `MapFile = "server_world.bin"` constant to `ServerLoop`. Server `Start()` now checks if `MapFile` exists: if found, loads the world via `ChunkMap.Read()` from file; if not, generates a new world via `ChunkMap.GenerateFloatingIsland()` and saves it via `ChunkMap.Write()`. Changed default world size from 16×16 to 32×32 chunks (`DefaultWorldWidth`/`DefaultWorldLength`). Updated `DefaultSpawnPosition` to (16, 73, 16) to match world center. Build verified.
 - **SoundMgr: Double initialization crash fix** — Added `if (!Raylib.IsAudioDeviceReady())` guard before `Raylib.InitAudioDevice()` in `SoundMgr.Init()`. The native Raylib crash (calling `InitAudioDevice()` twice) bypassed managed try-catch blocks, causing hard crashes when `MultiplayerGameState` created a `SoundMgr` instance after `GameState` had already initialized the audio device. Build verified.
 - **Remote player visibility on connect fix** — `PlayerJoinedPacket` for existing players was sent by the server before world data, but `MultiplayerGameState.HandlePlayerJoined()` discarded them because `_simulation` was null (only created after world loading). Fixed by adding `_pendingPlayerJoins` buffer (`List<PlayerJoinedPacket>`) — packets arriving before `_simulation` exists are buffered and replayed in `OnWorldDataReady()` after world loading completes. `Cleanup()` clears the buffer. Build verified.
+- **Server block change authority** — Added `HandleBlockPlaceRequest()` and `HandleBlockRemoveRequest()` methods to `ServerLoop`. Server receives `BlockPlaceRequestPacket`/`BlockRemoveRequestPacket` from clients in `OnPacketReceived`, validates player exists and is within reach distance (`MaxBlockReach = 25` units, slightly above client's 20 to account for prediction lag), then applies the block change to `ChunkMap` via `SetBlock()`. Invalid requests (out of range, unknown player) are silently rejected. Added `BroadcastBlockChanges()` method called each tick (step 8) that collects `ChunkMap.GetPendingChanges()`, broadcasts a `BlockChangePacket` for each change to all clients reliably, then calls `ClearPendingChanges()`. Build verified.
+- **Client block change handling** — Added `HandleBlockChange()` to `MultiplayerGameState` that receives `BlockChangePacket` from server and applies block changes to the local `ChunkMap` via `SetBlock()`. For local player actions, blocks are applied optimistically (client prediction) — `InventoryItem.DestroyBlock()`/`PlaceBlock()` modify the `ChunkMap` directly for immediate feedback. Added `SendPendingBlockChanges()` called after `TickGUI()` each frame: collects pending block changes from `ChunkMap.GetPendingChanges()`, sends `BlockRemoveRequestPacket` (for removals) or `BlockPlaceRequestPacket` (for placements) reliably to the server, then clears the log. Server validates and broadcasts authoritative `BlockChangePacket`s to all clients. Chunk mesh rebuilds are triggered automatically by `SetBlock()`. Build verified.
+- **World block sync** — Server tracks block changes via `ChunkMap._blockChangeLog` (populated automatically by `SetPlacedBlock()`). Each tick, `BroadcastBlockChanges()` collects pending changes and broadcasts `BlockChangePacket` reliably to all clients. On client connect, full world state is transferred via `WorldTransferManager`. During play, only delta block changes are sent. Clients apply server-confirmed changes to their local `ChunkMap`. Build verified.

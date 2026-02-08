@@ -34,6 +34,11 @@ namespace Voxelgine.States
 		private Thread _hostThread;
 		private bool _forceNewWorld;
 
+		/// <summary>
+		/// The hosted server instance, or null if not hosting.
+		/// </summary>
+		public ServerLoop HostedServer => _hostedServer;
+
 		public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 			Logging = Eng.DI.GetRequiredService<IFishLogging>();

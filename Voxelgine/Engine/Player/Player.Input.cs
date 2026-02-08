@@ -77,11 +77,11 @@ namespace Voxelgine.Engine
 			Camera.Update(CursorDisabled, ref Cam, InMgr.GetMousePos());
 
 			// Use InputMgr for F1
-			if (InMgr.IsInputPressed(InputKey.F1))
-			{
-				ToggleMouse();
-				OnMenuToggled?.Invoke(CursorDisabled); // Notify when cursor state changes
-			}
+				if (InMgr.IsInputPressed(InputKey.F1))
+				{
+					ToggleMouse();
+					OnMenuToggled?.Invoke(!CursorDisabled); // true when cursor is now visible (menu open)
+				}
 
 			// Keep OnKeyFuncs using Raylib for now (as they are mapped to KeyboardKey)
 			foreach (var KV in OnKeyFuncs)

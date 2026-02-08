@@ -238,8 +238,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- F1 menu window is toggled backwards, when cursor is enabled, window is hidden. Also the window shows normal menu options in there, it should be a list of check boxes for debugging options, like enabling debug menu, network view, etc..
-- Analyze debug_log.txt, analyze the network traffic and categorize bugs if you find any
+*Empty — all items categorized*
 
 ---
 

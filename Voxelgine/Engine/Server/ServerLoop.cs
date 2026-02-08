@@ -144,7 +144,7 @@ namespace Voxelgine.Engine.Server
 
 			_server = new NetServer(_logging);
 #if DEBUG
-			_server.PacketLoggingEnabled = true;
+			//_server.PacketLoggingEnabled = true;
 #endif
 			_worldTransfer = new WorldTransferManager(_server);
 

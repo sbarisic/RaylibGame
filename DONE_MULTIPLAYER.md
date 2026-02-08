@@ -102,4 +102,4 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **SoundMgr double initialization crash** — Guarded `InitAudioDevice()` with `IsAudioDeviceReady()` check.
 - **Dead code after single-player removal** — Removed dead methods, stale comments, unused usings across 7 files.
 - **Lighting computation parallelized** — 8-phase 2×2×2 index parity coloring for `ChunkMap.ComputeLighting()`.
-- **F1 debug menu not showing** — `OnMenuToggled` had no subscriber in `MultiplayerGameState`. Created `_debugMenuWindow` (FishUI `Window` with `GameConfig` variables) toggled by F1 via `OnMenuToggled`.
+- **F1 debug menu** — Created `_debugMenuWindow` toggled by F1 via `OnMenuToggled`. Fixed inverted toggle (`!CursorDisabled` instead of `CursorDisabled`). Content: debug checkboxes (Debug Mode, Network Stats, Client/Server Packet Logging) instead of config textboxes. Added `MainMenuStateFishUI.HostedServer` accessor for server-side toggle.

@@ -127,19 +127,41 @@ namespace Voxelgine.Graphics
 		public void GenerateFloatingIsland(int Width, int Length, int Seed = 666)
 		{
 			Noise.Seed = Seed;
-			float Scale = 0.02f;
+			const int CS = Chunk.ChunkSize;
 			int WorldHeight = 64;
 
-			Vector3 Center = new Vector3(Width, 0, Length) / 2;
-			float CenterRadius = Math.Min(Width / 2, Length / 2);
+			// Step 1 — Create chunk grid
+			Chunk[,,] chunkGrid = CreateChunkGrid(Width, Length, WorldHeight, CS);
 
-			// Pre-create all chunks for direct O(1) access during generation,
-			// bypassing SetPlacedBlock overhead (neighbor tracking, change logging,
-			// and lighting updates per block).
-			const int CS = Chunk.ChunkSize;
-			int chunksX = (Width + CS - 1) / CS;
-			int chunksY = (WorldHeight + CS - 1) / CS + 1; // +1 for an empty air chunk above the terrain
-			int chunksZ = (Length + CS - 1) / CS;
+			// Step 2 — Island shape (stone with caves)
+			GenerateIslandShape(chunkGrid, Width, Length, WorldHeight, CS);
+
+			// Step 3 — Surface layer (grass/dirt) and record surface heights
+			int[] surfaceHeight = ApplySurfaceLayer(chunkGrid, Width, Length, WorldHeight, CS);
+
+			// Step 4 — Water bodies (ponds with sand shoreline)
+			PlaceWaterBodies(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+
+			// Step 5 — Roads (plank paths between points of interest)
+			GenerateRoads(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+
+			// Step 6 — Trees (on remaining grass)
+			PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+
+			// Step 7 — Lighting
+			ComputeLighting();
+		}
+
+		/// <summary>
+		/// Pre-creates all chunks for direct O(1) access during generation,
+		/// bypassing SetPlacedBlock overhead (neighbor tracking, change logging,
+		/// and lighting updates per block).
+		/// </summary>
+		Chunk[,,] CreateChunkGrid(int width, int length, int worldHeight, int cs)
+		{
+			int chunksX = (width + cs - 1) / cs;
+			int chunksY = (worldHeight + cs - 1) / cs + 1; // +1 for an empty air chunk above the terrain
+			int chunksZ = (length + cs - 1) / cs;
 
 			Chunk[,,] chunkGrid = new Chunk[chunksX, chunksY, chunksZ];
 			for (int cx = 0; cx < chunksX; cx++)
@@ -152,49 +174,85 @@ namespace Voxelgine.Graphics
 						Chunks.Add(chunkIndex, chunk);
 					}
 
-			// Noise pass — each XZ column is independent, parallelized across X
-			Parallel.For(0, Width, x =>
+			return chunkGrid;
+		}
+
+		/// <summary>
+			/// Generates the island's base shape using 3D simplex noise with center and height falloff.
+			/// A 2D heightmap noise layer displaces the surface per XZ column to create gentle hills and valleys.
+			/// Fills solid areas with stone and carves cave pockets using a secondary noise layer.
+			/// Parallelized across the X axis — each XZ column is independent.
+			/// </summary>
+			void GenerateIslandShape(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
 			{
-				for (int z = 0; z < Length; z++)
-					for (int y = 0; y < WorldHeight; y++)
+				float scale = 0.02f;
+				Vector3 center = new Vector3(width, 0, length) / 2;
+				float centerRadius = Math.Min(width / 2, length / 2);
+
+				const float HillScale = 0.012f;
+				const float HillAmplitude = 6.0f;
+
+				Parallel.For(0, width, x =>
+				{
+					for (int z = 0; z < length; z++)
 					{
-						Vector3 Pos = new Vector3(x, (WorldHeight - y), z);
+						// 2D heightmap displacement — gentle hills and valleys (±HillAmplitude blocks)
+						float hillNoise = Noise.CalcPixel2D(x, z, HillScale) / 255f; // 0..1
+						float hillOffset = (hillNoise - 0.5f) * 2.0f * HillAmplitude; // -HillAmplitude..+HillAmplitude
 
-						float CenterFalloff = 1.0f - Utils.Clamp(((Center - Pos).Length() / CenterRadius) / 1.2f, 0, 1);
-						float Height = (float)y / WorldHeight;
-
-						const float HeightFallStart = 0.8f;
-						const float HeightFallEnd = 1.0f;
-						const float HeightFallRange = HeightFallEnd - HeightFallStart;
-
-						float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
-						float Density = Simplex(2, x, y * 0.5f, z, Scale) * CenterFalloff * HeightFalloff;
-
-						if (Density > 0.1f)
+						for (int y = 0; y < worldHeight; y++)
 						{
-							float Caves = Simplex(1, x, y, z, Scale * 4) * HeightFalloff;
-							if (Caves < 0.65f)
-								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Stone));
+							Vector3 Pos = new Vector3(x, (worldHeight - y), z);
+
+							float CenterFalloff = 1.0f - Utils.Clamp(((center - Pos).Length() / centerRadius) / 1.2f, 0, 1);
+							float Height = (float)(y - hillOffset) / worldHeight;
+
+							const float HeightFallStart = 0.8f;
+							const float HeightFallEnd = 1.0f;
+							const float HeightFallRange = HeightFallEnd - HeightFallStart;
+
+							float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
+							float Density = Simplex(2, x, y * 0.5f, z, scale) * CenterFalloff * HeightFalloff;
+
+							if (Density > 0.1f)
+							{
+								float Caves = Simplex(1, x, y, z, scale * 4) * HeightFalloff;
+								if (Caves < 0.65f)
+									chunkGrid[x / cs, y / cs, z / cs].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(BlockType.Stone));
+							}
 						}
 					}
-			});
+				});
+			}
 
-			// Surface pass — replace top stone with grass/dirt
-			Parallel.For(0, Width, x =>
+		/// <summary>
+		/// Replaces the topmost stone blocks with grass (surface) and dirt (subsurface, up to 4 deep).
+		/// Builds and returns a surface height map used by subsequent generation steps.
+		/// Parallelized across the X axis.
+		/// </summary>
+		int[] ApplySurfaceLayer(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
+		{
+			int[] surfaceHeight = new int[width * length];
+			Array.Fill(surfaceHeight, -1);
+
+			Parallel.For(0, width, x =>
 			{
-				for (int z = 0; z < Length; z++)
+				for (int z = 0; z < length; z++)
 				{
 					int DownRayHits = 0;
-					for (int y = WorldHeight - 1; y >= 0; y--)
+					for (int y = worldHeight - 1; y >= 0; y--)
 					{
-						if (chunkGrid[x / CS, y / CS, z / CS].GetBlock(x % CS, y % CS, z % CS).Type != BlockType.None)
+						if (chunkGrid[x / cs, y / cs, z / cs].GetBlock(x % cs, y % cs, z % cs).Type != BlockType.None)
 						{
 							DownRayHits++;
 
 							if (DownRayHits == 1)
-								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Grass));
+							{
+								chunkGrid[x / cs, y / cs, z / cs].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(BlockType.Grass));
+								surfaceHeight[x * length + z] = y;
+							}
 							else if (DownRayHits < 5)
-								chunkGrid[x / CS, y / CS, z / CS].SetBlock(x % CS, y % CS, z % CS, new PlacedBlock(BlockType.Dirt));
+								chunkGrid[x / cs, y / cs, z / cs].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(BlockType.Dirt));
 
 						}
 						else if (DownRayHits != 0)
@@ -203,7 +261,143 @@ namespace Voxelgine.Graphics
 				}
 			});
 
-			ComputeLighting();
+			return surfaceHeight;
+		}
+
+		/// <summary>
+		/// Generates plank roads connecting points of interest across the island.
+		/// Uses noise-seeded waypoints on the surface and connects them with
+		/// Bresenham-style paths, placing Plank blocks on the ground.
+		/// </summary>
+		void GenerateRoads(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		{
+			Random rng = new Random(seed + 3);
+			const float WaypointNoiseScale = 0.025f;
+			const float WaypointThreshold = 0.78f;
+			const int MinWaypointSpacing = 20;
+			const int EdgeMargin = 10;
+			const int RoadHalfWidth = 1;
+
+			// Find waypoints using noise
+			List<(int x, int z)> waypoints = new();
+
+			for (int x = EdgeMargin; x < width - EdgeMargin; x += 4)
+			{
+				for (int z = EdgeMargin; z < length - EdgeMargin; z += 4)
+				{
+					int surfY = surfaceHeight[x * length + z];
+					if (surfY < 0)
+						continue;
+
+					BlockType surfBlock = GridGetBlock(chunkGrid, x, surfY, z, width, worldHeight, length, cs);
+					if (surfBlock != BlockType.Grass)
+						continue;
+
+					float wpNoise = Noise.CalcPixel2D(x + seed * 11, z + seed * 11, WaypointNoiseScale) / 255f;
+					if (wpNoise < WaypointThreshold)
+						continue;
+
+					bool tooClose = false;
+					foreach (var (wx, wz) in waypoints)
+					{
+						int dx = x - wx;
+						int dz = z - wz;
+						if (dx * dx + dz * dz < MinWaypointSpacing * MinWaypointSpacing)
+						{
+							tooClose = true;
+							break;
+						}
+					}
+					if (tooClose)
+						continue;
+
+					waypoints.Add((x, z));
+				}
+			}
+
+			if (waypoints.Count < 2)
+				return;
+
+			// Connect each waypoint to its nearest neighbor that isn't already connected
+			HashSet<(int, int)> connectedPairs = new();
+
+			foreach (var (ax, az) in waypoints)
+			{
+				// Find nearest unconnected waypoint
+				int bestIdx = -1;
+				int bestDistSq = int.MaxValue;
+
+				for (int i = 0; i < waypoints.Count; i++)
+				{
+					var (bx, bz) = waypoints[i];
+					if (bx == ax && bz == az)
+						continue;
+
+					int pairA = Math.Min(ax * 10000 + az, bx * 10000 + bz);
+					int pairB = Math.Max(ax * 10000 + az, bx * 10000 + bz);
+					if (connectedPairs.Contains((pairA, pairB)))
+						continue;
+
+					int distSq = (ax - bx) * (ax - bx) + (az - bz) * (az - bz);
+					if (distSq < bestDistSq)
+					{
+						bestDistSq = distSq;
+						bestIdx = i;
+					}
+				}
+
+				if (bestIdx < 0)
+					continue;
+
+				var (tx, tz) = waypoints[bestIdx];
+				int pkA = Math.Min(ax * 10000 + az, tx * 10000 + tz);
+				int pkB = Math.Max(ax * 10000 + az, tx * 10000 + tz);
+				connectedPairs.Add((pkA, pkB));
+
+				// Lay plank path using Bresenham line between (ax,az) and (tx,tz)
+				PlaceRoadSegment(chunkGrid, surfaceHeight, ax, az, tx, tz, width, length, worldHeight, cs, RoadHalfWidth);
+			}
+		}
+
+		/// <summary>
+		/// Places a plank road segment between two XZ points, following the terrain surface.
+		/// Uses Bresenham's line algorithm with configurable half-width for road thickness.
+		/// </summary>
+		void PlaceRoadSegment(Chunk[,,] chunkGrid, int[] surfaceHeight, int x0, int z0, int x1, int z1, int width, int length, int worldHeight, int cs, int halfWidth)
+		{
+			int dx = Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+			int dz = Math.Abs(z1 - z0), sz = z0 < z1 ? 1 : -1;
+			int err = dx - dz;
+
+			while (true)
+			{
+				// Place road blocks in a cross pattern around the path center
+				for (int ox = -halfWidth; ox <= halfWidth; ox++)
+				{
+					for (int oz = -halfWidth; oz <= halfWidth; oz++)
+					{
+						int bx = x0 + ox;
+						int bz = z0 + oz;
+						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
+							continue;
+
+						int surfY = surfaceHeight[bx * length + bz];
+						if (surfY < 0)
+							continue;
+
+						BlockType surfBlock = GridGetBlock(chunkGrid, bx, surfY, bz, width, worldHeight, length, cs);
+						if (surfBlock == BlockType.Grass || surfBlock == BlockType.Dirt)
+							GridSetBlock(chunkGrid, bx, surfY, bz, BlockType.Plank, width, worldHeight, length, cs);
+					}
+				}
+
+				if (x0 == x1 && z0 == z1)
+					break;
+
+				int e2 = 2 * err;
+				if (e2 > -dz) { err -= dz; x0 += sx; }
+				if (e2 < dx) { err += dx; z0 += sz; }
+			}
 		}
 
 		/// <summary>
@@ -311,6 +505,258 @@ namespace Voxelgine.Graphics
 			}
 
 			return (Val / Octaves) / 255;
+		}
+
+		/// <summary>
+		/// Inline block set using pre-created chunk grid. Bounds-checked.
+		/// </summary>
+		static void GridSetBlock(Chunk[,,] grid, int x, int y, int z, BlockType type, int width, int height, int length, int cs)
+		{
+			if (x < 0 || x >= width || y < 0 || y >= height || z < 0 || z >= length)
+				return;
+			int cx = x / cs, cy = y / cs, cz = z / cs;
+			if (cx >= grid.GetLength(0) || cy >= grid.GetLength(1) || cz >= grid.GetLength(2))
+				return;
+			grid[cx, cy, cz].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(type));
+		}
+
+		/// <summary>
+		/// Inline block get using pre-created chunk grid. Returns None for out-of-bounds.
+		/// </summary>
+		static BlockType GridGetBlock(Chunk[,,] grid, int x, int y, int z, int width, int height, int length, int cs)
+		{
+			if (x < 0 || x >= width || y < 0 || y >= height || z < 0 || z >= length)
+				return BlockType.None;
+			int cx = x / cs, cy = y / cs, cz = z / cs;
+			if (cx >= grid.GetLength(0) || cy >= grid.GetLength(1) || cz >= grid.GetLength(2))
+				return BlockType.None;
+			return grid[cx, cy, cz].GetBlock(x % cs, y % cs, z % cs).Type;
+		}
+
+		/// <summary>
+		/// Places trees on grass blocks using noise-based distribution.
+		/// Uses a 2D noise layer to select tree positions, enforcing minimum spacing.
+		/// </summary>
+		void PlaceTrees(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		{
+			Random rng = new Random(seed + 1);
+			const float TreeNoiseScale = 0.08f;
+			const float TreeThreshold = 0.62f;
+			const int MinTreeSpacing = 5;
+			const int EdgeMargin = 4; // Keep trees away from world edges
+
+			// Collect tree positions using noise, then place sequentially
+			List<(int x, int z, int surfY)> treePositions = new();
+
+			for (int x = EdgeMargin; x < width - EdgeMargin; x++)
+			{
+				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
+				{
+					int surfY = surfaceHeight[x * length + z];
+					if (surfY < 0 || surfY + 12 >= worldHeight)
+						continue;
+
+					// Only place trees on grass
+					if (GridGetBlock(chunkGrid, x, surfY, z, width, worldHeight, length, cs) != BlockType.Grass)
+						continue;
+
+					// Noise-based placement
+					float treeNoise = Noise.CalcPixel2D(x + seed * 3, z + seed * 3, TreeNoiseScale) / 255f;
+					if (treeNoise < TreeThreshold)
+						continue;
+
+					// Check minimum spacing against already-selected trees
+					bool tooClose = false;
+					for (int i = treePositions.Count - 1; i >= 0 && i >= treePositions.Count - 50; i--)
+					{
+						int dx = x - treePositions[i].x;
+						int dz = z - treePositions[i].z;
+						if (dx * dx + dz * dz < MinTreeSpacing * MinTreeSpacing)
+						{
+							tooClose = true;
+							break;
+						}
+					}
+					if (tooClose)
+						continue;
+
+					treePositions.Add((x, z, surfY));
+				}
+			}
+
+			// Place each tree
+			foreach (var (tx, tz, surfY) in treePositions)
+			{
+				int trunkHeight = 6 + rng.Next(5); // 6-10
+				int canopyRadius = 2 + rng.Next(2); // 2-3
+				int canopyHeight = 3 + rng.Next(3); // 3-5
+				int canopyBase = surfY + trunkHeight - canopyHeight + 1;
+
+				// Trunk
+				for (int y = surfY + 1; y <= surfY + trunkHeight; y++)
+					GridSetBlock(chunkGrid, tx, y, tz, BlockType.Wood, width, worldHeight, length, cs);
+
+				// Replace grass under trunk with dirt
+				GridSetBlock(chunkGrid, tx, surfY, tz, BlockType.Dirt, width, worldHeight, length, cs);
+
+				// Leaf canopy (roughly spherical)
+				for (int ly = canopyBase; ly <= surfY + trunkHeight + 1; ly++)
+				{
+					// Canopy narrows at top and bottom
+					int layerFromCenter = Math.Abs(ly - (canopyBase + canopyHeight / 2));
+					int layerRadius = Math.Max(1, canopyRadius - layerFromCenter / 2);
+
+					for (int lx = -layerRadius; lx <= layerRadius; lx++)
+					{
+						for (int lz = -layerRadius; lz <= layerRadius; lz++)
+						{
+							// Skip corners for rounder shape
+							if (lx * lx + lz * lz > layerRadius * layerRadius + 1)
+								continue;
+
+							int bx = tx + lx;
+							int bz = tz + lz;
+
+							// Don't overwrite trunk
+							if (lx == 0 && lz == 0 && ly <= surfY + trunkHeight)
+								continue;
+
+							if (GridGetBlock(chunkGrid, bx, ly, bz, width, worldHeight, length, cs) == BlockType.None)
+								GridSetBlock(chunkGrid, bx, ly, bz, BlockType.Leaf, width, worldHeight, length, cs);
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Places small water bodies in terrain depressions.
+		/// Uses noise to select pond centers, carves shallow basins, and fills with water.
+		/// </summary>
+		void PlaceWaterBodies(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		{
+			Random rng = new Random(seed + 2);
+			const float PondNoiseScale = 0.015f;
+			const float PondThreshold = 0.72f;
+			const int PondMinSpacing = 30;
+			const int EdgeMargin = 8;
+
+			// Find potential pond centers using noise
+			List<(int x, int z)> pondCenters = new();
+
+			for (int x = EdgeMargin; x < width - EdgeMargin; x += 3)
+			{
+				for (int z = EdgeMargin; z < length - EdgeMargin; z += 3)
+				{
+					int surfY = surfaceHeight[x * length + z];
+					if (surfY < 2)
+						continue;
+
+					float pondNoise = Noise.CalcPixel2D(x + seed * 7, z + seed * 7, PondNoiseScale) / 255f;
+					if (pondNoise < PondThreshold)
+						continue;
+
+					// Check spacing
+					bool tooClose = false;
+					foreach (var (px, pz) in pondCenters)
+					{
+						int dx = x - px;
+						int dz = z - pz;
+						if (dx * dx + dz * dz < PondMinSpacing * PondMinSpacing)
+						{
+							tooClose = true;
+							break;
+						}
+					}
+					if (tooClose)
+						continue;
+
+					pondCenters.Add((x, z));
+				}
+			}
+
+			// Carve and fill each pond
+			foreach (var (cx, cz) in pondCenters)
+			{
+				int surfY = surfaceHeight[cx * length + cz];
+				int pondRadius = 3 + rng.Next(4); // 3-6 blocks radius
+				int pondDepth = 1 + rng.Next(3);  // 1-3 blocks deep
+				int waterLevel = surfY;
+
+				// Carve basin and fill with water
+				for (int dx = -pondRadius; dx <= pondRadius; dx++)
+				{
+					for (int dz = -pondRadius; dz <= pondRadius; dz++)
+					{
+						float distSq = dx * dx + dz * dz;
+						float radiusSq = pondRadius * pondRadius;
+						if (distSq > radiusSq)
+							continue;
+
+						int bx = cx + dx;
+						int bz = cz + dz;
+						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
+							continue;
+
+						int localSurfY = surfaceHeight[bx * length + bz];
+						if (localSurfY < 0)
+							continue;
+
+						// Depth tapers toward edges (deeper in center)
+						float edgeFactor = 1f - distSq / radiusSq;
+						int localDepth = Math.Max(1, (int)(pondDepth * edgeFactor + 0.5f));
+
+						// Carve terrain and fill with water
+						for (int dy = 0; dy < localDepth; dy++)
+						{
+							int carveY = localSurfY - dy;
+							if (carveY < 1)
+								break;
+
+							// Replace terrain with water up to water level
+							if (carveY <= waterLevel)
+								GridSetBlock(chunkGrid, bx, carveY, bz, BlockType.Water, width, worldHeight, length, cs);
+						}
+
+						// Fill any remaining space up to water level with water
+						for (int wy = localSurfY + 1; wy <= waterLevel; wy++)
+						{
+							if (GridGetBlock(chunkGrid, bx, wy, bz, width, worldHeight, length, cs) == BlockType.None)
+								GridSetBlock(chunkGrid, bx, wy, bz, BlockType.Water, width, worldHeight, length, cs);
+						}
+
+						// Update surface height to reflect water surface
+						if (localSurfY <= waterLevel)
+							surfaceHeight[bx * length + bz] = waterLevel;
+					}
+				}
+
+				// Add sand shoreline around the pond
+				for (int dx = -(pondRadius + 1); dx <= pondRadius + 1; dx++)
+				{
+					for (int dz = -(pondRadius + 1); dz <= pondRadius + 1; dz++)
+					{
+						float distSq = dx * dx + dz * dz;
+						float outerSq = (pondRadius + 1.5f) * (pondRadius + 1.5f);
+						float innerSq = (pondRadius - 0.5f) * (pondRadius - 0.5f);
+						if (distSq > outerSq || distSq < innerSq)
+							continue;
+
+						int bx = cx + dx;
+						int bz = cz + dz;
+						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
+							continue;
+
+						int localSurfY = surfaceHeight[bx * length + bz];
+						if (localSurfY < 0)
+							continue;
+
+						BlockType surfBlock = GridGetBlock(chunkGrid, bx, localSurfY, bz, width, worldHeight, length, cs);
+						if (surfBlock == BlockType.Grass || surfBlock == BlockType.Dirt)
+							GridSetBlock(chunkGrid, bx, localSurfY, bz, BlockType.Sand, width, worldHeight, length, cs);
+					}
+				}
+			}
 		}
 
 		public void SetPlacedBlock(int X, int Y, int Z, PlacedBlock Block)

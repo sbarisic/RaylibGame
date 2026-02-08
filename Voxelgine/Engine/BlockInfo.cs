@@ -45,7 +45,9 @@ namespace Voxelgine.Engine
 		Barrel,
 		Campfire,
 		Torch,
-		Foliage
+		Foliage,
+
+		Gravel
 	}
 
 	/// <summary>

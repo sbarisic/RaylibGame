@@ -183,7 +183,7 @@ Game Tick Flow (Client):
 
 ### Medium Priority
 
-- [ ] **Procedural trees and water bodies** — Add trees (6–10 block trunk, 3–5 block leaf canopy) and small water bodies (≥5×5, up to 3 deep, natural shoreline) to the floating island world generation. Use noise functions for organic, non-uniform distribution. **[CPX: 4]**
+*No medium priority tasks*
 
 ### Lower Priority
 
@@ -245,7 +245,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- The top of the island is flat, make it "mostly" flat and add some hills and variation to make it more interesting to explore and build on (improvement)
 
 ---
 

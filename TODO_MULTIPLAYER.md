@@ -244,7 +244,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- In prediction, gunshots and effects are not predicted locally — they only appear when the server confirms the hit. This can feel less responsive, especially at higher latencies. Possible solution: client-side prediction of fire effects based on input and local raycast, with server correction if the hit was different.
 
 ---
 

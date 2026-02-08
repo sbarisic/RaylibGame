@@ -142,7 +142,7 @@ namespace Voxelgine.Engine.Server
 			_logging = _di.GetRequiredService<IFishLogging>();
 			_logging.Init();
 
-			_server = new NetServer();
+			_server = new NetServer(_logging);
 			_worldTransfer = new WorldTransferManager(_server);
 
 			_server.OnClientConnected += OnClientConnected;
@@ -162,35 +162,35 @@ namespace Voxelgine.Engine.Server
 		public void Start(int port, int worldSeed = 666, bool forceRegenerate = false)
 		{
 			_worldSeed = worldSeed;
-			_logging.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
+			_logging.ServerWriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 
 			if (File.Exists(MapFile) && !forceRegenerate)
 			{
-				_logging.WriteLine($"Loading world from '{MapFile}'...");
+				_logging.ServerWriteLine($"Loading world from '{MapFile}'...");
 				using var fileStream = File.OpenRead(MapFile);
 				_simulation.Map.Read(fileStream);
-				_logging.WriteLine("World loaded from file.");
+				_logging.ServerWriteLine("World loaded from file.");
 			}
 			else
 			{
 				if (forceRegenerate && File.Exists(MapFile))
-					_logging.WriteLine("Force regeneration requested, ignoring existing world file.");
+					_logging.ServerWriteLine("Force regeneration requested, ignoring existing world file.");
 
-				_logging.WriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
+				_logging.ServerWriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
 				_simulation.Map.GenerateFloatingIsland(DefaultWorldWidth, DefaultWorldLength, worldSeed);
 				_simulation.Map.ClearPendingChanges();
-				_logging.WriteLine("World generation complete.");
+				_logging.ServerWriteLine("World generation complete.");
 
-				_logging.WriteLine($"Saving world to '{MapFile}'...");
+				_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
 				using var fileStream = File.Create(MapFile);
 				_simulation.Map.Write(fileStream);
-				_logging.WriteLine("World saved.");
+				_logging.ServerWriteLine("World saved.");
 			}
 
 			// Find valid spawn points on the world surface
 			FindAndSetSpawnPoints();
 
-			_logging.WriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
+			_logging.ServerWriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
 
 			// Spawn server-side entities
 			SpawnEntities();
@@ -199,7 +199,7 @@ namespace Voxelgine.Engine.Server
 			_server.Start(port);
 			_running = true;
 
-			_logging.WriteLine("Server is running. Press Ctrl+C to stop.");
+			_logging.ServerWriteLine("Server is running. Press Ctrl+C to stop.");
 
 			RunLoop();
 		}
@@ -297,10 +297,10 @@ namespace Voxelgine.Engine.Server
 
 		private void Shutdown()
 		{
-			_logging.WriteLine("Shutting down server...");
+			_logging.ServerWriteLine("Shutting down server...");
 			SaveWorld();
 			_server.Stop(CurrentTime);
-			_logging.WriteLine("Server stopped.");
+			_logging.ServerWriteLine("Server stopped.");
 		}
 
 		/// <summary>
@@ -344,14 +344,14 @@ namespace Voxelgine.Engine.Server
 		{
 			try
 			{
-				_logging.WriteLine($"Saving world to '{MapFile}'...");
+				_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
 				using var fileStream = File.Create(MapFile);
 				_simulation.Map.Write(fileStream);
-				_logging.WriteLine("World saved.");
+				_logging.ServerWriteLine("World saved.");
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"ERROR: Failed to save world: {ex.Message}");
+				_logging.ServerWriteLine($"ERROR: Failed to save world: {ex.Message}");
 			}
 		}
 
@@ -360,11 +360,11 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private byte[] SerializeWorld()
 		{
-			_logging.WriteLine("SerializeWorld: Serializing world...");
+			_logging.ServerWriteLine("SerializeWorld: Serializing world...");
 			using var ms = new MemoryStream();
 			_simulation.Map.Write(ms);
 			byte[] data = ms.ToArray();
-			_logging.WriteLine($"SerializeWorld: Produced {data.Length:N0} bytes");
+			_logging.ServerWriteLine($"SerializeWorld: Produced {data.Length:N0} bytes");
 			return data;
 		}
 
@@ -393,7 +393,7 @@ namespace Voxelgine.Engine.Server
 			if (spawnPoints.Count >= 3)
 				_npcSpawnPos = spawnPoints[2];
 
-			_logging.WriteLine($"Spawn points: Player={PlayerSpawnPosition}, Pickup={_pickupSpawnPos}, NPC={_npcSpawnPos} ({spawnPoints.Count} found)");
+			_logging.ServerWriteLine($"Spawn points: Player={PlayerSpawnPosition}, Pickup={_pickupSpawnPos}, NPC={_npcSpawnPos} ({spawnPoints.Count} found)");
 		}
 
 		public void Dispose()

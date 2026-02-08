@@ -11,8 +11,9 @@ namespace Voxelgine.Engine
 	{
 		string LogFolder;
 
-		FileStream FStream;
-		StreamWriter SWriter;
+		static object Lck = new object();
+		static FileStream FStream;
+		static StreamWriter SWriter;
 
 		public FishLogging(IFishConfig Cfg)
 		{
@@ -26,14 +27,23 @@ namespace Voxelgine.Engine
 			if (!Directory.Exists(LogFolder))
 				Directory.CreateDirectory(LogFolder);
 
-			FStream = File.OpenWrite(LogFileName);
-			SWriter = new StreamWriter(FStream, Encoding.UTF8);
+			lock (Lck)
+			{
+				if (FStream == null)
+				{
+					FStream = File.OpenWrite(LogFileName);
+					SWriter = new StreamWriter(FStream, Encoding.UTF8);
+				}
+			}
 		}
 
 		void Flush()
 		{
-			SWriter.Flush();
-			FStream.Flush();
+			lock (Lck)
+			{
+				SWriter.Flush();
+				FStream.Flush();
+			}
 		}
 
 		string GetPrefix()
@@ -44,9 +54,12 @@ namespace Voxelgine.Engine
 
 		public void WriteLine(string message)
 		{
-			Console.WriteLine(message);
-			SWriter.WriteLine(GetPrefix() + message);
-			Flush();
+			lock (Lck)
+			{
+				Console.WriteLine(message);
+				SWriter.WriteLine(GetPrefix() + message);
+				Flush();
+			}
 		}
 
 		public void ServerWriteLine(string message)

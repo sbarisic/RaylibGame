@@ -86,6 +86,10 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 
 - **WORLDBUILDING.md multiplayer review** — Added cooperative gameplay sections (resource dynamics, base building, combat, social dynamics). Updated design pillars and world anchor.
 
+## Testing & Debugging
+
+- **Categorized logging** — Replaced all `_logging.WriteLine()` with `ServerWriteLine`/`ClientWriteLine` in `ServerLoop.*` and `MultiplayerGameState`. Added optional `IFishLogging` to `NetServer`/`NetClient` with `ServerNetworkWriteLine`/`ClientNetworkWriteLine` for key network events (connect, disconnect, reject, timeout).
+
 ## Resolved Bugs
 
 - **Block placing/destroying broken** — `WeaponPicker.OnLeftClick` not calling `base.OnLeftClick(E)`, and block change echo loop from server broadcasts being re-sent as new requests.

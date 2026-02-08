@@ -150,7 +150,7 @@ namespace Voxelgine.Engine.Server
 			if (string.IsNullOrWhiteSpace(message))
 				return;
 
-			_logging.WriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
+			_logging.ServerWriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
 
 			// Rebroadcast with correct player ID
 			var broadcastPacket = new ChatMessagePacket

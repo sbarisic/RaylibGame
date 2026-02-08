@@ -145,7 +145,7 @@ namespace Voxelgine.States
 
 			Cleanup();
 
-			_client = new NetClient();
+			_client = new NetClient(_logging);
 			_inputBuffer = new ClientInputBuffer();
 			_prediction = new ClientPrediction();
 
@@ -172,7 +172,7 @@ namespace Voxelgine.States
 			{
 				_statusText = "";
 				_errorText = $"Failed to connect: {ex.Message}";
-				_logging.WriteLine($"MultiplayerGameState: Connection failed: {ex.Message}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Connection failed: {ex.Message}");
 			}
 		}
 
@@ -284,7 +284,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"MultiplayerGameState: Tick exception: {ex}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Tick exception: {ex}");
 			}
 		}
 
@@ -328,7 +328,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"MultiplayerGameState: UpdateLockstep exception: {ex}");
+				_logging.ClientWriteLine($"MultiplayerGameState: UpdateLockstep exception: {ex}");
 			}
 		}
 
@@ -397,7 +397,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"MultiplayerGameState: Draw exception: {ex}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Draw exception: {ex}");
 			}
 		}
 
@@ -504,7 +504,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"MultiplayerGameState: Draw2D exception: {ex}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Draw2D exception: {ex}");
 			}
 		}
 
@@ -512,13 +512,13 @@ namespace Voxelgine.States
 
 		private void OnConnected(ConnectAcceptPacket accept)
 		{
-			_logging.WriteLine($"MultiplayerGameState: Connected as player {accept.PlayerId}");
+			_logging.ClientWriteLine($"MultiplayerGameState: Connected as player {accept.PlayerId}");
 			_statusText = "Connected! Loading world...";
 		}
 
 		private void OnDisconnected(string reason)
 		{
-			_logging.WriteLine($"MultiplayerGameState: Disconnected: {reason}");
+			_logging.ClientWriteLine($"MultiplayerGameState: Disconnected: {reason}");
 
 			if (_initialized)
 			{
@@ -537,74 +537,74 @@ namespace Voxelgine.States
 
 		private void OnConnectionRejected(string reason)
 		{
-			_logging.WriteLine($"MultiplayerGameState: Rejected: {reason}");
+			_logging.ClientWriteLine($"MultiplayerGameState: Rejected: {reason}");
 			_statusText = "";
 			_errorText = $"Connection rejected: {reason}";
 		}
 
 		private void OnWorldDataReady(byte[] compressedData)
 		{
-			_logging.WriteLine($"MultiplayerGameState: World data received ({compressedData.Length} bytes compressed)");
+			_logging.ClientWriteLine($"MultiplayerGameState: World data received ({compressedData.Length} bytes compressed)");
 			_statusText = "Building world...";
 
 			try
 			{
 				// Create game simulation
-				_logging.WriteLine("MultiplayerGameState: Creating GameSimulation...");
+				_logging.ClientWriteLine("MultiplayerGameState: Creating GameSimulation...");
 				_simulation = new GameSimulation(Eng);
 				_simulation.DayNight.IsAuthority = false; // Server controls time
-				_logging.WriteLine("MultiplayerGameState: GameSimulation created");
+				_logging.ClientWriteLine("MultiplayerGameState: GameSimulation created");
 
 				// Load world
-				_logging.WriteLine("MultiplayerGameState: Reading ChunkMap from stream...");
+				_logging.ClientWriteLine("MultiplayerGameState: Reading ChunkMap from stream...");
 				using (var ms = new MemoryStream(compressedData))
 				{
 					_simulation.Map.Read(ms);
 				}
-				_logging.WriteLine("MultiplayerGameState: ChunkMap loaded successfully");
+				_logging.ClientWriteLine("MultiplayerGameState: ChunkMap loaded successfully");
 
-				_logging.WriteLine("MultiplayerGameState: Computing lighting...");
+				_logging.ClientWriteLine("MultiplayerGameState: Computing lighting...");
 				_simulation.Map.ComputeLighting();
-				_logging.WriteLine("MultiplayerGameState: Lighting computed");
+				_logging.ClientWriteLine("MultiplayerGameState: Lighting computed");
 
 				// Create GUI
-				_logging.WriteLine("MultiplayerGameState: Creating gameplay UI...");
+				_logging.ClientWriteLine("MultiplayerGameState: Creating gameplay UI...");
 				CreateGameplayUI();
-				_logging.WriteLine("MultiplayerGameState: Gameplay UI created");
+				_logging.ClientWriteLine("MultiplayerGameState: Gameplay UI created");
 
 				// Create sound
-				_logging.WriteLine("MultiplayerGameState: Creating SoundMgr...");
+				_logging.ClientWriteLine("MultiplayerGameState: Creating SoundMgr...");
 				_snd = new SoundMgr();
 				_snd.Init();
-				_logging.WriteLine("MultiplayerGameState: SoundMgr initialized");
+				_logging.ClientWriteLine("MultiplayerGameState: SoundMgr initialized");
 
 				// Create particle system
-				_logging.WriteLine("MultiplayerGameState: Creating ParticleSystem...");
+				_logging.ClientWriteLine("MultiplayerGameState: Creating ParticleSystem...");
 				_particle = new ParticleSystem();
 				_particle.Init(
 					(pt) => _simulation.Map.Collide(pt, Vector3.Zero, out Vector3 _),
 					(pt) => _simulation.Map.GetBlock(pt),
 					(pt) => _simulation.Map.GetLightColor(pt)
 				);
-				_logging.WriteLine("MultiplayerGameState: ParticleSystem initialized");
+				_logging.ClientWriteLine("MultiplayerGameState: ParticleSystem initialized");
 
 				// Create local player
-				_logging.WriteLine($"MultiplayerGameState: Creating Player (id={_client.PlayerId}, name={_playerName})...");
+				_logging.ClientWriteLine($"MultiplayerGameState: Creating Player (id={_client.PlayerId}, name={_playerName})...");
 				var ply = new Player(Eng, _gui, _playerName, true, _snd, _client.PlayerId);
-				_logging.WriteLine("MultiplayerGameState: Player created, adding to PlayerManager...");
+				_logging.ClientWriteLine("MultiplayerGameState: Player created, adding to PlayerManager...");
 				_simulation.Players.AddLocalPlayer(_client.PlayerId, ply);
 
-				_logging.WriteLine("MultiplayerGameState: InitGUI...");
+				_logging.ClientWriteLine("MultiplayerGameState: InitGUI...");
 				ply.InitGUI(_gameWindow, _gui);
-				_logging.WriteLine("MultiplayerGameState: InitGUI complete");
+				_logging.ClientWriteLine("MultiplayerGameState: InitGUI complete");
 
-				_logging.WriteLine("MultiplayerGameState: Player.Init...");
+				_logging.ClientWriteLine("MultiplayerGameState: Player.Init...");
 				ply.Init(_simulation.Map);
-				_logging.WriteLine("MultiplayerGameState: Player.Init complete");
+				_logging.ClientWriteLine("MultiplayerGameState: Player.Init complete");
 
-				_logging.WriteLine("MultiplayerGameState: SetPosition...");
+				_logging.ClientWriteLine("MultiplayerGameState: SetPosition...");
 				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
-				_logging.WriteLine("MultiplayerGameState: SetPosition complete");
+				_logging.ClientWriteLine("MultiplayerGameState: SetPosition complete");
 
 				// Set entity manager to non-authoritative (server owns entity state)
 				_simulation.Entities.IsAuthority = false;
@@ -612,7 +612,7 @@ namespace Voxelgine.States
 				// Process any PlayerJoined packets that arrived before the simulation was created
 				if (_pendingPlayerJoins.Count > 0)
 				{
-					_logging.WriteLine($"MultiplayerGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
+					_logging.ClientWriteLine($"MultiplayerGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
 					foreach (var pending in _pendingPlayerJoins)
 					{
 						HandlePlayerJoined(pending);
@@ -623,7 +623,7 @@ namespace Voxelgine.States
 				// Process any entity packets that arrived before the simulation was created
 				if (_pendingEntityPackets.Count > 0)
 				{
-					_logging.WriteLine($"MultiplayerGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
+					_logging.ClientWriteLine($"MultiplayerGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
 					float replayTime = (float)Raylib.GetTime();
 					foreach (var pending in _pendingEntityPackets)
 					{
@@ -644,7 +644,7 @@ namespace Voxelgine.States
 				}
 
 				// Finish loading
-				_logging.WriteLine("MultiplayerGameState: FinishLoading...");
+				_logging.ClientWriteLine("MultiplayerGameState: FinishLoading...");
 				_client.FinishLoading();
 				_initialized = true;
 				_statusText = "";
@@ -652,11 +652,11 @@ namespace Voxelgine.States
 
 				Raylib.DisableCursor();
 
-				_logging.WriteLine("MultiplayerGameState: World loaded, entering gameplay");
+				_logging.ClientWriteLine("MultiplayerGameState: World loaded, entering gameplay");
 			}
 			catch (Exception ex)
 			{
-				_logging.WriteLine($"MultiplayerGameState: Failed to load world: {ex}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Failed to load world: {ex}");
 				_statusText = "";
 				_errorText = $"Failed to load world: {ex.Message}";
 			}
@@ -664,7 +664,7 @@ namespace Voxelgine.States
 
 		private void OnWorldTransferFailed(string error)
 		{
-			_logging.WriteLine($"MultiplayerGameState: World transfer failed: {error}");
+			_logging.ClientWriteLine($"MultiplayerGameState: World transfer failed: {error}");
 			_statusText = "";
 			_errorText = $"World transfer failed: {error}";
 		}
@@ -789,7 +789,7 @@ namespace Voxelgine.States
 				return;
 			}
 
-			_logging.WriteLine($"MultiplayerGameState: Player joined: {joined.PlayerName} (ID {joined.PlayerId})");
+			_logging.ClientWriteLine($"MultiplayerGameState: Player joined: {joined.PlayerName} (ID {joined.PlayerId})");
 
 			var remote = new RemotePlayer(joined.PlayerId, joined.PlayerName, Eng);
 			remote.SetPosition(joined.Position);
@@ -801,7 +801,7 @@ namespace Voxelgine.States
 			if (_simulation == null)
 				return;
 
-			_logging.WriteLine($"MultiplayerGameState: Player left (ID {left.PlayerId})");
+			_logging.ClientWriteLine($"MultiplayerGameState: Player left (ID {left.PlayerId})");
 			_simulation.Players.RemoveRemotePlayer(left.PlayerId);
 		}
 
@@ -832,7 +832,7 @@ namespace Voxelgine.States
 			VoxEntity entity = CreateEntityByType(packet.EntityType);
 			if (entity == null)
 			{
-				_logging.WriteLine($"MultiplayerGameState: Unknown entity type '{packet.EntityType}'");
+				_logging.ClientWriteLine($"MultiplayerGameState: Unknown entity type '{packet.EntityType}'");
 				return;
 			}
 
@@ -847,7 +847,7 @@ namespace Voxelgine.States
 			}
 
 			_simulation.Entities.SpawnWithNetworkId(_simulation, entity, packet.NetworkId);
-			_logging.WriteLine($"MultiplayerGameState: Entity spawned: {packet.EntityType} (netId={packet.NetworkId})");
+			_logging.ClientWriteLine($"MultiplayerGameState: Entity spawned: {packet.EntityType} (netId={packet.NetworkId})");
 		}
 
 		/// <summary>
@@ -866,7 +866,7 @@ namespace Voxelgine.States
 			_entitySnapshots.Remove(packet.NetworkId);
 
 			if (removed != null)
-				_logging.WriteLine($"MultiplayerGameState: Entity removed (netId={packet.NetworkId})");
+				_logging.ClientWriteLine($"MultiplayerGameState: Entity removed (netId={packet.NetworkId})");
 		}
 
 		/// <summary>
@@ -1174,7 +1174,7 @@ namespace Voxelgine.States
 			if (packet.TargetPlayerId == _client.PlayerId)
 			{
 				// Local player took damage — health is synced via WorldSnapshot
-				_logging.WriteLine($"MultiplayerGameState: Took {packet.DamageAmount} damage from player [{packet.SourcePlayerId}]. Health: {_simulation.LocalPlayer.Health}");
+				_logging.ClientWriteLine($"MultiplayerGameState: Took {packet.DamageAmount} damage from player [{packet.SourcePlayerId}]. Health: {_simulation.LocalPlayer.Health}");
 			}
 		}
 

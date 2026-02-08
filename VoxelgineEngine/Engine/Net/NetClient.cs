@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -56,6 +57,7 @@ namespace Voxelgine.Engine
 		private readonly UdpTransport _transport;
 		private readonly ConcurrentQueue<byte[]> _receiveQueue = new();
 		private readonly WorldReceiver _worldReceiver = new();
+		private readonly IFishLogging _logging;
 
 		private NetConnection _connection;
 		private IPEndPoint _serverEndPoint;
@@ -154,9 +156,10 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public BandwidthTracker Bandwidth => _connection?.Bandwidth;
 
-		public NetClient()
+		public NetClient(IFishLogging logging = null)
 		{
 			_transport = new UdpTransport();
+			_logging = logging;
 			_worldReceiver.OnWorldDataReady += HandleWorldDataReady;
 			_worldReceiver.OnTransferFailed += HandleWorldTransferFailed;
 		}
@@ -188,6 +191,8 @@ namespace Voxelgine.Engine
 
 			State = ClientState.Connecting;
 
+			_logging?.ClientNetworkWriteLine($"Connecting to {host}:{port} as \"{playerName}\"...");
+
 			var connectPacket = new ConnectPacket
 			{
 				PlayerName = playerName,
@@ -205,6 +210,8 @@ namespace Voxelgine.Engine
 		{
 			if (State == ClientState.Disconnected)
 				return;
+
+			_logging?.ClientNetworkWriteLine($"Disconnecting: {reason}");
 
 			if (_connection != null && _connection.State != ConnectionState.Disconnected)
 			{
@@ -267,6 +274,8 @@ namespace Voxelgine.Engine
 				string reason = State == ClientState.Connecting
 					? "Connection attempt timed out"
 					: "Connection to server timed out";
+
+				_logging?.ClientNetworkWriteLine(reason);
 
 				_connection.Disconnect();
 				Cleanup();
@@ -340,6 +349,7 @@ namespace Voxelgine.Engine
 					break;
 
 				case DisconnectPacket disconnect:
+					_logging?.ClientNetworkWriteLine($"Server disconnected: {disconnect.Reason}");
 					_connection.Disconnect();
 					Cleanup();
 					OnDisconnected?.Invoke(disconnect.Reason);
@@ -380,11 +390,15 @@ namespace Voxelgine.Engine
 			LocalTick = accept.ServerTick;
 			State = ClientState.Loading;
 
+			_logging?.ClientNetworkWriteLine($"Connected as player [{accept.PlayerId}], server tick {accept.ServerTick}");
+
 			OnConnected?.Invoke(accept);
 		}
 
 		private void HandleConnectReject(ConnectRejectPacket reject)
 		{
+			_logging?.ClientNetworkWriteLine($"Connection rejected: {reject.Reason}");
+
 			_connection.Disconnect();
 			Cleanup();
 			OnConnectionRejected?.Invoke(reject.Reason);

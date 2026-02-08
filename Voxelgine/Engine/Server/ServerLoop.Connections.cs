@@ -9,7 +9,7 @@ namespace Voxelgine.Engine.Server
 			int playerId = connection.PlayerId;
 			string playerName = connection.PlayerName;
 
-			_logging.WriteLine($"Player connected: [{playerId}] \"{playerName}\" from {connection.RemoteEndPoint}");
+			_logging.ServerWriteLine($"Player connected: [{playerId}] \"{playerName}\" from {connection.RemoteEndPoint}");
 
 			// Create server-side player instance (no GUI, sound, or rendering)
 			Player player = new Player(_eng, playerId);
@@ -23,7 +23,7 @@ namespace Voxelgine.Engine.Server
 				player.SetPosition(savedPos);
 				player.Health = savedHealth;
 				player.SetVelocity(savedVel);
-				_logging.WriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data (pos={savedPos}, health={savedHealth}).");
+				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data (pos={savedPos}, health={savedHealth}).");
 			}
 			else
 			{
@@ -79,7 +79,7 @@ namespace Voxelgine.Engine.Server
 			byte[] worldData = SerializeWorld();
 			_worldTransfer.BeginTransfer(playerId, worldData);
 			int totalFragments = (worldData.Length + WorldTransferManager.FragmentSize - 1) / WorldTransferManager.FragmentSize;
-			_logging.WriteLine($"Player [{playerId}] \"{playerName}\" spawned at {player.Position}. Streaming world ({worldData.Length:N0} bytes, {totalFragments} fragments). Players online: {_simulation.Players.Count}");
+			_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" spawned at {player.Position}. Streaming world ({worldData.Length:N0} bytes, {totalFragments} fragments). Players online: {_simulation.Players.Count}");
 		}
 
 		private void OnClientDisconnected(NetConnection connection, string reason)
@@ -87,7 +87,7 @@ namespace Voxelgine.Engine.Server
 			int playerId = connection.PlayerId;
 			string playerName = connection.PlayerName;
 
-			_logging.WriteLine($"Player disconnected: [{playerId}] \"{playerName}\" - {reason}");
+			_logging.ServerWriteLine($"Player disconnected: [{playerId}] \"{playerName}\" - {reason}");
 
 			// Cancel any in-progress world transfer
 			_worldTransfer.CancelTransfer(playerId);
@@ -98,7 +98,7 @@ namespace Voxelgine.Engine.Server
 			{
 				_playerInventories.TryGetValue(playerId, out var inventory);
 				_playerData.Save(playerName, player.Position, player.Health, player.GetVelocity(), inventory);
-				_logging.WriteLine($"Player [{playerId}] \"{playerName}\" state saved.");
+				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" state saved.");
 			}
 
 			// Clean up per-player input pipeline
@@ -120,13 +120,13 @@ namespace Voxelgine.Engine.Server
 			};
 			_server.Broadcast(leftPacket, true, CurrentTime);
 
-			_logging.WriteLine($"Player [{playerId}] \"{playerName}\" removed. Players online: {_simulation.Players.Count}");
+			_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" removed. Players online: {_simulation.Players.Count}");
 		}
 
 		private void OnWorldTransferComplete(int playerId)
 		{
 			string playerName = GetPlayerName(playerId);
-			_logging.WriteLine($"World transfer complete for player [{playerId}] \"{playerName}\".");
+			_logging.ServerWriteLine($"World transfer complete for player [{playerId}] \"{playerName}\".");
 		}
 	}
 }

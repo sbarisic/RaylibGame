@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -43,6 +44,7 @@ namespace Voxelgine.Engine
 		private readonly Dictionary<int, NetConnection> _playerConnections = new();
 		private readonly ConcurrentQueue<(byte[] Data, IPEndPoint Sender)> _receiveQueue = new();
 		private readonly HashSet<int> _usedPlayerIds = new();
+		private readonly IFishLogging _logging;
 
 		private int _port;
 		private bool _running;
@@ -96,9 +98,10 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public int WorldSeed { get; set; }
 
-		public NetServer()
+		public NetServer(IFishLogging logging = null)
 		{
 			_transport = new UdpTransport();
+			_logging = logging;
 		}
 
 		/// <summary>
@@ -114,6 +117,7 @@ namespace Voxelgine.Engine
 			_transport.OnDataReceived += QueueReceivedData;
 			_transport.Bind(port);
 			_running = true;
+			_logging?.ServerNetworkWriteLine($"Server started on port {port}");
 		}
 
 		/// <summary>
@@ -125,6 +129,7 @@ namespace Voxelgine.Engine
 			if (!_running)
 				return;
 
+			_logging?.ServerNetworkWriteLine("Server stopping...");
 			_running = false;
 
 			foreach (var connection in _connections.Values.ToArray())
@@ -164,6 +169,7 @@ namespace Voxelgine.Engine
 
 				if (connection.HasTimedOut(currentTime))
 				{
+					_logging?.ServerNetworkWriteLine($"Client [{connection.PlayerId}] \"{connection.PlayerName}\" timed out");
 					DisconnectClient(connection, "Connection timed out", currentTime);
 					continue;
 				}
@@ -319,6 +325,7 @@ namespace Voxelgine.Engine
 
 			if (connect.ProtocolVersion != ProtocolVersion)
 			{
+				_logging?.ServerNetworkWriteLine($"Rejected connection from {sender}: protocol version mismatch (server: {ProtocolVersion}, client: {connect.ProtocolVersion})");
 				var reject = new ConnectRejectPacket
 				{
 					Reason = $"Protocol version mismatch (server: {ProtocolVersion}, client: {connect.ProtocolVersion})"
@@ -330,6 +337,7 @@ namespace Voxelgine.Engine
 
 			if (_connections.Count >= MaxPlayers)
 			{
+				_logging?.ServerNetworkWriteLine($"Rejected connection from {sender}: server is full ({_connections.Count}/{MaxPlayers})");
 				var reject = new ConnectRejectPacket
 				{
 					Reason = "Server is full"
@@ -358,6 +366,8 @@ namespace Voxelgine.Engine
 			_connections[sender] = tempConnection;
 			_playerConnections[playerId] = tempConnection;
 			_usedPlayerIds.Add(playerId);
+
+			_logging?.ServerNetworkWriteLine($"Accepted connection from {sender}: [{playerId}] \"{connect.PlayerName}\"");
 
 			var accept = new ConnectAcceptPacket
 				{
@@ -397,6 +407,8 @@ namespace Voxelgine.Engine
 		{
 			if (connection.State == ConnectionState.Disconnected)
 				return;
+
+			_logging?.ServerNetworkWriteLine($"Disconnecting [{connection.PlayerId}] \"{connection.PlayerName}\": {reason}");
 
 			var disconnectPacket = new DisconnectPacket { Reason = reason };
 			SendDirect(connection, disconnectPacket, true, currentTime);

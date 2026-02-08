@@ -30,7 +30,7 @@ namespace Voxelgine.Engine.Server
 				}
 				catch (Exception ex)
 				{
-					_logging.WriteLine($"[CMD] Error executing '{command}': {ex.Message}");
+					_logging.ServerWriteLine($"[CMD] Error executing '{command}': {ex.Message}");
 				}
 			}
 		}
@@ -82,7 +82,7 @@ namespace Voxelgine.Engine.Server
 					break;
 
 				default:
-					_logging.WriteLine($"[CMD] Unknown command: {cmd}. Type 'help' for a list of commands.");
+					_logging.ServerWriteLine($"[CMD] Unknown command: {cmd}. Type 'help' for a list of commands.");
 					break;
 			}
 		}
@@ -91,18 +91,18 @@ namespace Voxelgine.Engine.Server
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.WriteLine("[CMD] Usage: kick <player name or id>");
+				_logging.ServerWriteLine("[CMD] Usage: kick <player name or id>");
 				return;
 			}
 
 			var conn = FindConnectionByNameOrId(args);
 			if (conn == null)
 			{
-				_logging.WriteLine($"[CMD] Player not found: {args}");
+				_logging.ServerWriteLine($"[CMD] Player not found: {args}");
 				return;
 			}
 
-			_logging.WriteLine($"[CMD] Kicking player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
+			_logging.ServerWriteLine($"[CMD] Kicking player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
 			_server.Kick(conn.PlayerId, "Kicked by server", CurrentTime);
 		}
 
@@ -110,20 +110,20 @@ namespace Voxelgine.Engine.Server
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.WriteLine("[CMD] Usage: ban <player name or id>");
+				_logging.ServerWriteLine("[CMD] Usage: ban <player name or id>");
 				return;
 			}
 
 			var conn = FindConnectionByNameOrId(args);
 			if (conn == null)
 			{
-				_logging.WriteLine($"[CMD] Player not found: {args}");
+				_logging.ServerWriteLine($"[CMD] Player not found: {args}");
 				return;
 			}
 
 			// Ban is implemented as kick with a ban message.
 			// A full ban list (persisted IP/name bans) would require additional infrastructure.
-			_logging.WriteLine($"[CMD] Banning player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
+			_logging.ServerWriteLine($"[CMD] Banning player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
 			_server.Kick(conn.PlayerId, "Banned by server", CurrentTime);
 		}
 
@@ -131,11 +131,11 @@ namespace Voxelgine.Engine.Server
 		{
 			if (string.IsNullOrEmpty(message))
 			{
-				_logging.WriteLine("[CMD] Usage: say <message>");
+				_logging.ServerWriteLine("[CMD] Usage: say <message>");
 				return;
 			}
 
-			_logging.WriteLine($"[Server] {message}");
+			_logging.ServerWriteLine($"[Server] {message}");
 
 			var chatPacket = new ChatMessagePacket
 			{
@@ -149,18 +149,18 @@ namespace Voxelgine.Engine.Server
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.WriteLine($"[CMD] Current time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+				_logging.ServerWriteLine($"[CMD] Current time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
 				return;
 			}
 
 			if (!float.TryParse(args, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float hours) || hours < 0 || hours >= 24)
 			{
-				_logging.WriteLine("[CMD] Usage: time <hours> (0-24, e.g., 12.5 for 12:30)");
+				_logging.ServerWriteLine("[CMD] Usage: time <hours> (0-24, e.g., 12.5 for 12:30)");
 				return;
 			}
 
 			_simulation.DayNight.SetTime(hours);
-			_logging.WriteLine($"[CMD] Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+			_logging.ServerWriteLine($"[CMD] Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
 
 			// Broadcast updated time to all clients immediately
 			_server.Broadcast(new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
@@ -168,24 +168,24 @@ namespace Voxelgine.Engine.Server
 
 		private void CmdSave()
 		{
-			_logging.WriteLine("[CMD] Saving world...");
+			_logging.ServerWriteLine("[CMD] Saving world...");
 			SaveWorld();
 		}
 
 		private void CmdQuit()
 		{
-			_logging.WriteLine("[CMD] Server shutting down...");
+			_logging.ServerWriteLine("[CMD] Server shutting down...");
 			Stop();
 		}
 
 		private void CmdStatus()
 		{
-			_logging.WriteLine($"[CMD] Server status:");
-			_logging.WriteLine($"  Players: {_simulation.Players.Count}/{NetServer.MaxPlayers}");
-			_logging.WriteLine($"  Tick: {_server.ServerTick}");
-			_logging.WriteLine($"  Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
-			_logging.WriteLine($"  Entities: {_simulation.Entities.GetEntityCount()}");
-			_logging.WriteLine($"  Uptime: {CurrentTime:F0}s");
+			_logging.ServerWriteLine($"[CMD] Server status:");
+			_logging.ServerWriteLine($"  Players: {_simulation.Players.Count}/{NetServer.MaxPlayers}");
+			_logging.ServerWriteLine($"  Tick: {_server.ServerTick}");
+			_logging.ServerWriteLine($"  Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+			_logging.ServerWriteLine($"  Entities: {_simulation.Entities.GetEntityCount()}");
+			_logging.ServerWriteLine($"  Uptime: {CurrentTime:F0}s");
 		}
 
 		private void CmdPlayers()
@@ -193,33 +193,33 @@ namespace Voxelgine.Engine.Server
 			var players = _simulation.Players.GetAllPlayers().ToArray();
 			if (players.Length == 0)
 			{
-				_logging.WriteLine("[CMD] No players connected.");
+				_logging.ServerWriteLine("[CMD] No players connected.");
 				return;
 			}
 
-			_logging.WriteLine($"[CMD] Connected players ({players.Length}/{NetServer.MaxPlayers}):");
+			_logging.ServerWriteLine($"[CMD] Connected players ({players.Length}/{NetServer.MaxPlayers}):");
 			foreach (var player in players)
 			{
 				var conn = _server.GetConnection(player.PlayerId);
 				string name = conn?.PlayerName ?? "Unknown";
 				int ping = conn?.RoundTripTimeMs ?? 0;
 				string status = player.IsDead ? " [DEAD]" : "";
-				_logging.WriteLine($"  [{player.PlayerId}] \"{name}\" - Pos: ({player.Position.X:F1}, {player.Position.Y:F1}, {player.Position.Z:F1}) - HP: {player.Health:F0} - Ping: {ping}ms{status}");
+				_logging.ServerWriteLine($"  [{player.PlayerId}] \"{name}\" - Pos: ({player.Position.X:F1}, {player.Position.Y:F1}, {player.Position.Z:F1}) - HP: {player.Health:F0} - Ping: {ping}ms{status}");
 			}
 		}
 
 		private void CmdHelp()
 		{
-			_logging.WriteLine("[CMD] Available commands:");
-			_logging.WriteLine("  kick <player>  - Kick a player by name or ID");
-			_logging.WriteLine("  ban <player>   - Ban a player by name or ID");
-			_logging.WriteLine("  say <message>  - Broadcast a server message to all players");
-			_logging.WriteLine("  time [hours]   - Show or set time of day (0-24)");
-			_logging.WriteLine("  save           - Save the world to disk");
-			_logging.WriteLine("  quit / stop    - Save and shut down the server");
-			_logging.WriteLine("  status         - Show server status");
-			_logging.WriteLine("  players        - List connected players");
-			_logging.WriteLine("  help           - Show this help message");
+			_logging.ServerWriteLine("[CMD] Available commands:");
+			_logging.ServerWriteLine("  kick <player>  - Kick a player by name or ID");
+			_logging.ServerWriteLine("  ban <player>   - Ban a player by name or ID");
+			_logging.ServerWriteLine("  say <message>  - Broadcast a server message to all players");
+			_logging.ServerWriteLine("  time [hours]   - Show or set time of day (0-24)");
+			_logging.ServerWriteLine("  save           - Save the world to disk");
+			_logging.ServerWriteLine("  quit / stop    - Save and shut down the server");
+			_logging.ServerWriteLine("  status         - Show server status");
+			_logging.ServerWriteLine("  players        - List connected players");
+			_logging.ServerWriteLine("  help           - Show this help message");
 		}
 
 		/// <summary>

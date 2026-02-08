@@ -205,7 +205,6 @@ Game Tick Flow (Client):
 
 ### High Priority
 
-- [ ] **Categorized logging** — Replace `_logging.WriteLine(...)` with `ServerWriteLine`/`ClientWriteLine`/`ServerNetworkWriteLine`/`ClientNetworkWriteLine` throughout server (`ServerLoop.*`) and client (`MultiplayerGameState`) classes for better log visibility and separation. Add `IFishLogging` dependency to `NetServer`/`NetClient` and use the network-specific methods there. Consider making `WriteLine` non-public to enforce categorized usage. **[CPX: 2]** **HIGHEST PRIORITY**
 - [ ] **Network packet logger** — Debug option to log all sent/received packets with timestamps, types, sizes, and source/destination. Output to `IFishLogging` using `ServerNetworkWriteLine`/`ClientNetworkWriteLine`. Toggle via debug menu. **[CPX: 1]** **HIGHEST PRIORITY**
 
 ### Medium Priority

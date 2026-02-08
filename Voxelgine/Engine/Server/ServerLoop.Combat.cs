@@ -118,7 +118,7 @@ namespace Voxelgine.Engine.Server
 
 					if (hitPlayer.IsDead)
 						{
-							_logging.WriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
+							_logging.ServerWriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
 							_respawnTimers[hitPlayerId] = CurrentTime;
 
 							// Broadcast kill feed event to all clients
@@ -209,7 +209,7 @@ namespace Voxelgine.Engine.Server
 				{
 					player.TakeDamage(player.MaxHealth);
 					_respawnTimers[player.PlayerId] = CurrentTime;
-					_logging.WriteLine($"Player [{player.PlayerId}] \"{GetPlayerName(player.PlayerId)}\" fell out of the world and died.");
+					_logging.ServerWriteLine($"Player [{player.PlayerId}] \"{GetPlayerName(player.PlayerId)}\" fell out of the world and died.");
 				}
 			}
 		}
@@ -248,7 +248,7 @@ namespace Voxelgine.Engine.Server
 					player.SetPosition(PlayerSpawnPosition);
 					player.SetVelocity(Vector3.Zero);
 
-				_logging.WriteLine($"Player [{playerId}] \"{GetPlayerName(playerId)}\" respawned.");
+				_logging.ServerWriteLine($"Player [{playerId}] \"{GetPlayerName(playerId)}\" respawned.");
 			}
 		}
 	}

@@ -25,7 +25,7 @@ namespace Voxelgine.Engine.Server
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
 
-			_logging.WriteLine($"Spawned {_simulation.Entities.GetEntityCount()} entities.");
+			_logging.ServerWriteLine($"Spawned {_simulation.Entities.GetEntityCount()} entities.");
 		}
 
 		/// <summary>

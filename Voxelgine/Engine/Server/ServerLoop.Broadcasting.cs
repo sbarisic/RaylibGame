@@ -24,6 +24,7 @@ namespace Voxelgine.Engine.Server
 			{
 				Player p = allPlayers[i];
 				Vector3 camAngle = p.GetCamAngle();
+				_lastInputTicks.TryGetValue(p.PlayerId, out int lastInputTick);
 				snapshot.Players[i] = new WorldSnapshotPacket.PlayerEntry
 				{
 					PlayerId = p.PlayerId,
@@ -32,6 +33,7 @@ namespace Voxelgine.Engine.Server
 					CameraAngle = new Vector2(camAngle.X, camAngle.Y),
 					Health = p.Health,
 					AnimationState = GetPlayerAnimationState(p),
+					LastInputTick = lastInputTick,
 				};
 			}
 

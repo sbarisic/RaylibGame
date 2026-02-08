@@ -98,6 +98,10 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 
 - **Categorized logging** — Replaced all `_logging.WriteLine()` with `ServerWriteLine`/`ClientWriteLine` in `ServerLoop.*` and `MultiplayerGameState`. Added optional `IFishLogging` to `NetServer`/`NetClient` with `ServerNetworkWriteLine`/`ClientNetworkWriteLine` for key network events (connect, disconnect, reject, timeout).
 - **Network packet logger** — `PacketLoggingEnabled` toggle on `NetServer` and `NetClient`. Logs all sent/received packets with type, size, and endpoint via `ServerNetworkWriteLine`/`ClientNetworkWriteLine`.
+
+## Bug Fixes
+
+- **Prediction tick desync causing sluggish movement at high ping** — `LocalTick` was initialized from `ServerTick` at connection time but froze during world loading while the server kept ticking, causing a permanent offset. `ProcessServerSnapshot` used the server's tick to look up client predictions, but the prediction buffer was indexed by `LocalTick` — tick numbers never matched, triggering reconciliation every tick with zero inputs replayed (snapping the player back to the server position ~RTT/2 behind). Fix: server now tracks each player's last-received `InputStatePacket.TickNumber` in `_lastInputTicks` and includes it per-player in `WorldSnapshotPacket.PlayerEntry.LastInputTick`. Client uses this for prediction comparison and reconciliation replay range, making tick counters independent.
 - **Network simulation** — `NetworkSimulation` class in `VoxelgineEngine` with configurable latency (0–500ms), packet loss (0–100%), and jitter (0–200ms). Integrated into `NetClient.Tick()` receive pipeline. Debug menu (F1) has enable checkbox + three sliders with live labels. Disabled by default; packets pass through immediately when off.
 
 ## Resolved Bugs

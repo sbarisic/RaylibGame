@@ -120,7 +120,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Make ponds larger and more irregular shape, also make sure they are surrounded by stone/air/sand blocks on all sides, so they don't spill over
+- Any way to optimize GenMesh and GenMeshTransparent methods? Maybe increase chunk size to 24x24?
 
 ---
 

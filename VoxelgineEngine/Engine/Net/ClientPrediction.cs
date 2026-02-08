@@ -110,41 +110,45 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Processes a server-authoritative snapshot for the local player.
-		/// Compares the server state with the predicted state at the snapshot's tick.
+		/// Compares the server state with the predicted state at the last-processed input tick.
 		/// Checks both position and velocity to catch divergent predictions early.
 		/// </summary>
 		/// <remarks>
 		/// If this method returns true, the caller must:
 		/// <list type="number">
 		/// <item>Snap the player to <paramref name="serverPosition"/> and <paramref name="serverVelocity"/>.</item>
-		/// <item>Retrieve buffered inputs via <c>ClientInputBuffer.GetInputsInRange(serverTick, currentTick)</c>.</item>
+		/// <item>Retrieve buffered inputs via <c>ClientInputBuffer.GetInputsInRange(lastInputTick, currentTick)</c>.</item>
 		/// <item>For each buffered input: set the camera angle, update direction vectors,
 		/// feed the input into an <see cref="InputMgr"/> via <see cref="NetworkInputSource"/>,
 		/// call <c>Player.UpdatePhysics()</c>, and call <see cref="RecordPrediction"/> with the result.</item>
 		/// </list>
 		/// </remarks>
-		/// <param name="serverTick">The server tick number from the snapshot.</param>
+		/// <param name="lastInputTick">The client tick of the last input the server processed.</param>
 		/// <param name="serverPosition">The server's authoritative position.</param>
 		/// <param name="serverVelocity">The server's authoritative velocity.</param>
 		/// <returns>True if the prediction was wrong and reconciliation is needed.</returns>
 		public bool ProcessServerSnapshot(
-			int serverTick,
+			int lastInputTick,
 			Vector3 serverPosition,
 			Vector3 serverVelocity)
 		{
 			LastCorrectionDistance = 0f;
 
-			// Ignore old or duplicate snapshots
-			if (serverTick <= LastServerTick)
+			// No input processed yet — server hasn't received any InputStatePackets
+			if (lastInputTick <= 0)
 				return false;
 
-			LastServerTick = serverTick;
+			// Ignore old or duplicate snapshots
+			if (lastInputTick <= LastServerTick)
+				return false;
+
+			LastServerTick = lastInputTick;
 
 			// Look up the predicted state at this tick
-			int index = serverTick % BufferSize;
+			int index = lastInputTick % BufferSize;
 			if (index < 0) index += BufferSize;
 
-			if (_stateBuffer[index].TickNumber != serverTick)
+			if (_stateBuffer[index].TickNumber != lastInputTick)
 			{
 				// No prediction stored for this tick (too old, overwritten).
 				// Accept server state unconditionally.

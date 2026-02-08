@@ -81,6 +81,13 @@ namespace Voxelgine.Engine.Server
 		private readonly Dictionary<int, InputMgr> _playerInputMgrs = new();
 		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
 		private readonly Dictionary<int, ServerInventory> _playerInventories = new();
+
+		/// <summary>
+		/// Tracks the tick number of the last <see cref="InputStatePacket"/> received
+		/// from each player. Included in <see cref="WorldSnapshotPacket"/> so clients
+		/// can match predictions to the correct tick during reconciliation.
+		/// </summary>
+		private readonly Dictionary<int, int> _lastInputTicks = new();
 		private readonly PlayerDataStore _playerData = new();
 
 		private float _lastTimeSyncTime;

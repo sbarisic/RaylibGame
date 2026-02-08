@@ -851,9 +851,14 @@ namespace Voxelgine.States
 					// Sync health from server
 					_simulation.LocalPlayer.Health = entry.Health;
 
-					// Local player — reconciliation
+					// Skip prediction reconciliation until the server has processed
+					// at least one of our InputStatePackets
+					if (entry.LastInputTick <= 0)
+						continue;
+
+					// Local player — reconciliation using server's last-processed input tick
 					bool needsCorrection = _prediction.ProcessServerSnapshot(
-						snapshot.TickNumber,
+						entry.LastInputTick,
 						entry.Position,
 						entry.Velocity
 					);
@@ -867,7 +872,7 @@ namespace Voxelgine.States
 							_simulation.LocalPlayer,
 							entry.Position,
 							entry.Velocity,
-							snapshot.TickNumber,
+							entry.LastInputTick,
 							_client.LocalTick,
 							_inputBuffer,
 							_prediction,

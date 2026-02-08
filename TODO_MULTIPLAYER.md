@@ -245,7 +245,6 @@ Game Tick Flow (Client):
 ### Uncategorized
 
 *No uncategorized items*
-- Any way to optimize GenMesh and GenMeshTransparent methods? Maybe increase chunk size to 24x24?
 
 ---
 

@@ -27,13 +27,13 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Snaps the player to the server-authoritative state and replays all buffered
-		/// inputs from <paramref name="serverTick"/> to <paramref name="currentTick"/>
+		/// inputs from <paramref name="lastInputTick"/> to <paramref name="currentTick"/>
 		/// using the same Quake-style physics as the server.
 		/// </summary>
 		/// <param name="player">The local player to reconcile.</param>
 		/// <param name="serverPosition">The server's authoritative position.</param>
 		/// <param name="serverVelocity">The server's authoritative velocity.</param>
-		/// <param name="serverTick">The tick of the server snapshot.</param>
+		/// <param name="lastInputTick">The client tick of the last input the server processed.</param>
 		/// <param name="currentTick">The current client tick (inclusive).</param>
 		/// <param name="inputBuffer">The client input buffer containing inputs for replay.</param>
 		/// <param name="prediction">The prediction system to update with replayed states.</param>
@@ -44,7 +44,7 @@ namespace Voxelgine.Engine
 			Player player,
 			Vector3 serverPosition,
 			Vector3 serverVelocity,
-			int serverTick,
+			int lastInputTick,
 			int currentTick,
 			ClientInputBuffer inputBuffer,
 			ClientPrediction prediction,
@@ -56,8 +56,8 @@ namespace Voxelgine.Engine
 			player.SetPosition(serverPosition);
 			player.SetVelocity(serverVelocity);
 
-			// Get all inputs that need to be replayed (after server tick, up to current)
-			List<BufferedInput> inputs = inputBuffer.GetInputsInRange(serverTick, currentTick);
+			// Get all inputs that need to be replayed (after last-processed input tick, up to current)
+			List<BufferedInput> inputs = inputBuffer.GetInputsInRange(lastInputTick, currentTick);
 
 			foreach (var input in inputs)
 			{

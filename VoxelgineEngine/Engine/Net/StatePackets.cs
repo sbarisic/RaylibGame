@@ -119,6 +119,14 @@ namespace Voxelgine.Engine
 			public Vector2 CameraAngle;
 			public float Health;
 			public byte AnimationState;
+
+			/// <summary>
+			/// The tick number of the last <see cref="InputStatePacket"/> the server
+			/// processed for this player. Clients use this (not the server tick) to
+			/// look up predicted state and determine the replay range during
+			/// reconciliation. 0 if no input has been received yet.
+			/// </summary>
+			public int LastInputTick;
 		}
 
 		public PlayerEntry[] Players { get; set; } = Array.Empty<PlayerEntry>();
@@ -136,6 +144,7 @@ namespace Voxelgine.Engine
 				writer.WriteVector2(Players[i].CameraAngle);
 				writer.Write(Players[i].Health);
 				writer.Write(Players[i].AnimationState);
+				writer.Write(Players[i].LastInputTick);
 			}
 		}
 
@@ -153,6 +162,7 @@ namespace Voxelgine.Engine
 				Players[i].CameraAngle = reader.ReadVector2();
 				Players[i].Health = reader.ReadSingle();
 				Players[i].AnimationState = reader.ReadByte();
+				Players[i].LastInputTick = reader.ReadInt32();
 			}
 		}
 	}

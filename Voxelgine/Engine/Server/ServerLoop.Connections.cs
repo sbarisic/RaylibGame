@@ -105,10 +105,11 @@ namespace Voxelgine.Engine.Server
 			_playerInputMgrs.Remove(playerId);
 			_playerInputSources.Remove(playerId);
 
-			// Clean up respawn timer, attack timer, and inventory
+			// Clean up respawn timer, attack timer, inventory, and input tick tracking
 			_respawnTimers.Remove(playerId);
 			_playerAttackEndTimes.Remove(playerId);
 			_playerInventories.Remove(playerId);
+			_lastInputTicks.Remove(playerId);
 
 			// Remove from simulation
 			_simulation.Players.RemovePlayer(playerId);

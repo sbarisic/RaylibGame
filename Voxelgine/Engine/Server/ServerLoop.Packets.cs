@@ -55,6 +55,9 @@ namespace Voxelgine.Engine.Server
 			// Feed the input into the player's NetworkInputSource
 			inputSource.SetState(state);
 
+			// Track the most recent client tick for prediction reconciliation
+			_lastInputTicks[playerId] = inputPacket.TickNumber;
+
 			// Set the camera angle from the packet (Vector2 yaw/pitch → Vector3 with Z=0)
 			player.SetCamAngle(new Vector3(inputPacket.CameraAngle.X, inputPacket.CameraAngle.Y, 0));
 		}

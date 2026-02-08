@@ -238,7 +238,8 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*Empty — all items categorized*
+- Added new weapon models in json format, they have gun_body/grip and gun_body/projectile parts, grip is used for hand attachment, projectile is where the shooting effects come from, where the projectile spawns
+- Gun Y+ axis is top, Z- axis is forward (away from user and gun), X+ axis is right
 
 ---
 

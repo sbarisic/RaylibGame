@@ -71,24 +71,39 @@ namespace Voxelgine.Engine.Server
 			int playerId = connection.PlayerId;
 			Player player = _simulation.Players.GetPlayer(playerId);
 			if (player == null)
+			{
+				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: player not found in simulation");
 				return;
+			}
 
 			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
 			float distance = Vector3.Distance(player.Position, blockCenter);
 			if (distance > MaxBlockReach)
+			{
+				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: distance {distance:F1} > {MaxBlockReach} (player={player.Position}, block={blockCenter})");
 				return;
+			}
 
 			// Validate inventory: find the slot for this block type and check count
 			BlockType blockType = (BlockType)packet.BlockType;
 			int slot = ServerInventory.FindSlotByBlockType(blockType);
 			if (slot < 0)
+			{
+				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory slot for BlockType {blockType} (raw byte: 0x{packet.BlockType:X2})");
 				return;
+			}
 
 			if (!_playerInventories.TryGetValue(playerId, out var inventory))
+			{
+				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory entry for player");
 				return;
+			}
 
 			if (!inventory.TryDecrement(slot))
-				return; // No items left
+			{
+				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: slot {slot} ({blockType}) has no items left (count={inventory.GetCount(slot)})");
+				return;
+			}
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
 

@@ -164,7 +164,7 @@
 	],
 	"groups": [
 		{
-			"name": "gunp3",
+			"name": "gun_body",
 			"origin": [7, 7, 1],
 			"color": 0,
 			"children": [

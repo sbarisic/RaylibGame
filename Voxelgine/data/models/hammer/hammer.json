@@ -1,0 +1,75 @@
+{
+	"format_version": "1.21.11",
+	"credit": "Made with Blockbench",
+	"texture_size": [32, 32],
+	"textures": {
+		"0": "hammer_tex",
+		"particle": "hammer_tex"
+	},
+	"elements": [
+		{
+			"name": "gunbody1",
+			"from": [7, 12, 7],
+			"to": [9, 14, 9],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 14, 7]},
+			"faces": {
+				"north": {"uv": [4, 5, 5, 5.5], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [6, 1, 5, 2], "rotation": 180, "texture": "#0"},
+				"south": {"uv": [5, 3, 6, 3.5], "rotation": 270, "texture": "#0"},
+				"west": {"uv": [2, 6, 1, 5], "texture": "#0"},
+				"up": {"uv": [5, 2.5, 6, 3], "rotation": 270, "texture": "#0"},
+				"down": {"uv": [5, 3.5, 6, 4], "rotation": 270, "texture": "#0"}
+			}
+		},
+		{
+			"name": "projectile",
+			"from": [6, 8, 4],
+			"to": [10, 12, 12],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7, 12, 4]},
+			"faces": {
+				"north": {"uv": [5, 2, 7, 2.5], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [4, 2, 0, 4], "rotation": 180, "texture": "#0"},
+				"south": {"uv": [2, 5, 4, 5.5], "rotation": 270, "texture": "#0"},
+				"west": {"uv": [4, 2, 0, 0], "texture": "#0"},
+				"up": {"uv": [1, 4, 5, 4.5], "rotation": 270, "texture": "#0"},
+				"down": {"uv": [1, 4.5, 5, 5], "rotation": 270, "texture": "#0"}
+			}
+		},
+		{
+			"name": "grip",
+			"from": [7, 0, 7],
+			"to": [9, 8, 9],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 8, 7]},
+			"faces": {
+				"north": {"uv": [5, 0.5, 9, 1], "rotation": 90, "texture": "#0"},
+				"east": {"uv": [5, 0, 4, 4], "rotation": 180, "texture": "#0"},
+				"south": {"uv": [5, 0, 9, 0.5], "rotation": 270, "texture": "#0"},
+				"west": {"uv": [1, 8, 0, 4], "texture": "#0"},
+				"up": {"uv": [5, 4, 6, 4.5], "rotation": 270, "texture": "#0"},
+				"down": {"uv": [5, 4.5, 6, 5], "rotation": 270, "texture": "#0"}
+			}
+		}
+	],
+	"groups": [
+		{
+			"name": "gun_body",
+			"origin": [7, 0, 7],
+			"color": 0,
+			"children": [
+				0,
+				{
+					"name": "projectile",
+					"origin": [4, 0, 3],
+					"color": 0,
+					"children": [1]
+				},
+				{
+					"name": "grip",
+					"origin": [7, 0, 7],
+					"color": 0,
+					"children": [2]
+				}
+			]
+		}
+	]
+}

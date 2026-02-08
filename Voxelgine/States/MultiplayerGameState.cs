@@ -105,6 +105,11 @@ namespace Voxelgine.States
 		// Buffer for inventory update packets received before simulation is created
 		private InventoryUpdatePacket _pendingInventoryUpdate;
 
+		// Visual correction smoothing — accumulated position offset from reconciliation
+		// corrections, blended toward zero each frame to avoid visual jitter/snapping.
+		private Vector3 _correctionSmoothOffset;
+		private const float CorrectionSmoothRate = 12f; // Higher = faster convergence
+
 		// Entity interpolation buffers keyed by network ID
 		private readonly Dictionary<int, SnapshotBuffer<EntitySnapshot>> _entitySnapshots = new Dictionary<int, SnapshotBuffer<EntitySnapshot>>();
 
@@ -395,12 +400,32 @@ namespace Voxelgine.States
 				// Sync render camera from physics camera
 				_simulation.LocalPlayer.RenderCam = _simulation.LocalPlayer.Cam;
 
+				// Decay correction smooth offset toward zero
+				float dt = Raylib.GetFrameTime();
+				if (_correctionSmoothOffset.LengthSquared() > 0.0001f)
+				{
+					_correctionSmoothOffset *= MathF.Max(0f, 1f - CorrectionSmoothRate * dt);
+				}
+				else
+				{
+					_correctionSmoothOffset = Vector3.Zero;
+				}
+
+				// Apply smooth offset to render camera (physics position is unaffected)
+				if (_correctionSmoothOffset != Vector3.Zero)
+				{
+					var cam = _simulation.LocalPlayer.RenderCam;
+					cam.Position += _correctionSmoothOffset;
+					cam.Target += _correctionSmoothOffset;
+					_simulation.LocalPlayer.RenderCam = cam;
+				}
+
 				// Populate frame info for GameWindow interpolation
 				FInfo.Empty = false;
-				FInfo.Pos = _simulation.LocalPlayer.Camera.Position;
-				FInfo.Cam = _simulation.LocalPlayer.Cam;
+				FInfo.Pos = _simulation.LocalPlayer.RenderCam.Position;
+				FInfo.Cam = _simulation.LocalPlayer.RenderCam;
 				FInfo.CamAngle = _simulation.LocalPlayer.GetCamAngle();
-				FInfo.FeetPosition = _simulation.LocalPlayer.FeetPosition;
+				FInfo.FeetPosition = _simulation.LocalPlayer.FeetPosition + _correctionSmoothOffset;
 				FInfo.ViewModelOffset = _simulation.LocalPlayer.ViewMdl.ViewModelOffset;
 				FInfo.ViewModelRot = _simulation.LocalPlayer.ViewMdl.VMRot;
 
@@ -835,6 +860,9 @@ namespace Voxelgine.States
 
 					if (needsCorrection)
 					{
+						// Capture pre-correction position for visual smoothing
+						Vector3 preCorrection = _simulation.LocalPlayer.Position;
+
 						PredictionReconciler.Reconcile(
 							_simulation.LocalPlayer,
 							entry.Position,
@@ -847,6 +875,21 @@ namespace Voxelgine.States
 							_simulation.PhysicsData,
 							DeltaTime
 						);
+
+						// Compute visual offset: difference between where we were and where we should be.
+						// If the error is small (< SnapThreshold), smooth visually instead of hard-snapping.
+						Vector3 postCorrection = _simulation.LocalPlayer.Position;
+						Vector3 delta = preCorrection - postCorrection;
+
+						if (delta.LengthSquared() < ClientPrediction.SnapThreshold * ClientPrediction.SnapThreshold)
+						{
+							_correctionSmoothOffset += delta;
+						}
+						else
+						{
+							// Large correction (teleport) — snap immediately
+							_correctionSmoothOffset = Vector3.Zero;
+						}
 					}
 				}
 				else

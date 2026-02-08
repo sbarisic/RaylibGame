@@ -49,9 +49,22 @@ namespace Voxelgine.Engine
 	{
 		/// <summary>
 		/// Position difference threshold (in world units) beyond which reconciliation is triggered.
-		/// Small errors (below this) are ignored to avoid unnecessary corrections from floating-point drift.
+		/// Errors below this are absorbed to avoid unnecessary corrections from floating-point drift.
+		/// Source-engine style: allow small desync to reduce correction frequency at higher latency.
 		/// </summary>
-		public const float CorrectionThreshold = 0.01f;
+		public const float CorrectionThreshold = 0.1f;
+
+		/// <summary>
+		/// Velocity difference threshold (in world units/s) beyond which reconciliation is triggered.
+		/// Divergent velocity causes future predictions to drift even when current position is close.
+		/// </summary>
+		public const float VelocityCorrectionThreshold = 0.5f;
+
+		/// <summary>
+		/// Position error beyond which the correction is applied as an instant snap
+		/// rather than smoothed visually. Handles teleports and large desync.
+		/// </summary>
+		public const float SnapThreshold = 3.0f;
 
 		/// <summary>
 		/// Size of the prediction state buffer. Must match <see cref="ClientInputBuffer.BufferSize"/>.
@@ -98,6 +111,7 @@ namespace Voxelgine.Engine
 		/// <summary>
 		/// Processes a server-authoritative snapshot for the local player.
 		/// Compares the server state with the predicted state at the snapshot's tick.
+		/// Checks both position and velocity to catch divergent predictions early.
 		/// </summary>
 		/// <remarks>
 		/// If this method returns true, the caller must:
@@ -140,10 +154,19 @@ namespace Voxelgine.Engine
 			}
 
 			// Compare predicted position with server position
-			float error = Vector3.Distance(_stateBuffer[index].Position, serverPosition);
-			LastCorrectionDistance = error;
+			float posError = Vector3.Distance(_stateBuffer[index].Position, serverPosition);
+			LastCorrectionDistance = posError;
 
-			if (error > CorrectionThreshold)
+			if (posError > CorrectionThreshold)
+			{
+				ReconciliationCount++;
+				return true;
+			}
+
+			// Compare predicted velocity with server velocity — divergent velocity
+			// causes future prediction drift even when current position is close
+			float velError = Vector3.Distance(_stateBuffer[index].Velocity, serverVelocity);
+			if (velError > VelocityCorrectionThreshold)
 			{
 				ReconciliationCount++;
 				return true;

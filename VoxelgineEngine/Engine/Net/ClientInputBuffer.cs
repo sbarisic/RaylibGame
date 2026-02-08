@@ -39,6 +39,9 @@ namespace Voxelgine.Engine
 		private readonly BufferedInput[] _buffer = new BufferedInput[BufferSize];
 		private int _count;
 
+		// Pre-allocated list reused by GetInputsInRange to avoid per-reconciliation allocation
+		private readonly List<BufferedInput> _replayList = new List<BufferedInput>(BufferSize);
+
 		/// <summary>
 		/// The number of inputs currently stored in the buffer (up to <see cref="BufferSize"/>).
 		/// </summary>
@@ -99,11 +102,15 @@ namespace Voxelgine.Engine
 		/// ordered by tick number. Used for prediction reconciliation: replay these
 		/// inputs from the server-confirmed state.
 		/// </summary>
+		/// <remarks>
+		/// Returns a shared list that is reused across calls — do not hold references to it
+		/// beyond the current reconciliation cycle.
+		/// </remarks>
 		/// <param name="afterTick">The last server-acknowledged tick (exclusive).</param>
 		/// <param name="upToTick">The current client tick (inclusive).</param>
 		public List<BufferedInput> GetInputsInRange(int afterTick, int upToTick)
 		{
-			var result = new List<BufferedInput>();
+			_replayList.Clear();
 
 			for (int tick = afterTick + 1; tick <= upToTick; tick++)
 			{
@@ -112,11 +119,11 @@ namespace Voxelgine.Engine
 
 				if (_buffer[index].TickNumber == tick)
 				{
-					result.Add(_buffer[index]);
+					_replayList.Add(_buffer[index]);
 				}
 			}
 
-			return result;
+			return _replayList;
 		}
 
 		/// <summary>

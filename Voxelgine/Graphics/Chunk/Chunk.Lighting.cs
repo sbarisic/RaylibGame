@@ -87,6 +87,8 @@ namespace Voxelgine.Graphics
 		/// <summary>
 		/// Computes skylight by propagating light from sky-exposed blocks.
 		/// Sky-exposed means the block can see the sky directly above (no opaque blocks in the way).
+		/// Also seeds from pre-existing skylight at chunk boundaries (written by earlier
+		/// parallel phases via cross-chunk propagation) to avoid light artefacts at seams.
 		/// </summary>
 		void ComputeSkylight()
 		{
@@ -138,8 +140,55 @@ namespace Voxelgine.Graphics
 				}
 			}
 
+			// Second pass: seed from pre-existing skylight at chunk boundaries.
+			// Earlier parallel phases may have written skylight into this chunk's
+			// boundary blocks via cross-chunk propagation. Those values need to be
+			// added to the queue so they continue propagating inward.
+			SeedFromBoundarySkylight(skylightQueue);
+
 			// Propagate skylight in all directions with attenuation
 			PropagateSkylight(skylightQueue);
+		}
+
+		/// <summary>
+		/// Scans all 6 faces of the chunk for non-opaque blocks with pre-existing
+		/// skylight values (from cross-chunk writes by earlier parallel phases).
+		/// Adds them to the propagation queue so light continues spreading inward.
+		/// </summary>
+		void SeedFromBoundarySkylight(Queue<BlockPos> queue)
+		{
+			const int last = ChunkSize - 1;
+
+			for (int a = 0; a < ChunkSize; a++)
+			{
+				for (int b = 0; b < ChunkSize; b++)
+				{
+					// X = 0 and X = last faces
+					TrySeedBoundarySkylight(0, a, b, queue);
+					TrySeedBoundarySkylight(last, a, b, queue);
+					// Y = 0 and Y = last faces
+					TrySeedBoundarySkylight(a, 0, b, queue);
+					TrySeedBoundarySkylight(a, last, b, queue);
+					// Z = 0 and Z = last faces
+					TrySeedBoundarySkylight(a, b, 0, queue);
+					TrySeedBoundarySkylight(a, b, last, queue);
+				}
+			}
+		}
+
+		/// <summary>
+		/// If the block at (x,y,z) has skylight > 1 and is not opaque, enqueue it
+		/// for further propagation. Blocks already set to 15 by sky-exposure seeding
+		/// are harmless duplicates — the BFS greater-than check prevents re-propagation.
+		/// </summary>
+		void TrySeedBoundarySkylight(int x, int y, int z, Queue<BlockPos> queue)
+		{
+			int idx = x + ChunkSize * (y + ChunkSize * z);
+			if (BlockInfo.IsOpaque(Blocks[idx].Type))
+				return;
+			byte skylight = Blocks[idx].GetMaxSkylight();
+			if (skylight > 1)
+				queue.Enqueue(new BlockPos(x, y, z));
 		}
 
 		/// <summary>

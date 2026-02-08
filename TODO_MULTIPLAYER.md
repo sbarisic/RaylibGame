@@ -165,7 +165,9 @@ Game Tick Flow (Client):
 
 > Client-side networking, prediction, interpolation, and rendering of remote players.
 
-*All tasks completed — see [DONE_MULTIPLAYER.md](DONE_MULTIPLAYER.md)*
+### Medium Priority
+
+*No medium priority tasks*
 
 ---
 
@@ -197,6 +199,10 @@ Game Tick Flow (Client):
 
 ### Lower Priority
 
+*No low priority tasks*
+
+### On Hold
+
 - [ ] **Server browser (LAN)** — Broadcast UDP discovery on LAN. Servers respond with name, player count, map info. Client displays list of discovered servers. Select to connect. **[CPX: 3]**
 
 ---
@@ -209,11 +215,11 @@ Game Tick Flow (Client):
 
 ### Lower Priority
 
-- [ ] **Multiplayer unit tests** — Test packet serialization round-trips, reliable delivery layer ACK/retransmit logic, snapshot interpolation math, prediction reconciliation correctness. Add to existing `UnitTest` project. **[CPX: 3]**
+*No lower priority tasks*
 
 ---
 
-## Documentation
+## Documentation (On Hold)
 
 ### Medium Priority
 
@@ -238,7 +244,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- Make light recalculations happen only on visible frustum culled chunks to speed things up. Make the render limit 8 chunks.
 
 ---
 

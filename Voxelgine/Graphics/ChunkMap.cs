@@ -47,6 +47,12 @@ namespace Voxelgine.Graphics
 		IFishEngineRunner Eng;
 
 		/// <summary>
+		/// Maximum render distance in blocks. Chunks whose center is farther than this
+		/// from the camera are skipped entirely (before frustum testing).
+		/// </summary>
+		public float RenderDistanceBlocks = 160;
+
+		/// <summary>
 		/// Log of block changes since last clear. Used for network delta sync —
 		/// server reads and broadcasts pending changes each tick.
 		/// </summary>
@@ -402,12 +408,13 @@ namespace Voxelgine.Graphics
 
 		/// <summary>
 		/// Scans the world for valid spawn points on the surface.
-		/// A valid spawn point has a solid ground block with at least 2 air blocks above it.
+		/// A valid spawn point has a grass surface block on a flat 3×3 area
+		/// (all 9 blocks at the same height ±1) with at least 3 air blocks above.
 		/// Points are selected with minimum spacing, prioritized by proximity to the world center.
 		/// </summary>
 		/// <param name="count">Number of spawn points to find.</param>
 		/// <param name="minSpacing">Minimum distance in blocks between spawn points.</param>
-		/// <returns>List of world positions suitable for spawning (3 blocks above ground surface).</returns>
+		/// <returns>List of world positions suitable for spawning (above ground surface).</returns>
 		public List<Vector3> FindSpawnPoints(int count, int minSpacing = 5)
 		{
 			// Compute world bounds from loaded chunks
@@ -438,19 +445,53 @@ namespace Voxelgine.Graphics
 
 			var candidates = new List<Vector3>();
 
-			// Scan each XZ column top-down for the topmost surface block
-			for (int x = minX; x < maxX; x++)
-				for (int z = minZ; z < maxZ; z++)
+			// Scan each XZ column top-down for the topmost grass block on a flat 3x3 surface
+			for (int x = minX + 1; x < maxX - 1; x++)
+				for (int z = minZ + 1; z < maxZ - 1; z++)
 				{
 					for (int y = maxY - 1; y >= minY; y--)
 					{
-						if (BlockInfo.IsSolid(GetBlock(x, y, z)) &&
-							GetBlock(x, y + 1, z) == BlockType.None &&
-							GetBlock(x, y + 2, z) == BlockType.None)
+						// Must be a grass block
+						if (GetBlock(x, y, z) != BlockType.Grass)
+							continue;
+
+						// Need 3 air blocks above for player clearance
+						if (GetBlock(x, y + 1, z) != BlockType.None ||
+							GetBlock(x, y + 2, z) != BlockType.None ||
+							GetBlock(x, y + 3, z) != BlockType.None)
+							continue;
+
+						// Check 3x3 flatness: all surrounding surface blocks must be solid
+						// and within ±1 of the center height
+						bool flat = true;
+						for (int dx = -1; dx <= 1 && flat; dx++)
 						{
-							candidates.Add(new Vector3(x, y + 3, z));
-							break;
+							for (int dz = -1; dz <= 1 && flat; dz++)
+							{
+								if (dx == 0 && dz == 0)
+									continue;
+
+								// Find topmost solid block in this neighbor column (within ±1 of y)
+								bool neighborOk = false;
+								for (int ny = y + 1; ny >= y - 1; ny--)
+								{
+									if (BlockInfo.IsSolid(GetBlock(x + dx, ny, z + dz)) &&
+										GetBlock(x + dx, ny + 1, z + dz) == BlockType.None)
+									{
+										neighborOk = true;
+										break;
+									}
+								}
+								if (!neighborOk)
+									flat = false;
+							}
 						}
+
+						if (!flat)
+							continue;
+
+						candidates.Add(new Vector3(x, y + 3, z));
+						break;
 					}
 				}
 
@@ -1039,9 +1080,16 @@ namespace Voxelgine.Graphics
 
 		public void Draw(ref Frustum Fr)
 		{
+			float halfChunk = Chunk.ChunkSize * 0.5f;
+			float renderDistSq = RenderDistanceBlocks * RenderDistanceBlocks;
+
 			foreach (var KV in Chunks.Items)
 			{
 				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+				Vector3 ChunkCenter = ChunkPos + new Vector3(halfChunk);
+				if (Vector3.DistanceSquared(Fr.CamPos, ChunkCenter) > renderDistSq)
+					continue;
+
 				KV.Value.Draw(ChunkPos, ref Fr);
 			}
 
@@ -1050,11 +1098,19 @@ namespace Voxelgine.Graphics
 
 		public void DrawTransparent(ref Frustum Fr, Vector3 cameraPos)
 		{
-			// Collect all transparent faces from all visible chunks
+			// Collect all transparent faces from visible chunks within render distance
 			TransparentFaceBuffer.Clear();
+
+			float halfChunk = Chunk.ChunkSize * 0.5f;
+			float renderDistSq = RenderDistanceBlocks * RenderDistanceBlocks;
 
 			foreach (var KV in Chunks.Items)
 			{
+				Vector3 ChunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+				Vector3 ChunkCenter = ChunkPos + new Vector3(halfChunk);
+				if (Vector3.DistanceSquared(cameraPos, ChunkCenter) > renderDistSq)
+					continue;
+
 				if (KV.Value.HasTransparentFaces())
 				{
 					var faces = KV.Value.GetTransparentFaces(ref Fr);

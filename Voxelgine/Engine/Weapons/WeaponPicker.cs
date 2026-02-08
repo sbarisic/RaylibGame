@@ -22,6 +22,9 @@ namespace Voxelgine.Engine
 		{
 			// Apply swing animation to the view model
 			ParentPlayer.ViewMdl.ApplySwing();
+
+			// Destroy the block (base handles the raycast and Map.SetBlock call)
+			base.OnLeftClick(E);
 		}
 	}
 }

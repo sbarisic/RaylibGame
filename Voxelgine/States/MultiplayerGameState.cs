@@ -268,6 +268,12 @@ namespace Voxelgine.States
 				}
 
 				// Update game systems
+				// Discard block changes logged by server-broadcasted BlockChangePackets
+				// (processed during _client.Tick above) so they are not echoed back as
+				// client requests in SendPendingBlockChanges. Only changes from local
+				// player interaction (TickGUI below) should be sent to the server.
+				_simulation.Map.ClearPendingChanges();
+
 				_simulation.Map.Tick();
 				_simulation.LocalPlayer.Tick(Window.InMgr);
 				_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);

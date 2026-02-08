@@ -11,5 +11,13 @@ namespace Voxelgine.Engine.DI
 		public void Init();
 
 		public void WriteLine(string message);
+
+		public void ServerWriteLine(string message);
+
+		public void ClientWriteLine(string message);
+
+		public void ServerNetworkWriteLine(string message);
+
+		public void ClientNetworkWriteLine(string message);
 	}
 }

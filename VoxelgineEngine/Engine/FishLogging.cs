@@ -48,5 +48,25 @@ namespace Voxelgine.Engine
 			SWriter.WriteLine(GetPrefix() + message);
 			Flush();
 		}
+
+		public void ServerWriteLine(string message)
+		{
+			WriteLine("[SERVER] " + message);
+		}
+
+		public void ClientWriteLine(string message)
+		{
+			WriteLine("[CLIENT] " + message);
+		}
+
+		public void ServerNetworkWriteLine(string message)
+		{
+			WriteLine("[SERVER][NETWORK] " + message);
+		}
+
+		public void ClientNetworkWriteLine(string message)
+		{
+			WriteLine("[CLIENT][NETWORK] " + message);
+		}
 	}
 }

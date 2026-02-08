@@ -264,27 +264,30 @@ namespace Voxelgine.Engine.Server
 			// 4. Process player input and run authoritative physics
 			ProcessPlayerPhysics(dt);
 
-			// 5. Update day/night cycle
+			// 5. Kill players who fell out of the world
+			CheckPlayerBounds();
+
+			// 6. Update day/night cycle
 			_simulation.DayNight.Update(dt);
 
-			// 6. Broadcast time sync periodically
+			// 7. Broadcast time sync periodically
 			BroadcastTimeSync(totalTime);
 
-			// 7. Update entity simulation
+			// 8. Update entity simulation
 			// Note: Entity UpdateLockstep requires InputMgr; on the server, entities run
 			// their own AI and don't process player input, so we pass null.
 			_simulation.Entities.UpdateLockstep(totalTime, dt, null);
 
-			// 8. Broadcast authoritative player positions to all clients
+			// 9. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
 
-			// 9. Broadcast pending block changes to all clients
+			// 10. Broadcast pending block changes to all clients
 			BroadcastBlockChanges(totalTime);
 
-			// 10. Broadcast entity snapshots to all clients
+			// 11. Broadcast entity snapshots to all clients
 			BroadcastEntitySnapshots(totalTime);
 
-			// 11. Periodic auto-save
+			// 12. Periodic auto-save
 			if (totalTime - _lastAutoSaveTime >= AutoSaveInterval)
 			{
 				_lastAutoSaveTime = totalTime;

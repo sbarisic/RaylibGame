@@ -44,7 +44,8 @@ namespace Voxelgine.Engine
 		CraftingTable,
 		Barrel,
 		Campfire,
-		Torch
+		Torch,
+		Foliage
 	}
 
 	/// <summary>
@@ -93,6 +94,7 @@ namespace Voxelgine.Engine
 				// Custom mesh blocks
 				case BlockType.Campfire:
 				case BlockType.Torch:
+				case BlockType.Foliage:
 					return false;
 
 				// Transparent square blocks
@@ -112,6 +114,7 @@ namespace Voxelgine.Engine
 			{
 				case BlockType.None:
 				case BlockType.Water:
+				case BlockType.Foliage:
 					return false;
 			}
 
@@ -302,6 +305,8 @@ namespace Voxelgine.Engine
 
 		public static Model GetCustomModel(BlockType BType)
 		{
+			// TODO: Replace all obj models with json ones
+
 			if (BType == BlockType.Barrel)
 			{
 				return ResMgr.GetModel("barrel/barrel.obj");
@@ -313,6 +318,11 @@ namespace Voxelgine.Engine
 			else if (BType == BlockType.Torch)
 			{
 				return ResMgr.GetModel("torch/torch.obj");
+			}
+			else if (BType == BlockType.Foliage)
+			{
+				// TODO: Check if json model loading works properly? Choose a random grass1, grass2, or grass3 json model for variety 
+				return ResMgr.GetModel("grass/grass1.json");
 			}
 			else
 				throw new NotImplementedException();

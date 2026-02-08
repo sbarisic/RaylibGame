@@ -132,6 +132,7 @@ namespace Voxelgine.Engine
 				WeaponJsonModel.SetTexture(ResMgr.GetModelTexture(texturePath));
 				HasWeaponJsonModel = true;
 				UseViewmodel = true;
+				Logging.WriteLine($"SetupJsonModel: Loaded '{jsonPath}' with {WeaponJsonModel.Meshes.Count} meshes, texture='{texturePath}'");
 			}
 			catch (Exception ex)
 			{

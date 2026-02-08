@@ -34,6 +34,7 @@ namespace Voxelgine.Engine
 
 		// Offset to align weapon grip with arm hand (computed when weapon is set)
 		Vector3 WeaponGripOffset = Vector3.Zero;
+		bool _weaponDrawLogged = false;
 
 		/// <summary>
 		/// World-space muzzle point extracted from the weapon's "projectile" mesh.
@@ -134,6 +135,8 @@ namespace Voxelgine.Engine
 			WeaponModel = weapon;
 			WeaponModelLoaded = weapon != null;
 
+			Logging.WriteLine($"ViewModel.SetWeaponModel: model={weapon != null}, meshCount={weapon?.Meshes?.Count ?? 0}, armLoaded={ArmModelLoaded}");
+
 			if (WeaponModelLoaded && ArmModelLoaded)
 			{
 				CustomMesh hand = ArmModel.GetMeshByName("hand");
@@ -143,10 +146,12 @@ namespace Voxelgine.Engine
 					Vector3 handCenter = (hand.BBox.Min + hand.BBox.Max) * 0.5f;
 					Vector3 gripCenter = (grip.BBox.Min + grip.BBox.Max) * 0.5f;
 					WeaponGripOffset = handCenter - gripCenter;
+					Logging.WriteLine($"ViewModel.SetWeaponModel: gripOffset={WeaponGripOffset}, handCenter={handCenter}, gripCenter={gripCenter}");
 				}
 				else
 				{
 					WeaponGripOffset = Vector3.Zero;
+					Logging.WriteLine($"ViewModel.SetWeaponModel: WARNING hand={hand != null} grip={grip != null}, using zero offset");
 				}
 			}
 		}
@@ -375,10 +380,21 @@ namespace Voxelgine.Engine
 			ArmModel.DrawWithMatrix(armMat, lightColor);
 
 			// Draw weapon attached to hand
-			if (WeaponModelLoaded)
-			{
-				Matrix4x4 weaponMat = Matrix4x4.CreateTranslation(WeaponGripOffset) * armMat;
-				WeaponModel.DrawWithMatrix(weaponMat, lightColor);
+				if (WeaponModelLoaded)
+				{
+					if (!_weaponDrawLogged)
+					{
+						_weaponDrawLogged = true;
+						Logging.WriteLine($"ViewModel.DrawViewModel: Drawing weapon! meshCount={WeaponModel.Meshes.Count}, gripOffset={WeaponGripOffset}, lightColor=({lightColor.R},{lightColor.G},{lightColor.B},{lightColor.A})");
+						for (int mi = 0; mi < WeaponModel.Meshes.Count; mi++)
+						{
+							var m = WeaponModel.Meshes[mi];
+							Logging.WriteLine($"  mesh[{mi}] '{m.Name}': bbox=({m.BBox.Min})-({m.BBox.Max})");
+						}
+					}
+
+					Matrix4x4 weaponMat = Matrix4x4.CreateTranslation(WeaponGripOffset) * armMat;
+					WeaponModel.DrawWithMatrix(weaponMat, lightColor);
 
 				// Extract muzzle point from projectile mesh
 				CustomMesh projectile = WeaponModel.GetMeshByName("projectile");

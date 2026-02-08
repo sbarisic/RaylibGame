@@ -181,6 +181,10 @@ Game Tick Flow (Client):
 
 > Multiplayer-specific gameplay features built on top of the networking layer.
 
+### Medium Priority
+
+- [ ] **Procedural trees and water bodies** — Add trees (6–10 block trunk, 3–5 block leaf canopy) and small water bodies (≥5×5, up to 3 deep, natural shoreline) to the floating island world generation. Use noise functions for organic, non-uniform distribution. **[CPX: 4]**
+
 ### Lower Priority
 
 - [ ] **Text chat** — Client sends `ChatMessage` to server, server broadcasts to all. Display chat messages in a scrollable FishUI panel anchored to bottom-left. Fade out after 10 seconds. Toggle chat input with Enter key. Support `/commands` for admin actions. **[CPX: 3]**
@@ -189,11 +193,14 @@ Game Tick Flow (Client):
 
 ## UI & Menus
 
+### Higher Priority
+
+- [ ] **Network stats panel position and style** — Move the F5 network statistics overlay panel from top-left to top-right corner of the screen. Change the text color inside the panel from white to black for better readability against the dark panel background. **[CPX: 1]**
+
 ### Medium Priority
 
 - [ ] **Player list overlay** — In-game FishUI panel (toggle with Tab or similar key) showing connected players, their ping, and status. Visible during gameplay. **[CPX: 2]**
 - [ ] **Connection status indicator** — Small HUD element showing connection quality (ping bar icon, green/yellow/red based on latency). Show "Reconnecting..." text when experiencing packet loss. **[CPX: 1]**
-- [ ] **Network stats panel position and style** — Move the F5 network statistics overlay panel from top-left to top-right corner of the screen. Change the text color inside the panel from white to black for better readability against the dark panel background. **[CPX: 1]**
 
 ### Lower Priority
 
@@ -238,7 +245,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- Handle TODO comments in BlockInfo.cs
 
 ---
 

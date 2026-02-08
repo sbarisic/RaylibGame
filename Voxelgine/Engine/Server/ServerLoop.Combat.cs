@@ -39,6 +39,9 @@ namespace Voxelgine.Engine.Server
 			if (Vector3.Distance(origin, player.Position) > 3f)
 				return;
 
+			// Set attack animation timer for the shooter
+			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
+
 			// --- Raycast against world blocks ---
 			Vector3 worldHitPos = Vector3.Zero;
 			Vector3 worldHitNormal = Vector3.Zero;

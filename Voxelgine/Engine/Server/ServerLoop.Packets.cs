@@ -92,6 +92,9 @@ namespace Voxelgine.Engine.Server
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
 
+			// Trigger attack animation for block placement
+			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
+
 			// Send updated count to the client (server correction)
 			if (inventory.GetCount(slot) != -1) // Only send for finite items
 				_server.SendTo(playerId, inventory.CreateSlotUpdatePacket(slot), true, CurrentTime);
@@ -122,6 +125,9 @@ namespace Voxelgine.Engine.Server
 				return;
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
+
+			// Trigger attack animation for block destruction
+			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
 
 			// Broadcast block break sound event to all clients
 			_server.Broadcast(new SoundEventPacket

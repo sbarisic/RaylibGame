@@ -31,6 +31,7 @@ namespace Voxelgine.Engine.Server
 					Velocity = p.GetVelocity(),
 					CameraAngle = new Vector2(camAngle.X, camAngle.Y),
 					Health = p.Health,
+					AnimationState = GetPlayerAnimationState(p),
 				};
 			}
 
@@ -98,6 +99,22 @@ namespace Voxelgine.Engine.Server
 			};
 
 			_server.Broadcast(packet, true, currentTime);
+		}
+
+		/// <summary>
+		/// Determines the animation state byte for a player.
+		/// 0 = idle, 1 = walk, 2 = attack (recently fired weapon or placed/destroyed block).
+		/// </summary>
+		private byte GetPlayerAnimationState(Player player)
+		{
+			// Attack takes priority — check if the player recently performed an action
+			if (_playerAttackEndTimes.TryGetValue(player.PlayerId, out float attackEnd) && CurrentTime < attackEnd)
+				return 2;
+
+			// Walk vs idle based on XZ velocity
+			Vector3 vel = player.GetVelocity();
+			float xzSpeed = new Vector2(vel.X, vel.Z).Length();
+			return xzSpeed > 0.5f ? (byte)1 : (byte)0;
 		}
 	}
 }

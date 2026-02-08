@@ -738,11 +738,11 @@ namespace Voxelgine.States
 				else
 				{
 					// Remote player — apply snapshot for interpolation
-					var remote = _simulation.Players.GetRemotePlayer(entry.PlayerId);
-					if (remote != null)
-					{
-						remote.ApplySnapshot(entry.Position, entry.Velocity, entry.CameraAngle, currentTime);
-					}
+						var remote = _simulation.Players.GetRemotePlayer(entry.PlayerId);
+						if (remote != null)
+						{
+							remote.ApplySnapshot(entry.Position, entry.Velocity, entry.CameraAngle, entry.AnimationState, currentTime);
+						}
 				}
 			}
 		}

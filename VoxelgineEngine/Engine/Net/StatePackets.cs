@@ -118,6 +118,7 @@ namespace Voxelgine.Engine
 			public Vector3 Velocity;
 			public Vector2 CameraAngle;
 			public float Health;
+			public byte AnimationState;
 		}
 
 		public PlayerEntry[] Players { get; set; } = Array.Empty<PlayerEntry>();
@@ -134,6 +135,7 @@ namespace Voxelgine.Engine
 				writer.WriteVector3(Players[i].Velocity);
 				writer.WriteVector2(Players[i].CameraAngle);
 				writer.Write(Players[i].Health);
+				writer.Write(Players[i].AnimationState);
 			}
 		}
 
@@ -150,6 +152,7 @@ namespace Voxelgine.Engine
 				Players[i].Velocity = reader.ReadVector3();
 				Players[i].CameraAngle = reader.ReadVector2();
 				Players[i].Health = reader.ReadSingle();
+				Players[i].AnimationState = reader.ReadByte();
 			}
 		}
 	}

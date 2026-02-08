@@ -90,6 +90,17 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private readonly Dictionary<int, float> _respawnTimers = new();
 
+		/// <summary>
+		/// Duration of the attack animation in seconds, used for animation state broadcasting.
+		/// </summary>
+		private const float AttackAnimDuration = 0.4f;
+
+		/// <summary>
+		/// Tracks the time at which each player's attack animation ends.
+		/// Key = playerId, Value = time when the attack animation expires.
+		/// </summary>
+		private readonly Dictionary<int, float> _playerAttackEndTimes = new();
+
 		private volatile bool _running;
 		private bool _disposed;
 		private float _lastAutoSaveTime;

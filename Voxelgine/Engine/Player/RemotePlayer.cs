@@ -59,6 +59,7 @@ namespace Voxelgine.Engine
 			public Vector3 Position;
 			public Vector3 Velocity;
 			public Vector2 CameraAngle;
+			public byte AnimationState;
 		}
 
 		public RemotePlayer(int playerId, string playerName, IFishEngineRunner eng)
@@ -100,13 +101,14 @@ namespace Voxelgine.Engine
 		/// Applies a snapshot from the server (from <see cref="WorldSnapshotPacket.PlayerEntry"/>).
 		/// Adds the snapshot to the interpolation buffer.
 		/// </summary>
-		public void ApplySnapshot(Vector3 position, Vector3 velocity, Vector2 cameraAngle, float currentTime)
+		public void ApplySnapshot(Vector3 position, Vector3 velocity, Vector2 cameraAngle, byte animationState, float currentTime)
 		{
 			var snapshot = new PlayerSnapshot
 			{
 				Position = position,
 				Velocity = velocity,
 				CameraAngle = cameraAngle,
+				AnimationState = animationState,
 			};
 			_snapshotBuffer.Add(snapshot, currentTime);
 
@@ -119,6 +121,9 @@ namespace Voxelgine.Engine
 			}
 		}
 
+		/// <summary>Current animation state byte from the server (0=idle, 1=walk, 2=attack).</summary>
+		private byte _currentAnimState;
+
 		/// <summary>
 		/// Updates interpolated position for rendering. Call each frame.
 		/// </summary>
@@ -126,6 +131,8 @@ namespace Voxelgine.Engine
 		{
 			if (_snapshotBuffer.Count == 0)
 				return;
+
+			byte animState = _currentAnimState;
 
 			if (_snapshotBuffer.Count >= 2)
 			{
@@ -136,21 +143,55 @@ namespace Voxelgine.Engine
 					Position = Vector3.Lerp(from.Position, to.Position, t);
 					Velocity = Vector3.Lerp(from.Velocity, to.Velocity, t);
 					CameraAngle = LerpAngle(from.CameraAngle, to.CameraAngle, t);
+					// Use the 'to' snapshot's animation state (most recent authoritative state)
+					animState = to.AnimationState;
 				}
 			}
 
-			// Update animation based on velocity
+			_currentAnimState = animState;
+
+			// Update animation based on server-driven animation state
 			if (_animator != null)
 			{
-				float speed = new Vector2(Velocity.X, Velocity.Z).Length();
-				string targetAnim = speed > 0.5f ? "walk" : "idle";
+				// Base layer: idle or walk
+				string targetBaseAnim = animState == 1 ? "walk" : "idle";
+				if (_animator.CurrentAnimation != targetBaseAnim)
+					_animator.Play(targetBaseAnim);
 
-				if (_animator.CurrentAnimation != targetAnim)
-					_animator.Play(targetAnim);
+				// Action layer: attack animation overlay
+				if (animState == 2)
+				{
+					if (!_attackLayerActive)
+					{
+						_animator.PlayOnLayer("action", "attack");
+						_animator.SetLayerWeight("action", 1.0f);
+						_attackLayerActive = true;
+					}
+				}
+				else if (_attackLayerActive)
+				{
+					_animator.StopLayer("action");
+					_attackLayerActive = false;
+				}
 
 				_animator.Update(deltaTime);
 			}
+
+			// Apply head pitch from camera angle after animation update
+			if (_modelLoaded && _model != null)
+			{
+				CustomMesh headMesh = _model.GetMeshByName("head");
+				if (headMesh != null)
+				{
+					// CameraAngle.Y is pitch in degrees; clamp to reasonable range
+					float pitch = Math.Clamp(CameraAngle.Y, -80f, 80f);
+					headMesh.AnimationRotation = new Vector3(pitch, headMesh.AnimationRotation.Y, headMesh.AnimationRotation.Z);
+					headMesh.UpdateAnimationMatrix();
+				}
+			}
 		}
+
+		private bool _attackLayerActive;
 
 		/// <summary>
 		/// Renders the remote player model in 3D space.
@@ -173,6 +214,9 @@ namespace Voxelgine.Engine
 			_model.LookDirection = new Vector3(MathF.Sin(yawRad), 0, MathF.Cos(yawRad));
 
 			_model.Draw();
+
+			// Draw held item at right hand position
+			DrawHeldItem();
 
 			if (_eng.DebugMode)
 			{
@@ -206,6 +250,34 @@ namespace Voxelgine.Engine
 			// Simple debug name rendering at world position
 			// Full billboard text rendering is a separate TODO (Player name tags)
 			Raylib.DrawSphere(worldPos, 0.05f, Color.White);
+		}
+
+		/// <summary>
+		/// Draws a simple held item (cube) at the right hand position using the hand mesh's world transform.
+		/// </summary>
+		private void DrawHeldItem()
+		{
+			if (!_modelLoaded || _model == null)
+				return;
+
+			CustomMesh handR = _model.GetMeshByName("hand_r");
+			if (handR == null)
+				return;
+
+			// Reconstruct the model matrix (same logic as CustomModel.GetModelMatrix)
+			Vector2 dir = Vector2.Normalize(new Vector2(_model.LookDirection.X, _model.LookDirection.Z));
+			float ang = MathF.Atan2(dir.X, dir.Y) - MathF.PI;
+			Matrix4x4 modelMat = Matrix4x4.CreateRotationY(ang) * Matrix4x4.CreateTranslation(_model.Position);
+
+			// Get the hand's world-space transform
+			Matrix4x4 handWorld = handR.GetWorldMatrix(modelMat);
+
+			// Extract world position from the transform matrix
+			Vector3 handPos = new Vector3(handWorld.M41, handWorld.M42, handWorld.M43);
+
+			// Draw a small cube representing the held item
+			Raylib.DrawCube(handPos, 0.12f, 0.12f, 0.35f, Color.Gray);
+			Raylib.DrawCubeWires(handPos, 0.12f, 0.12f, 0.35f, Color.DarkGray);
 		}
 
 		/// <summary>

@@ -20,6 +20,40 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="data\FishUISamples\Samples\ISample.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleAnimations.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleBasicControls.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleBigDigitDisplay.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleButtonVariants.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleDataGrid.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleDatePicker.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleDefault.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleDesignerForm.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleDropDown.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleEditorLayout.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleEventSerialization.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleGameMenu.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleGauges.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleImageBox.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleItemListbox.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleLayoutSystem.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleLineChart.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleListBox.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleMenuBar.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleMultiLineEditbox.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleParticles.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SamplePropertyGrid.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleScrollablePane.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleSerialization.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleSpreadsheetGrid.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleThemeSwitcher.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleTimePicker.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleToastNotification.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleUIScaling.cs" />
+    <Compile Remove="data\FishUISamples\Samples\SampleVirtualCursor.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="af.ico" />
     <Content Include="data\models\barrel\composter_bottom.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -527,6 +561,40 @@
     <Folder Include="data\models\pickaxe\" />
     <Folder Include="data\textures\items\" />
     <Folder Include="data\textures\smoke\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="data\FishUISamples\Samples\ISample.cs" />
+    <None Include="data\FishUISamples\Samples\SampleAnimations.cs" />
+    <None Include="data\FishUISamples\Samples\SampleBasicControls.cs" />
+    <None Include="data\FishUISamples\Samples\SampleBigDigitDisplay.cs" />
+    <None Include="data\FishUISamples\Samples\SampleButtonVariants.cs" />
+    <None Include="data\FishUISamples\Samples\SampleDataGrid.cs" />
+    <None Include="data\FishUISamples\Samples\SampleDatePicker.cs" />
+    <None Include="data\FishUISamples\Samples\SampleDefault.cs" />
+    <None Include="data\FishUISamples\Samples\SampleDesignerForm.cs" />
+    <None Include="data\FishUISamples\Samples\SampleDropDown.cs" />
+    <None Include="data\FishUISamples\Samples\SampleEditorLayout.cs" />
+    <None Include="data\FishUISamples\Samples\SampleEventSerialization.cs" />
+    <None Include="data\FishUISamples\Samples\SampleGameMenu.cs" />
+    <None Include="data\FishUISamples\Samples\SampleGauges.cs" />
+    <None Include="data\FishUISamples\Samples\SampleImageBox.cs" />
+    <None Include="data\FishUISamples\Samples\SampleItemListbox.cs" />
+    <None Include="data\FishUISamples\Samples\SampleLayoutSystem.cs" />
+    <None Include="data\FishUISamples\Samples\SampleLineChart.cs" />
+    <None Include="data\FishUISamples\Samples\SampleListBox.cs" />
+    <None Include="data\FishUISamples\Samples\SampleMenuBar.cs" />
+    <None Include="data\FishUISamples\Samples\SampleMultiLineEditbox.cs" />
+    <None Include="data\FishUISamples\Samples\SampleParticles.cs" />
+    <None Include="data\FishUISamples\Samples\SamplePropertyGrid.cs" />
+    <None Include="data\FishUISamples\Samples\SampleScrollablePane.cs" />
+    <None Include="data\FishUISamples\Samples\SampleSerialization.cs" />
+    <None Include="data\FishUISamples\Samples\SampleSpreadsheetGrid.cs" />
+    <None Include="data\FishUISamples\Samples\SampleThemeSwitcher.cs" />
+    <None Include="data\FishUISamples\Samples\SampleTimePicker.cs" />
+    <None Include="data\FishUISamples\Samples\SampleToastNotification.cs" />
+    <None Include="data\FishUISamples\Samples\SampleUIScaling.cs" />
+    <None Include="data\FishUISamples\Samples\SampleVirtualCursor.cs" />
   </ItemGroup>
 
   <ItemGroup>

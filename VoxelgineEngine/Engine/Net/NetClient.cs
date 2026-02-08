@@ -58,6 +58,8 @@ namespace Voxelgine.Engine
 		private readonly ConcurrentQueue<byte[]> _receiveQueue = new();
 		private readonly WorldReceiver _worldReceiver = new();
 		private readonly IFishLogging _logging;
+		private readonly NetworkSimulation _netSim = new();
+		private readonly List<byte[]> _simReady = new();
 
 		private NetConnection _connection;
 		private IPEndPoint _serverEndPoint;
@@ -168,6 +170,13 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public bool PacketLoggingEnabled { get; set; }
 
+		/// <summary>
+		/// Network condition simulator for debugging. Configure <see cref="NetworkSimulation.Enabled"/>,
+		/// <see cref="NetworkSimulation.LatencyMs"/>, <see cref="NetworkSimulation.PacketLossPercent"/>,
+		/// and <see cref="NetworkSimulation.JitterMs"/> to simulate bad network conditions.
+		/// </summary>
+		public NetworkSimulation NetSimulation => _netSim;
+
 		public NetClient(IFishLogging logging = null)
 		{
 			_transport = new UdpTransport();
@@ -262,7 +271,17 @@ namespace Voxelgine.Engine
 
 			_connection.Bandwidth.Update(currentTime);
 
-			while (_receiveQueue.TryDequeue(out var data))
+			// Feed incoming datagrams into the network simulation pipeline
+			while (_receiveQueue.TryDequeue(out var rawData))
+			{
+				_netSim.Submit(rawData, currentTime);
+			}
+
+			// Collect datagrams ready for processing (may be delayed by simulation)
+			_simReady.Clear();
+			_netSim.Collect(currentTime, _simReady);
+
+			foreach (var data in _simReady)
 			{
 				_connection.Bandwidth.RecordReceived(data.Length);
 
@@ -451,6 +470,7 @@ namespace Voxelgine.Engine
 			_transport.Close();
 
 			_worldReceiver.Reset();
+			_netSim.Clear();
 
 			_connection = null;
 			_serverEndPoint = null;

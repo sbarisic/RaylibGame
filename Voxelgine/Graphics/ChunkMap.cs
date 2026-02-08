@@ -178,52 +178,52 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
-			/// Generates the island's base shape using 3D simplex noise with center and height falloff.
-			/// A 2D heightmap noise layer displaces the surface per XZ column to create gentle hills and valleys.
-			/// Fills solid areas with stone and carves cave pockets using a secondary noise layer.
-			/// Parallelized across the X axis — each XZ column is independent.
-			/// </summary>
-			void GenerateIslandShape(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
+		/// Generates the island's base shape using 3D simplex noise with center and height falloff.
+		/// A 2D heightmap noise layer displaces the surface per XZ column to create gentle hills and valleys.
+		/// Fills solid areas with stone and carves cave pockets using a secondary noise layer.
+		/// Parallelized across the X axis — each XZ column is independent.
+		/// </summary>
+		void GenerateIslandShape(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
+		{
+			float scale = 0.02f;
+			Vector3 center = new Vector3(width, 0, length) / 2;
+			float centerRadius = Math.Min(width / 2, length / 2);
+
+			const float HillScale = 0.012f;
+			const float HillAmplitude = 6.0f;
+
+			Parallel.For(0, width, x =>
 			{
-				float scale = 0.02f;
-				Vector3 center = new Vector3(width, 0, length) / 2;
-				float centerRadius = Math.Min(width / 2, length / 2);
-
-				const float HillScale = 0.012f;
-				const float HillAmplitude = 6.0f;
-
-				Parallel.For(0, width, x =>
+				for (int z = 0; z < length; z++)
 				{
-					for (int z = 0; z < length; z++)
+					// 2D heightmap displacement — gentle hills and valleys (±HillAmplitude blocks)
+					float hillNoise = Noise.CalcPixel2D(x, z, HillScale) / 255f; // 0..1
+					float hillOffset = (hillNoise - 0.5f) * 2.0f * HillAmplitude; // -HillAmplitude..+HillAmplitude
+
+					for (int y = 0; y < worldHeight; y++)
 					{
-						// 2D heightmap displacement — gentle hills and valleys (±HillAmplitude blocks)
-						float hillNoise = Noise.CalcPixel2D(x, z, HillScale) / 255f; // 0..1
-						float hillOffset = (hillNoise - 0.5f) * 2.0f * HillAmplitude; // -HillAmplitude..+HillAmplitude
+						Vector3 Pos = new Vector3(x, (worldHeight - y), z);
 
-						for (int y = 0; y < worldHeight; y++)
+						float CenterFalloff = 1.0f - Utils.Clamp(((center - Pos).Length() / centerRadius) / 1.2f, 0, 1);
+						float Height = (float)(y - hillOffset) / worldHeight;
+
+						const float HeightFallStart = 0.8f;
+						const float HeightFallEnd = 1.0f;
+						const float HeightFallRange = HeightFallEnd - HeightFallStart;
+
+						float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
+						float Density = Simplex(2, x, y * 0.5f, z, scale) * CenterFalloff * HeightFalloff;
+
+						if (Density > 0.1f)
 						{
-							Vector3 Pos = new Vector3(x, (worldHeight - y), z);
-
-							float CenterFalloff = 1.0f - Utils.Clamp(((center - Pos).Length() / centerRadius) / 1.2f, 0, 1);
-							float Height = (float)(y - hillOffset) / worldHeight;
-
-							const float HeightFallStart = 0.8f;
-							const float HeightFallEnd = 1.0f;
-							const float HeightFallRange = HeightFallEnd - HeightFallStart;
-
-							float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
-							float Density = Simplex(2, x, y * 0.5f, z, scale) * CenterFalloff * HeightFalloff;
-
-							if (Density > 0.1f)
-							{
-								float Caves = Simplex(1, x, y, z, scale * 4) * HeightFalloff;
-								if (Caves < 0.65f)
-									chunkGrid[x / cs, y / cs, z / cs].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(BlockType.Stone));
-							}
+							float Caves = Simplex(1, x, y, z, scale * 4) * HeightFalloff;
+							if (Caves < 0.65f)
+								chunkGrid[x / cs, y / cs, z / cs].SetBlock(x % cs, y % cs, z % cs, new PlacedBlock(BlockType.Stone));
 						}
 					}
-				});
-			}
+				}
+			});
+		}
 
 		/// <summary>
 		/// Replaces the topmost stone blocks with grass (surface) and dirt (subsurface, up to 4 deep).
@@ -545,6 +545,9 @@ namespace Voxelgine.Graphics
 			const int MinTreeSpacing = 5;
 			const int EdgeMargin = 4; // Keep trees away from world edges
 
+			// Use actual grid extent — the chunk grid has an extra air chunk above worldHeight
+			int gridHeight = chunkGrid.GetLength(1) * cs;
+
 			// Collect tree positions using noise, then place sequentially
 			List<(int x, int z, int surfY)> treePositions = new();
 
@@ -553,11 +556,11 @@ namespace Voxelgine.Graphics
 				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
 				{
 					int surfY = surfaceHeight[x * length + z];
-					if (surfY < 0 || surfY + 12 >= worldHeight)
+					if (surfY < 0 || surfY + 12 >= gridHeight)
 						continue;
 
 					// Only place trees on grass
-					if (GridGetBlock(chunkGrid, x, surfY, z, width, worldHeight, length, cs) != BlockType.Grass)
+					if (GridGetBlock(chunkGrid, x, surfY, z, width, gridHeight, length, cs) != BlockType.Grass)
 						continue;
 
 					// Noise-based placement
@@ -594,10 +597,10 @@ namespace Voxelgine.Graphics
 
 				// Trunk
 				for (int y = surfY + 1; y <= surfY + trunkHeight; y++)
-					GridSetBlock(chunkGrid, tx, y, tz, BlockType.Wood, width, worldHeight, length, cs);
+					GridSetBlock(chunkGrid, tx, y, tz, BlockType.Wood, width, gridHeight, length, cs);
 
 				// Replace grass under trunk with dirt
-				GridSetBlock(chunkGrid, tx, surfY, tz, BlockType.Dirt, width, worldHeight, length, cs);
+				GridSetBlock(chunkGrid, tx, surfY, tz, BlockType.Dirt, width, gridHeight, length, cs);
 
 				// Leaf canopy (roughly spherical)
 				for (int ly = canopyBase; ly <= surfY + trunkHeight + 1; ly++)
@@ -621,8 +624,8 @@ namespace Voxelgine.Graphics
 							if (lx == 0 && lz == 0 && ly <= surfY + trunkHeight)
 								continue;
 
-							if (GridGetBlock(chunkGrid, bx, ly, bz, width, worldHeight, length, cs) == BlockType.None)
-								GridSetBlock(chunkGrid, bx, ly, bz, BlockType.Leaf, width, worldHeight, length, cs);
+							if (GridGetBlock(chunkGrid, bx, ly, bz, width, gridHeight, length, cs) == BlockType.None)
+								GridSetBlock(chunkGrid, bx, ly, bz, BlockType.Leaf, width, gridHeight, length, cs);
 						}
 					}
 				}

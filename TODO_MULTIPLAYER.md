@@ -193,7 +193,7 @@ Game Tick Flow (Client):
 
 ### Medium Priority
 
-- [ ] **Player list overlay** — In-game FishUI panel (toggle with Tab or similar key) showing connected players, their ping, and status. Visible during gameplay. **[CPX: 2]**
+*No medium priority tasks*
 
 ### Lower Priority
 
@@ -205,7 +205,7 @@ Game Tick Flow (Client):
 
 ### Medium Priority
 
-- [ ] **Network simulation** — Debug options to simulate bad network conditions: artificial latency (add delay to packet delivery), packet loss (randomly drop X% of packets), jitter (randomize latency). Configurable via debug menu. Essential for testing prediction/interpolation robustness. **[CPX: 2]**
+*No medium priority tasks*
 
 ### Lower Priority
 

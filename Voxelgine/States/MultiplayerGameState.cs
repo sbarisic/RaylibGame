@@ -50,6 +50,9 @@ namespace Voxelgine.States
 		// Network statistics HUD
 		private bool _showNetStats;
 
+		// Player list overlay
+		private bool _showPlayerList;
+
 		// Kill feed duration for toast notifications
 		private const float KillFeedDuration = 5f;
 
@@ -82,6 +85,10 @@ namespace Voxelgine.States
 
 		// FishUI HUD controls — Connection status
 		private Label _connectionStatusLabel;
+
+		// FishUI HUD controls — Player list
+		private Panel _playerListPanel;
+		private FishUIInfoLabel _playerListInfoLabel;
 
 		// FishUI HUD controls — Chat
 		private ToastNotification _chatToast;
@@ -279,6 +286,10 @@ namespace Voxelgine.States
 				// Toggle network statistics overlay
 				if (Raylib.IsKeyPressed(KeyboardKey.F5))
 					_showNetStats = !_showNetStats;
+
+				// Toggle player list overlay
+				if (Raylib.IsKeyPressed(KeyboardKey.Tab))
+					_showPlayerList = !_showPlayerList;
 
 				// Chat input handling
 				if (_chatOpen)
@@ -531,6 +542,12 @@ namespace Voxelgine.States
 					_netStatsPanel.Visible = _showNetStats;
 				if (_showNetStats)
 					UpdateNetStats();
+
+				// Player list panel visibility
+				if (_playerListPanel != null)
+					_playerListPanel.Visible = _showPlayerList;
+				if (_showPlayerList)
+					UpdatePlayerList();
 
 				// Death overlay visibility
 				if (_deathOverlayPanel != null)
@@ -1452,6 +1469,9 @@ namespace Voxelgine.States
 			_chatInputPanel = null;
 			_chatInputBox = null;
 			_chatOpen = false;
+			_playerListPanel = null;
+			_playerListInfoLabel = null;
+			_showPlayerList = false;
 		}
 
 		// ======================================= FishUI Setup =================================================
@@ -1627,6 +1647,25 @@ namespace Voxelgine.States
 			_netStatsPanel.AddChild(_netStatsInfoLabel);
 			_gui.AddControl(_netStatsPanel);
 
+			// Player list panel — center screen, toggled with Tab
+			_playerListInfoLabel = new FishUIInfoLabel
+			{
+				Position = new Vector2(4, 4),
+				Size = new Vector2(282, 240),
+				TextColor = FishColor.White,
+				DrawOutline = false,
+			};
+			_playerListPanel = new Panel
+			{
+				Position = new Vector2(screenW / 2f - 145, screenH / 2f - 130),
+				Size = new Vector2(290, 250),
+				Variant = PanelVariant.Dark,
+				Visible = false,
+			};
+			_playerListPanel.Opacity = 0.85f;
+			_playerListPanel.AddChild(_playerListInfoLabel);
+			_gui.AddControl(_playerListPanel);
+
 			// Death overlay — full-screen red tint with centered text
 			_deathOverlayPanel = new Panel
 			{
@@ -1715,7 +1754,7 @@ namespace Voxelgine.States
 
 		private void CreateDebugMenu(int screenW, int screenH)
 		{
-			var windowSize = new Vector2(320, 340);
+			var windowSize = new Vector2(320, 540);
 			_debugMenuWindow = new Window
 			{
 				Title = "Debug Menu",
@@ -1783,6 +1822,87 @@ namespace Voxelgine.States
 				if (server != null) server.PacketLoggingEnabled = isChecked;
 			};
 			stack.AddChild(chkServerPacketLog);
+
+			// --- Network Simulation ---
+			var chkNetSim = new CheckBox("Network Simulation")
+			{
+				IsChecked = _client?.NetSimulation?.Enabled ?? false,
+				Size = new Vector2(24, 24)
+			};
+			chkNetSim.OnCheckedChanged += (sender, isChecked) =>
+			{
+				if (_client?.NetSimulation != null) _client.NetSimulation.Enabled = isChecked;
+			};
+			stack.AddChild(chkNetSim);
+
+			var lblLatency = new Label("Latency (ms): 0")
+			{
+				Size = new Vector2(260, 20),
+				Alignment = Align.Left,
+			};
+			stack.AddChild(lblLatency);
+
+			var sldLatency = new Slider
+			{
+				MinValue = 0,
+				MaxValue = 500,
+				Value = 0,
+				Step = 10,
+				Size = new Vector2(260, 24),
+			};
+			sldLatency.OnValueChanged += (slider, val) =>
+			{
+				int ms = (int)val;
+				if (_client?.NetSimulation != null) _client.NetSimulation.LatencyMs = ms;
+				lblLatency.Text = $"Latency (ms): {ms}";
+			};
+			stack.AddChild(sldLatency);
+
+			var lblLoss = new Label("Packet Loss (%): 0")
+			{
+				Size = new Vector2(260, 20),
+				Alignment = Align.Left,
+			};
+			stack.AddChild(lblLoss);
+
+			var sldLoss = new Slider
+			{
+				MinValue = 0,
+				MaxValue = 100,
+				Value = 0,
+				Step = 5,
+				Size = new Vector2(260, 24),
+			};
+			sldLoss.OnValueChanged += (slider, val) =>
+			{
+				int pct = (int)val;
+				if (_client?.NetSimulation != null) _client.NetSimulation.PacketLossPercent = pct;
+				lblLoss.Text = $"Packet Loss (%): {pct}";
+			};
+			stack.AddChild(sldLoss);
+
+			var lblJitter = new Label("Jitter (ms): 0")
+			{
+				Size = new Vector2(260, 20),
+				Alignment = Align.Left,
+			};
+			stack.AddChild(lblJitter);
+
+			var sldJitter = new Slider
+			{
+				MinValue = 0,
+				MaxValue = 200,
+				Value = 0,
+				Step = 5,
+				Size = new Vector2(260, 24),
+			};
+			sldJitter.OnValueChanged += (slider, val) =>
+			{
+				int ms = (int)val;
+				if (_client?.NetSimulation != null) _client.NetSimulation.JitterMs = ms;
+				lblJitter.Text = $"Jitter (ms): {ms}";
+			};
+			stack.AddChild(sldJitter);
 
 			var btnClose = new Button
 			{
@@ -1913,6 +2033,34 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Updates the player list overlay with all connected players.
+		/// </summary>
+		private void UpdatePlayerList()
+		{
+			if (_playerListInfoLabel == null || _simulation == null)
+				return;
+
+			_playerListInfoLabel.Clear();
+
+			int playerCount = (_simulation.Players?.RemotePlayerCount ?? 0) + 1;
+			_playerListInfoLabel.WriteLine($"Players ({playerCount})");
+			_playerListInfoLabel.WriteLine("---");
+
+			// Local player
+			int localPing = _client?.RoundTripTimeMs ?? 0;
+			_playerListInfoLabel.WriteLine($"  {_playerName} (you)  {localPing} ms");
+
+			// Remote players
+			if (_simulation.Players != null)
+			{
+				foreach (var remote in _simulation.Players.GetAllRemotePlayers())
+				{
+					_playerListInfoLabel.WriteLine($"  {remote.PlayerName}");
+				}
+			}
+		}
+
+		/// <summary>
 		/// Repositions all FishUI HUD controls when the window is resized.
 		/// </summary>
 		private void PositionHUDControls(int screenW, int screenH)
@@ -1995,6 +2143,10 @@ namespace Voxelgine.States
 			// Chat input panel — bottom-left
 			if (_chatInputPanel != null)
 				_chatInputPanel.Position = new Vector2(10, screenH - 186);
+
+			// Player list panel — centered
+			if (_playerListPanel != null)
+				_playerListPanel.Position = new Vector2(screenW / 2f - 145, screenH / 2f - 130);
 		}
 
 		// ====================================== Rendering Helpers ===============================================

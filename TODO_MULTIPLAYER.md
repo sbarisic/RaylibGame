@@ -239,7 +239,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*No uncategorized items*
+- Viewmodel arm is still not animated, always points down, it should point forwards but down a bit
 
 ---
 

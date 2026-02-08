@@ -329,6 +329,9 @@ namespace Voxelgine.States
 					);
 				}
 
+				// Update viewmodel position/rotation/animations from current camera state
+				_simulation.LocalPlayer.ViewMdl.Update(_simulation.LocalPlayer);
+
 				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
 				// UpdateLockstep is still called for any non-authoritative cleanup.
 				_simulation.Entities.UpdateLockstep(TotalTime, Dt, InMgr);
@@ -401,6 +404,10 @@ namespace Voxelgine.States
 				Raylib.EndShaderMode();
 
 				Raylib.EndMode3D();
+
+				// Draw viewmodel overlay AFTER EndMode3D so the 2D texture is not
+				// projected through the 3D camera (which would misplace it on screen).
+				_simulation.LocalPlayer.DrawViewModelOverlay();
 			}
 			catch (Exception ex)
 			{

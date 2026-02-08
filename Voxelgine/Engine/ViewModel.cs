@@ -60,6 +60,10 @@ namespace Voxelgine.Engine
 		LerpVec3 LrpKickback;
 		Vector3 KickbackOffset = Vector3.Zero;
 
+		// Jiggle animation for empty hand clicks
+		LerpVec3 LrpJiggle;
+		Vector3 JiggleOffset = Vector3.Zero;
+
 		// Swing animation for melee weapons
 		LerpFloat LrpSwing;
 		float SwingAngle = 0f;
@@ -92,6 +96,11 @@ namespace Voxelgine.Engine
 			LrpKickback.Easing = Easing.EaseOutQuad;
 			LrpKickback.Loop = false;
 			LrpKickback.StartLerp(0.01f, Vector3.Zero, Vector3.Zero);
+
+			LrpJiggle = new LerpVec3(lerpMgr);
+			LrpJiggle.Easing = Easing.EaseOutQuad;
+			LrpJiggle.Loop = false;
+			LrpJiggle.StartLerp(0.01f, Vector3.Zero, Vector3.Zero);
 
 			LrpSwing = new LerpFloat(lerpMgr);
 			LrpSwing.Easing = Easing.EaseOutQuad;
@@ -212,6 +221,26 @@ namespace Voxelgine.Engine
 			};
 		}
 
+		/// <summary>
+		/// Applies a subtle jiggle animation to the arm when clicking with an empty hand.
+		/// A quick forward-down reach then return, like a tap or punch gesture.
+		/// </summary>
+		public void ApplyJiggle()
+		{
+			const float JiggleForward = 0.04f;
+			const float JiggleDown = -0.03f;
+			const float JiggleDuration = 0.18f;
+
+			LrpJiggle.Easing = Easing.EaseOutQuad;
+			LrpJiggle.StartLerp(JiggleDuration * 0.35f, Vector3.Zero, new Vector3(0, JiggleDown, JiggleForward));
+			LrpJiggle.OnComplete = (lerp) =>
+			{
+				LrpJiggle.Easing = Easing.EaseOutQuad;
+				LrpJiggle.StartLerp(JiggleDuration * 0.65f, new Vector3(0, JiggleDown, JiggleForward), Vector3.Zero);
+				LrpJiggle.OnComplete = null;
+			};
+		}
+
 		public void Update(Player Ply)
 		{
 			// Camera basis
@@ -270,6 +299,9 @@ namespace Voxelgine.Engine
 			// Apply kickback offset in camera space
 			KickbackOffset = LrpKickback.GetVec3();
 
+			// Apply jiggle offset for empty hand clicks
+			JiggleOffset = LrpJiggle.GetVec3();
+
 			// Update swing angle
 			SwingAngle = LrpSwing.GetFloat();
 
@@ -324,13 +356,15 @@ namespace Voxelgine.Engine
 			if (!IsActive || !ArmModelLoaded)
 				return;
 
-			// Calculate kickback in world space using camera basis
+			// Calculate kickback and jiggle in world space using camera basis
 			Vector3 camForward = Ply.GetForward();
 			Vector3 camRight = -Ply.GetLeft();
+			Vector3 camUp = Ply.GetUp();
 			Vector3 KickbackWorld = camForward * KickbackOffset.Z;
+			Vector3 JiggleWorld = camForward * JiggleOffset.Z + camUp * JiggleOffset.Y;
 
-			// Calculate final position using interpolated render camera position + offset + kickback
-			Vector3 P = Ply.RenderCam.Position + ViewModelOffset + KickbackWorld;
+			// Calculate final position using interpolated render camera position + offset + kickback + jiggle
+			Vector3 P = Ply.RenderCam.Position + ViewModelOffset + KickbackWorld + JiggleWorld;
 			Quaternion R = VMRot;
 
 			// Apply swing rotation around the right axis (pitches the weapon forward)

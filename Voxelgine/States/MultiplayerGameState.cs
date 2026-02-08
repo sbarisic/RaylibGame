@@ -322,17 +322,14 @@ namespace Voxelgine.States
 					_simulation.LocalPlayer.UpdatePhysics(_simulation.Map, _simulation.PhysicsData, Dt, InMgr);
 
 					// Record predicted state
-					_prediction.RecordPrediction(
-						_client.LocalTick,
-						_simulation.LocalPlayer.Position,
-						_simulation.LocalPlayer.GetVelocity()
-					);
-				}
+						_prediction.RecordPrediction(
+							_client.LocalTick,
+							_simulation.LocalPlayer.Position,
+							_simulation.LocalPlayer.GetVelocity()
+						);
+					}
 
-				// Update viewmodel position/rotation/animations from current camera state
-				_simulation.LocalPlayer.ViewMdl.Update(_simulation.LocalPlayer);
-
-				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
+					// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
 				// UpdateLockstep is still called for any non-authoritative cleanup.
 				_simulation.Entities.UpdateLockstep(TotalTime, Dt, InMgr);
 			}

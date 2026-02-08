@@ -175,6 +175,10 @@ namespace Voxelgine.Engine
 					if (Middle)
 						ActiveSelection.OnMiddleClick(E);
 				}
+				else if (Left || Right)
+				{
+					ViewMdl.ApplyJiggle();
+				}
 			}
 
 			if (!CursorDisabled)

@@ -141,7 +141,6 @@ Game Tick Flow (Client):
 
 ### Lower Priority
 
-- [ ] **ViewModel: Arm jiggle animation on click** — Add a subtle jiggle animation to the viewmodel arm when the player left or right clicks with an empty hand (no weapon equipped). Reuse existing `LerpVec3`/`LerpFloat` animation system in `ViewModel`. **[CPX: 2]**
 - [ ] **BlockInfo: Use IsRendered for mesh and lighting optimizations** — `BlockInfo.IsRendered()` exists but is not used anywhere. Integrate it into mesh generation (`Chunk.GenMesh.cs`) to skip non-rendered blocks early, and into lighting calculations to avoid unnecessary light propagation through empty blocks. Currently these checks use `!= BlockType.None` directly; abstracting to `IsRendered` allows future invisible block types and centralizes the check. **[CPX: 2]**
 
 ---
@@ -239,7 +238,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Viewmodel arm is still not animated, always points down, it should point forwards but down a bit
+*No uncategorized items*
 
 ---
 

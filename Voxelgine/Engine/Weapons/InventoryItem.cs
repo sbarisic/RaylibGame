@@ -206,6 +206,8 @@ namespace Voxelgine.Engine
 
 			if (UseViewmodel && (UseBlockIcon || (!UseBlockIcon && Icon == IconType.Hammer)))
 			{
+				if (!HasWeaponJsonModel)
+					ParentPlayer.ViewMdl.ApplyJiggle();
 				DestroyBlock(E.Map, E.Start, E.Dir, E.MaxLen);
 			}
 		}
@@ -220,6 +222,8 @@ namespace Voxelgine.Engine
 
 				if (PlaceBlock(E.Map, E.Start, E.Dir, E.MaxLen, BlockIcon))
 				{
+					if (!HasWeaponJsonModel)
+						ParentPlayer.ViewMdl.ApplyJiggle();
 					if (Count > 0)
 						Count--;
 				}

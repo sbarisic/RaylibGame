@@ -50,7 +50,13 @@ namespace Voxelgine.Graphics
 		/// Maximum render distance in blocks. Chunks whose center is farther than this
 		/// from the camera are skipped entirely (before frustum testing).
 		/// </summary>
-		public float RenderDistanceBlocks = 160;
+		public float RenderDistanceBlocks = 52;
+
+		/// <summary>
+		/// Last known camera position, updated each <see cref="Draw"/> call.
+		/// Used by <see cref="SetPlacedBlock"/> to skip lighting for chunks outside render distance.
+		/// </summary>
+		private Vector3 _cameraPosition;
 
 		/// <summary>
 		/// Log of block changes since last clear. Used for network delta sync —
@@ -877,7 +883,10 @@ namespace Voxelgine.Graphics
 				// Light can travel up to 15 blocks, which is almost 1 full chunk in each direction
 				const int lightRangeInChunks = 1; // 15 blocks / 16 blocks per chunk, rounded up
 
-				// Collect all chunks within light range
+				// Collect all chunks within light range, split by render-distance visibility
+				float halfChunk = Chunk.ChunkSize * 0.5f;
+				float renderDistSq = RenderDistanceBlocks * RenderDistanceBlocks;
+
 				List<Chunk> chunksToUpdate = new List<Chunk>();
 				for (int cx = -lightRangeInChunks; cx <= lightRangeInChunks; cx++)
 				{
@@ -888,22 +897,35 @@ namespace Voxelgine.Graphics
 							Vector3 neighborIdx = ChunkIndex + new Vector3(cx, cy, cz);
 							if (Chunks.TryGetValue(neighborIdx, out var chunk))
 							{
-								chunksToUpdate.Add(chunk);
+								Vector3 chunkCenter = neighborIdx * Chunk.ChunkSize + new Vector3(halfChunk);
+								if (Vector3.DistanceSquared(_cameraPosition, chunkCenter) <= renderDistSq)
+								{
+									chunksToUpdate.Add(chunk);
+								}
+								else
+								{
+									// Defer lighting for chunks outside render distance
+									chunk.NeedsRelighting = true;
+									chunk.MarkDirty();
+								}
 							}
 						}
 					}
 				}
 
-				// Reset all affected chunks first (prevents stale cross-chunk light values)
-				foreach (var chunk in chunksToUpdate)
-					chunk.ResetLighting();
+				if (chunksToUpdate.Count > 0)
+				{
+					// Reset all affected chunks first (prevents stale cross-chunk light values)
+					foreach (var chunk in chunksToUpdate)
+						chunk.ResetLighting();
 
-				// Compute lighting in parallel using 8-phase coloring
-				ComputeLightingParallel(chunksToUpdate.ToArray());
+					// Compute lighting in parallel using 8-phase coloring
+					ComputeLightingParallel(chunksToUpdate.ToArray());
 
-				// Mark all as dirty for mesh rebuild
-				foreach (var chunk in chunksToUpdate)
-					chunk.MarkDirty();
+					// Mark all as dirty for mesh rebuild
+					foreach (var chunk in chunksToUpdate)
+						chunk.MarkDirty();
+				}
 			}
 		}
 
@@ -1080,8 +1102,34 @@ namespace Voxelgine.Graphics
 
 		public void Draw(ref Frustum Fr)
 		{
+			_cameraPosition = Fr.CamPos;
 			float halfChunk = Chunk.ChunkSize * 0.5f;
 			float renderDistSq = RenderDistanceBlocks * RenderDistanceBlocks;
+
+			// Collect chunks that entered render distance and need deferred relighting
+			List<Chunk> relightChunks = null;
+			foreach (var KV in Chunks.Items)
+			{
+				if (!KV.Value.NeedsRelighting)
+					continue;
+
+				Vector3 ChunkCenter = KV.Key * new Vector3(Chunk.ChunkSize) + new Vector3(halfChunk);
+				if (Vector3.DistanceSquared(Fr.CamPos, ChunkCenter) <= renderDistSq)
+				{
+					relightChunks ??= new List<Chunk>();
+					relightChunks.Add(KV.Value);
+					KV.Value.NeedsRelighting = false;
+				}
+			}
+
+			if (relightChunks != null)
+			{
+				foreach (var chunk in relightChunks)
+					chunk.ResetLighting();
+				ComputeLightingParallel(relightChunks.ToArray());
+				foreach (var chunk in relightChunks)
+					chunk.MarkDirty();
+			}
 
 			foreach (var KV in Chunks.Items)
 			{

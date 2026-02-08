@@ -63,6 +63,13 @@ namespace Voxelgine.Graphics
 		public PlacedBlock[] Blocks;
 		bool Dirty;
 
+		/// <summary>
+		/// True when a block change affected this chunk's lighting but it was outside
+		/// render distance at the time. Lighting will be recomputed when the chunk
+		/// enters render distance during <see cref="ChunkMap.Draw"/>.
+		/// </summary>
+		public bool NeedsRelighting;
+
 		bool ModelValidOpaque;
 		bool ModelValidTransp;
 

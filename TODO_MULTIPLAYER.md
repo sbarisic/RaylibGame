@@ -244,7 +244,8 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Make light recalculations happen only on visible frustum culled chunks to speed things up. Make the render limit 8 chunks.
+*No uncategorized items*
+- Any way to optimize GenMesh and GenMeshTransparent methods? Maybe increase chunk size to 24x24?
 
 ---
 

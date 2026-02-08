@@ -61,20 +61,25 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
-		/// Retrieves all packets whose delivery time has arrived.
+		/// Retrieves all packets whose delivery time has arrived, preserving submission order.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>
 		/// <param name="output">List to append ready packets to.</param>
 		public void Collect(float currentTime, List<byte[]> output)
 		{
-			for (int i = _delayed.Count - 1; i >= 0; i--)
+			int writeIdx = 0;
+			for (int i = 0; i < _delayed.Count; i++)
 			{
 				if (currentTime >= _delayed[i].DeliverAt)
 				{
 					output.Add(_delayed[i].Data);
-					_delayed.RemoveAt(i);
+				}
+				else
+				{
+					_delayed[writeIdx++] = _delayed[i];
 				}
 			}
+			_delayed.RemoveRange(writeIdx, _delayed.Count - writeIdx);
 		}
 
 		/// <summary>

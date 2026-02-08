@@ -24,7 +24,7 @@ namespace Voxelgine.Graphics
 						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 GlobalBlockPos);
 
 						PlacedBlock CurBlock = GetBlock(x, y, z);
-						if (CurBlock.Type == BlockType.None || BlockInfo.IsOpaque(CurBlock.Type))
+						if (!BlockInfo.IsRendered(CurBlock.Type) || BlockInfo.IsOpaque(CurBlock.Type))
 							continue;
 
 						TranspVerts.SetPositionOffset(new Vector3(x, y, z) * BlockSize);
@@ -212,7 +212,7 @@ namespace Voxelgine.Graphics
 					for (int z = 0; z < ChunkSize; z++)
 					{
 						PlacedBlock CurBlock = GetBlock(x, y, z);
-						if (CurBlock.Type == BlockType.None || BlockInfo.IsOpaque(CurBlock.Type))
+						if (!BlockInfo.IsRendered(CurBlock.Type) || BlockInfo.IsOpaque(CurBlock.Type))
 							continue;
 
 						Vector3 blockWorldPos = chunkWorldPos + new Vector3(x, y, z) * BlockSize;

@@ -33,7 +33,7 @@ namespace Voxelgine.Graphics
 						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 GlobalBlockPos);
 
 						PlacedBlock CurBlock = null;
-						if ((CurBlock = GetBlock(x, y, z)).Type != BlockType.None)
+						if (BlockInfo.IsRendered((CurBlock = GetBlock(x, y, z)).Type))
 						{
 							// --- Optimization: skip face culling for fully enclosed opaque blocks ---
 							if (BlockInfo.IsOpaque(CurBlock.Type)

@@ -123,7 +123,7 @@ namespace Voxelgine.Graphics
 						int idx = x + ChunkSize * (y + ChunkSize * z);
 						PlacedBlock block = Blocks[idx];
 
-						if (skyExposed && (block.Type == BlockType.None || !BlockInfo.IsOpaque(block.Type)))
+						if (skyExposed && (!BlockInfo.IsRendered(block.Type) || !BlockInfo.IsOpaque(block.Type)))
 						{
 							// This block receives full skylight
 							Blocks[idx].SetSkylight(15);

@@ -175,7 +175,7 @@ namespace Voxelgine.Engine
 
 		public virtual void OnSelected(ViewModel CurViewModel)
 		{
-			Logging.WriteLine($"Selected '{Name}'");
+			Logging.WriteLine($"Selected '{Name}' (HasWeaponJsonModel={HasWeaponJsonModel}, UseViewmodel={UseViewmodel}, meshCount={WeaponJsonModel?.Meshes?.Count ?? -1})");
 
 			CurViewModel.IsActive = true;
 

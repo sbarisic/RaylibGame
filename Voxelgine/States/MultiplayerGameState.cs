@@ -1443,19 +1443,19 @@ namespace Voxelgine.States
 
 			// Network stats panel — top-left, below HUD info (toggled with F5)
 			_netStatsInfoLabel = new FishUIInfoLabel
-			{
-				Position = new Vector2(4, 4),
-				Size = new Vector2(270, 200),
-				TextColor = FishColor.White,
-				DrawOutline = false,
-			};
+				{
+					Position = new Vector2(4, 4),
+					Size = new Vector2(270, 200),
+					TextColor = FishColor.Black,
+					DrawOutline = false,
+				};
 			_netStatsPanel = new Panel
-			{
-				Position = new Vector2(6, 66),
-				Size = new Vector2(280, 210),
-				Variant = PanelVariant.Dark,
-				Visible = false,
-			};
+				{
+					Position = new Vector2(screenW - 286, 66),
+					Size = new Vector2(280, 210),
+					Variant = PanelVariant.Dark,
+					Visible = false,
+				};
 			_netStatsPanel.Opacity = 0.85f;
 			_netStatsPanel.AddChild(_netStatsInfoLabel);
 			_gui.AddControl(_netStatsPanel);

@@ -70,8 +70,6 @@ namespace Voxelgine.Engine
 
 	static class BlockInfo
 	{
-		// TODO: Implement functionality for IsRendered (use case: optimizations) It returns true if the block type should be rendered (not None/air).
-		// This can be used to skip mesh generation checks and parts of lighting calculations for empty blocks, improving performance
 		public static bool IsRendered(BlockType T)
 		{
 			switch (T)

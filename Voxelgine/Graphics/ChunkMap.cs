@@ -378,7 +378,7 @@ namespace Voxelgine.Graphics
 
 			// Recompute lighting if a light-emitting or light-blocking block was placed/removed
 			bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||
-									   Block.Type == BlockType.None || // Block removed
+									   !BlockInfo.IsRendered(Block.Type) || // Block removed
 									   BlockInfo.IsOpaque(Block.Type); // Opaque block affects light propagation
 
 			if (needsLightingUpdate)

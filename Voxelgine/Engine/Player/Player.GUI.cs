@@ -116,6 +116,7 @@ namespace Voxelgine.Engine
 				var particle = Eng.MultiplayerGameState?.Particle;
 				particle?.GetStats(out OnScreen, out Drawn, out Max);
 				InfoLbl.WriteLine("Particles: {0}/{1}/{2}", OnScreen, Drawn, Max);
+				InfoLbl.WriteLine(ViewMdl.GetDebugInfo());
 			}
 		}
 

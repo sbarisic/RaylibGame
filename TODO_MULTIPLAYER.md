@@ -139,9 +139,9 @@ Game Tick Flow (Client):
 
 > These tasks make the existing single-player code multiplayer-ready without adding any networking yet. The game must remain fully functional in single-player after each refactoring step.
 
-### Lower Priority
+### Medium Priority
 
-- [ ] **BlockInfo: Use IsRendered for mesh and lighting optimizations** — `BlockInfo.IsRendered()` exists but is not used anywhere. Integrate it into mesh generation (`Chunk.GenMesh.cs`) to skip non-rendered blocks early, and into lighting calculations to avoid unnecessary light propagation through empty blocks. Currently these checks use `!= BlockType.None` directly; abstracting to `IsRendered` allows future invisible block types and centralizes the check. **[CPX: 2]**
+*No medium priority tasks*
 
 ---
 
@@ -195,7 +195,7 @@ Game Tick Flow (Client):
 
 ### Higher Priority
 
-- [ ] **Network stats panel position and style** — Move the F5 network statistics overlay panel from top-left to top-right corner of the screen. Change the text color inside the panel from white to black for better readability against the dark panel background. **[CPX: 1]**
+*No higher priority tasks*
 
 ### Medium Priority
 
@@ -245,7 +245,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Handle TODO comments in BlockInfo.cs
+*No uncategorized items*
 
 ---
 

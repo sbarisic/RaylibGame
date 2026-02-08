@@ -35,6 +35,18 @@ namespace Voxelgine.Engine
 		// Offset to align weapon grip with arm hand (computed when weapon is set)
 		Vector3 WeaponGripOffset = Vector3.Zero;
 		bool _weaponDrawLogged = false;
+		bool _weaponNotLoadedLogged = false;
+
+		/// <summary>
+		/// Returns viewmodel debug state for the F3 panel.
+		/// </summary>
+		public string GetDebugInfo()
+		{
+			string weaponInfo = WeaponModelLoaded
+				? $"Weapon: YES ({WeaponModel?.Meshes?.Count ?? 0} meshes, offset={WeaponGripOffset})"
+				: "Weapon: NO";
+			return $"Arm: {(ArmModelLoaded ? "YES" : "NO")} | {weaponInfo} | Mode: {ViewMdlRotMode}";
+		}
 
 		/// <summary>
 		/// World-space muzzle point extracted from the weapon's "projectile" mesh.
@@ -401,9 +413,14 @@ namespace Voxelgine.Engine
 				if (projectile != null)
 				{
 					Matrix4x4 muzzleWorld = projectile.GetWorldMatrix(weaponMat);
-					MuzzlePoint = new Vector3(muzzleWorld.M41, muzzleWorld.M42, muzzleWorld.M43);
-				}
-			}
-		}
+							MuzzlePoint = new Vector3(muzzleWorld.M41, muzzleWorld.M42, muzzleWorld.M43);
+							}
+						}
+						else if (!_weaponNotLoadedLogged)
+						{
+							_weaponNotLoadedLogged = true;
+							Logging.WriteLine($"ViewModel.DrawViewModel: Weapon NOT loaded (WeaponModelLoaded=false, IsActive={IsActive}, ArmLoaded={ArmModelLoaded})");
+						}
+					}
 	}
 }

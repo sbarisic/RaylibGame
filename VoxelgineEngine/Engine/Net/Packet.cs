@@ -51,6 +51,9 @@ namespace Voxelgine.Engine
 
 		// Sound/particle events
 		SoundEvent = 0xA0,
+
+		// Kill feed
+		KillFeed = 0xB0,
 	}
 
 	/// <summary>
@@ -207,6 +210,9 @@ namespace Voxelgine.Engine
 
 			// Sound/particle events
 			Register<SoundEventPacket>(PacketType.SoundEvent);
+
+			// Kill feed
+			Register<KillFeedPacket>(PacketType.KillFeed);
 		}
 	}
 }

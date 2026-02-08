@@ -48,6 +48,17 @@ namespace Voxelgine.States
 		// Network statistics HUD
 		private bool _showNetStats;
 
+		// Kill feed entries displayed in the top-right corner
+		private const float KillFeedDuration = 5f;
+		private const float KillFeedFadeStart = 3.5f;
+		private readonly List<KillFeedEntry> _killFeedEntries = new List<KillFeedEntry>();
+
+		private struct KillFeedEntry
+		{
+			public string Text;
+			public float TimeRemaining;
+		}
+
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
 
@@ -457,6 +468,12 @@ namespace Voxelgine.States
 					Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
 				}
 
+				// Remote player name tags
+				DrawRemotePlayerNameTags();
+
+				// Kill feed
+				DrawKillFeed(deltaTime);
+
 				// Health bar
 				DrawHealthBar();
 
@@ -696,6 +713,10 @@ namespace Voxelgine.States
 
 					case SoundEventPacket soundEvent:
 						HandleSoundEvent(soundEvent);
+						break;
+
+					case KillFeedPacket killFeed:
+						HandleKillFeed(killFeed);
 						break;
 			}
 		}
@@ -1149,6 +1170,26 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Handles a <see cref="KillFeedPacket"/> from the server.
+		/// Adds a kill event entry to the on-screen kill feed.
+		/// </summary>
+		private void HandleKillFeed(KillFeedPacket packet)
+		{
+			string weaponName = packet.WeaponType switch
+			{
+				0 => "Gun",
+				_ => "Gun",
+			};
+
+			string text = $"{packet.KillerName} killed {packet.VictimName} with {weaponName}";
+			_killFeedEntries.Add(new KillFeedEntry { Text = text, TimeRemaining = KillFeedDuration });
+
+			// Cap entries to avoid unbounded growth
+			while (_killFeedEntries.Count > 8)
+				_killFeedEntries.RemoveAt(0);
+		}
+
+		/// <summary>
 		/// Handles an <see cref="InventoryUpdatePacket"/> from the server.
 		/// Updates local player inventory item counts to match the server-authoritative state.
 		/// </summary>
@@ -1206,6 +1247,74 @@ namespace Voxelgine.States
 			string healthText = $"{(int)health} / {(int)maxHealth}";
 			int textW = Raylib.MeasureText(healthText, 14);
 			Raylib.DrawText(healthText, barX + (barW - textW) / 2, barY + 1, 14, Color.White);
+		}
+
+		/// <summary>
+		/// Updates and draws the kill feed in the top-right corner of the screen.
+		/// Entries fade out after <see cref="KillFeedFadeStart"/> seconds and are removed after <see cref="KillFeedDuration"/>.
+		/// </summary>
+		private void DrawKillFeed(float deltaTime)
+		{
+			// Update timers and remove expired entries
+			for (int i = _killFeedEntries.Count - 1; i >= 0; i--)
+			{
+				var entry = _killFeedEntries[i];
+				entry.TimeRemaining -= deltaTime;
+				_killFeedEntries[i] = entry;
+
+				if (entry.TimeRemaining <= 0)
+					_killFeedEntries.RemoveAt(i);
+			}
+
+			if (_killFeedEntries.Count == 0)
+				return;
+
+			int screenW = _gameWindow.Width;
+			int fontSize = 18;
+			int lineH = fontSize + 6;
+			int padding = 8;
+			int margin = 10;
+			int y = 10;
+
+			for (int i = 0; i < _killFeedEntries.Count; i++)
+			{
+				var entry = _killFeedEntries[i];
+
+				// Compute alpha: full until KillFeedFadeStart, then fade to 0
+				float fadeTime = KillFeedDuration - KillFeedFadeStart;
+				float alpha = entry.TimeRemaining < fadeTime
+					? Math.Clamp(entry.TimeRemaining / fadeTime, 0f, 1f)
+					: 1f;
+				int a = (int)(alpha * 255);
+
+				int textW = Raylib.MeasureText(entry.Text, fontSize);
+				int bgW = textW + padding * 2;
+				int bgX = screenW - bgW - margin;
+
+				// Background
+				Raylib.DrawRectangle(bgX, y, bgW, lineH, new Color(0, 0, 0, (int)(140 * alpha)));
+
+				// Text
+				Raylib.DrawText(entry.Text, bgX + padding, y + 3, fontSize, new Color(255, 70, 70, a));
+
+				y += lineH + 2;
+			}
+		}
+
+		/// <summary>
+		/// Draws name tags above remote players as billboard text in screen space.
+		/// </summary>
+		private void DrawRemotePlayerNameTags()
+		{
+			if (_simulation?.LocalPlayer == null || _simulation.Players == null)
+				return;
+
+			Camera3D camera = _simulation.LocalPlayer.RenderCam;
+
+			foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
+			{
+				remotePlayer.DrawNameTag(camera, _simulation.Map);
+			}
 		}
 
 		/// <summary>
@@ -1395,6 +1504,7 @@ namespace Voxelgine.States
 			_pendingPlayerJoins.Clear();
 			_pendingEntityPackets.Clear();
 			_entitySnapshots.Clear();
+			_killFeedEntries.Clear();
 		}
 
 		// ====================================== Rendering Helpers ===============================================

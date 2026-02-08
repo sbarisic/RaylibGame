@@ -219,16 +219,12 @@ namespace Voxelgine.Engine
 			DrawHeldItem();
 
 			if (_eng.DebugMode)
-			{
-				// Draw bounding box
-				Vector3 bboxMin = new Vector3(feetPos.X - PlayerRadius, feetPos.Y, feetPos.Z - PlayerRadius);
-				Vector3 bboxMax = new Vector3(feetPos.X + PlayerRadius, feetPos.Y + PlayerHeight, feetPos.Z + PlayerRadius);
-				Raylib.DrawBoundingBox(new BoundingBox(bboxMin, bboxMax), Color.Green);
-
-				// Draw player name above head
-				Vector3 namePos = feetPos + new Vector3(0, PlayerHeight + 0.3f, 0);
-				DrawPlayerName(namePos);
-			}
+				{
+					// Draw bounding box
+					Vector3 bboxMin = new Vector3(feetPos.X - PlayerRadius, feetPos.Y, feetPos.Z - PlayerRadius);
+					Vector3 bboxMax = new Vector3(feetPos.X + PlayerRadius, feetPos.Y + PlayerHeight, feetPos.Z + PlayerRadius);
+					Raylib.DrawBoundingBox(new BoundingBox(bboxMin, bboxMax), Color.Green);
+				}
 		}
 
 		private void DrawPlaceholder()
@@ -245,11 +241,91 @@ namespace Voxelgine.Engine
 			Raylib.DrawLine3D(Position, Position + lookDir * 1.5f, Color.Yellow);
 		}
 
-		private void DrawPlayerName(Vector3 worldPos)
+		/// <summary>Max distance at which name tags are visible.</summary>
+		private const float MaxNameTagDistance = 50f;
+
+		/// <summary>Distance at which name tags start fading out.</summary>
+		private const float NameTagFadeStart = 30f;
+
+		/// <summary>Base font size for name tags at close range.</summary>
+		private const int NameTagBaseFontSize = 20;
+
+		/// <summary>Minimum font size for name tags at far range.</summary>
+		private const int NameTagMinFontSize = 10;
+
+		/// <summary>
+		/// Draws the player's name tag as billboard text above their head.
+		/// Scales with distance, fades at long range, hidden when obstructed by blocks.
+		/// Must be called during the 2D rendering pass (after EndMode3D).
+		/// </summary>
+		public void DrawNameTag(Camera3D camera, ChunkMap map)
 		{
-			// Simple debug name rendering at world position
-			// Full billboard text rendering is a separate TODO (Player name tags)
-			Raylib.DrawSphere(worldPos, 0.05f, Color.White);
+			// Name tag position: above the player's head
+			Vector3 feetPos = Position - new Vector3(0, PlayerEyeOffset, 0);
+			Vector3 nameTagWorldPos = feetPos + new Vector3(0, PlayerHeight + 0.3f, 0);
+
+			// Distance check
+			float distance = Vector3.Distance(camera.Position, nameTagWorldPos);
+			if (distance > MaxNameTagDistance || distance < 0.5f)
+				return;
+
+			// Check if behind camera (dot product with camera forward)
+			Vector3 toTag = Vector3.Normalize(nameTagWorldPos - camera.Position);
+			Vector3 camForward = Vector3.Normalize(camera.Target - camera.Position);
+			if (Vector3.Dot(toTag, camForward) <= 0)
+				return;
+
+			// Obstruction check: raycast from camera toward name tag
+			if (map != null)
+			{
+				Vector3 dir = nameTagWorldPos - camera.Position;
+				Vector3 dirNorm = Vector3.Normalize(dir);
+				if (map.RaycastPrecise(camera.Position, distance, dirNorm, out Vector3 hitPoint, out Vector3 _))
+				{
+					float hitDist = Vector3.Distance(camera.Position, hitPoint);
+					if (hitDist < distance - 0.5f)
+						return;
+				}
+			}
+
+			// Project to screen
+			Vector2 screenPos = Raylib.GetWorldToScreen(nameTagWorldPos, camera);
+
+			// Check if within screen bounds
+			int screenW = Raylib.GetScreenWidth();
+			int screenH = Raylib.GetScreenHeight();
+			if (screenPos.X < -100 || screenPos.X > screenW + 100 || screenPos.Y < -50 || screenPos.Y > screenH + 50)
+				return;
+
+			// Scale font size with distance
+			float distanceFactor = 1f - Math.Clamp((distance - 5f) / (MaxNameTagDistance - 5f), 0f, 1f);
+			int fontSize = (int)(NameTagMinFontSize + (NameTagBaseFontSize - NameTagMinFontSize) * distanceFactor);
+			if (fontSize < NameTagMinFontSize)
+				fontSize = NameTagMinFontSize;
+
+			// Fade alpha with distance
+			float alpha;
+			if (distance > NameTagFadeStart)
+				alpha = 1f - Math.Clamp((distance - NameTagFadeStart) / (MaxNameTagDistance - NameTagFadeStart), 0f, 1f);
+			else
+				alpha = 1f;
+
+			byte alphaByte = (byte)(alpha * 255);
+			if (alphaByte == 0)
+				return;
+
+			// Measure text for centering
+			int textWidth = Raylib.MeasureText(PlayerName, fontSize);
+			int textX = (int)(screenPos.X - textWidth / 2f);
+			int textY = (int)(screenPos.Y - fontSize / 2f);
+
+			// Draw background for readability
+			int padding = 4;
+			int bgAlpha = (int)(alphaByte * 0.5f);
+			Raylib.DrawRectangle(textX - padding, textY - padding / 2, textWidth + padding * 2, fontSize + padding, new Color(0, 0, 0, bgAlpha));
+
+			// Draw name text
+			Raylib.DrawText(PlayerName, textX, textY, fontSize, new Color(255, 255, 255, (int)alphaByte));
 		}
 
 		/// <summary>

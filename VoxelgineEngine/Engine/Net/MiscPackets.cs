@@ -166,4 +166,36 @@ namespace Voxelgine.Engine
 			Timestamp = reader.ReadInt64();
 		}
 	}
+
+	/// <summary>
+	/// Server → Client (reliable). Notifies clients that a player killed another player.
+	/// Clients display the kill event in a top-right kill feed with fade-out.
+	/// </summary>
+	public class KillFeedPacket : Packet
+	{
+		public override PacketType Type => PacketType.KillFeed;
+
+		/// <summary>Display name of the killer.</summary>
+		public string KillerName { get; set; } = string.Empty;
+
+		/// <summary>Display name of the victim.</summary>
+		public string VictimName { get; set; } = string.Empty;
+
+		/// <summary>Weapon type used for the kill (0 = Gun).</summary>
+		public byte WeaponType { get; set; }
+
+		public override void Write(BinaryWriter writer)
+		{
+			writer.Write(KillerName);
+			writer.Write(VictimName);
+			writer.Write(WeaponType);
+		}
+
+		public override void Read(BinaryReader reader)
+		{
+			KillerName = reader.ReadString();
+			VictimName = reader.ReadString();
+			WeaponType = reader.ReadByte();
+		}
+	}
 }

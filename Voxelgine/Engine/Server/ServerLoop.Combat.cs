@@ -117,10 +117,19 @@ namespace Voxelgine.Engine.Server
 					_server.Broadcast(damagePacket, true, CurrentTime);
 
 					if (hitPlayer.IsDead)
-					{
-						_logging.WriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
-						_respawnTimers[hitPlayerId] = CurrentTime;
-					}
+						{
+							_logging.WriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
+							_respawnTimers[hitPlayerId] = CurrentTime;
+
+							// Broadcast kill feed event to all clients
+							var killFeedPacket = new KillFeedPacket
+							{
+								KillerName = GetPlayerName(playerId),
+								VictimName = GetPlayerName(hitPlayerId),
+								WeaponType = packet.WeaponType,
+							};
+							_server.Broadcast(killFeedPacket, true, CurrentTime);
+						}
 				}
 			}
 

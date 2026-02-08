@@ -279,15 +279,15 @@ namespace Voxelgine.Engine
 				switch (ViewMdlRotMode)
 				{
 					case ViewModelRotationMode.Block:
-					case ViewModelRotationMode.Tool:
-						newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
-						break;
-					case ViewModelRotationMode.Gun:
 						newDesiredOffset = camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
 						break;
-					case ViewModelRotationMode.GunIronsight:
-						newDesiredOffset = camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+					case ViewModelRotationMode.Tool:
+					case ViewModelRotationMode.Gun:
+						newDesiredOffset = camForward * 0.7f + camRight * 0.6f + camUp * -0.6f;
 						break;
+					case ViewModelRotationMode.GunIronsight:
+							newDesiredOffset = camForward * 0.55f + camRight * 0.045f + camUp * -0.48f;
+							break;
 					default:
 						throw new NotImplementedException();
 				}
@@ -332,11 +332,11 @@ namespace Voxelgine.Engine
 				switch (ViewMdlRotMode)
 				{
 					case ViewModelRotationMode.Block:
-					case ViewModelRotationMode.Tool:
 						qModeAdj = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(-22), Utils.ToRad(35), 0);
 						break;
+					case ViewModelRotationMode.Tool:
 					case ViewModelRotationMode.Gun:
-						qModeAdj = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(15), Utils.ToRad(10), 0);
+						qModeAdj = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(5), Utils.ToRad(0), 0);
 						break;
 					case ViewModelRotationMode.GunIronsight:
 						qModeAdj = Quaternion.CreateFromYawPitchRoll(0, Utils.ToRad(2), 0);

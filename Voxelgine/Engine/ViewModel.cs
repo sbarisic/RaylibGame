@@ -243,22 +243,19 @@ namespace Voxelgine.Engine
 
 		public void Update(Player Ply)
 		{
-			// Camera basis
+			// Camera basis for offset computation
 			var cam = Ply.Cam;
-			Vector3 worldUp = Vector3.UnitY;
 			Vector3 camForward = Ply.GetForward();
 			Vector3 camRight = -Ply.GetLeft();
 			Vector3 camUp = Ply.GetUp();
 
-			// Calculate offset from camera based on mode (not absolute position)
+			// Calculate offset from camera based on mode
 			Vector3 newDesiredOffset;
-			Quaternion newDesiredRotOffset;
 
 			if (!WeaponModelLoaded)
 			{
 				// No weapon equipped: lower the arm so it doesn't obstruct the view
 				newDesiredOffset = camForward * 0.3f + camRight * 0.5f + camUp * -0.7f;
-				newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(0, 0, 0);
 			}
 			else
 			{
@@ -267,30 +264,23 @@ namespace Voxelgine.Engine
 					case ViewModelRotationMode.Block:
 					case ViewModelRotationMode.Tool:
 						newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
-						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
 						break;
 					case ViewModelRotationMode.Gun:
 						newDesiredOffset = camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
-						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0);
 						break;
 					case ViewModelRotationMode.GunIronsight:
 						newDesiredOffset = camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
-						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
 						break;
 					default:
 						throw new NotImplementedException();
 				}
 			}
 
-			// Start lerps if desired offset/rotation changed
+			// Start offset lerp if desired position changed
 			if (DesiredViewModelOffset != newDesiredOffset)
 			{
 				LrpOffset.StartLerp(0.2f, ViewModelOffset, newDesiredOffset);
 				DesiredViewModelOffset = newDesiredOffset;
-			}
-			if (LrpRot.GetQuat() != newDesiredRotOffset)
-			{
-				LrpRot.StartLerp(0.2f, LrpRot.GetQuat(), newDesiredRotOffset);
 			}
 
 			// Lerp offset
@@ -308,46 +298,42 @@ namespace Voxelgine.Engine
 			// Calculate absolute position for GameFrameInfo capture
 			ViewModelPos = cam.Position + ViewModelOffset;
 
+			// --- Rotation ---
+			// The arm/weapon model faces -Z in model space (hand at -Z, shoulder at +Z).
+			// The camera faces +Z at CamAngle=(0,0,0). Rotate 180° around Y to align
+			// model forward (-Z) with camera forward (+Z).
 			Vector3 CamAngle = Ply.GetCamAngle();
-			float yaw = Utils.ToRad(0) - CamAngle.X * MathF.PI / 180f;
-			float pitch = Utils.ToRad(90) - CamAngle.Y * MathF.PI / 180f;
-			var yawRot = Matrix4x4.CreateFromAxisAngle(worldUp, -yaw);
-			camRight = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, yawRot));
-			var pitchRot = Matrix4x4.CreateFromAxisAngle(camRight, -pitch);
-			var modelMat = pitchRot * yawRot * Matrix4x4.CreateTranslation(ViewModelPos);
-			var qYaw = Quaternion.CreateFromAxisAngle(worldUp, -yaw);
-			var qPitch = Quaternion.CreateFromAxisAngle(camRight, -pitch);
-			var qInitial = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(90));
-			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
-			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
+			Vector3 CamAngleRad = CamAngle * (MathF.PI / 180f);
 
-			if (!WeaponModelLoaded)
-			{
-				// Simple camera-following rotation for lowered arm
-				DesiredVMRot = qPitch * qYaw;
-			}
-			else
+			Quaternion qModelFlip = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI);
+			Quaternion qCam = Quaternion.CreateFromYawPitchRoll(CamAngleRad.X, CamAngleRad.Y, 0);
+
+			// Mode-specific adjustment in model space (after flip, before camera orientation)
+			Quaternion qModeAdj = Quaternion.Identity;
+			if (WeaponModelLoaded)
 			{
 				switch (ViewMdlRotMode)
 				{
 					case ViewModelRotationMode.Block:
 					case ViewModelRotationMode.Tool:
-						DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
+						qModeAdj = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(-22), Utils.ToRad(35), 0);
 						break;
 					case ViewModelRotationMode.Gun:
-						DesiredVMRot = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+						qModeAdj = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(15), Utils.ToRad(10), 0);
 						break;
 					case ViewModelRotationMode.GunIronsight:
-						DesiredVMRot = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+						qModeAdj = Quaternion.CreateFromYawPitchRoll(0, Utils.ToRad(2), 0);
 						break;
 					default:
 						throw new NotImplementedException();
 				}
 			}
-			DesiredVMRot = System.Numerics.Quaternion.Normalize(DesiredVMRot);
 
-			// Lerp rotation
-			VMRot = Quaternion.Slerp(VMRot, DesiredVMRot * LrpRot.GetQuat(), 0.2f);
+			// Compose: first flip model, then mode adjustment, then camera orientation
+			DesiredVMRot = Quaternion.Normalize(qCam * qModeAdj * qModelFlip);
+
+			// Smooth rotation interpolation
+			VMRot = Quaternion.Slerp(VMRot, DesiredVMRot, 0.2f);
 		}
 
 

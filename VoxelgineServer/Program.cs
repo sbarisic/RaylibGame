@@ -47,6 +47,29 @@ namespace VoxelgineServer
 				server.Stop();
 			};
 
+			// Start a background thread to read stdin commands
+			Thread consoleThread = new Thread(() =>
+			{
+				try
+				{
+					while (true)
+					{
+						string line = Console.ReadLine();
+						if (line == null)
+							break; // stdin closed
+						server.ExecuteCommand(line);
+					}
+				}
+				catch (Exception)
+				{
+					// stdin not available (e.g., redirected/piped with no input)
+				}
+			});
+			consoleThread.IsBackground = true;
+			consoleThread.Name = "ConsoleInput";
+			consoleThread.Start();
+
+			// Start blocks until Stop() is called
 			server.Start(port, seed, forceRegen);
 		}
 	}

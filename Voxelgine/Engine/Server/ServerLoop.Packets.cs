@@ -24,6 +24,10 @@ namespace Voxelgine.Engine.Server
 				case WeaponFirePacket weaponFire:
 					HandleWeaponFire(connection, weaponFire);
 					break;
+
+				case ChatMessagePacket chatMsg:
+					HandleChatMessage(connection, chatMsg);
+					break;
 			}
 		}
 
@@ -57,7 +61,8 @@ namespace Voxelgine.Engine.Server
 
 		/// <summary>
 		/// Handles a <see cref="BlockPlaceRequestPacket"/> from a client.
-		/// Validates that the player is within reach, then applies the block change to the ChunkMap.
+		/// Validates that the player is within reach and has the item in inventory,
+		/// then applies the block change to the ChunkMap and decrements the inventory count.
 		/// The change is automatically logged by <see cref="ChunkMap.SetPlacedBlock"/> and
 		/// will be broadcast to all clients in <see cref="BroadcastBlockChanges"/>.
 		/// </summary>
@@ -73,7 +78,23 @@ namespace Voxelgine.Engine.Server
 			if (distance > MaxBlockReach)
 				return;
 
-			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, (BlockType)packet.BlockType);
+			// Validate inventory: find the slot for this block type and check count
+			BlockType blockType = (BlockType)packet.BlockType;
+			int slot = ServerInventory.FindSlotByBlockType(blockType);
+			if (slot < 0)
+				return;
+
+			if (!_playerInventories.TryGetValue(playerId, out var inventory))
+				return;
+
+			if (!inventory.TryDecrement(slot))
+				return; // No items left
+
+			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
+
+			// Send updated count to the client (server correction)
+			if (inventory.GetCount(slot) != -1) // Only send for finite items
+				_server.SendTo(playerId, inventory.CreateSlotUpdatePacket(slot), true, CurrentTime);
 		}
 
 		/// <summary>
@@ -93,6 +114,29 @@ namespace Voxelgine.Engine.Server
 				return;
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
+		}
+
+		/// <summary>
+		/// Handles a <see cref="ChatMessagePacket"/> from a client.
+		/// Sets the sender's player ID, logs the message, and broadcasts to all clients.
+		/// </summary>
+		private void HandleChatMessage(NetConnection connection, ChatMessagePacket packet)
+		{
+			string playerName = connection.PlayerName;
+			string message = packet.Message;
+
+			if (string.IsNullOrWhiteSpace(message))
+				return;
+
+			_logging.WriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
+
+			// Rebroadcast with correct player ID
+			var broadcastPacket = new ChatMessagePacket
+			{
+				PlayerId = connection.PlayerId,
+				Message = message
+			};
+			_server.Broadcast(broadcastPacket, true, CurrentTime);
 		}
 	}
 }

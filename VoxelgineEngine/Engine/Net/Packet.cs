@@ -45,6 +45,9 @@ namespace Voxelgine.Engine
 		DayTimeSync = 0x70,
 		Ping = 0x80,
 		Pong = 0x81,
+
+		// Inventory
+		InventoryUpdate = 0x90,
 	}
 
 	/// <summary>
@@ -195,6 +198,9 @@ namespace Voxelgine.Engine
 			Register<DayTimeSyncPacket>(PacketType.DayTimeSync);
 			Register<PingPacket>(PacketType.Ping);
 			Register<PongPacket>(PacketType.Pong);
+
+			// Inventory
+			Register<InventoryUpdatePacket>(PacketType.InventoryUpdate);
 		}
 	}
 }

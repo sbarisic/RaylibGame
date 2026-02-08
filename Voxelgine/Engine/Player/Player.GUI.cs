@@ -21,6 +21,14 @@ namespace Voxelgine.Engine
 		public int GetSelectedInventoryIndex() => Inventory?.GetSelectedIndex() ?? 0;
 		public void SetSelectedInventoryIndex(int index) => Inventory?.SetSelectedIndex(index);
 
+		/// <summary>
+		/// Gets the inventory item at the given slot index, or null if the slot is empty or out of range.
+		/// </summary>
+		public InventoryItem GetInventoryItem(int slot)
+		{
+			return Inventory?.GetItem(slot)?.Item;
+		}
+
 		public void RecalcGUI(IGameWindow Window)
 		{
 			// FishUI handles positioning via control properties

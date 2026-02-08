@@ -149,6 +149,11 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public WorldReceiver WorldReceiver => _worldReceiver;
 
+		/// <summary>
+		/// The bandwidth tracker for the server connection. Null if not connected.
+		/// </summary>
+		public BandwidthTracker Bandwidth => _connection?.Bandwidth;
+
 		public NetClient()
 		{
 			_transport = new UdpTransport();

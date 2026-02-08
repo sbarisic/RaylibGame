@@ -406,21 +406,14 @@ namespace Voxelgine.Graphics
 
 				// Reset all affected chunks first (prevents stale cross-chunk light values)
 				foreach (var chunk in chunksToUpdate)
-				{
 					chunk.ResetLighting();
-				}
 
-				// Then compute lighting (propagation can now safely update neighbors)
-				foreach (var chunk in chunksToUpdate)
-				{
-					chunk.ComputeLightingWithoutReset();
-				}
+				// Compute lighting in parallel using 8-phase coloring
+				ComputeLightingParallel(chunksToUpdate.ToArray());
 
 				// Mark all as dirty for mesh rebuild
 				foreach (var chunk in chunksToUpdate)
-				{
 					chunk.MarkDirty();
-				}
 			}
 		}
 
@@ -525,16 +518,41 @@ namespace Voxelgine.Graphics
 
 		public void ComputeLighting()
 		{
-			// Reset all chunks first to prevent cross-chunk propagated values from being overwritten
-			foreach (Chunk C in GetAllChunks())
-				C.ResetLighting();
+			var allChunks = GetAllChunks();
 
-			// Then compute lighting for all chunks (propagation can now safely update neighbors)
-			foreach (Chunk C in GetAllChunks())
-				C.ComputeLightingWithoutReset();
+			// Reset all chunks in parallel — purely per-chunk, no cross-chunk dependencies
+			Parallel.ForEach(allChunks, c => c.ResetLighting());
 
-			foreach (Chunk C in GetAllChunks())
-				C.MarkDirty();
+			// Compute lighting in parallel using 8-phase coloring
+			ComputeLightingParallel(allChunks);
+
+			// Mark all dirty in parallel
+			Parallel.ForEach(allChunks, c => c.MarkDirty());
+		}
+
+		/// <summary>
+		/// Groups chunks into 8 phases using 2×2×2 index parity coloring and computes
+		/// lighting for each phase in parallel. Within each phase, chunks are ≥2 apart
+		/// on every axis, so cross-chunk border writes (which extend at most 1 block into
+		/// face-neighbors) target non-overlapping blocks and cannot race.
+		/// </summary>
+		private void ComputeLightingParallel(Chunk[] chunks)
+		{
+			var phases = new List<Chunk>[8];
+			for (int i = 0; i < 8; i++)
+				phases[i] = new List<Chunk>(chunks.Length / 8 + 1);
+
+			foreach (var c in chunks)
+			{
+				int cx = ((int)c.GlobalChunkIndex.X % 2 + 2) % 2;
+				int cy = ((int)c.GlobalChunkIndex.Y % 2 + 2) % 2;
+				int cz = ((int)c.GlobalChunkIndex.Z % 2 + 2) % 2;
+				phases[cx + cy * 2 + cz * 4].Add(c);
+			}
+
+			for (int phase = 0; phase < 8; phase++)
+				if (phases[phase].Count > 0)
+					Parallel.ForEach(phases[phase], c => c.ComputeLightingWithoutReset());
 		}
 
 		/// <summary>
@@ -543,27 +561,27 @@ namespace Voxelgine.Graphics
 		/// <param name="entityLights">Collection of point lights from entities.</param>
 		public void ComputeLightingWithEntities(IEnumerable<PointLight> entityLights)
 		{
-			// Reset all chunks first to prevent cross-chunk propagated values from being overwritten
-			foreach (Chunk C in GetAllChunks())
-				C.ResetLighting();
+			var allChunks = GetAllChunks();
 
-			// Then compute standard block-based lighting for all chunks
-			foreach (Chunk C in GetAllChunks())
-				C.ComputeLightingWithoutReset();
+			// Reset all chunks in parallel
+			Parallel.ForEach(allChunks, c => c.ResetLighting());
 
-			// Then add entity lights with shadows
+			// Compute standard block-based lighting in parallel
+			ComputeLightingParallel(allChunks);
+
+			// Then add entity lights with shadows (uses same cross-chunk write pattern)
 			if (entityLights != null)
 			{
 				var lightList = entityLights.ToList();
 				if (lightList.Count > 0)
 				{
-					foreach (Chunk C in GetAllChunks())
+					foreach (Chunk C in allChunks)
 						C.ComputeEntityLights(lightList);
 				}
 			}
 
-			foreach (Chunk C in GetAllChunks())
-				C.MarkDirty();
+			// Mark all dirty in parallel
+			Parallel.ForEach(allChunks, c => c.MarkDirty());
 		}
 
 		public void Tick()

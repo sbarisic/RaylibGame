@@ -41,6 +41,13 @@ namespace Voxelgine.States
 		private string _errorText = "";
 		private bool _initialized;
 
+		// Connection lost overlay
+		private bool _connectionLost;
+		private string _disconnectReason = "";
+
+		// Network statistics HUD
+		private bool _showNetStats;
+
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
 
@@ -154,15 +161,43 @@ namespace Voxelgine.States
 
 		public override void Tick(float GameTime)
 		{
-			if (_client == null)
+			if (_client == null && !_connectionLost)
 				return;
 
 			try
 			{
 				float currentTime = (float)Raylib.GetTime();
 
-				// Process network
-				_client.Tick(currentTime);
+				// Process network (client may still be processing final packets)
+				_client?.Tick(currentTime);
+
+				// Handle connection lost overlay input
+				if (_connectionLost)
+				{
+					if (Raylib.IsKeyPressed(KeyboardKey.R))
+					{
+						// Reconnect to the same server
+						string host = _serverHost;
+						int port = _serverPort;
+						string name = _playerName;
+						Cleanup();
+						Connect(host, port, name);
+						return;
+					}
+
+					if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+					{
+						// Return to main menu
+						Cleanup();
+						Window.SetState(Eng.MainMenuState);
+						return;
+					}
+
+					// Keep updating particles and day/night for visual continuity
+					_simulation?.DayNight.Update(Raylib.GetFrameTime());
+					_particle?.Tick(GameTime);
+					return;
+				}
 
 				if (!_initialized)
 				{
@@ -190,6 +225,10 @@ namespace Voxelgine.States
 
 				_particle?.Tick(GameTime);
 
+				// Toggle network statistics overlay
+				if (Raylib.IsKeyPressed(KeyboardKey.F5))
+					_showNetStats = !_showNetStats;
+
 				// Handle ESC — disconnect and return to main menu
 				if (Window.InMgr.IsInputPressed(InputKey.Esc))
 				{
@@ -214,7 +253,7 @@ namespace Voxelgine.States
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
 		{
-			if (_client == null || !_initialized || _client.State != ClientState.Playing)
+			if (_connectionLost || _client == null || !_initialized || _client.State != ClientState.Playing)
 				return;
 
 			try
@@ -406,16 +445,29 @@ namespace Voxelgine.States
 				Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
 
 				// Network info
-				string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
-				Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
+				if (_client != null)
+				{
+					string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
+					Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
+				}
 
 				// Health bar
 				DrawHealthBar();
+
+				// Network statistics overlay
+				if (_showNetStats)
+					DrawNetworkStatsOverlay();
 
 				// Death screen overlay
 				if (_simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead)
 				{
 					DrawDeathOverlay();
+				}
+
+				// Connection lost overlay
+				if (_connectionLost)
+				{
+					DrawConnectionLostOverlay();
 				}
 			}
 			catch (Exception ex)
@@ -435,14 +487,19 @@ namespace Voxelgine.States
 		private void OnDisconnected(string reason)
 		{
 			_logging.WriteLine($"MultiplayerGameState: Disconnected: {reason}");
-			_statusText = "";
-			_errorText = $"Disconnected: {reason}";
 
 			if (_initialized)
 			{
-				// Was in-game, go back to menu
-				_initialized = false;
-				Window.SetState(Eng.MainMenuState);
+				// Was in-game — show "Connection Lost" overlay with reconnect/return options
+				_connectionLost = true;
+				_disconnectReason = reason;
+				Raylib.EnableCursor();
+			}
+			else
+			{
+				// Was still connecting/loading — show error on the status screen
+				_statusText = "";
+				_errorText = $"Disconnected: {reason}";
 			}
 		}
 
@@ -625,6 +682,10 @@ namespace Voxelgine.States
 
 				case PlayerDamagePacket damage:
 					HandlePlayerDamage(damage);
+					break;
+
+				case InventoryUpdatePacket inventoryUpdate:
+					HandleInventoryUpdate(inventoryUpdate);
 					break;
 			}
 		}
@@ -1049,6 +1110,23 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Handles an <see cref="InventoryUpdatePacket"/> from the server.
+		/// Updates local player inventory item counts to match the server-authoritative state.
+		/// </summary>
+		private void HandleInventoryUpdate(InventoryUpdatePacket packet)
+		{
+			if (_simulation?.LocalPlayer == null)
+				return;
+
+			foreach (var slot in packet.Slots)
+			{
+				InventoryItem item = _simulation.LocalPlayer.GetInventoryItem(slot.SlotIndex);
+				if (item != null)
+					item.Count = slot.Count;
+			}
+		}
+
+		/// <summary>
 		/// Draws the player health bar in the bottom-center of the screen.
 		/// </summary>
 		private void DrawHealthBar()
@@ -1092,6 +1170,89 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Draws a debug overlay with network diagnostics: ping, bandwidth,
+		/// prediction errors, tick rate, and interpolation buffer health.
+		/// Toggled with F5.
+		/// </summary>
+		private void DrawNetworkStatsOverlay()
+		{
+			int x = 10;
+			int y = 70;
+			int lineH = 18;
+			int fontSize = 16;
+			Color labelColor = new Color(180, 180, 180, 220);
+			Color valueColor = Color.White;
+			Color headerColor = new Color(100, 200, 255, 255);
+
+			// Background panel
+			int panelW = 280;
+			int panelH = lineH * 12 + 10;
+			Raylib.DrawRectangle(x - 4, y - 4, panelW, panelH, new Color(0, 0, 0, 160));
+
+			// Header
+			Raylib.DrawText("Network Stats (F5)", x, y, fontSize, headerColor);
+			y += lineH + 4;
+
+			// Ping
+			int ping = _client?.RoundTripTimeMs ?? 0;
+			Color pingColor = ping < 80 ? new Color(50, 220, 50, 255) : ping < 150 ? new Color(220, 200, 30, 255) : new Color(220, 50, 50, 255);
+			Raylib.DrawText($"Ping: {ping} ms", x, y, fontSize, pingColor);
+			y += lineH;
+
+			// Bandwidth
+			var bw = _client?.Bandwidth;
+			if (bw != null)
+			{
+				float kbIn = bw.BytesReceivedPerSec / 1024f;
+				float kbOut = bw.BytesSentPerSec / 1024f;
+				Raylib.DrawText($"In:  {kbIn:F1} KB/s", x, y, fontSize, labelColor);
+				y += lineH;
+				Raylib.DrawText($"Out: {kbOut:F1} KB/s", x, y, fontSize, labelColor);
+				y += lineH;
+			}
+			else
+			{
+				Raylib.DrawText("In:  -- KB/s", x, y, fontSize, labelColor);
+				y += lineH;
+				Raylib.DrawText("Out: -- KB/s", x, y, fontSize, labelColor);
+				y += lineH;
+			}
+
+			// Tick
+			int tick = _client?.LocalTick ?? 0;
+			Raylib.DrawText($"Client Tick: {tick}", x, y, fontSize, labelColor);
+			y += lineH;
+
+			// Player count
+			int playerCount = (_simulation?.Players?.RemotePlayerCount ?? 0) + 1;
+			Raylib.DrawText($"Players: {playerCount}", x, y, fontSize, labelColor);
+			y += lineH;
+
+			// Prediction
+			if (_prediction != null)
+			{
+				Raylib.DrawText($"Reconciliations: {_prediction.ReconciliationCount}", x, y, fontSize, labelColor);
+				y += lineH;
+				Color corrColor = _prediction.LastCorrectionDistance > 0.1f ? new Color(220, 200, 30, 255) : labelColor;
+				Raylib.DrawText($"Last Correction: {_prediction.LastCorrectionDistance:F3}", x, y, fontSize, corrColor);
+				y += lineH;
+			}
+			else
+			{
+				Raylib.DrawText("Reconciliations: --", x, y, fontSize, labelColor);
+				y += lineH;
+				Raylib.DrawText("Last Correction: --", x, y, fontSize, labelColor);
+				y += lineH;
+			}
+
+			// Interpolation buffer health (remote players)
+			int remoteCount = _simulation?.Players?.RemotePlayerCount ?? 0;
+			int entityBufCount = _entitySnapshots.Count;
+			Raylib.DrawText($"Interp Buffers: {remoteCount} players, {entityBufCount} entities", x, y, fontSize, labelColor);
+			y += lineH;
+		}
+
+		/// <summary>
 		/// Draws a death screen overlay when the local player is dead.
 		/// Shows a dark red tint, "YOU DIED" text, and a respawn countdown.
 		/// </summary>
@@ -1116,6 +1277,43 @@ namespace Voxelgine.States
 			Raylib.DrawText(respawnText, (screenW - respawnTextW) / 2, screenH / 2 + 30, respawnFontSize, new Color(200, 200, 200, 200));
 		}
 
+		/// <summary>
+		/// Draws a "Connection Lost" overlay with the disconnect reason and options to reconnect or return to menu.
+		/// </summary>
+		private void DrawConnectionLostOverlay()
+		{
+			int screenW = _gameWindow.Width;
+			int screenH = _gameWindow.Height;
+
+			// Dark tint over entire screen
+			Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(0, 0, 0, 160));
+
+			// "CONNECTION LOST" title
+			string title = "CONNECTION LOST";
+			int titleFontSize = 48;
+			int titleW = Raylib.MeasureText(title, titleFontSize);
+			Raylib.DrawText(title, (screenW - titleW) / 2, screenH / 2 - 80, titleFontSize, new Color(255, 80, 80, 255));
+
+			// Disconnect reason
+			if (!string.IsNullOrEmpty(_disconnectReason))
+			{
+				string reason = _disconnectReason;
+				int reasonFontSize = 22;
+				int reasonW = Raylib.MeasureText(reason, reasonFontSize);
+				Raylib.DrawText(reason, (screenW - reasonW) / 2, screenH / 2 - 20, reasonFontSize, new Color(200, 200, 200, 220));
+			}
+
+			// Options
+			string reconnectText = "Press [R] to Reconnect";
+			int optFontSize = 20;
+			int reconnectW = Raylib.MeasureText(reconnectText, optFontSize);
+			Raylib.DrawText(reconnectText, (screenW - reconnectW) / 2, screenH / 2 + 30, optFontSize, new Color(100, 255, 100, 220));
+
+			string menuText = "Press [ESC] to Return to Menu";
+			int menuW = Raylib.MeasureText(menuText, optFontSize);
+			Raylib.DrawText(menuText, (screenW - menuW) / 2, screenH / 2 + 60, optFontSize, new Color(200, 200, 200, 200));
+		}
+
 		// ======================================= Helper Methods =================================================
 
 		private void DisconnectAndReturn(string reason)
@@ -1131,6 +1329,9 @@ namespace Voxelgine.States
 		private void Cleanup()
 		{
 			_initialized = false;
+			_connectionLost = false;
+			_disconnectReason = "";
+			_showNetStats = false;
 			_statusText = "";
 			_errorText = "";
 

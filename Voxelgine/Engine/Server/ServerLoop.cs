@@ -79,7 +79,9 @@ namespace Voxelgine.Engine.Server
 		/// <see cref="NetworkInputSource"/> that receives input from the client's <see cref="InputStatePacket"/>.
 		/// </summary>
 		private readonly Dictionary<int, InputMgr> _playerInputMgrs = new();
-		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
+			private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
+			private readonly Dictionary<int, ServerInventory> _playerInventories = new();
+			private readonly PlayerDataStore _playerData = new();
 
 		private float _lastTimeSyncTime;
 
@@ -236,6 +238,9 @@ namespace Voxelgine.Engine.Server
 
 		private void Tick(float totalTime, float dt)
 		{
+			// 0. Process queued admin commands
+			ProcessCommands();
+
 			// 1. Process incoming network packets
 			_server.Tick(totalTime);
 

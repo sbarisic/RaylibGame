@@ -339,6 +339,7 @@ Game Tick Flow (Client):
 
 - Block placing and destroying seems to be broken
 - Move the F5 menu to the top right corner of the screen. Make text inside the panel black
+- Handle TODOs in BlockInfo.cs
 
 ---
 

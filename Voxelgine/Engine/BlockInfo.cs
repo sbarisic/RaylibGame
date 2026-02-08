@@ -43,7 +43,8 @@ namespace Voxelgine.Engine
 		Wood,
 		CraftingTable,
 		Barrel,
-		Campfire
+		Campfire,
+		Torch
 	}
 
 	/// <summary>
@@ -62,11 +63,26 @@ namespace Voxelgine.Engine
 		HeartFull,
 		HeartHalf,
 		Lava,
-		Pickaxe
+		Pickaxe,
+		Torch
 	}
 
 	static class BlockInfo
 	{
+		// TODO: Implement functionality for IsRendered (use case: optimizations) It returns true if the block type should be rendered (not None/air).
+		// This can be used to skip mesh generation checks and parts of lighting calculations for empty blocks, improving performance
+		public static bool IsRendered(BlockType T)
+		{
+			switch (T)
+			{
+				case BlockType.None:
+					return false;
+
+				default:
+					return true;
+			}
+		}
+
 		public static bool IsOpaque(BlockType T)
 		{
 			switch (T)
@@ -74,9 +90,12 @@ namespace Voxelgine.Engine
 				case BlockType.None:
 					return false;
 
+				// Custom mesh blocks
 				case BlockType.Campfire:
+				case BlockType.Torch:
 					return false;
 
+				// Transparent square blocks
 				case BlockType.Water:
 				case BlockType.Glass:
 				case BlockType.Ice:
@@ -113,6 +132,7 @@ namespace Voxelgine.Engine
 			{
 				case BlockType.Campfire:
 				case BlockType.Glowstone:
+				case BlockType.Torch:
 					return true;
 
 				default:
@@ -129,8 +149,13 @@ namespace Voxelgine.Engine
 			{
 				case BlockType.Glowstone:
 					return 15;
+
 				case BlockType.Campfire:
 					return 14;
+
+				case BlockType.Torch:
+					return 10;
+
 				default:
 					return 0;
 			}
@@ -197,6 +222,10 @@ namespace Voxelgine.Engine
 				case IconType.Pickaxe:
 					Texture = ResMgr.GetTexture("items/pickaxe.png", TextureFilter.Point);
 					return;
+
+				case IconType.Torch:
+					Texture = ResMgr.GetTexture("items/torch.png", TextureFilter.Point);
+					return;
 			}
 
 			int IconID = (int)Icon - 1;
@@ -259,13 +288,16 @@ namespace Voxelgine.Engine
 
 		public static bool CustomModel(BlockType BType)
 		{
-			if (BType == BlockType.Barrel)
-				return true;
+			switch (BType)
+			{
+				case BlockType.Barrel:
+				case BlockType.Campfire:
+				case BlockType.Torch:
+					return true;
 
-			if (BType == BlockType.Campfire)
-				return true;
-
-			return false;
+				default:
+					return false;
+			}
 		}
 
 		public static Model GetCustomModel(BlockType BType)
@@ -277,6 +309,10 @@ namespace Voxelgine.Engine
 			else if (BType == BlockType.Campfire)
 			{
 				return ResMgr.GetModel("campfire/campfire.obj");
+			}
+			else if (BType == BlockType.Torch)
+			{
+				return ResMgr.GetModel("torch/torch.obj");
 			}
 			else
 				throw new NotImplementedException();

@@ -98,6 +98,12 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public int WorldSeed { get; set; }
 
+		/// <summary>
+		/// When enabled, logs all sent and received packets with type, size, and endpoint.
+		/// Toggle via debug menu at runtime.
+		/// </summary>
+		public bool PacketLoggingEnabled { get; set; }
+
 		public NetServer(IFishLogging logging = null)
 		{
 			_transport = new UdpTransport();
@@ -300,10 +306,11 @@ namespace Voxelgine.Engine
 				foreach (var sub in subPackets)
 				{
 					Packet packet = connection.UnwrapPacket(sub, currentTime);
-					if (packet == null)
-						continue;
+						if (packet == null)
+							continue;
 
-					HandlePacket(connection, packet, currentTime);
+						LogPacket("RECV", packet, connection);
+						HandlePacket(connection, packet, currentTime);
 
 					if (connection.State == ConnectionState.Disconnected)
 						break;
@@ -380,6 +387,14 @@ namespace Voxelgine.Engine
 			OnClientConnected?.Invoke(tempConnection);
 		}
 
+		private void LogPacket(string direction, Packet packet, NetConnection connection)
+		{
+			if (!PacketLoggingEnabled || _logging == null)
+				return;
+
+			_logging.ServerNetworkWriteLine($"[{direction}] {packet.Type} ({packet.Serialize().Length}B) [{connection.PlayerId}] {connection.RemoteEndPoint}");
+		}
+
 		private void HandlePacket(NetConnection connection, Packet packet, float currentTime)
 		{
 			switch (packet)
@@ -443,6 +458,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void SendDirect(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
+			LogPacket("SEND", packet, connection);
 			connection.SendImmediate(packet, reliable, currentTime, _transport);
 		}
 
@@ -451,6 +467,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void QueuePacket(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
+			LogPacket("SEND", packet, connection);
 			connection.QueuePacket(packet, reliable, currentTime);
 		}
 

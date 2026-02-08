@@ -156,6 +156,12 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public BandwidthTracker Bandwidth => _connection?.Bandwidth;
 
+		/// <summary>
+		/// When enabled, logs all sent and received packets with type, size, and endpoint.
+		/// Toggle via debug menu at runtime.
+		/// </summary>
+		public bool PacketLoggingEnabled { get; set; }
+
 		public NetClient(IFishLogging logging = null)
 		{
 			_transport = new UdpTransport();
@@ -258,10 +264,11 @@ namespace Voxelgine.Engine
 				foreach (var sub in subPackets)
 				{
 					Packet packet = _connection.UnwrapPacket(sub, currentTime);
-					if (packet == null)
-						continue;
+						if (packet == null)
+							continue;
 
-					HandlePacket(packet, currentTime);
+						LogPacket("RECV", packet);
+						HandlePacket(packet, currentTime);
 
 					// HandlePacket may trigger Cleanup() which nulls _connection
 					if (_connection == null || State == ClientState.Disconnected)
@@ -415,8 +422,17 @@ namespace Voxelgine.Engine
 			OnWorldTransferFailed?.Invoke(error);
 		}
 
+		private void LogPacket(string direction, Packet packet)
+		{
+			if (!PacketLoggingEnabled || _logging == null)
+				return;
+
+			_logging.ClientNetworkWriteLine($"[{direction}] {packet.Type} ({packet.Serialize().Length}B) {_serverEndPoint}");
+		}
+
 		private void SendInternal(Packet packet, bool reliable, float currentTime)
 		{
+			LogPacket("SEND", packet);
 			_connection.SendImmediate(packet, reliable, currentTime, _transport);
 		}
 

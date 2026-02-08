@@ -10,6 +10,7 @@ namespace Voxelgine.Engine
 	public class FishLogging : IFishLogging
 	{
 		string LogFolder;
+		bool IsServer = false;
 
 		static object Lck = new object();
 		static FileStream FStream;
@@ -20,9 +21,10 @@ namespace Voxelgine.Engine
 			LogFolder = Cfg.LogFolder;
 		}
 
-		public void Init()
+		public void Init(bool IsServer = false)
 		{
 			string LogFileName = $"{LogFolder}/log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt";
+			this.IsServer = IsServer;
 
 			if (!Directory.Exists(LogFolder))
 				Directory.CreateDirectory(LogFolder);
@@ -48,8 +50,14 @@ namespace Voxelgine.Engine
 
 		string GetPrefix()
 		{
-			string prefix = $"[{DateTime.Now:HH:mm:ss.fff}] ";
-			return prefix;
+			string prefix = $"[{DateTime.Now:HH:mm:ss.fff}]";
+
+			if (IsServer)
+				prefix = prefix + "[SERVER]";
+			else
+				prefix = prefix + "[CLIENT]";
+
+			return prefix + " ";
 		}
 
 		public void WriteLine(string message)
@@ -64,22 +72,22 @@ namespace Voxelgine.Engine
 
 		public void ServerWriteLine(string message)
 		{
-			WriteLine("[SERVER] " + message);
+			WriteLine(message);
 		}
 
 		public void ClientWriteLine(string message)
 		{
-			WriteLine("[CLIENT] " + message);
+			WriteLine(message);
 		}
 
 		public void ServerNetworkWriteLine(string message)
 		{
-			WriteLine("[SERVER][NETWORK] " + message);
+			WriteLine("[NETWORK] " + message);
 		}
 
 		public void ClientNetworkWriteLine(string message)
 		{
-			WriteLine("[CLIENT][NETWORK] " + message);
+			WriteLine("[NETWORK] " + message);
 		}
 	}
 }

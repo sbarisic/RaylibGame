@@ -140,7 +140,7 @@ namespace Voxelgine.Engine.Server
 			cfg.LogFolder = "server_logs";
 
 			_logging = _di.GetRequiredService<IFishLogging>();
-			_logging.Init();
+			_logging.Init(true);
 
 			_server = new NetServer(_logging);
 			_worldTransfer = new WorldTransferManager(_server);

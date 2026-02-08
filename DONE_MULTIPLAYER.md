@@ -89,6 +89,7 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 ## Testing & Debugging
 
 - **Categorized logging** — Replaced all `_logging.WriteLine()` with `ServerWriteLine`/`ClientWriteLine` in `ServerLoop.*` and `MultiplayerGameState`. Added optional `IFishLogging` to `NetServer`/`NetClient` with `ServerNetworkWriteLine`/`ClientNetworkWriteLine` for key network events (connect, disconnect, reject, timeout).
+- **Network packet logger** — `PacketLoggingEnabled` toggle on `NetServer` and `NetClient`. Logs all sent/received packets with type, size, and endpoint via `ServerNetworkWriteLine`/`ClientNetworkWriteLine`.
 
 ## Resolved Bugs
 

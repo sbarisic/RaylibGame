@@ -203,10 +203,6 @@ Game Tick Flow (Client):
 
 ## Testing & Debugging
 
-### High Priority
-
-- [ ] **Network packet logger** — Debug option to log all sent/received packets with timestamps, types, sizes, and source/destination. Output to `IFishLogging` using `ServerNetworkWriteLine`/`ClientNetworkWriteLine`. Toggle via debug menu. **[CPX: 1]** **HIGHEST PRIORITY**
-
 ### Medium Priority
 
 - [ ] **Network simulation** — Debug options to simulate bad network conditions: artificial latency (add delay to packet delivery), packet loss (randomly drop X% of packets), jitter (randomize latency). Configurable via debug menu. Essential for testing prediction/interpolation robustness. **[CPX: 2]**
@@ -234,7 +230,7 @@ Game Tick Flow (Client):
 
 ### Active Bugs
 
-*No active bugs*
+- [ ] **Block placement not propagating to server** — Player can destroy blocks (propagated correctly), but spawning a block only shows clientside (walkthrough, not sent to server). Possibly raycast-related regression after raytracing changes. **[HIGH PRIORITY]**
 
 ### Resolved Bugs
 
@@ -242,7 +238,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-*Empty — all items categorized*
+- F1 debug menu does not show up when i press F1, only mouse input becomes enabled
 
 ---
 

@@ -8,7 +8,7 @@ namespace Voxelgine.Engine.DI
 {
 	public interface IFishLogging
 	{
-		public void Init();
+		public void Init(bool IsServer = false);
 
 		public void WriteLine(string message);
 

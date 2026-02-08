@@ -7,6 +7,8 @@ using System.IO;
 using System.Numerics;
 using Voxelgine.GUI;
 using Voxelgine.Engine.DI;
+using FishUI;
+using FishUI.Controls;
 
 namespace Voxelgine.States
 {
@@ -48,16 +50,30 @@ namespace Voxelgine.States
 		// Network statistics HUD
 		private bool _showNetStats;
 
-		// Kill feed entries displayed in the top-right corner
+		// Kill feed duration for toast notifications
 		private const float KillFeedDuration = 5f;
-		private const float KillFeedFadeStart = 3.5f;
-		private readonly List<KillFeedEntry> _killFeedEntries = new List<KillFeedEntry>();
 
-		private struct KillFeedEntry
-		{
-			public string Text;
-			public float TimeRemaining;
-		}
+		// FishUI HUD controls — Loading screen
+		private Label _loadingStatusLabel;
+		private Label _loadingErrorLabel;
+		private Label _loadingHintLabel;
+		private ProgressBar _loadingProgressBar;
+
+		// FishUI HUD controls — In-game
+		private FishUIInfoLabel _hudInfoLabel;
+		private BarGauge _healthBar;
+		private Label _healthLabel;
+		private ToastNotification _killFeedToast;
+		private Panel _netStatsPanel;
+		private FishUIInfoLabel _netStatsInfoLabel;
+		private Panel _deathOverlayPanel;
+		private Label _deathTitleLabel;
+		private Label _deathSubtitleLabel;
+		private Panel _connectionLostPanel;
+		private Label _connectionLostTitleLabel;
+		private Label _connectionLostReasonLabel;
+		private Label _connectionLostReconnectLabel;
+		private Label _connectionLostMenuLabel;
 
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
@@ -143,6 +159,10 @@ namespace Voxelgine.States
 
 			_statusText = $"Connecting to {host}:{port}...";
 			_errorText = "";
+
+			// Create FishUI for loading screen
+			_gui = new FishUIManager(_gameWindow, _logging);
+			CreateLoadingUI();
 
 			try
 			{
@@ -337,18 +357,18 @@ namespace Voxelgine.States
 				}
 
 				// Update remote player interpolation
-					float frameTime = Raylib.GetFrameTime();
-					float currentTime = (float)Raylib.GetTime();
-					foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
-					{
-						remotePlayer.Update(currentTime, frameTime);
+				float frameTime = Raylib.GetFrameTime();
+				float currentTime = (float)Raylib.GetTime();
+				foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
+				{
+					remotePlayer.Update(currentTime, frameTime);
 
-						// Play footstep sounds for remote players based on velocity detection
-						if (_snd != null && remotePlayer.TryPlayFootstep())
-						{
-							_snd.PlayCombo("walk", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), remotePlayer.Position);
-						}
+					// Play footstep sounds for remote players based on velocity detection
+					if (_snd != null && remotePlayer.TryPlayFootstep())
+					{
+						_snd.PlayCombo("walk", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), remotePlayer.Position);
 					}
+				}
 
 				// Update entity interpolation from server snapshots
 				UpdateEntityInterpolation(currentTime);
@@ -405,93 +425,76 @@ namespace Voxelgine.States
 
 				if (!_initialized)
 				{
-					// Draw connection/loading status screen
+					// Loading screen
 					Raylib.ClearBackground(new Color(30, 30, 40, 255));
 
-					int screenW = _gameWindow.Width;
-					int screenH = _gameWindow.Height;
+					// Update loading UI state
+					if (_loadingStatusLabel != null)
+						_loadingStatusLabel.Text = _statusText ?? "";
 
-					if (!string.IsNullOrEmpty(_statusText))
+					bool hasError = !string.IsNullOrEmpty(_errorText);
+					if (_loadingErrorLabel != null)
 					{
-						int textW = Raylib.MeasureText(_statusText, 24);
-						Raylib.DrawText(_statusText, (screenW - textW) / 2, screenH / 2 - 20, 24, Color.White);
+						_loadingErrorLabel.Text = _errorText ?? "";
+						_loadingErrorLabel.Visible = hasError;
+					}
+					if (_loadingHintLabel != null)
+						_loadingHintLabel.Visible = hasError;
+
+					if (_client?.State == ClientState.Loading && _loadingProgressBar != null)
+					{
+						_loadingProgressBar.Visible = true;
+						_loadingProgressBar.Value = _client.WorldReceiver.Progress;
+					}
+					else if (_loadingProgressBar != null)
+					{
+						_loadingProgressBar.Visible = false;
 					}
 
-					if (!string.IsNullOrEmpty(_errorText))
+					if (hasError && Raylib.IsKeyPressed(KeyboardKey.Escape))
 					{
-						int textW = Raylib.MeasureText(_errorText, 20);
-						Raylib.DrawText(_errorText, (screenW - textW) / 2, screenH / 2 + 20, 20, Color.Red);
-
-						string backText = "Press ESC to return to menu";
-						int backW = Raylib.MeasureText(backText, 18);
-						Raylib.DrawText(backText, (screenW - backW) / 2, screenH / 2 + 60, 18, Color.Gray);
-
-						if (Raylib.IsKeyPressed(KeyboardKey.Escape))
-						{
-							DisconnectAndReturn("Cancelled");
-						}
+						DisconnectAndReturn("Cancelled");
+						return;
 					}
 
-					// Show loading progress bar
-					if (_client?.State == ClientState.Loading)
-					{
-						var wr = _client.WorldReceiver;
-						float progress = wr.Progress;
-						int barW = 300;
-						int barH = 20;
-						int barX = (screenW - barW) / 2;
-						int barY = screenH / 2 + 30;
-
-						Raylib.DrawRectangle(barX, barY, barW, barH, Color.DarkGray);
-						Raylib.DrawRectangle(barX, barY, (int)(barW * progress), barH, Color.Green);
-						Raylib.DrawRectangleLines(barX, barY, barW, barH, Color.White);
-					}
-
+					_gui?.Tick(deltaTime, _totalTime);
 					return;
 				}
 
 				// In-game HUD
 				DrawUnderwaterOverlay();
 
-				_gui.Tick(deltaTime, _totalTime);
+				// Crosshair and FPS (Raylib primitives)
 				Raylib.DrawCircleLines(_gameWindow.Width / 2, _gameWindow.Height / 2, 5, Color.White);
 				Raylib.DrawFPS(10, 10);
 
-				// Time of day
-				string timeStr = $"Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})";
-				Raylib.DrawText(timeStr, 10, 30, 20, Color.White);
-
-				// Network info
-				if (_client != null)
-				{
-					string netInfo = $"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}";
-					Raylib.DrawText(netInfo, 10, 50, 16, Color.LightGray);
-				}
-
-				// Remote player name tags
+				// Remote player name tags (3D projection, stays as Raylib)
 				DrawRemotePlayerNameTags();
 
-				// Kill feed
-				DrawKillFeed(deltaTime);
+				// Update FishUI HUD state
+				UpdateHUDInfo();
+				UpdateHealthBar();
 
-				// Health bar
-				DrawHealthBar();
-
-				// Network statistics overlay
+				// Network stats panel visibility
+				if (_netStatsPanel != null)
+					_netStatsPanel.Visible = _showNetStats;
 				if (_showNetStats)
-					DrawNetworkStatsOverlay();
+					UpdateNetStats();
 
-				// Death screen overlay
-				if (_simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead)
-				{
-					DrawDeathOverlay();
-				}
+				// Death overlay visibility
+				if (_deathOverlayPanel != null)
+					_deathOverlayPanel.Visible = _simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead;
 
 				// Connection lost overlay
-				if (_connectionLost)
+				if (_connectionLostPanel != null)
 				{
-					DrawConnectionLostOverlay();
+					_connectionLostPanel.Visible = _connectionLost;
+					if (_connectionLost && _connectionLostReasonLabel != null)
+						_connectionLostReasonLabel.Text = _disconnectReason ?? "";
 				}
+
+				// FishUI draws all HUD controls (inventory, health, kill feed, overlays)
+				_gui.Tick(deltaTime, _totalTime);
 			}
 			catch (Exception ex)
 			{
@@ -559,9 +562,9 @@ namespace Voxelgine.States
 				_logging.WriteLine("MultiplayerGameState: Lighting computed");
 
 				// Create GUI
-				_logging.WriteLine("MultiplayerGameState: Creating FishUIManager...");
-				_gui = new FishUIManager(_gameWindow, _logging);
-				_logging.WriteLine("MultiplayerGameState: FishUIManager created");
+				_logging.WriteLine("MultiplayerGameState: Creating gameplay UI...");
+				CreateGameplayUI();
+				_logging.WriteLine("MultiplayerGameState: Gameplay UI created");
 
 				// Create sound
 				_logging.WriteLine("MultiplayerGameState: Creating SoundMgr...");
@@ -708,16 +711,16 @@ namespace Voxelgine.States
 					break;
 
 				case InventoryUpdatePacket inventoryUpdate:
-						HandleInventoryUpdate(inventoryUpdate);
-						break;
+					HandleInventoryUpdate(inventoryUpdate);
+					break;
 
-					case SoundEventPacket soundEvent:
-						HandleSoundEvent(soundEvent);
-						break;
+				case SoundEventPacket soundEvent:
+					HandleSoundEvent(soundEvent);
+					break;
 
-					case KillFeedPacket killFeed:
-						HandleKillFeed(killFeed);
-						break;
+				case KillFeedPacket killFeed:
+					HandleKillFeed(killFeed);
+					break;
 			}
 		}
 
@@ -759,11 +762,11 @@ namespace Voxelgine.States
 				else
 				{
 					// Remote player — apply snapshot for interpolation
-						var remote = _simulation.Players.GetRemotePlayer(entry.PlayerId);
-						if (remote != null)
-						{
-							remote.ApplySnapshot(entry.Position, entry.Velocity, entry.CameraAngle, entry.AnimationState, currentTime);
-						}
+					var remote = _simulation.Players.GetRemotePlayer(entry.PlayerId);
+					if (remote != null)
+					{
+						remote.ApplySnapshot(entry.Position, entry.Velocity, entry.CameraAngle, entry.AnimationState, currentTime);
+					}
 				}
 			}
 		}
@@ -1182,11 +1185,7 @@ namespace Voxelgine.States
 			};
 
 			string text = $"{packet.KillerName} killed {packet.VictimName} with {weaponName}";
-			_killFeedEntries.Add(new KillFeedEntry { Text = text, TimeRemaining = KillFeedDuration });
-
-			// Cap entries to avoid unbounded growth
-			while (_killFeedEntries.Count > 8)
-				_killFeedEntries.RemoveAt(0);
+			_killFeedToast?.Show(text, ToastType.Error, KillFeedDuration);
 		}
 
 		/// <summary>
@@ -1207,101 +1206,6 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
-		/// Draws the player health bar in the bottom-center of the screen.
-		/// </summary>
-		private void DrawHealthBar()
-		{
-			if (_simulation?.LocalPlayer == null)
-				return;
-
-			float health = _simulation.LocalPlayer.Health;
-			float maxHealth = _simulation.LocalPlayer.MaxHealth;
-			float ratio = Math.Clamp(health / maxHealth, 0f, 1f);
-
-			int screenW = _gameWindow.Width;
-			int screenH = _gameWindow.Height;
-
-			int barW = 200;
-			int barH = 16;
-			int barX = (screenW - barW) / 2;
-			int barY = screenH - 40;
-
-			// Background
-			Raylib.DrawRectangle(barX - 1, barY - 1, barW + 2, barH + 2, new Color(0, 0, 0, 180));
-
-			// Health fill — green > 60%, yellow > 30%, red otherwise
-			Color barColor;
-			if (ratio > 0.6f)
-				barColor = new Color(50, 200, 50, 230);
-			else if (ratio > 0.3f)
-				barColor = new Color(220, 200, 30, 230);
-			else
-				barColor = new Color(220, 40, 40, 230);
-
-			Raylib.DrawRectangle(barX, barY, (int)(barW * ratio), barH, barColor);
-
-			// Border
-			Raylib.DrawRectangleLines(barX, barY, barW, barH, Color.White);
-
-			// Text
-			string healthText = $"{(int)health} / {(int)maxHealth}";
-			int textW = Raylib.MeasureText(healthText, 14);
-			Raylib.DrawText(healthText, barX + (barW - textW) / 2, barY + 1, 14, Color.White);
-		}
-
-		/// <summary>
-		/// Updates and draws the kill feed in the top-right corner of the screen.
-		/// Entries fade out after <see cref="KillFeedFadeStart"/> seconds and are removed after <see cref="KillFeedDuration"/>.
-		/// </summary>
-		private void DrawKillFeed(float deltaTime)
-		{
-			// Update timers and remove expired entries
-			for (int i = _killFeedEntries.Count - 1; i >= 0; i--)
-			{
-				var entry = _killFeedEntries[i];
-				entry.TimeRemaining -= deltaTime;
-				_killFeedEntries[i] = entry;
-
-				if (entry.TimeRemaining <= 0)
-					_killFeedEntries.RemoveAt(i);
-			}
-
-			if (_killFeedEntries.Count == 0)
-				return;
-
-			int screenW = _gameWindow.Width;
-			int fontSize = 18;
-			int lineH = fontSize + 6;
-			int padding = 8;
-			int margin = 10;
-			int y = 10;
-
-			for (int i = 0; i < _killFeedEntries.Count; i++)
-			{
-				var entry = _killFeedEntries[i];
-
-				// Compute alpha: full until KillFeedFadeStart, then fade to 0
-				float fadeTime = KillFeedDuration - KillFeedFadeStart;
-				float alpha = entry.TimeRemaining < fadeTime
-					? Math.Clamp(entry.TimeRemaining / fadeTime, 0f, 1f)
-					: 1f;
-				int a = (int)(alpha * 255);
-
-				int textW = Raylib.MeasureText(entry.Text, fontSize);
-				int bgW = textW + padding * 2;
-				int bgX = screenW - bgW - margin;
-
-				// Background
-				Raylib.DrawRectangle(bgX, y, bgW, lineH, new Color(0, 0, 0, (int)(140 * alpha)));
-
-				// Text
-				Raylib.DrawText(entry.Text, bgX + padding, y + 3, fontSize, new Color(255, 70, 70, a));
-
-				y += lineH + 2;
-			}
-		}
-
-		/// <summary>
 		/// Draws name tags above remote players as billboard text in screen space.
 		/// </summary>
 		private void DrawRemotePlayerNameTags()
@@ -1315,151 +1219,6 @@ namespace Voxelgine.States
 			{
 				remotePlayer.DrawNameTag(camera, _simulation.Map);
 			}
-		}
-
-		/// <summary>
-		/// Draws a debug overlay with network diagnostics: ping, bandwidth,
-		/// prediction errors, tick rate, and interpolation buffer health.
-		/// Toggled with F5.
-		/// </summary>
-		private void DrawNetworkStatsOverlay()
-		{
-			int x = 10;
-			int y = 70;
-			int lineH = 18;
-			int fontSize = 16;
-			Color labelColor = new Color(180, 180, 180, 220);
-			Color valueColor = Color.White;
-			Color headerColor = new Color(100, 200, 255, 255);
-
-			// Background panel
-			int panelW = 280;
-			int panelH = lineH * 12 + 10;
-			Raylib.DrawRectangle(x - 4, y - 4, panelW, panelH, new Color(0, 0, 0, 160));
-
-			// Header
-			Raylib.DrawText("Network Stats (F5)", x, y, fontSize, headerColor);
-			y += lineH + 4;
-
-			// Ping
-			int ping = _client?.RoundTripTimeMs ?? 0;
-			Color pingColor = ping < 80 ? new Color(50, 220, 50, 255) : ping < 150 ? new Color(220, 200, 30, 255) : new Color(220, 50, 50, 255);
-			Raylib.DrawText($"Ping: {ping} ms", x, y, fontSize, pingColor);
-			y += lineH;
-
-			// Bandwidth
-			var bw = _client?.Bandwidth;
-			if (bw != null)
-			{
-				float kbIn = bw.BytesReceivedPerSec / 1024f;
-				float kbOut = bw.BytesSentPerSec / 1024f;
-				Raylib.DrawText($"In:  {kbIn:F1} KB/s", x, y, fontSize, labelColor);
-				y += lineH;
-				Raylib.DrawText($"Out: {kbOut:F1} KB/s", x, y, fontSize, labelColor);
-				y += lineH;
-			}
-			else
-			{
-				Raylib.DrawText("In:  -- KB/s", x, y, fontSize, labelColor);
-				y += lineH;
-				Raylib.DrawText("Out: -- KB/s", x, y, fontSize, labelColor);
-				y += lineH;
-			}
-
-			// Tick
-			int tick = _client?.LocalTick ?? 0;
-			Raylib.DrawText($"Client Tick: {tick}", x, y, fontSize, labelColor);
-			y += lineH;
-
-			// Player count
-			int playerCount = (_simulation?.Players?.RemotePlayerCount ?? 0) + 1;
-			Raylib.DrawText($"Players: {playerCount}", x, y, fontSize, labelColor);
-			y += lineH;
-
-			// Prediction
-			if (_prediction != null)
-			{
-				Raylib.DrawText($"Reconciliations: {_prediction.ReconciliationCount}", x, y, fontSize, labelColor);
-				y += lineH;
-				Color corrColor = _prediction.LastCorrectionDistance > 0.1f ? new Color(220, 200, 30, 255) : labelColor;
-				Raylib.DrawText($"Last Correction: {_prediction.LastCorrectionDistance:F3}", x, y, fontSize, corrColor);
-				y += lineH;
-			}
-			else
-			{
-				Raylib.DrawText("Reconciliations: --", x, y, fontSize, labelColor);
-				y += lineH;
-				Raylib.DrawText("Last Correction: --", x, y, fontSize, labelColor);
-				y += lineH;
-			}
-
-			// Interpolation buffer health (remote players)
-			int remoteCount = _simulation?.Players?.RemotePlayerCount ?? 0;
-			int entityBufCount = _entitySnapshots.Count;
-			Raylib.DrawText($"Interp Buffers: {remoteCount} players, {entityBufCount} entities", x, y, fontSize, labelColor);
-			y += lineH;
-		}
-
-		/// <summary>
-		/// Draws a death screen overlay when the local player is dead.
-		/// Shows a dark red tint, "YOU DIED" text, and a respawn countdown.
-		/// </summary>
-		private void DrawDeathOverlay()
-		{
-			int screenW = _gameWindow.Width;
-			int screenH = _gameWindow.Height;
-
-			// Dark red tint over entire screen
-			Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(100, 0, 0, 140));
-
-			// "YOU DIED" text
-			string deathText = "YOU DIED";
-			int deathFontSize = 60;
-			int deathTextW = Raylib.MeasureText(deathText, deathFontSize);
-			Raylib.DrawText(deathText, (screenW - deathTextW) / 2, screenH / 2 - 50, deathFontSize, new Color(220, 30, 30, 255));
-
-			// Respawn message
-			string respawnText = "Respawning...";
-			int respawnFontSize = 24;
-			int respawnTextW = Raylib.MeasureText(respawnText, respawnFontSize);
-			Raylib.DrawText(respawnText, (screenW - respawnTextW) / 2, screenH / 2 + 30, respawnFontSize, new Color(200, 200, 200, 200));
-		}
-
-		/// <summary>
-		/// Draws a "Connection Lost" overlay with the disconnect reason and options to reconnect or return to menu.
-		/// </summary>
-		private void DrawConnectionLostOverlay()
-		{
-			int screenW = _gameWindow.Width;
-			int screenH = _gameWindow.Height;
-
-			// Dark tint over entire screen
-			Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(0, 0, 0, 160));
-
-			// "CONNECTION LOST" title
-			string title = "CONNECTION LOST";
-			int titleFontSize = 48;
-			int titleW = Raylib.MeasureText(title, titleFontSize);
-			Raylib.DrawText(title, (screenW - titleW) / 2, screenH / 2 - 80, titleFontSize, new Color(255, 80, 80, 255));
-
-			// Disconnect reason
-			if (!string.IsNullOrEmpty(_disconnectReason))
-			{
-				string reason = _disconnectReason;
-				int reasonFontSize = 22;
-				int reasonW = Raylib.MeasureText(reason, reasonFontSize);
-				Raylib.DrawText(reason, (screenW - reasonW) / 2, screenH / 2 - 20, reasonFontSize, new Color(200, 200, 200, 220));
-			}
-
-			// Options
-			string reconnectText = "Press [R] to Reconnect";
-			int optFontSize = 20;
-			int reconnectW = Raylib.MeasureText(reconnectText, optFontSize);
-			Raylib.DrawText(reconnectText, (screenW - reconnectW) / 2, screenH / 2 + 30, optFontSize, new Color(100, 255, 100, 220));
-
-			string menuText = "Press [ESC] to Return to Menu";
-			int menuW = Raylib.MeasureText(menuText, optFontSize);
-			Raylib.DrawText(menuText, (screenW - menuW) / 2, screenH / 2 + 60, optFontSize, new Color(200, 200, 200, 200));
 		}
 
 		// ======================================= Helper Methods =================================================
@@ -1504,7 +1263,390 @@ namespace Voxelgine.States
 			_pendingPlayerJoins.Clear();
 			_pendingEntityPackets.Clear();
 			_entitySnapshots.Clear();
-			_killFeedEntries.Clear();
+
+			// FishUI controls are owned by _gui; null the references
+			_loadingStatusLabel = null;
+			_loadingErrorLabel = null;
+			_loadingHintLabel = null;
+			_loadingProgressBar = null;
+			_hudInfoLabel = null;
+			_healthBar = null;
+			_healthLabel = null;
+			_killFeedToast = null;
+			_netStatsPanel = null;
+			_netStatsInfoLabel = null;
+			_deathOverlayPanel = null;
+			_deathTitleLabel = null;
+			_deathSubtitleLabel = null;
+			_connectionLostPanel = null;
+			_connectionLostTitleLabel = null;
+			_connectionLostReasonLabel = null;
+			_connectionLostReconnectLabel = null;
+			_connectionLostMenuLabel = null;
+		}
+
+		// ======================================= FishUI Setup =================================================
+
+		public override void OnResize(GameWindow window)
+		{
+			base.OnResize(window);
+			_gui?.OnResize(window.Width, window.Height);
+			PositionHUDControls(window.Width, window.Height);
+		}
+
+		/// <summary>
+		/// Creates FishUI controls for the loading/connecting screen.
+		/// Called from <see cref="Connect"/> before any network activity.
+		/// </summary>
+		private void CreateLoadingUI()
+		{
+			int screenW = _gameWindow.Width;
+			int screenH = _gameWindow.Height;
+
+			_loadingStatusLabel = new Label
+			{
+				Text = "",
+				Position = new Vector2(screenW / 2f - 200, screenH / 2f - 30),
+				Size = new Vector2(400, 30),
+				Alignment = Align.Center,
+			};
+			_gui.AddControl(_loadingStatusLabel);
+
+			_loadingErrorLabel = new Label
+			{
+				Text = "",
+				Position = new Vector2(screenW / 2f - 200, screenH / 2f + 10),
+				Size = new Vector2(400, 24),
+				Alignment = Align.Center,
+				Visible = false,
+			};
+			_loadingErrorLabel.SetColorOverride("Text", new FishColor(255, 60, 60, 255));
+			_gui.AddControl(_loadingErrorLabel);
+
+			_loadingHintLabel = new Label
+			{
+				Text = "Press ESC to return to menu",
+				Position = new Vector2(screenW / 2f - 200, screenH / 2f + 50),
+				Size = new Vector2(400, 22),
+				Alignment = Align.Center,
+				Visible = false,
+			};
+			_loadingHintLabel.SetColorOverride("Text", new FishColor(150, 150, 150, 255));
+			_gui.AddControl(_loadingHintLabel);
+
+			_loadingProgressBar = new ProgressBar
+			{
+				Value = 0f,
+				Position = new Vector2(screenW / 2f - 150, screenH / 2f + 20),
+				Size = new Vector2(300, 20),
+				Visible = false,
+			};
+			_gui.AddControl(_loadingProgressBar);
+		}
+
+		/// <summary>
+		/// Removes loading screen FishUI controls and creates gameplay HUD controls.
+		/// Called from <see cref="OnWorldDataReady"/> after world loading completes.
+		/// </summary>
+		private void CreateGameplayUI()
+		{
+			// Remove loading controls
+			if (_loadingStatusLabel != null) { _gui.RemoveControl(_loadingStatusLabel); _loadingStatusLabel = null; }
+			if (_loadingErrorLabel != null) { _gui.RemoveControl(_loadingErrorLabel); _loadingErrorLabel = null; }
+			if (_loadingHintLabel != null) { _gui.RemoveControl(_loadingHintLabel); _loadingHintLabel = null; }
+			if (_loadingProgressBar != null) { _gui.RemoveControl(_loadingProgressBar); _loadingProgressBar = null; }
+
+			int screenW = _gameWindow.Width;
+			int screenH = _gameWindow.Height;
+
+			// HUD info label (time + net info) — top-left, below FPS counter
+			_hudInfoLabel = new FishUIInfoLabel
+			{
+				Position = new Vector2(10, 30),
+				Size = new Vector2(400, 50),
+				TextColor = FishColor.White,
+			};
+			_gui.AddControl(_hudInfoLabel);
+
+			// Health bar — bottom-center, fuel-style zones (red-yellow-green)
+			int barW = 200;
+			int barH = 20;
+			_healthBar = new BarGauge(0, 100)
+			{
+				Value = 100,
+				Position = new Vector2(screenW / 2f - barW / 2f, screenH - 42),
+				Size = new Vector2(barW, barH),
+				ShowValue = false,
+			};
+			_healthBar.SetupFuelZones();
+			_gui.AddControl(_healthBar);
+
+			// Health text label overlaying the bar
+			_healthLabel = new Label
+			{
+				Text = "100 / 100",
+				Position = new Vector2(screenW / 2f - barW / 2f, screenH - 42),
+				Size = new Vector2(barW, barH),
+				Alignment = Align.Center,
+			};
+			_gui.AddControl(_healthLabel);
+
+			// Kill feed — toast notifications in the top-right corner
+			_killFeedToast = new ToastNotification
+			{
+				MaxToasts = 8,
+				DefaultDuration = KillFeedDuration,
+			};
+			_killFeedToast.TextColor = new FishColor(255, 70, 70, 255);
+			_gui.AddControl(_killFeedToast);
+
+			// Network stats panel — top-left, below HUD info (toggled with F5)
+			_netStatsInfoLabel = new FishUIInfoLabel
+			{
+				Position = new Vector2(4, 4),
+				Size = new Vector2(270, 200),
+				TextColor = FishColor.White,
+				DrawOutline = false,
+			};
+			_netStatsPanel = new Panel
+			{
+				Position = new Vector2(6, 66),
+				Size = new Vector2(280, 210),
+				Variant = PanelVariant.Dark,
+				Visible = false,
+			};
+			_netStatsPanel.Opacity = 0.85f;
+			_netStatsPanel.AddChild(_netStatsInfoLabel);
+			_gui.AddControl(_netStatsPanel);
+
+			// Death overlay — full-screen red tint with centered text
+			_deathOverlayPanel = new Panel
+			{
+				Position = Vector2.Zero,
+				Size = new Vector2(screenW, screenH),
+				Visible = false,
+			};
+			_deathOverlayPanel.SetColorOverride("Background", new FishColor(100, 0, 0, 140));
+
+			_deathTitleLabel = new Label
+			{
+				Text = "YOU DIED",
+				Position = new Vector2(0, screenH / 2f - 50),
+				Size = new Vector2(screenW, 60),
+				Alignment = Align.Center,
+			};
+			_deathTitleLabel.SetColorOverride("Text", new FishColor(220, 30, 30, 255));
+			_deathOverlayPanel.AddChild(_deathTitleLabel);
+
+			_deathSubtitleLabel = new Label
+			{
+				Text = "Respawning...",
+				Position = new Vector2(0, screenH / 2f + 20),
+				Size = new Vector2(screenW, 30),
+				Alignment = Align.Center,
+			};
+			_deathSubtitleLabel.SetColorOverride("Text", new FishColor(200, 200, 200, 200));
+			_deathOverlayPanel.AddChild(_deathSubtitleLabel);
+
+			_gui.AddControl(_deathOverlayPanel);
+
+			// Connection lost overlay — full-screen dark tint with reconnect options
+			_connectionLostPanel = new Panel
+			{
+				Position = Vector2.Zero,
+				Size = new Vector2(screenW, screenH),
+				Visible = false,
+			};
+			_connectionLostPanel.SetColorOverride("Background", new FishColor(0, 0, 0, 160));
+
+			_connectionLostTitleLabel = new Label
+			{
+				Text = "CONNECTION LOST",
+				Position = new Vector2(0, screenH / 2f - 80),
+				Size = new Vector2(screenW, 50),
+				Alignment = Align.Center,
+			};
+			_connectionLostTitleLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+			_connectionLostPanel.AddChild(_connectionLostTitleLabel);
+
+			_connectionLostReasonLabel = new Label
+			{
+				Text = "",
+				Position = new Vector2(0, screenH / 2f - 20),
+				Size = new Vector2(screenW, 30),
+				Alignment = Align.Center,
+			};
+			_connectionLostReasonLabel.SetColorOverride("Text", new FishColor(200, 200, 200, 220));
+			_connectionLostPanel.AddChild(_connectionLostReasonLabel);
+
+			_connectionLostReconnectLabel = new Label
+			{
+				Text = "Press [R] to Reconnect",
+				Position = new Vector2(0, screenH / 2f + 30),
+				Size = new Vector2(screenW, 26),
+				Alignment = Align.Center,
+			};
+			_connectionLostReconnectLabel.SetColorOverride("Text", new FishColor(100, 255, 100, 220));
+			_connectionLostPanel.AddChild(_connectionLostReconnectLabel);
+
+			_connectionLostMenuLabel = new Label
+			{
+				Text = "Press [ESC] to Return to Menu",
+				Position = new Vector2(0, screenH / 2f + 60),
+				Size = new Vector2(screenW, 26),
+				Alignment = Align.Center,
+			};
+			_connectionLostMenuLabel.SetColorOverride("Text", new FishColor(200, 200, 200, 200));
+			_connectionLostPanel.AddChild(_connectionLostMenuLabel);
+
+			_gui.AddControl(_connectionLostPanel);
+		}
+
+		/// <summary>
+		/// Updates the HUD info label with time of day and network stats.
+		/// </summary>
+		private void UpdateHUDInfo()
+		{
+			if (_hudInfoLabel == null || _simulation == null)
+				return;
+
+			_hudInfoLabel.Clear();
+			_hudInfoLabel.WriteLine($"Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+
+			if (_client != null)
+				_hudInfoLabel.WriteLine($"Ping: {_client.RoundTripTimeMs}ms | Tick: {_client.LocalTick} | Players: {_simulation.Players.RemotePlayerCount + 1}");
+		}
+
+		/// <summary>
+		/// Updates the health bar gauge and label from local player state.
+		/// </summary>
+		private void UpdateHealthBar()
+		{
+			if (_healthBar == null || _simulation?.LocalPlayer == null)
+				return;
+
+			float health = _simulation.LocalPlayer.Health;
+			float maxHealth = _simulation.LocalPlayer.MaxHealth;
+			_healthBar.Value = health;
+
+			if (_healthLabel != null)
+				_healthLabel.Text = $"{(int)health} / {(int)maxHealth}";
+		}
+
+		/// <summary>
+		/// Updates the network statistics overlay label with current diagnostic data.
+		/// </summary>
+		private void UpdateNetStats()
+		{
+			if (_netStatsInfoLabel == null)
+				return;
+
+			_netStatsInfoLabel.Clear();
+			_netStatsInfoLabel.WriteLine("Network Stats (F5)");
+
+			int ping = _client?.RoundTripTimeMs ?? 0;
+			_netStatsInfoLabel.WriteLine($"Ping: {ping} ms");
+
+			var bw = _client?.Bandwidth;
+			if (bw != null)
+			{
+				float kbIn = bw.BytesReceivedPerSec / 1024f;
+				float kbOut = bw.BytesSentPerSec / 1024f;
+				_netStatsInfoLabel.WriteLine($"In:  {kbIn:F1} KB/s");
+				_netStatsInfoLabel.WriteLine($"Out: {kbOut:F1} KB/s");
+			}
+			else
+			{
+				_netStatsInfoLabel.WriteLine("In:  -- KB/s");
+				_netStatsInfoLabel.WriteLine("Out: -- KB/s");
+			}
+
+			int tick = _client?.LocalTick ?? 0;
+			_netStatsInfoLabel.WriteLine($"Client Tick: {tick}");
+
+			int playerCount = (_simulation?.Players?.RemotePlayerCount ?? 0) + 1;
+			_netStatsInfoLabel.WriteLine($"Players: {playerCount}");
+
+			if (_prediction != null)
+			{
+				_netStatsInfoLabel.WriteLine($"Reconciliations: {_prediction.ReconciliationCount}");
+				_netStatsInfoLabel.WriteLine($"Last Correction: {_prediction.LastCorrectionDistance:F3}");
+			}
+			else
+			{
+				_netStatsInfoLabel.WriteLine("Reconciliations: --");
+				_netStatsInfoLabel.WriteLine("Last Correction: --");
+			}
+
+			int remoteCount = _simulation?.Players?.RemotePlayerCount ?? 0;
+			int entityBufCount = _entitySnapshots.Count;
+			_netStatsInfoLabel.WriteLine($"Interp Buffers: {remoteCount} players, {entityBufCount} entities");
+		}
+
+		/// <summary>
+		/// Repositions all FishUI HUD controls when the window is resized.
+		/// </summary>
+		private void PositionHUDControls(int screenW, int screenH)
+		{
+			// Loading screen controls
+			if (_loadingStatusLabel != null)
+				_loadingStatusLabel.Position = new Vector2(screenW / 2f - 200, screenH / 2f - 30);
+			if (_loadingErrorLabel != null)
+				_loadingErrorLabel.Position = new Vector2(screenW / 2f - 200, screenH / 2f + 10);
+			if (_loadingHintLabel != null)
+				_loadingHintLabel.Position = new Vector2(screenW / 2f - 200, screenH / 2f + 50);
+			if (_loadingProgressBar != null)
+				_loadingProgressBar.Position = new Vector2(screenW / 2f - 150, screenH / 2f + 20);
+
+			// Health bar
+			int barW = 200;
+			int barH = 20;
+			if (_healthBar != null)
+				_healthBar.Position = new Vector2(screenW / 2f - barW / 2f, screenH - 42);
+			if (_healthLabel != null)
+				_healthLabel.Position = new Vector2(screenW / 2f - barW / 2f, screenH - 42);
+
+			// Death overlay
+			if (_deathOverlayPanel != null)
+			{
+				_deathOverlayPanel.Size = new Vector2(screenW, screenH);
+				if (_deathTitleLabel != null)
+				{
+					_deathTitleLabel.Position = new Vector2(0, screenH / 2f - 50);
+					_deathTitleLabel.Size = new Vector2(screenW, 60);
+				}
+				if (_deathSubtitleLabel != null)
+				{
+					_deathSubtitleLabel.Position = new Vector2(0, screenH / 2f + 20);
+					_deathSubtitleLabel.Size = new Vector2(screenW, 30);
+				}
+			}
+
+			// Connection lost overlay
+			if (_connectionLostPanel != null)
+			{
+				_connectionLostPanel.Size = new Vector2(screenW, screenH);
+				if (_connectionLostTitleLabel != null)
+				{
+					_connectionLostTitleLabel.Position = new Vector2(0, screenH / 2f - 80);
+					_connectionLostTitleLabel.Size = new Vector2(screenW, 50);
+				}
+				if (_connectionLostReasonLabel != null)
+				{
+					_connectionLostReasonLabel.Position = new Vector2(0, screenH / 2f - 20);
+					_connectionLostReasonLabel.Size = new Vector2(screenW, 30);
+				}
+				if (_connectionLostReconnectLabel != null)
+				{
+					_connectionLostReconnectLabel.Position = new Vector2(0, screenH / 2f + 30);
+					_connectionLostReconnectLabel.Size = new Vector2(screenW, 26);
+				}
+				if (_connectionLostMenuLabel != null)
+				{
+					_connectionLostMenuLabel.Position = new Vector2(0, screenH / 2f + 60);
+					_connectionLostMenuLabel.Size = new Vector2(screenW, 26);
+				}
+			}
 		}
 
 		// ====================================== Rendering Helpers ===============================================

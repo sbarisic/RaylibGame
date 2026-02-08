@@ -1,8 +1,50 @@
 using System;
 using System.IO;
+using System.Numerics;
 
 namespace Voxelgine.Engine
 {
+	/// <summary>
+	/// Sound/particle event types for <see cref="SoundEventPacket"/>.
+	/// </summary>
+	public enum SoundEventType : byte
+	{
+		BlockBreak = 0,
+		BlockPlace = 1,
+	}
+
+	/// <summary>
+	/// Server → Client (unreliable). A gameplay sound/particle event at a world position.
+	/// Clients play the appropriate sound and spawn particles locally.
+	/// </summary>
+	public class SoundEventPacket : Packet
+	{
+		public override PacketType Type => PacketType.SoundEvent;
+
+		/// <summary>Event type (see <see cref="SoundEventType"/>).</summary>
+		public byte EventType { get; set; }
+
+		/// <summary>World position of the event.</summary>
+		public Vector3 Position { get; set; }
+
+		/// <summary>Player who caused the event (-1 for server/world).</summary>
+		public int SourcePlayerId { get; set; }
+
+		public override void Write(BinaryWriter writer)
+		{
+			writer.Write(EventType);
+			writer.WriteVector3(Position);
+			writer.Write(SourcePlayerId);
+		}
+
+		public override void Read(BinaryReader reader)
+		{
+			EventType = reader.ReadByte();
+			Position = reader.ReadVector3();
+			SourcePlayerId = reader.ReadInt32();
+		}
+	}
+
 	/// <summary>
 	/// Server → Client (reliable). Updates one or more inventory slots with new item counts.
 	/// Used for initial inventory sync on connect and server-authoritative count corrections.

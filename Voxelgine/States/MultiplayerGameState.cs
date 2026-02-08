@@ -326,12 +326,18 @@ namespace Voxelgine.States
 				}
 
 				// Update remote player interpolation
-				float frameTime = Raylib.GetFrameTime();
-				float currentTime = (float)Raylib.GetTime();
-				foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
-				{
-					remotePlayer.Update(currentTime, frameTime);
-				}
+					float frameTime = Raylib.GetFrameTime();
+					float currentTime = (float)Raylib.GetTime();
+					foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
+					{
+						remotePlayer.Update(currentTime, frameTime);
+
+						// Play footstep sounds for remote players based on velocity detection
+						if (_snd != null && remotePlayer.TryPlayFootstep())
+						{
+							_snd.PlayCombo("walk", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), remotePlayer.Position);
+						}
+					}
 
 				// Update entity interpolation from server snapshots
 				UpdateEntityInterpolation(currentTime);
@@ -685,8 +691,12 @@ namespace Voxelgine.States
 					break;
 
 				case InventoryUpdatePacket inventoryUpdate:
-					HandleInventoryUpdate(inventoryUpdate);
-					break;
+						HandleInventoryUpdate(inventoryUpdate);
+						break;
+
+					case SoundEventPacket soundEvent:
+						HandleSoundEvent(soundEvent);
+						break;
 			}
 		}
 
@@ -1089,6 +1099,35 @@ namespace Voxelgine.States
 						Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
 						_particle.SpawnFire(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
 					}
+					break;
+			}
+		}
+
+		/// <summary>
+		/// Handles a <see cref="SoundEventPacket"/> from the server.
+		/// Plays the appropriate sound at the event position. Skips events caused by the local player
+		/// (the local player already played the sound optimistically on input).
+		/// </summary>
+		private void HandleSoundEvent(SoundEventPacket packet)
+		{
+			if (_simulation == null || _snd == null)
+				return;
+
+			// Local player already played the sound on their end
+			if (packet.SourcePlayerId == _client.PlayerId)
+				return;
+
+			Vector3 ears = _simulation.LocalPlayer.Position;
+			Vector3 dir = _simulation.LocalPlayer.GetForward();
+
+			switch ((SoundEventType)packet.EventType)
+			{
+				case SoundEventType.BlockBreak:
+					_snd.PlayCombo("block_break", ears, dir, packet.Position);
+					break;
+
+				case SoundEventType.BlockPlace:
+					_snd.PlayCombo("block_place", ears, dir, packet.Position);
 					break;
 			}
 		}

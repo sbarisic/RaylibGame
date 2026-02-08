@@ -1,5 +1,6 @@
 using Raylib_cs;
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
@@ -45,6 +46,12 @@ namespace Voxelgine.Engine
 
 		// Interpolation buffer — ring buffer of timestamped snapshots
 		private readonly SnapshotBuffer<PlayerSnapshot> _snapshotBuffer = new SnapshotBuffer<PlayerSnapshot>();
+
+		// Footstep detection for remote player sounds
+		private readonly Stopwatch _footstepWatch = Stopwatch.StartNew();
+		private long _lastFootstepMs;
+		const float FootstepSpeedThreshold = 1.0f;
+		const long FootstepIntervalMs = 350;
 
 		/// <summary>Snapshot data stored in the interpolation buffer.</summary>
 		public struct PlayerSnapshot
@@ -199,6 +206,28 @@ namespace Voxelgine.Engine
 			// Simple debug name rendering at world position
 			// Full billboard text rendering is a separate TODO (Player name tags)
 			Raylib.DrawSphere(worldPos, 0.05f, Color.White);
+		}
+
+		/// <summary>
+		/// Returns true if a footstep sound should be played for this remote player.
+		/// Detects walking from XZ velocity magnitude and a cooldown timer.
+		/// </summary>
+		public bool TryPlayFootstep()
+		{
+			float xzSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
+			if (xzSpeed < FootstepSpeedThreshold)
+				return false;
+
+			// Skip if likely airborne (significant vertical velocity)
+			if (MathF.Abs(Velocity.Y) > 2.0f)
+				return false;
+
+			long now = _footstepWatch.ElapsedMilliseconds;
+			if (now - _lastFootstepMs < FootstepIntervalMs)
+				return false;
+
+			_lastFootstepMs = now;
+			return true;
 		}
 
 		/// <summary>

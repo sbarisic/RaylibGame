@@ -48,6 +48,9 @@ namespace Voxelgine.Engine
 
 		// Inventory
 		InventoryUpdate = 0x90,
+
+		// Sound/particle events
+		SoundEvent = 0xA0,
 	}
 
 	/// <summary>
@@ -201,6 +204,9 @@ namespace Voxelgine.Engine
 
 			// Inventory
 			Register<InventoryUpdatePacket>(PacketType.InventoryUpdate);
+
+			// Sound/particle events
+			Register<SoundEventPacket>(PacketType.SoundEvent);
 		}
 	}
 }

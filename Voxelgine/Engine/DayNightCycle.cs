@@ -35,9 +35,18 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// When true (default), time advances locally in <see cref="Update"/>.
-		/// When false (client in multiplayer), time only updates via <see cref="SetTime"/> from server sync.
+		/// When false (client in multiplayer), time lerps smoothly toward the target set by <see cref="SetTime"/>.
 		/// </summary>
 		public bool IsAuthority { get; set; } = true;
+
+		// Client-side smooth time sync
+		float _targetTime = -1f;
+
+		/// <summary>
+		/// Lerp speed in hours per second for non-authority time sync.
+		/// Higher values catch up faster but may look less smooth.
+		/// </summary>
+		const float TimeLerpSpeed = 2f;
 
 		// Time constants (in hours)
 		const float SunriseStart = 5f;    // Dawn begins
@@ -95,20 +104,54 @@ namespace Voxelgine.Engine
 		/// <param name="deltaTime">Frame delta time in seconds.</param>
 		public void Update(float deltaTime)
 		{
-			if (!IsAuthority || IsPaused || DayLengthSeconds <= 0)
+			if (IsPaused)
 				return;
 
-			// Calculate hours per real second
-			float hoursPerSecond = 24f / DayLengthSeconds;
-			
-			// Advance time
-			TimeOfDay += deltaTime * hoursPerSecond * TimeScale;
-			
-			// Wrap around at 24 hours
-			while (TimeOfDay >= 24f)
-				TimeOfDay -= 24f;
-			while (TimeOfDay < 0f)
-				TimeOfDay += 24f;
+			if (IsAuthority)
+			{
+				if (DayLengthSeconds <= 0)
+					return;
+
+				// Calculate hours per real second
+				float hoursPerSecond = 24f / DayLengthSeconds;
+
+				// Advance time
+				TimeOfDay += deltaTime * hoursPerSecond * TimeScale;
+
+				// Wrap around at 24 hours
+				while (TimeOfDay >= 24f)
+					TimeOfDay -= 24f;
+				while (TimeOfDay < 0f)
+					TimeOfDay += 24f;
+			}
+			else if (_targetTime >= 0f)
+			{
+				// Smoothly lerp toward server-provided target time
+				float diff = _targetTime - TimeOfDay;
+
+				// Handle wrapping (e.g., 23.9 -> 0.1 should go forward 0.2, not backward 23.8)
+				if (diff > 12f)
+					diff -= 24f;
+				else if (diff < -12f)
+					diff += 24f;
+
+				if (MathF.Abs(diff) < 0.01f)
+				{
+					// Close enough — snap and stop lerping
+					TimeOfDay = _targetTime;
+					_targetTime = -1f;
+				}
+				else
+				{
+					TimeOfDay += diff * Math.Clamp(TimeLerpSpeed * deltaTime, 0f, 1f);
+				}
+
+				// Wrap around at 24 hours
+				while (TimeOfDay >= 24f)
+					TimeOfDay -= 24f;
+				while (TimeOfDay < 0f)
+					TimeOfDay += 24f;
+			}
 
 			// Update lighting based on new time
 			UpdateLighting();
@@ -116,13 +159,30 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Sets the time of day directly (0-24 hours).
+		/// In authority mode, snaps immediately. In non-authority mode, sets a target
+		/// that <see cref="Update"/> lerps toward smoothly to avoid visual pop.
 		/// </summary>
 		public void SetTime(float hours)
 		{
-			TimeOfDay = hours % 24f;
-			if (TimeOfDay < 0f)
-				TimeOfDay += 24f;
-			UpdateLighting();
+			hours = hours % 24f;
+			if (hours < 0f)
+				hours += 24f;
+
+			if (IsAuthority)
+			{
+				TimeOfDay = hours;
+				UpdateLighting();
+			}
+			else
+			{
+				// First call initializes time instantly (no lerp from default)
+				if (_targetTime < 0f && MathF.Abs(TimeOfDay - hours) > 1f)
+				{
+					TimeOfDay = hours;
+					UpdateLighting();
+				}
+				_targetTime = hours;
+			}
 		}
 
 		/// <summary>

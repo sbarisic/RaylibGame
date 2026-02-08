@@ -95,6 +95,14 @@ namespace Voxelgine.Engine.Server
 			// Send updated count to the client (server correction)
 			if (inventory.GetCount(slot) != -1) // Only send for finite items
 				_server.SendTo(playerId, inventory.CreateSlotUpdatePacket(slot), true, CurrentTime);
+
+			// Broadcast block place sound event to all clients
+			_server.Broadcast(new SoundEventPacket
+			{
+				EventType = (byte)SoundEventType.BlockPlace,
+				Position = blockCenter,
+				SourcePlayerId = playerId,
+			}, false, CurrentTime);
 		}
 
 		/// <summary>
@@ -114,6 +122,14 @@ namespace Voxelgine.Engine.Server
 				return;
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
+
+			// Broadcast block break sound event to all clients
+			_server.Broadcast(new SoundEventPacket
+			{
+				EventType = (byte)SoundEventType.BlockBreak,
+				Position = blockCenter,
+				SourcePlayerId = playerId,
+			}, false, CurrentTime);
 		}
 
 		/// <summary>

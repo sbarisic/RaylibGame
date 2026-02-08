@@ -69,6 +69,8 @@ Planned tasks for implementing multiplayer support (up to 10 players).
 | 0x70 | `DayTimeSync` | S→C | Reliable | Current time of day |
 | 0x80 | `Ping` | Both | Unreliable | Timestamp |
 | 0x81 | `Pong` | Both | Unreliable | Echoed timestamp |
+| 0x90 | `InventoryUpdate` | S→C | Reliable | Slot entries (index, count) |
+| 0xA0 | `SoundEvent` | S→C | Unreliable | Event type, position, source player ID |
 
 ### Multiplayer State Flow
 
@@ -240,8 +242,8 @@ Game Tick Flow (Client):
 
 ### Lower Priority
 
-- [ ] **Particle/sound sync** — Server sends compact event packets for gameplay-relevant effects (weapon fire, block break, explosion). Clients spawn particles and play sounds locally based on these events. Ambient particles (smoke) remain client-only. **[CPX: 2]**
-- [ ] **Day/night sync** — Server periodically sends current time. Client smoothly transitions to server time (lerp, not snap, to avoid visual pop). **[CPX: 1]**
+- [x] **Particle/sound sync** ✅
+- [x] **Day/night sync** ✅
 
 ---
 
@@ -253,17 +255,16 @@ Game Tick Flow (Client):
 
 - [x] **Player health system** ✅
 - [x] **Player respawn system** ✅
+- [ ] **Player model** — Create or assign a visible 3D model for remote players (could reuse/adapt NPC model). Animate walk cycle based on velocity. Play attack animation when player fires weapon or places/destroys blocks (sync via animation state byte in `WorldSnapshotPacket`). Rotate head bone based on camera pitch (look direction) so remote players visually look where they aim. Show held weapon model in hand. **[CPX: 3]**
 
 ### Medium Priority
 
-- [ ] **Text chat** — Client sends `ChatMessage` to server, server broadcasts to all. Display chat messages in a scrollable FishUI panel anchored to bottom-left. Fade out after 10 seconds. Toggle chat input with Enter key. Support `/commands` for admin actions. **[CPX: 3]**
 - [ ] **Player name tags** — Render player display names above remote player models using billboard text. Scale with distance, fade at long range, hidden when obstructed by blocks. **[CPX: 2]**
-- [ ] **Kill feed** — Display a temporary message when a player kills another player (e.g., "PlayerA killed PlayerB with Gun"). Server sends kill event, clients display in top-right corner with fade-out timer (FishUI Toast notify). **[CPX: 1]**
-- [ ] **Player model** — Create or assign a visible 3D model for remote players (could reuse/adapt NPC model). Animate walk cycle based on velocity. Play attack animation when player fires weapon or places/destroys blocks (sync via animation state byte in `WorldSnapshotPacket`). Rotate head bone based on camera pitch (look direction) so remote players visually look where they aim. Show held weapon model in hand. **[CPX: 3]**
 
 ### Lower Priority
 
-- [ ] **Scoreboard** — Tab key shows overlay with all connected players: name, kills, deaths, ping. Server tracks stats and broadcasts periodically. **[CPX: 2]**
+- [ ] **Text chat** — Client sends `ChatMessage` to server, server broadcasts to all. Display chat messages in a scrollable FishUI panel anchored to bottom-left. Fade out after 10 seconds. Toggle chat input with Enter key. Support `/commands` for admin actions. **[CPX: 3]**
+- [ ] **Kill feed** — Display a temporary message when a player kills another player (e.g., "PlayerA killed PlayerB with Gun"). Server sends kill event, clients display in top-right corner with fade-out timer (FishUI Toast notify). **[CPX: 1]**
 
 ---
 
@@ -273,6 +274,7 @@ Game Tick Flow (Client):
 
 - [x] **Connect to server UI** ✅
 - [x] **Host game UI** ✅
+- [ ] **MultiplayerGameState FishUI refactor** — Refactor MultiplayerGameState to use FishUI instead of drawing the GUI with Raylib. Replace all `Raylib.DrawText`/`Raylib.DrawRectangle` HUD elements (health bar, death overlay, connection lost overlay, loading screen, network stats) with FishUI panels, labels, and windows for consistent UI styling and layout. FishUI.xml contains documentation **[CPX: 3]**
 
 ### Medium Priority
 
@@ -335,7 +337,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Refactor MultiplayerGameState to use FishUI instead of drawing the GUI with Raylib
+- FishUI documentation is in FishUI.xml, examples on how to use it are in data/FishUISamples/Samples/ folder
 
 ---
 
@@ -447,3 +449,5 @@ Game Tick Flow (Client):
 - **Client disconnect handling** — Modified `MultiplayerGameState` to show a "Connection Lost" overlay instead of immediately returning to the main menu when disconnected while in-game. Added `_connectionLost` bool and `_disconnectReason` string fields. `OnDisconnected` now sets these fields and calls `Raylib.EnableCursor()` when `_initialized` is true (was in-game); pre-game disconnects still show the error on the status screen. `DrawConnectionLostOverlay()` renders a dark semi-transparent tint, "CONNECTION LOST" title in red, the disconnect reason, and "[R] to Reconnect" / "[ESC] to Return to Menu" prompts. `Tick()` handles overlay input: R key calls `Cleanup()` then `Connect()` with the saved host/port/name; ESC key calls `Cleanup()` and `Window.SetState(Eng.MainMenuState)`. While the overlay is active, the 3D scene remains visible (frozen), day/night and particles continue updating for visual continuity, but `UpdateLockstep` is skipped (no prediction/input). `Cleanup()` resets `_connectionLost` and `_disconnectReason`. Network info HUD guarded with null check on `_client` to avoid NullReferenceException during disconnect state. Timeout detection (10s) and explicit `DisconnectPacket` handling already existed in `NetClient` — this task adds the proper client-side UI response. Build verified.
 - **Network statistics HUD** — Added debug overlay to `MultiplayerGameState` toggled with F5 key. `_showNetStats` bool field toggles in `Tick()` on `KeyboardKey.F5` press, reset in `Cleanup()`. `DrawNetworkStatsOverlay()` renders a semi-transparent background panel at top-left (below FPS counter) with: ping in ms (color-coded green/yellow/red by latency threshold), bandwidth in/out in KB/s from `BandwidthTracker` (`BytesReceivedPerSec`/`BytesSentPerSec`), client tick number, connected player count, prediction reconciliation count and last correction distance from `ClientPrediction` (correction distance highlighted yellow when > 0.1 units), and interpolation buffer counts (remote players + entity snapshot buffers). Called from `Draw2D()` after health bar and before death/connection-lost overlays. All data sources null-safe (graceful "--" fallback when not connected). Build verified.
 - **Inventory sync** — Implemented server-authoritative inventory tracking with client sync. Created `ServerInventory` class in `Voxelgine/Engine/Server/ServerInventory.cs` — tracks 10 fixed-slot inventory counts per player matching the client loadout (slots 0-1: Gun/Hammer with infinite count, slots 2-9: block types with count 64). `FindSlotByBlockType()` maps `BlockType` to slot index. `TryDecrement()` validates and decrements counts (infinite slots always succeed). `CreateFullUpdatePacket()`/`CreateSlotUpdatePacket()` generate `InventoryUpdatePacket`s. `Write()`/`Read()` for binary persistence. Added `InventoryUpdatePacket` (ID 0x90) to `VoxelgineEngine/Engine/Net/MiscPackets.cs` — S→C reliable, carries array of `(slotIndex, count)` entries for single-slot corrections or full inventory dumps. Registered in `PacketType` enum and `PacketRegistry`. **Server (`ServerLoop`):** Added `Dictionary<int, ServerInventory> _playerInventories`. `OnClientConnected` creates inventory, loads persisted counts via `PlayerDataStore.TryLoad()` (version 2 format), sends `CreateFullUpdatePacket()` to client before world transfer. `HandleBlockPlaceRequest` validates block type maps to a slot, checks `TryDecrement()` succeeds before applying `SetBlock()`, sends `CreateSlotUpdatePacket()` for finite items. `OnClientDisconnected` saves inventory via `PlayerDataStore.Save()` and cleans up. **Persistence (`PlayerDataStore`):** Upgraded to DataVersion 2 — appends `ServerInventory.Write()/Read()` (10 × int32 = 40 bytes) after existing position/health/velocity data. Backward compatible: version 1 files load without inventory (defaults used). `Save()`/`TryLoad()` accept optional `ServerInventory` parameter. **Client (`MultiplayerGameState`):** Handles `InventoryUpdatePacket` in `OnPacketReceived` — `HandleInventoryUpdate()` iterates slot entries and sets `InventoryItem.Count` on the local player's inventory items via new `Player.GetInventoryItem(int slot)` method (added to `Player.GUI.cs`). Client prediction unchanged — `OnRightClick` still decrements count locally for immediate feedback; server corrects via `InventoryUpdatePacket` if counts diverge. `FishUIItemBox` auto-updates display text from `InventoryItem.GetInvText()` each frame. Build verified.
+- **Day/night sync** — Modified `DayNightCycle` to smoothly lerp time on non-authority clients instead of snapping. Added `_targetTime` field and `TimeLerpSpeed` constant (2 hours/second). When `IsAuthority` is false, `SetTime()` sets a lerp target instead of snapping `TimeOfDay` directly (first call snaps if the difference exceeds 1 hour to handle initial connect). `Update()` now runs on clients: when a target is set, it computes the shortest-path difference (handling 24h wraparound, e.g., 23.9→0.1 goes forward 0.2h not backward 23.8h), lerps toward it using `diff * clamp(TimeLerpSpeed * dt, 0, 1)`, and snaps when within 0.01h. `UpdateLighting()` is called every frame regardless of mode so sky colors, sun position, and light levels stay current during transitions. Server continues broadcasting `DayTimeSyncPacket` every 5 seconds; client handler unchanged (`SetTime()` now sets target). Authority mode (server/headless) behavior unchanged. Build verified.
+- **Particle/sound sync** — Implemented multiplayer sound synchronization for block events and remote player footsteps. Created `SoundEventPacket` (ID 0xA0, S→C unreliable) in `VoxelgineEngine/Engine/Net/MiscPackets.cs` with `SoundEventType` enum (`BlockBreak=0`, `BlockPlace=1`), `Vector3 Position`, and `int SourcePlayerId`. Registered in `PacketType` enum and `PacketRegistry`. **Server (`ServerLoop.Packets.cs`):** `HandleBlockPlaceRequest` and `HandleBlockRemoveRequest` now broadcast `SoundEventPacket` to all clients after applying block changes — `BlockPlace` for placements, `BlockBreak` for removals, with the requesting player's ID as source. Sent unreliably (sounds are non-critical). **Client (`MultiplayerGameState.cs`):** `HandleSoundEvent()` plays positional audio via `SoundMgr.PlayCombo()` at the event position. Skips events where `SourcePlayerId` matches the local player (they already played the sound optimistically on input). Handles `BlockBreak` → "block_break" combo and `BlockPlace` → "block_place" combo. **Remote player footsteps (`RemotePlayer.cs`):** Added client-side footstep detection — `TryPlayFootstep()` checks XZ velocity magnitude (> 1.0 threshold), vertical velocity (< 2.0 to filter airborne), and a 350ms cooldown timer (`Stopwatch`-based, matching `Player.PhysicsHit` walk interval). `MultiplayerGameState` calls `TryPlayFootstep()` during the remote player update loop and plays "walk" combo at the remote player's position. **Already synced (no changes needed):** Weapon fire sounds (via `WeaponFireEffectPacket` — "shoot1" played for remote player shots), weapon hit particles (blood, sparks, fire, tracers via `HandleWeaponFireEffect`). Ambient particles (smoke from pickups) remain client-only. Build verified.

@@ -23,6 +23,14 @@ namespace Voxelgine.Engine {
 
 			Mat.Maps[0].Texture = ResMgr.GetTexture("npc/humanoid.png");
 		}
+
+		public CustomMaterial(Texture2D texture) {
+			Mesh CubeMesh = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
+			Model Mdl = Raylib.LoadModelFromMesh(CubeMesh);
+			Mat = Mdl.Materials[0];
+
+			Mat.Maps[0].Texture = texture;
+		}
 	}
 
 	/// <summary>
@@ -135,6 +143,11 @@ namespace Voxelgine.Engine {
 		public void Draw(Matrix4x4 Model) {
 			Raylib.DrawMesh(Mesh, Material.Mat, Matrix4x4.Transpose(GetWorldMatrix(Model)));
 		}
+
+		public unsafe void Draw(Matrix4x4 Model, Color tint) {
+			Material.Mat.Maps[0].Color = tint;
+			Raylib.DrawMesh(Mesh, Material.Mat, Matrix4x4.Transpose(GetWorldMatrix(Model)));
+		}
 	}
 
 	/// <summary>
@@ -229,6 +242,33 @@ namespace Voxelgine.Engine {
 
 			foreach (var Msh in Meshes) {
 				Msh.Draw(Model);
+			}
+		}
+
+		/// <summary>
+		/// Sets the texture for all meshes in this model.
+		/// </summary>
+		public unsafe void SetTexture(Texture2D texture) {
+			foreach (var mesh in Meshes) {
+				mesh.Material.Mat.Maps[0].Texture = texture;
+			}
+		}
+
+		/// <summary>
+		/// Draws the model using a provided model matrix instead of the internal position/direction.
+		/// </summary>
+		public void DrawWithMatrix(Matrix4x4 modelMatrix) {
+			foreach (var Msh in Meshes) {
+				Msh.Draw(modelMatrix);
+			}
+		}
+
+		/// <summary>
+		/// Draws the model using a provided model matrix with a tint color (e.g., for lighting).
+		/// </summary>
+		public void DrawWithMatrix(Matrix4x4 modelMatrix, Color tint) {
+			foreach (var Msh in Meshes) {
+				Msh.Draw(modelMatrix, tint);
 			}
 		}
 

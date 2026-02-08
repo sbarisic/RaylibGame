@@ -131,7 +131,7 @@ Game Tick Flow (Client):
 | **GBuffer/Rendering** | Local rendering pipeline | No changes — client-only, server skips rendering |
 | **GUI/FishUI** | Local UI | Add multiplayer UI (server browser, player list, chat) — client-only |
 | **Frustum** | Camera-based culling | No changes — client-only |
-| **ViewModel** | Local view model rendering | No changes — client-only, each client renders own ViewModel |
+| **ViewModel** | ✅ Migrated from OBJ to `CustomModel` JSON system. Arm (`viewmodel_arm.json`) always rendered; weapons (`gun.json`, `hammer.json`) attached via grip→hand alignment. `MuzzlePoint` from `projectile` mesh. Arm lowered when nothing equipped. | `CustomMaterial`/`CustomModel` extended with `SetTexture()`, `DrawWithMatrix()`, tinted `Draw()`. `ResMgr.GetModelTexture()` added. |
 
 ---
 
@@ -141,6 +141,7 @@ Game Tick Flow (Client):
 
 ### Lower Priority
 
+- [ ] **ViewModel: Arm jiggle animation on click** — Add a subtle jiggle animation to the viewmodel arm when the player left or right clicks with an empty hand (no weapon equipped). Reuse existing `LerpVec3`/`LerpFloat` animation system in `ViewModel`. **[CPX: 2]**
 - [ ] **BlockInfo: Use IsRendered for mesh and lighting optimizations** — `BlockInfo.IsRendered()` exists but is not used anywhere. Integrate it into mesh generation (`Chunk.GenMesh.cs`) to skip non-rendered blocks early, and into lighting calculations to avoid unnecessary light propagation through empty blocks. Currently these checks use `!= BlockType.None` directly; abstracting to `IsRendered` allows future invisible block types and centralizes the check. **[CPX: 2]**
 
 ---
@@ -230,7 +231,7 @@ Game Tick Flow (Client):
 
 ### Active Bugs
 
-- [ ] **Block placement not propagating to server** — Player can destroy blocks (propagated correctly), but spawning a block only shows clientside (walkthrough, not sent to server). Possibly raycast-related regression after raytracing changes. **[HIGH PRIORITY]**
+*No active bugs*
 
 ### Resolved Bugs
 
@@ -238,10 +239,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- Added new weapon models in json format, they have gun_body/grip and gun_body/projectile parts, grip is used for hand attachment, projectile is where the shooting effects come from, where the projectile spawns
-- Gun Y+ axis is top, Z- axis is forward (away from user and gun), X+ axis is right
-- Added viewmodel_arm.json for the player's arm in first person, it has "arm" and "arm/hand" part which is used for hand attachment, it is positioned and rotated to match the player's right arm, so the gun can be attached to the hand and positioned correctly
-- viewmodel_arm is also rendered when nothing is equipped, but it is lowered so it doesn't take up view space. it should "jiggle" when player left or right clicks
+*No uncategorized items*
 
 ---
 
@@ -258,6 +256,9 @@ Game Tick Flow (Client):
 - Single-player mode has been replaced by listen server — Host Game is the only way to play (hosts a local server and connects to it)
 - `FPSCamera` static-to-instance refactoring is the most critical prerequisite — almost every other task depends on supporting multiple player instances
 - FishUI documentation is in `FishUI.xml`, usage examples are in `data/FishUISamples/Samples/` folder
+- Weapon JSON models use Blockbench format with named parts: `gun_body` (main body), `grip` (hand attachment point), `projectile` (muzzle/spawn point for fire effects). Gun axis: Y+ top, Z- forward (away from player), X+ right
+- `viewmodel_arm.json` has `arm` and `hand` parts with parent-child hierarchy. Hand is the attachment point for weapon grip
+- `CustomModel`/`CustomMesh` system extended with `SetTexture()`, `DrawWithMatrix()`, tinted `Draw()` for viewmodel rendering. `ResMgr.GetModelTexture()` loads textures from `data/models/` directory
 
 ---
 

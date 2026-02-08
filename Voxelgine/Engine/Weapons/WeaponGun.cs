@@ -26,7 +26,7 @@ namespace Voxelgine.Engine
 		public WeaponGun(IFishEngineRunner Eng, Player ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Gun)
 		{
 			SetViewModelInfo(ViewModelRotationMode.Gun);
-			SetupModel("gun/gun.obj");
+			SetupJsonModel("gun/gun.json", "gun/gun_tex.png");
 		}
 
 		public override void Tick(ViewModel ViewMdl, InputMgr InMgr)

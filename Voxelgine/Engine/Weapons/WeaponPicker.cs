@@ -15,7 +15,7 @@ namespace Voxelgine.Engine
 		public WeaponPicker(IFishEngineRunner Eng, Player ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Hammer)
 		{
 			SetViewModelInfo(ViewModelRotationMode.Tool);
-			SetupModel("hammer/hammer.obj");
+			SetupJsonModel("hammer/hammer.json", "hammer/hammer_tex.png");
 		}
 
 		public override void OnLeftClick(InventoryClickEventArgs E)
@@ -23,8 +23,8 @@ namespace Voxelgine.Engine
 			// Apply swing animation to the view model
 			ParentPlayer.ViewMdl.ApplySwing();
 
-			// Destroy the block (base handles the raycast and Map.SetBlock call)
-			base.OnLeftClick(E);
+			// Destroy the block (base handles the raycast and Map.SetBlock call) - don't destroy, do nothing for now
+			// base.OnLeftClick(E);
 		}
 	}
 }

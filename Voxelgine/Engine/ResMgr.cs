@@ -230,7 +230,9 @@ namespace Voxelgine.Engine {
 					List<MinecrafTexture> TexList = new List<MinecrafTexture>();
 
 					foreach (JProperty Tex in Itm.Value) {
-						TexList.Add(new MinecrafTexture() { Name = Tex.Name, TextureName = ((string)Tex.Value).Split(":")[1] + ".png" });
+						string texValue = (string)Tex.Value;
+						string texName = texValue.Contains(':') ? texValue.Split(":")[1] + ".png" : texValue + ".png";
+						TexList.Add(new MinecrafTexture() { Name = Tex.Name, TextureName = texName });
 					}
 
 					JMdl.Textures = TexList.ToArray();
@@ -247,6 +249,25 @@ namespace Voxelgine.Engine {
 			}
 
 			return JMdl;
+		}
+
+		public static Texture2D GetModelTexture(string FilePath) {
+			FilePath = Path.GetFullPath(Path.Combine("data/models", FilePath)).Replace("\\", "/");
+
+			if (Textures.ContainsKey(FilePath))
+				return Textures[FilePath];
+
+			if (!File.Exists(FilePath))
+				throw new Exception("File not found " + FilePath);
+
+			Image Img = Raylib.LoadImage(FilePath);
+			Texture2D Tex = Raylib.LoadTextureFromImage(Img);
+
+			Raylib.SetTextureFilter(Tex, TextureFilter.Point);
+			Raylib.SetTextureWrap(Tex, TextureWrap.Clamp);
+
+			Textures.Add(FilePath, Tex);
+			return Tex;
 		}
 
 		/*internal static Texture2D GetBlockTexture(BlockType BType) {

@@ -31,6 +31,9 @@ namespace Voxelgine.Engine
 		bool HasRenderModel = false;
 		Model RenderModel;
 
+		bool HasWeaponJsonModel = false;
+		CustomModel WeaponJsonModel;
+
 		public ViewModelRotationMode ViewModelRotationMode;
 
 		/// <summary>
@@ -120,6 +123,24 @@ namespace Voxelgine.Engine
 			return this;
 		}
 
+		public virtual InventoryItem SetupJsonModel(string jsonPath, string texturePath)
+		{
+			try
+			{
+				MinecraftModel jsonModel = ResMgr.GetJsonModel(jsonPath);
+				WeaponJsonModel = MeshGenerator.Generate(jsonModel);
+				WeaponJsonModel.SetTexture(ResMgr.GetModelTexture(texturePath));
+				HasWeaponJsonModel = true;
+				UseViewmodel = true;
+			}
+			catch (Exception ex)
+			{
+				Logging.WriteLine($"Failed to load JSON model '{jsonPath}': {ex.Message}");
+				HasWeaponJsonModel = false;
+			}
+			return this;
+		}
+
 		public virtual InventoryItem SetCount(int Count)
 		{
 			this.Count = Count;
@@ -155,23 +176,16 @@ namespace Voxelgine.Engine
 		{
 			Logging.WriteLine($"Selected '{Name}'");
 
-			if (UseViewmodel)
-			{
-				if (HasRenderModel)
-				{
-					CurViewModel.IsActive = true;
-					CurViewModel.SetModel(RenderModel);
-					CurViewModel.SetRotationMode(ViewModelRotationMode);
-				}
-				else
-				{
-					CurViewModel.IsActive = false;
-				}
+			CurViewModel.IsActive = true;
 
+			if (HasWeaponJsonModel)
+			{
+				CurViewModel.SetWeaponModel(WeaponJsonModel);
+				CurViewModel.SetRotationMode(ViewModelRotationMode);
 			}
 			else
 			{
-				CurViewModel.IsActive = false;
+				CurViewModel.ClearWeaponModel();
 			}
 		}
 

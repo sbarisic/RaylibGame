@@ -17,6 +17,7 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **Player/Entity network serialization** — `WriteSnapshot()`/`ReadSnapshot()` on both `Player` and `VoxEntity` with subclass extension points.
 - **WeaponGun fire/hit separation** — `FireIntent` → `ApplyFireEffects()` → `ResolveFireIntent()` → `ApplyHitEffects()`. Multiplayer: client sends intent, server resolves, client renders effects.
 - **DayNightCycle external time** — `IsAuthority` flag. Clients receive time via `SetTime()` with smooth lerp interpolation (handles 24h wraparound).
+- **ViewModel JSON model migration** — Replaced OBJ-based `ViewModel` with `CustomModel` JSON system. Arm model (`viewmodel_arm.json`) always rendered; weapons (`gun.json`, `hammer.json`) attached via grip→hand alignment. `MuzzlePoint` from `projectile` mesh for fire effects. `CustomMaterial`/`CustomModel` extended with texture parameterization, `SetTexture()`, `DrawWithMatrix()`, tinted `Draw()`. `ResMgr.GetJsonModel()` fixed for non-namespaced textures; `GetModelTexture()` added. Arm lowered when nothing equipped.
 
 ## Networking Infrastructure
 
@@ -103,3 +104,4 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **Dead code after single-player removal** — Removed dead methods, stale comments, unused usings across 7 files.
 - **Lighting computation parallelized** — 8-phase 2×2×2 index parity coloring for `ChunkMap.ComputeLighting()`.
 - **F1 debug menu** — Created `_debugMenuWindow` toggled by F1 via `OnMenuToggled`. Fixed inverted toggle (`!CursorDisabled` instead of `CursorDisabled`). Content: debug checkboxes (Debug Mode, Network Stats, Client/Server Packet Logging) instead of config textboxes. Added `MainMenuStateFishUI.HostedServer` accessor for server-side toggle.
+- **Block placement not propagating to server** — `InventoryUpdatePacket` sent during connect arrived before client simulation existed and was silently dropped. Client used hardcoded 64-count inventory while server had depleted counts from saved player data (e.g., Dirt=0), causing `TryDecrement()` to reject placement. Fixed: client buffers `InventoryUpdatePacket` pre-simulation via `_pendingInventoryUpdate` and replays after world load; server re-sends inventory in `OnWorldTransferComplete`. Added diagnostic logging to all `HandleBlockPlaceRequest` early returns.

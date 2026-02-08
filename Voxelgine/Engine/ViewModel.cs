@@ -24,9 +24,23 @@ namespace Voxelgine.Engine
 
 	public class ViewModel
 	{
-		// Viewmodel fields
-		Model VModel; // Non-animated viewmodel
-		const string DefaultViewModelName = "gun/gun.obj";
+		// Arm model (always loaded)
+		CustomModel ArmModel;
+		bool ArmModelLoaded;
+
+		// Current weapon model (null when nothing equipped)
+		CustomModel WeaponModel;
+		bool WeaponModelLoaded;
+
+		// Offset to align weapon grip with arm hand (computed when weapon is set)
+		Vector3 WeaponGripOffset = Vector3.Zero;
+
+		/// <summary>
+		/// World-space muzzle point extracted from the weapon's "projectile" mesh.
+		/// Used for fire effects (WeaponFireEffectPacket origin).
+		/// </summary>
+		public Vector3 MuzzlePoint;
+
 		ViewModelRotationMode ViewMdlRotMode = ViewModelRotationMode.GunIronsight;
 
 		// Store offset from camera instead of absolute position for proper interpolation
@@ -59,14 +73,8 @@ namespace Voxelgine.Engine
 			this.Eng = Eng;
 			this.Logging = Eng.DI.GetRequiredService<IFishLogging>();
 
-			SetModel(DefaultViewModelName);
+			LoadArmModel();
 			IsActive = true;
-
-			if (VModel.MeshCount == 0)
-			{
-				IsActive = false;
-				Logging.WriteLine($"======================== Warning! Zero meshes in model {DefaultViewModelName}");
-			}
 
 			var lerpMgr = Eng.DI.GetRequiredService<ILerpManager>();
 
@@ -91,14 +99,57 @@ namespace Voxelgine.Engine
 			LrpSwing.StartLerp(0.01f, 0f, 0f);
 		}
 
-		public void SetModel(string ModelName)
+		void LoadArmModel()
 		{
-			VModel = ResMgr.GetModel(ModelName);
+			try
+			{
+				MinecraftModel jsonModel = ResMgr.GetJsonModel("viewmodel_arm/viewmodel_arm.json");
+				ArmModel = MeshGenerator.Generate(jsonModel);
+				ArmModel.SetTexture(ResMgr.GetModelTexture("viewmodel_arm/viewmodel_arm_tex.png"));
+				ArmModel.SetupHierarchy("arm", "hand");
+				ArmModelLoaded = true;
+			}
+			catch (Exception ex)
+			{
+				Logging.WriteLine($"ViewModel: Failed to load arm model: {ex.Message}");
+				ArmModelLoaded = false;
+			}
 		}
 
-		public void SetModel(Model Mdl)
+		/// <summary>
+		/// Sets a JSON-based weapon model to be drawn attached to the arm's hand.
+		/// The weapon's "grip" mesh is aligned to the arm's "hand" mesh.
+		/// </summary>
+		public void SetWeaponModel(CustomModel weapon)
 		{
-			VModel = Mdl;
+			WeaponModel = weapon;
+			WeaponModelLoaded = weapon != null;
+
+			if (WeaponModelLoaded && ArmModelLoaded)
+			{
+				CustomMesh hand = ArmModel.GetMeshByName("hand");
+				CustomMesh grip = weapon.GetMeshByName("grip");
+				if (hand != null && grip != null)
+				{
+					Vector3 handCenter = (hand.BBox.Min + hand.BBox.Max) * 0.5f;
+					Vector3 gripCenter = (grip.BBox.Min + grip.BBox.Max) * 0.5f;
+					WeaponGripOffset = handCenter - gripCenter;
+				}
+				else
+				{
+					WeaponGripOffset = Vector3.Zero;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Clears the current weapon model. The arm will be drawn in a lowered position.
+		/// </summary>
+		public void ClearWeaponModel()
+		{
+			WeaponModel = null;
+			WeaponModelLoaded = false;
+			WeaponGripOffset = Vector3.Zero;
 		}
 
 		public void SetRotationMode(ViewModelRotationMode Mode)
@@ -106,9 +157,6 @@ namespace Voxelgine.Engine
 			if (ViewMdlRotMode != Mode)
 			{
 				ViewMdlRotMode = Mode;
-				// TODO: Toggle animation
-
-				Logging.WriteLine("Toggle anim!");
 			}
 		}
 
@@ -176,23 +224,33 @@ namespace Voxelgine.Engine
 			// Calculate offset from camera based on mode (not absolute position)
 			Vector3 newDesiredOffset;
 			Quaternion newDesiredRotOffset;
-			switch (ViewMdlRotMode)
+
+			if (!WeaponModelLoaded)
 			{
-				case ViewModelRotationMode.Block:
-				case ViewModelRotationMode.Tool:
-					newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
-					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
-					break;
-				case ViewModelRotationMode.Gun:
-					newDesiredOffset = camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
-					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0);
-					break;
-				case ViewModelRotationMode.GunIronsight:
-					newDesiredOffset = camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
-					newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
-					break;
-				default:
-					throw new NotImplementedException();
+				// No weapon equipped: lower the arm so it doesn't obstruct the view
+				newDesiredOffset = camForward * 0.3f + camRight * 0.5f + camUp * -0.7f;
+				newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(0, 0, 0);
+			}
+			else
+			{
+				switch (ViewMdlRotMode)
+				{
+					case ViewModelRotationMode.Block:
+					case ViewModelRotationMode.Tool:
+						newDesiredOffset = camForward * 0.5f + camRight * 0.5f + camUp * -0.3f;
+						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
+						break;
+					case ViewModelRotationMode.Gun:
+						newDesiredOffset = camForward * 0.7f + camRight * 0.4f + camUp * -0.6f;
+						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(45), 0, 0);
+						break;
+					case ViewModelRotationMode.GunIronsight:
+						newDesiredOffset = camForward * 0.72f + camRight * 0.125f + camUp * -0.19f;
+						newDesiredRotOffset = Quaternion.CreateFromYawPitchRoll(Utils.ToRad(0), 0, 0);
+						break;
+					default:
+						throw new NotImplementedException();
+				}
 			}
 
 			// Start lerps if desired offset/rotation changed
@@ -231,21 +289,28 @@ namespace Voxelgine.Engine
 			var qWeaponAngle = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(180 + 35));
 			var qAwayFromCam = Quaternion.CreateFromAxisAngle(camUp, Utils.ToRad(-22));
 
-			DesiredVMRot = qPitch * qYaw;
-			switch (ViewMdlRotMode)
+			if (!WeaponModelLoaded)
 			{
-				case ViewModelRotationMode.Block:
-				case ViewModelRotationMode.Tool:
-					DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
-					break;
-				case ViewModelRotationMode.Gun:
-					DesiredVMRot = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
-					break;
-				case ViewModelRotationMode.GunIronsight:
-					DesiredVMRot = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
-					break;
-				default:
-					throw new NotImplementedException();
+				// Simple camera-following rotation for lowered arm
+				DesiredVMRot = qPitch * qYaw;
+			}
+			else
+			{
+				switch (ViewMdlRotMode)
+				{
+					case ViewModelRotationMode.Block:
+					case ViewModelRotationMode.Tool:
+						DesiredVMRot = qAwayFromCam * qWeaponAngle * qInitial * qPitch * qYaw;
+						break;
+					case ViewModelRotationMode.Gun:
+						DesiredVMRot = Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+						break;
+					case ViewModelRotationMode.GunIronsight:
+						DesiredVMRot = Quaternion.CreateFromAxisAngle(camRight, Utils.ToRad(2)) * Quaternion.CreateFromAxisAngle(camForward, Utils.ToRad(180)) * qInitial * qPitch * qYaw;
+						break;
+					default:
+						throw new NotImplementedException();
+				}
 			}
 			DesiredVMRot = System.Numerics.Quaternion.Normalize(DesiredVMRot);
 
@@ -254,10 +319,9 @@ namespace Voxelgine.Engine
 		}
 
 
-		// TODO: Make animation system for viewmodels better, lerp between rotations and positions instead of using a switch statement?
 		public void DrawViewModel(Player Ply, float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurFame)
 		{
-			if (!IsActive)
+			if (!IsActive || !ArmModelLoaded)
 				return;
 
 			// Calculate kickback in world space using camera basis
@@ -276,10 +340,6 @@ namespace Voxelgine.Engine
 				R = swingRot * R;
 			}
 
-			float angle = 2.0f * MathF.Acos(R.W) * 180f / MathF.PI;
-			float s = MathF.Sqrt(1 - R.W * R.W);
-			Vector3 axis = s < 0.001f ? new Vector3(1, 0, 0) : new Vector3(R.X / s, R.Y / s, R.Z / s);
-
 			// Sample light level at player position and apply to view model
 			Color lightColor = Color.White;
 			if (Eng.MultiplayerGameState?.Map != null)
@@ -287,7 +347,27 @@ namespace Voxelgine.Engine
 				lightColor = Eng.MultiplayerGameState.Map.GetLightColor(Ply.Position);
 			}
 
-			Raylib.DrawModelEx(VModel, P, axis, angle, new Vector3(1, 1, 1), lightColor);
+			// Build model matrix from quaternion rotation + position
+			Matrix4x4 rotMatrix = Matrix4x4.CreateFromQuaternion(R);
+			Matrix4x4 armMat = rotMatrix * Matrix4x4.CreateTranslation(P);
+
+			// Draw arm
+			ArmModel.DrawWithMatrix(armMat, lightColor);
+
+			// Draw weapon attached to hand
+			if (WeaponModelLoaded)
+			{
+				Matrix4x4 weaponMat = Matrix4x4.CreateTranslation(WeaponGripOffset) * armMat;
+				WeaponModel.DrawWithMatrix(weaponMat, lightColor);
+
+				// Extract muzzle point from projectile mesh
+				CustomMesh projectile = WeaponModel.GetMeshByName("projectile");
+				if (projectile != null)
+				{
+					Matrix4x4 muzzleWorld = projectile.GetWorldMatrix(weaponMat);
+					MuzzlePoint = new Vector3(muzzleWorld.M41, muzzleWorld.M42, muzzleWorld.M43);
+				}
+			}
 		}
 	}
 }

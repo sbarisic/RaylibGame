@@ -74,6 +74,7 @@ namespace Voxelgine.States
 		private Label _connectionLostReasonLabel;
 		private Label _connectionLostReconnectLabel;
 		private Label _connectionLostMenuLabel;
+		private Window _debugMenuWindow;
 
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
@@ -146,6 +147,9 @@ namespace Voxelgine.States
 			Cleanup();
 
 			_client = new NetClient(_logging);
+#if DEBUG
+			_client.PacketLoggingEnabled = true;
+#endif
 			_inputBuffer = new ClientInputBuffer();
 			_prediction = new ClientPrediction();
 
@@ -601,6 +605,16 @@ namespace Voxelgine.States
 				_logging.ClientWriteLine("MultiplayerGameState: Player.Init...");
 				ply.Init(_simulation.Map);
 				_logging.ClientWriteLine("MultiplayerGameState: Player.Init complete");
+
+				ply.OnMenuToggled = (cursorVisible) =>
+				{
+					if (_debugMenuWindow != null)
+					{
+						_debugMenuWindow.Visible = cursorVisible;
+						if (cursorVisible)
+							_debugMenuWindow.BringToFront();
+					}
+				};
 
 				_logging.ClientWriteLine("MultiplayerGameState: SetPosition...");
 				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
@@ -1289,6 +1303,7 @@ namespace Voxelgine.States
 			_connectionLostReasonLabel = null;
 			_connectionLostReconnectLabel = null;
 			_connectionLostMenuLabel = null;
+			_debugMenuWindow = null;
 		}
 
 		// ======================================= FishUI Setup =================================================
@@ -1506,6 +1521,105 @@ namespace Voxelgine.States
 			_connectionLostPanel.AddChild(_connectionLostMenuLabel);
 
 			_gui.AddControl(_connectionLostPanel);
+
+			// Debug menu — toggled with F1
+			CreateDebugMenu(screenW, screenH);
+		}
+
+		private void CreateDebugMenu(int screenW, int screenH)
+		{
+			var windowSize = new Vector2(400, 500);
+			_debugMenuWindow = new Window
+			{
+				Title = "Debug Menu",
+				Position = new Vector2(screenW / 2f - windowSize.X / 2f, screenH / 2f - windowSize.Y / 2f),
+				Size = windowSize,
+				IsResizable = true,
+				ShowCloseButton = true,
+				Visible = false
+			};
+
+			_debugMenuWindow.OnClosed += (window) =>
+			{
+				_debugMenuWindow.Visible = false;
+				// Re-lock cursor when closing the menu
+				_simulation?.LocalPlayer?.ToggleMouse(false);
+			};
+
+			var scrollPane = new ScrollablePane
+			{
+				Position = new Vector2(10, 10),
+				Size = new Vector2(windowSize.X - 40, windowSize.Y - 100),
+				AutoContentSize = true
+			};
+
+			var stack = new StackLayout
+			{
+				Orientation = StackOrientation.Vertical,
+				Spacing = 8,
+				Position = Vector2.Zero,
+				Size = new Vector2(windowSize.X - 60, 800),
+				IsTransparent = true
+			};
+
+			var configVars = Eng.DI.GetRequiredService<GameConfig>().GetVariables().ToArray();
+			foreach (var varRef in configVars)
+			{
+				var label = new Label
+				{
+					Text = varRef.FieldName,
+					Size = new Vector2(200, 22)
+				};
+
+				var textBox = new Textbox
+				{
+					Text = varRef.GetValueString(),
+					Size = new Vector2(windowSize.X - 80, 26),
+					ID = $"dbg_{varRef.FieldName}"
+				};
+
+				string fieldName = varRef.FieldName;
+				textBox.OnTextChanged += (sender, newText) =>
+				{
+					try
+					{
+						var currentVar = Eng.DI.GetRequiredService<GameConfig>().GetVariables().FirstOrDefault(v => v.FieldName == fieldName);
+						currentVar?.SetValueString(newText);
+					}
+					catch { }
+				};
+
+				stack.AddChild(label);
+				stack.AddChild(textBox);
+			}
+
+			var btnSave = new Button
+			{
+				Text = "Save Config",
+				Size = new Vector2(140, 36)
+			};
+			btnSave.Clicked += (sender, args) =>
+			{
+				Eng.DI.GetRequiredService<GameConfig>().SaveToJson();
+			};
+
+			var btnClose = new Button
+			{
+				Text = "Close",
+				Size = new Vector2(140, 36)
+			};
+			btnClose.Clicked += (sender, args) =>
+			{
+				_debugMenuWindow.Visible = false;
+				_simulation?.LocalPlayer?.ToggleMouse(false);
+			};
+
+			stack.AddChild(btnSave);
+			stack.AddChild(btnClose);
+
+			scrollPane.AddChild(stack);
+			_debugMenuWindow.AddChild(scrollPane);
+			_gui.AddControl(_debugMenuWindow);
 		}
 
 		/// <summary>
@@ -1652,6 +1766,13 @@ namespace Voxelgine.States
 					_connectionLostMenuLabel.Position = new Vector2(0, screenH / 2f + 60);
 					_connectionLostMenuLabel.Size = new Vector2(screenW, 26);
 				}
+			}
+
+			// Debug menu — center on resize
+			if (_debugMenuWindow != null)
+			{
+				var sz = _debugMenuWindow.Size;
+				_debugMenuWindow.Position = new Vector2(screenW / 2f - sz.X / 2f, screenH / 2f - sz.Y / 2f);
 			}
 		}
 

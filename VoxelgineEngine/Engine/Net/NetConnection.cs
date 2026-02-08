@@ -181,6 +181,15 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
+		/// Returns the number of seconds since the last data was received on this connection.
+		/// </summary>
+		/// <param name="currentTime">Current time in seconds.</param>
+		public float TimeSinceLastReceive(float currentTime)
+		{
+			return currentTime - _lastReceiveTime;
+		}
+
+		/// <summary>
 		/// Returns whether it is time to send a Ping packet based on <see cref="PingInterval"/>.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>

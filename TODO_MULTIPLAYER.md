@@ -181,13 +181,7 @@ Game Tick Flow (Client):
 
 > Multiplayer-specific gameplay features built on top of the networking layer.
 
-### Medium Priority
-
-*No medium priority tasks*
-
-### Lower Priority
-
-- [ ] **Text chat** — Client sends `ChatMessage` to server, server broadcasts to all. Display chat messages in a scrollable FishUI panel anchored to bottom-left. Fade out after 10 seconds. Toggle chat input with Enter key. Support `/commands` for admin actions. **[CPX: 3]**
+*All tasks completed — see [DONE_MULTIPLAYER.md](DONE_MULTIPLAYER.md)*
 
 ---
 
@@ -200,7 +194,6 @@ Game Tick Flow (Client):
 ### Medium Priority
 
 - [ ] **Player list overlay** — In-game FishUI panel (toggle with Tab or similar key) showing connected players, their ping, and status. Visible during gameplay. **[CPX: 2]**
-- [ ] **Connection status indicator** — Small HUD element showing connection quality (ping bar icon, green/yellow/red based on latency). Show "Reconnecting..." text when experiencing packet loss. **[CPX: 1]**
 
 ### Lower Priority
 
@@ -245,7 +238,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- The top of the island is flat, make it "mostly" flat and add some hills and variation to make it more interesting to explore and build on (improvement)
+*No uncategorized items*
 
 ---
 

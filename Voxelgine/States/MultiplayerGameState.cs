@@ -53,6 +53,10 @@ namespace Voxelgine.States
 		// Kill feed duration for toast notifications
 		private const float KillFeedDuration = 5f;
 
+		// Chat message display duration
+		private const float ChatMessageDuration = 10f;
+		private const int MaxChatMessages = 10;
+
 		// FishUI HUD controls — Loading screen
 		private Label _loadingStatusLabel;
 		private Label _loadingErrorLabel;
@@ -75,6 +79,15 @@ namespace Voxelgine.States
 		private Label _connectionLostReconnectLabel;
 		private Label _connectionLostMenuLabel;
 		private Window _debugMenuWindow;
+
+		// FishUI HUD controls — Connection status
+		private Label _connectionStatusLabel;
+
+		// FishUI HUD controls — Chat
+		private ToastNotification _chatToast;
+		private Panel _chatInputPanel;
+		private Textbox _chatInputBox;
+		private bool _chatOpen;
 
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
@@ -266,6 +279,26 @@ namespace Voxelgine.States
 				// Toggle network statistics overlay
 				if (Raylib.IsKeyPressed(KeyboardKey.F5))
 					_showNetStats = !_showNetStats;
+
+				// Chat input handling
+				if (_chatOpen)
+				{
+					if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+					{
+						SubmitChatMessage();
+					}
+					else if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+					{
+						CloseChatInput();
+					}
+					return; // Consume all other input while chat is open
+				}
+
+				if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+				{
+					OpenChatInput();
+					return;
+				}
 
 				// Handle ESC — disconnect and return to main menu
 				if (Window.InMgr.IsInputPressed(InputKey.Esc))
@@ -491,6 +524,7 @@ namespace Voxelgine.States
 				// Update FishUI HUD state
 				UpdateHUDInfo();
 				UpdateHealthBar();
+				UpdateConnectionStatus();
 
 				// Network stats panel visibility
 				if (_netStatsPanel != null)
@@ -751,6 +785,10 @@ namespace Voxelgine.States
 
 				case SoundEventPacket soundEvent:
 					HandleSoundEvent(soundEvent);
+					break;
+
+				case ChatMessagePacket chatMsg:
+					HandleChatMessage(chatMsg);
 					break;
 
 				case KillFeedPacket killFeed:
@@ -1224,6 +1262,33 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Handles a <see cref="ChatMessagePacket"/> from the server.
+		/// Resolves the sender name and displays the message in the chat toast.
+		/// </summary>
+		private void HandleChatMessage(ChatMessagePacket packet)
+		{
+			string senderName;
+			if (packet.PlayerId < 0)
+			{
+				// Server message — already formatted
+				senderName = null;
+			}
+			else if (packet.PlayerId == _client?.PlayerId)
+			{
+				senderName = _playerName ?? "You";
+			}
+			else
+			{
+				var remote = _simulation?.Players?.GetRemotePlayer(packet.PlayerId);
+				senderName = remote?.PlayerName ?? $"Player {packet.PlayerId}";
+			}
+
+			string displayText = senderName != null ? $"{senderName}: {packet.Message}" : packet.Message;
+			_chatToast?.Show(displayText, ToastType.Info, ChatMessageDuration);
+			_logging.ClientWriteLine($"[Chat] {displayText}");
+		}
+
+		/// <summary>
 		/// Handles an <see cref="InventoryUpdatePacket"/> from the server.
 		/// Updates local player inventory item counts to match the server-authoritative state.
 		/// </summary>
@@ -1262,6 +1327,64 @@ namespace Voxelgine.States
 		}
 
 		// ======================================= Helper Methods =================================================
+
+		private void OpenChatInput()
+		{
+			_chatOpen = true;
+			if (_chatInputPanel != null)
+				_chatInputPanel.Visible = true;
+			if (_chatInputBox != null)
+				_chatInputBox.Text = "";
+			Raylib.EnableCursor();
+		}
+
+		private void CloseChatInput()
+		{
+			_chatOpen = false;
+			if (_chatInputPanel != null)
+				_chatInputPanel.Visible = false;
+			if (_chatInputBox != null)
+				_chatInputBox.Text = "";
+			Raylib.DisableCursor();
+		}
+
+		private void SubmitChatMessage()
+		{
+			string message = _chatInputBox?.Text?.Trim();
+			CloseChatInput();
+
+			if (string.IsNullOrEmpty(message))
+				return;
+
+			// Handle /commands — route to hosted server if available
+			if (message.StartsWith('/'))
+			{
+				string command = message.Substring(1);
+				var server = Eng.MainMenuState?.HostedServer;
+				if (server != null)
+				{
+					server.ExecuteCommand(command);
+					_chatToast?.Show($"[Command] /{command}", ToastType.Info, ChatMessageDuration);
+				}
+				else
+				{
+					_chatToast?.Show("Commands are only available on the host.", ToastType.Warning, ChatMessageDuration);
+				}
+				return;
+			}
+
+			// Send chat message to server
+			if (_client != null && _client.IsConnected)
+			{
+				var packet = new ChatMessagePacket
+				{
+					PlayerId = _client.PlayerId,
+					Message = message
+				};
+				_client.Send(packet, true, (float)Raylib.GetTime());
+			}
+		}
+
 
 		private void DisconnectAndReturn(string reason)
 		{
@@ -1324,6 +1447,11 @@ namespace Voxelgine.States
 			_connectionLostReconnectLabel = null;
 			_connectionLostMenuLabel = null;
 			_debugMenuWindow = null;
+			_connectionStatusLabel = null;
+			_chatToast = null;
+			_chatInputPanel = null;
+			_chatInputBox = null;
+			_chatOpen = false;
 		}
 
 		// ======================================= FishUI Setup =================================================
@@ -1409,6 +1537,16 @@ namespace Voxelgine.States
 			};
 			_gui.AddControl(_hudInfoLabel);
 
+			// Connection status indicator — top-right corner, small ping display
+			_connectionStatusLabel = new Label
+			{
+				Text = "",
+				Position = new Vector2(screenW - 120, 10),
+				Size = new Vector2(110, 22),
+				Alignment = Align.Right,
+			};
+			_gui.AddControl(_connectionStatusLabel);
+
 			// Health bar — bottom-center, fuel-style zones (red-yellow-green)
 			int barW = 200;
 			int barH = 20;
@@ -1440,6 +1578,35 @@ namespace Voxelgine.States
 			};
 			_killFeedToast.TextColor = new FishColor(255, 70, 70, 255);
 			_gui.AddControl(_killFeedToast);
+
+			// Chat messages — toast notifications anchored to bottom-left
+			_chatToast = new ToastNotification
+			{
+				MaxToasts = MaxChatMessages,
+				DefaultDuration = ChatMessageDuration,
+				Position = new Vector2(10, screenH - 370),
+				Size = new Vector2(400, 180),
+			};
+			_chatToast.TextColor = FishColor.White;
+			_gui.AddControl(_chatToast);
+
+			// Chat input panel — bottom-left, hidden by default
+			_chatInputPanel = new Panel
+			{
+				Position = new Vector2(10, screenH - 186),
+				Size = new Vector2(400, 30),
+				Visible = false,
+			};
+			_chatInputPanel.Opacity = 0.85f;
+
+			_chatInputBox = new Textbox
+			{
+				Placeholder = "Type a message...",
+				Position = new Vector2(2, 2),
+				Size = new Vector2(396, 26),
+			};
+			_chatInputPanel.AddChild(_chatInputBox);
+			_gui.AddControl(_chatInputPanel);
 
 			// Network stats panel — top-left, below HUD info (toggled with F5)
 			_netStatsInfoLabel = new FishUIInfoLabel
@@ -1661,12 +1828,43 @@ namespace Voxelgine.States
 			_healthBar.Value = health;
 
 			if (_healthLabel != null)
-				_healthLabel.Text = $"{(int)health} / {(int)maxHealth}";
-		}
+					_healthLabel.Text = $"{(int)health} / {(int)maxHealth}";
+			}
 
-		/// <summary>
-		/// Updates the network statistics overlay label with current diagnostic data.
-		/// </summary>
+			/// <summary>
+			/// Updates the connection status indicator label with ping and color coding.
+			/// Green (≤50ms), Yellow (51–150ms), Red (>150ms).
+			/// Shows "Reconnecting..." when no data has been received for over 3 seconds.
+			/// </summary>
+			private void UpdateConnectionStatus()
+			{
+				if (_connectionStatusLabel == null || _client == null)
+					return;
+
+				float currentTime = (float)Raylib.GetTime();
+				float timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
+
+				if (timeSinceReceive > 3f)
+				{
+					_connectionStatusLabel.Text = "Reconnecting...";
+					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+					return;
+				}
+
+				int ping = _client.RoundTripTimeMs;
+				_connectionStatusLabel.Text = $"{ping} ms";
+
+				if (ping <= 50)
+					_connectionStatusLabel.SetColorOverride("Text", new FishColor(80, 255, 80, 255));
+				else if (ping <= 150)
+					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 220, 50, 255));
+				else
+					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+			}
+
+			/// <summary>
+			/// Updates the network statistics overlay label with current diagnostic data.
+			/// </summary>
 		private void UpdateNetStats()
 		{
 			if (_netStatsInfoLabel == null)
@@ -1785,6 +1983,18 @@ namespace Voxelgine.States
 				var sz = _debugMenuWindow.Size;
 				_debugMenuWindow.Position = new Vector2(screenW / 2f - sz.X / 2f, screenH / 2f - sz.Y / 2f);
 			}
+
+			// Connection status indicator — top-right
+			if (_connectionStatusLabel != null)
+				_connectionStatusLabel.Position = new Vector2(screenW - 120, 10);
+
+			// Chat toast — bottom-left above input
+			if (_chatToast != null)
+				_chatToast.Position = new Vector2(10, screenH - 370);
+
+			// Chat input panel — bottom-left
+			if (_chatInputPanel != null)
+				_chatInputPanel.Position = new Vector2(10, screenH - 186);
 		}
 
 		// ====================================== Rendering Helpers ===============================================

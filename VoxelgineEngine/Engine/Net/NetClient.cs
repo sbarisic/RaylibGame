@@ -157,6 +157,12 @@ namespace Voxelgine.Engine
 		public BandwidthTracker Bandwidth => _connection?.Bandwidth;
 
 		/// <summary>
+		/// Returns the number of seconds since the last data was received from the server.
+		/// Returns 0 if not connected.
+		/// </summary>
+		public float TimeSinceLastReceive(float currentTime) => _connection?.TimeSinceLastReceive(currentTime) ?? 0f;
+
+		/// <summary>
 		/// When enabled, logs all sent and received packets with type, size, and endpoint.
 		/// Toggle via debug menu at runtime.
 		/// </summary>

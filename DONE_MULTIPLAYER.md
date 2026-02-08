@@ -77,6 +77,7 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **Player model** — Humanoid model with server-driven animation state (idle/walk/attack). Head pitch rotation, held item at `hand_r`.
 - **Player name tags** — Billboard screen-space rendering. Distance scaling, alpha fade (30–50 units), block obstruction check.
 - **Kill feed** — `KillFeedPacket` (S→C). FishUI `ToastNotification` display with fade-out.
+- **Text chat** — Client sends `ChatMessagePacket` to server, server rebroadcasts to all. FishUI `ToastNotification` for messages (bottom-left, 10s fade). `Panel`+`Textbox` input toggled with Enter/Escape. `/commands` routed to `ServerLoop.ExecuteCommand()` on host. Sender name resolution (server, self, remote player).
 - **Player out-of-bounds death** — Server kills players below Y=-50 via `CheckPlayerBounds()`. Respawn system handles recovery.
 - **Procedural trees and water bodies** — Added noise-based tree placement (6–10 block Wood trunk, 2–3 radius Leaf canopy, tapered spherical shape, min 5-block spacing) and water body generation (3–6 radius ponds with depth tapering, Sand shoreline, carved into terrain depressions) to `GenerateFloatingIsland`. Surface height map built during surface pass. Helper methods `PlaceTrees`, `PlaceWaterBodies`, `GridSetBlock`, `GridGetBlock` for safe chunk-grid access.
 
@@ -86,6 +87,7 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **Host game UI** — FishUI dialog with port, player name, seed inputs. Background `ServerLoop` thread.
 - **MultiplayerGameState FishUI refactor** — All HUD elements converted from Raylib to FishUI controls (loading screen, health bar, kill feed toast, net stats panel, death/connection-lost overlays, HUD info label).
 - **Network stats panel position and style** — Moved F5 network statistics panel from top-left to top-right corner. Changed text color from white to black for readability against dark panel background.
+- **Connection status indicator** — FishUI `Label` in top-right corner showing ping with color coding (green ≤50ms, yellow 51–150ms, red >150ms). Shows "Reconnecting..." when no server data received for >3 seconds. Uses `NetConnection.TimeSinceLastReceive()` exposed through `NetClient`.
 
 ## Documentation
 

@@ -101,6 +101,7 @@ namespace Voxelgine.Engine
 				case BlockType.Water:
 				case BlockType.Glass:
 				case BlockType.Ice:
+				case BlockType.Leaf:
 					return false;
 
 				default:

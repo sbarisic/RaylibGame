@@ -127,6 +127,14 @@ namespace Voxelgine.Engine.Server
 		{
 			string playerName = GetPlayerName(playerId);
 			_logging.ServerWriteLine($"World transfer complete for player [{playerId}] \"{playerName}\".");
+
+			// Re-send inventory after world transfer — the initial InventoryUpdate sent during
+			// connect may have arrived before the client created its simulation and been dropped.
+			if (_playerInventories.TryGetValue(playerId, out var inventory))
+			{
+				_server.SendTo(playerId, inventory.CreateFullUpdatePacket(), true, CurrentTime);
+				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" inventory re-sent after world transfer.");
+			}
 		}
 	}
 }

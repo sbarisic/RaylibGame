@@ -82,6 +82,9 @@ namespace Voxelgine.States
 		// Buffer for entity packets received before simulation is created
 		private readonly List<Packet> _pendingEntityPackets = new List<Packet>();
 
+		// Buffer for inventory update packets received before simulation is created
+		private InventoryUpdatePacket _pendingInventoryUpdate;
+
 		// Entity interpolation buffers keyed by network ID
 		private readonly Dictionary<int, SnapshotBuffer<EntitySnapshot>> _entitySnapshots = new Dictionary<int, SnapshotBuffer<EntitySnapshot>>();
 
@@ -622,6 +625,14 @@ namespace Voxelgine.States
 
 				// Set entity manager to non-authoritative (server owns entity state)
 				_simulation.Entities.IsAuthority = false;
+
+				// Process any InventoryUpdate packet that arrived before the simulation was created
+				if (_pendingInventoryUpdate != null)
+				{
+					_logging.ClientWriteLine($"MultiplayerGameState: Replaying buffered InventoryUpdatePacket ({_pendingInventoryUpdate.Slots.Length} slots)...");
+					HandleInventoryUpdate(_pendingInventoryUpdate);
+					_pendingInventoryUpdate = null;
+				}
 
 				// Process any PlayerJoined packets that arrived before the simulation was created
 				if (_pendingPlayerJoins.Count > 0)
@@ -1215,7 +1226,12 @@ namespace Voxelgine.States
 		private void HandleInventoryUpdate(InventoryUpdatePacket packet)
 		{
 			if (_simulation?.LocalPlayer == null)
+			{
+				// Simulation not created yet — buffer for replay after world load
+				_pendingInventoryUpdate = packet;
+				_logging.ClientWriteLine($"MultiplayerGameState: Buffered InventoryUpdatePacket ({packet.Slots.Length} slots) — simulation not ready");
 				return;
+			}
 
 			foreach (var slot in packet.Slots)
 			{

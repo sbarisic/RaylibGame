@@ -240,6 +240,8 @@ Game Tick Flow (Client):
 
 - Added new weapon models in json format, they have gun_body/grip and gun_body/projectile parts, grip is used for hand attachment, projectile is where the shooting effects come from, where the projectile spawns
 - Gun Y+ axis is top, Z- axis is forward (away from user and gun), X+ axis is right
+- Added viewmodel_arm.json for the player's arm in first person, it has "arm" and "arm/hand" part which is used for hand attachment, it is positioned and rotated to match the player's right arm, so the gun can be attached to the hand and positioned correctly
+- viewmodel_arm is also rendered when nothing is equipped, but it is lowered so it doesn't take up view space. it should "jiggle" when player left or right clicks
 
 ---
 

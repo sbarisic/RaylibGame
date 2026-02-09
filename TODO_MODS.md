@@ -166,7 +166,7 @@ mods/
 
 ### Uncategorized
 
-*No uncategorized items*
+- Implement basic mod loading infrastructure/system in VoxelgineEngine
 
 ---
 

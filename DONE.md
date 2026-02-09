@@ -50,6 +50,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Particles: Fire effect** — Added `SpawnFire()` method with fire textures (1-4.png). Fire rises upward with random drift, semi-transparent, short-lived (0.6-1.0s), shrinks over lifetime, supports initial force/direction for wall impact effects. Added `ParticleType` enum for type-specific behavior.
 - **Particles: Spark effect** — Added `SpawnSpark()` with spark textures (1-4.png). Sparks orient along movement direction via `DrawBillboardPro`, fall slowly with gravity, shrink over 1.2-2.0s lifetime, additive blend, emissive.
 - **Weapons: Gun fire particles** — Gun now spawns fire particles instead of smoke on impact, using the wall normal as initial force direction.
+- **Entities: Door model** — `VEntSlidingDoor` uses `door/door.json` Blockbench model via `CustomModel` with procedurally generated wood texture, facing direction serialization, and server spawn.
 
 ---
 

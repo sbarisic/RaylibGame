@@ -32,6 +32,13 @@ namespace Voxelgine.Engine
 		public Vector3 SlideDirection = Vector3.UnitY; // Direction to slide (default: up)
 		public float OpenDelay = 0.5f;              // Time to stay open after player leaves trigger
 
+		/// <summary>Direction the door faces (used for model orientation).</summary>
+		public Vector3 FacingDirection = Vector3.UnitZ;
+
+		// JSON model rendering
+		CustomModel CModel;
+		static Texture2D? _doorTexture;
+
 		// Internal state
 		float SlideProgress = 0f;                   // 0 = closed, 1 = fully open
 		float OpenTimer = 0f;                       // Timer for open delay
@@ -187,6 +194,9 @@ namespace Voxelgine.Engine
 			writer.Write(ClosedPosition.X);
 			writer.Write(ClosedPosition.Y);
 			writer.Write(ClosedPosition.Z);
+			writer.Write(FacingDirection.X);
+			writer.Write(FacingDirection.Y);
+			writer.Write(FacingDirection.Z);
 		}
 
 		protected override void ReadSpawnPropertiesExtra(BinaryReader reader)
@@ -195,6 +205,78 @@ namespace Voxelgine.Engine
 			SlideDistance = reader.ReadSingle();
 			TriggerRadius = reader.ReadSingle();
 			ClosedPosition = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+			FacingDirection = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+		}
+
+		public override void SetModel(string MdlName)
+		{
+			HasModel = false;
+			ModelOffset = Vector3.Zero;
+			CenterOffset = Vector3.Zero;
+			ModelRotationDeg = 0;
+			ModelColor = Color.White;
+			ModelScale = Vector3.One;
+
+			EntModelName = MdlName;
+			MinecraftModel JMdl = ResMgr.GetJsonModel(MdlName);
+			CModel = MeshGenerator.Generate(JMdl);
+
+			if (_doorTexture == null || _doorTexture.Value.Id == 0)
+				_doorTexture = GenerateDoorTexture();
+			CModel.SetTexture(_doorTexture.Value);
+
+			HasModel = true;
+
+			if (Size != Vector3.Zero)
+				ModelOffset = new Vector3(Size.X / 2, 0, Size.Z / 2);
+		}
+
+		protected override void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
+		{
+			if (HasModel)
+			{
+				CModel.Position = GetDrawPosition();
+				CModel.LookDirection = FacingDirection;
+				CModel.Draw();
+			}
+		}
+
+		static Texture2D GenerateDoorTexture()
+		{
+			Color woodBase = new Color(139, 90, 43, 255);
+			Color woodDark = new Color(101, 67, 33, 255);
+			Color woodLight = new Color(160, 110, 60, 255);
+			Color handle = new Color(200, 170, 50, 255);
+
+			Image img = Raylib.GenImageColor(64, 64, woodBase);
+
+			// Front face (UV area 0-16, 0-32): frame borders and panels
+			Raylib.ImageDrawRectangle(ref img, 0, 0, 16, 1, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 0, 31, 16, 1, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 0, 0, 1, 32, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 15, 0, 1, 32, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 0, 15, 16, 2, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 2, 2, 12, 12, woodLight);
+			Raylib.ImageDrawRectangle(ref img, 2, 18, 12, 12, woodLight);
+			Raylib.ImageDrawRectangle(ref img, 12, 14, 2, 3, handle);
+
+			// Back face (UV area 18-34, 0-32): matching panels
+			Raylib.ImageDrawRectangle(ref img, 18, 0, 16, 1, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 18, 31, 16, 1, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 18, 0, 1, 32, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 33, 0, 1, 32, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 18, 15, 16, 2, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 20, 2, 12, 12, woodLight);
+			Raylib.ImageDrawRectangle(ref img, 20, 18, 12, 12, woodLight);
+
+			// Side edges (UV areas 16-18 and 34-36, 0-32)
+			Raylib.ImageDrawRectangle(ref img, 16, 0, 2, 32, woodDark);
+			Raylib.ImageDrawRectangle(ref img, 34, 0, 2, 32, woodDark);
+
+			Texture2D tex = Raylib.LoadTextureFromImage(img);
+			Raylib.SetTextureFilter(tex, TextureFilter.Point);
+			Raylib.UnloadImage(img);
+			return tex;
 		}
 
 		protected override void DrawCollisionBox()

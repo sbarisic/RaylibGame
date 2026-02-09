@@ -56,15 +56,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Entities: Door model** — Make `VEntSlidingDoor` use `data/models/door/door.json` model (16x32 units = 1x2 blocks) **[CPX: 2]**
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
-
-### Lower Priority
-
-- [ ] **Voxel World: Procedural world generation, floating islands, but not infinite. There should be a single but big floating island. Maybe a few other floating islands stacked vertically? Trees, water, caves...**
+*No medium priority items*
 
 ### On Hold
 
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
 ---
@@ -77,12 +73,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **World Gen: Improved ponds** — Make ponds larger and more irregular (noise-based shape instead of circular), ensure water is fully contained by solid blocks (stone/sand) on sides and bottom to prevent spilling **[CPX: 2]**
+- [ ] **Chunk: GenMesh/GenMeshTransparent optimization** — Profile and optimize opaque and transparent mesh generation methods. Investigate chunk size increase (e.g., 16→24), early-out for empty/solid chunks, memory access patterns, and reducing per-face overhead **[CPX: 3]**
 
 ### On Hold
 
 - [ ] **GUI: Disabled inventory items** — Draw inventory items as visually disabled when count reaches 0 **[CPX: 1]**
-- [ ] **Animation: View model mode transitions** — Add smooth toggle animations when switching view model rotation modes (e.g., hip to ironsight) **[CPX: 2]**
 
 ---
 
@@ -120,8 +116,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Make ponds larger and more irregular shape, also make sure they are surrounded by stone/air/sand blocks on all sides, so they don't spill over
-- Any way to optimize GenMesh and GenMeshTransparent methods? Maybe increase chunk size to 24x24?
+- Add buttons to F1 menu to spawn door, campfire in front of the player
+- Check if a chunk may update itself multiple times instead of one time, like when lights are regenerated?
 
 ---
 

@@ -54,6 +54,10 @@ namespace Voxelgine.Engine
 
 		// Kill feed
 		KillFeed = 0xB0,
+
+		// Debug (0xC0–0xC1)
+		DebugSpawnEntityRequest = 0xC0,
+		DebugPlaceBlockRequest = 0xC1,
 	}
 
 	/// <summary>
@@ -213,6 +217,10 @@ namespace Voxelgine.Engine
 
 			// Kill feed
 			Register<KillFeedPacket>(PacketType.KillFeed);
+
+			// Debug
+			Register<DebugSpawnEntityRequestPacket>(PacketType.DebugSpawnEntityRequest);
+			Register<DebugPlaceBlockRequestPacket>(PacketType.DebugPlaceBlockRequest);
 		}
 	}
 }

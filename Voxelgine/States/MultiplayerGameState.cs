@@ -1909,7 +1909,7 @@ namespace Voxelgine.States
 
 		private void CreateDebugMenu(int screenW, int screenH)
 		{
-			var windowSize = new Vector2(320, 540);
+			var windowSize = new Vector2(320, 620);
 			_debugMenuWindow = new Window
 			{
 				Title = "Debug Menu",
@@ -2059,6 +2059,23 @@ namespace Voxelgine.States
 			};
 			stack.AddChild(sldJitter);
 
+			// --- Debug Spawn Buttons (listen server only) ---
+			var btnSpawnDoor = new Button
+			{
+				Text = "Spawn Door",
+				Size = new Vector2(140, 36)
+			};
+			btnSpawnDoor.Clicked += (sender, args) => DebugSpawnDoor();
+			stack.AddChild(btnSpawnDoor);
+
+			var btnPlaceCampfire = new Button
+			{
+				Text = "Place Campfire",
+				Size = new Vector2(140, 36)
+			};
+			btnPlaceCampfire.Clicked += (sender, args) => DebugPlaceCampfire();
+			stack.AddChild(btnPlaceCampfire);
+
 			var btnClose = new Button
 			{
 				Text = "Close",
@@ -2073,6 +2090,54 @@ namespace Voxelgine.States
 
 			_debugMenuWindow.AddChild(stack);
 			_gui.AddControl(_debugMenuWindow);
+		}
+
+		private void DebugSpawnDoor()
+		{
+			var player = _simulation?.LocalPlayer;
+			if (_client == null || !_client.IsConnected || player == null)
+				return;
+
+			Vector3 fwd = player.GetForward();
+			Vector3 horizontalFwd = new Vector3(fwd.X, 0, fwd.Z);
+			if (horizontalFwd.LengthSquared() > 0.001f)
+				horizontalFwd = Vector3.Normalize(horizontalFwd);
+			else
+				horizontalFwd = Vector3.UnitZ;
+
+			Vector3 pos = player.Position + horizontalFwd * 3;
+			pos = new Vector3(MathF.Floor(pos.X), MathF.Floor(pos.Y), MathF.Floor(pos.Z));
+			Vector3 facing = -horizontalFwd;
+
+			var packet = new DebugSpawnEntityRequestPacket
+			{
+				EntityType = "VEntSlidingDoor",
+				Position = pos,
+				FacingDirection = facing,
+			};
+			_client.Send(packet, true, (float)Raylib.GetTime());
+		}
+
+		private void DebugPlaceCampfire()
+		{
+			var player = _simulation?.LocalPlayer;
+			if (_client == null || !_client.IsConnected || player == null)
+				return;
+
+			Vector3 fwd = player.GetForward();
+			Vector3 pos = player.Position + fwd * 3;
+			int x = (int)MathF.Floor(pos.X);
+			int y = (int)MathF.Floor(pos.Y);
+			int z = (int)MathF.Floor(pos.Z);
+
+			var packet = new DebugPlaceBlockRequestPacket
+			{
+				X = x,
+				Y = y,
+				Z = z,
+				BlockType = (byte)BlockType.Campfire,
+			};
+			_client.Send(packet, true, (float)Raylib.GetTime());
 		}
 
 		/// <summary>

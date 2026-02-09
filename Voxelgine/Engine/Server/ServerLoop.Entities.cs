@@ -36,6 +36,18 @@ namespace Voxelgine.Engine.Server
 		}
 
 		/// <summary>
+		/// Spawns an entity on the server and broadcasts its spawn packet to all connected clients.
+		/// Must be called from the server thread.
+		/// </summary>
+		public void SpawnEntityAndBroadcast(VoxEntity entity)
+		{
+			_simulation.Entities.Spawn(_simulation, entity);
+			var packet = BuildEntitySpawnPacket(entity);
+			_server.Broadcast(packet, true, CurrentTime);
+			_logging.ServerWriteLine($"Spawned {entity.EntityTypeName} (netId={entity.NetworkId}) at {entity.Position}");
+		}
+
+		/// <summary>
 		/// Gets a compact animation state byte for an entity.
 		/// 0 = idle, 1 = walk, 2 = attack.
 		/// </summary>

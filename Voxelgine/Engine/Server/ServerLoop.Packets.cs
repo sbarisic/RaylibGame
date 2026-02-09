@@ -25,11 +25,19 @@ namespace Voxelgine.Engine.Server
 					HandleWeaponFire(connection, weaponFire);
 					break;
 
-				case ChatMessagePacket chatMsg:
-					HandleChatMessage(connection, chatMsg);
-					break;
-			}
-		}
+						case ChatMessagePacket chatMsg:
+							HandleChatMessage(connection, chatMsg);
+							break;
+
+						case DebugSpawnEntityRequestPacket debugSpawn:
+							HandleDebugSpawnEntityRequest(connection, debugSpawn);
+							break;
+
+						case DebugPlaceBlockRequestPacket debugPlace:
+							HandleDebugPlaceBlockRequest(connection, debugPlace);
+							break;
+					}
+				}
 
 		/// <summary>
 		/// Handles an <see cref="InputStatePacket"/> from a client.
@@ -177,6 +185,50 @@ namespace Voxelgine.Engine.Server
 				Message = message
 			};
 			_server.Broadcast(broadcastPacket, true, CurrentTime);
+		}
+
+		/// <summary>
+		/// Handles a <see cref="DebugSpawnEntityRequestPacket"/> from a client.
+		/// Creates the requested entity on the server and broadcasts it to all clients.
+		/// </summary>
+		private void HandleDebugSpawnEntityRequest(NetConnection connection, DebugSpawnEntityRequestPacket packet)
+		{
+			_logging.ServerWriteLine($"DebugSpawnEntity [{connection.PlayerId}]: type={packet.EntityType} pos={packet.Position}");
+
+			VoxEntity entity = packet.EntityType switch
+			{
+				"VEntSlidingDoor" => CreateDebugDoor(packet.Position, packet.FacingDirection),
+				_ => null,
+			};
+
+			if (entity == null)
+			{
+				_logging.ServerWriteLine($"DebugSpawnEntity REJECTED [{connection.PlayerId}]: unknown entity type '{packet.EntityType}'");
+				return;
+			}
+
+			SpawnEntityAndBroadcast(entity);
+		}
+
+		private VoxEntity CreateDebugDoor(Vector3 position, Vector3 facingDirection)
+		{
+			var door = new VEntSlidingDoor();
+			door.SetModelName("door/door.json");
+			door.Initialize(position, new Vector3(1.0f, 2.0f, 0.125f), Vector3.UnitY, 2.0f);
+			door.FacingDirection = facingDirection;
+			return door;
+		}
+
+		/// <summary>
+		/// Handles a <see cref="DebugPlaceBlockRequestPacket"/> from a client.
+		/// Places the block without inventory validation and broadcasts the change.
+		/// </summary>
+		private void HandleDebugPlaceBlockRequest(NetConnection connection, DebugPlaceBlockRequestPacket packet)
+		{
+			_logging.ServerWriteLine($"DebugPlaceBlock [{connection.PlayerId}]: ({packet.X}, {packet.Y}, {packet.Z}) type={packet.BlockType}");
+
+			BlockType blockType = (BlockType)packet.BlockType;
+			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
 		}
 	}
 }

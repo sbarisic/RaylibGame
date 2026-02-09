@@ -69,12 +69,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items*
+- [ ] **Chunk: GenMesh/GenMeshTransparent optimization** — Profile and optimize opaque and transparent mesh generation methods. Investigate chunk size increase (e.g., 16→24), early-out for empty/solid chunks, memory access patterns, reducing per-face overhead, and audit for redundant mesh rebuilds (e.g., chunks marked dirty multiple times per frame during lighting recomputation) **[CPX: 3]**
 
 ### Medium Priority
 
 - [ ] **World Gen: Improved ponds** — Make ponds larger and more irregular (noise-based shape instead of circular), ensure water is fully contained by solid blocks (stone/sand) on sides and bottom to prevent spilling **[CPX: 2]**
-- [ ] **Chunk: GenMesh/GenMeshTransparent optimization** — Profile and optimize opaque and transparent mesh generation methods. Investigate chunk size increase (e.g., 16→24), early-out for empty/solid chunks, memory access patterns, and reducing per-face overhead **[CPX: 3]**
 
 ### On Hold
 
@@ -116,8 +115,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Add buttons to F1 menu to spawn door, campfire in front of the player
-- Check if a chunk may update itself multiple times instead of one time, like when lights are regenerated?
+*No uncategorized items*
 
 ---
 

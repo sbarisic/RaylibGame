@@ -58,6 +58,9 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		private Vector3 _cameraPosition;
 
+		/// <summary>Countdown timer for periodic block particle emission (campfire fire particles, etc.).</summary>
+		private float _blockParticleTimer;
+
 		/// <summary>
 		/// Log of block changes since last clear. Used for network delta sync —
 		/// server reads and broadcasts pending changes each tick.
@@ -1178,6 +1181,57 @@ namespace Voxelgine.Graphics
 
 		public void Tick()
 		{
+		}
+
+		/// <summary>
+		/// Emits particles for blocks that produce them (e.g. campfire fire particles).
+		/// Called each frame; internally throttled to emit every ~0.25 seconds.
+		/// Uses <see cref="_cameraPosition"/> from the previous Draw call for distance filtering.
+		/// </summary>
+		public void EmitBlockParticles(ParticleSystem particle, float dt)
+		{
+			const float EmitInterval = 0.25f;
+
+			_blockParticleTimer -= dt;
+			if (_blockParticleTimer > 0f)
+				return;
+			_blockParticleTimer = EmitInterval;
+
+			float halfChunk = Chunk.ChunkSize * 0.5f;
+			float renderDistSq = RenderDistanceBlocks * RenderDistanceBlocks;
+
+			foreach (var KV in Chunks.Items)
+			{
+				Chunk chunk = KV.Value;
+				if (!chunk.HasCustomModelBlocks)
+					continue;
+
+				Vector3 chunkPos = KV.Key * new Vector3(Chunk.ChunkSize);
+				Vector3 chunkCenter = chunkPos + new Vector3(halfChunk);
+				if (Vector3.DistanceSquared(_cameraPosition, chunkCenter) > renderDistSq)
+					continue;
+
+				for (int i = 0; i < chunk.CachedCustomModelBlocks.Count; i++)
+				{
+					var cmb = chunk.CachedCustomModelBlocks[i];
+					if (cmb.Type == BlockType.Campfire)
+					{
+						Vector3 worldPos = chunkPos + new Vector3(cmb.X + 0.5f, cmb.Y + 0.6f, cmb.Z + 0.5f);
+
+						float forceFactor = 10.6f;
+						float randomUnitFactor = 0.6f;
+						Vector3 hitNormal = new Vector3(0, 1, 0);
+						if (hitNormal.Y == 0)
+						{
+							forceFactor *= 2;
+							randomUnitFactor = 0.4f;
+						}
+						Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+
+						particle.SpawnFire(worldPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+					}
+				}
+			}
 		}
 
 		public void Draw(ref Frustum Fr)

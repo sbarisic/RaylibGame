@@ -57,6 +57,7 @@ works for any connected client.
 - **Foliage: Random grass variety** — Added `Foliage` as a custom model block type with 3 grass variants (`grass1-3.json`). Deterministic variant selection per block position via spatial hash. Added noise-based foliage placement in world generation on grass surface blocks.
 - **World Gen: Improved ponds** — Ponds now use noise-modulated radius for irregular organic shapes (0.55–1.0× base radius per position), are larger (5–10 radius, 2–4 depth), and have a containment pass that seals basin floor with stone and sides with sand to prevent water spilling through gaps.
 - **ViewModel: Submerged lowering** — Viewmodel rotates 25° downward when player is in water, with smooth interpolation in/out. Detects water via `ChunkMap.IsWaterAt` at player eye position.
+- **Chunk: Block particle emission** — Campfire blocks emit fire particles every ~0.25s. `ChunkMap.EmitBlockParticles` iterates visible chunks' `CachedCustomModelBlocks`, spawning fire at campfire positions via `ParticleSystem.SpawnFire`.
 
 ---
 

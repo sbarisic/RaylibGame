@@ -73,7 +73,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Chunk: Block particle emission** — Add ability for custom model blocks in chunks to emit particles periodically. Campfire blocks should emit fire particles every ~0.25 seconds. Requires per-chunk tracking of particle-emitting block positions and integration with `ParticleSystem` **[CPX: 3]**
+*No medium priority items*
 
 ### On Hold
 

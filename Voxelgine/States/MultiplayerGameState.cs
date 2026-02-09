@@ -287,6 +287,8 @@ namespace Voxelgine.States
 				}
 
 				_particle?.Tick(GameTime);
+				if (_particle != null)
+					_simulation.Map.EmitBlockParticles(_particle, dt);
 
 				// Toggle network statistics overlay
 				if (Raylib.IsKeyPressed(KeyboardKey.F5))

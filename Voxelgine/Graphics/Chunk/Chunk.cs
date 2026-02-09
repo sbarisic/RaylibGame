@@ -95,12 +95,12 @@ namespace Voxelgine.Graphics
 		List<TransparentFace> CachedTransparentFaces;
 		bool TransparentFacesValid;
 
-		List<CustomModelBlock> CachedCustomModelBlocks;
-			bool HasCustomModelBlocks;
+		internal List<CustomModelBlock> CachedCustomModelBlocks;
+		internal bool HasCustomModelBlocks;
 
-			Model CachedModelFoliage;
-			Mesh CachedMeshFoliage;
-			bool ModelValidFoliage;
+		Model CachedModelFoliage;
+		Mesh CachedMeshFoliage;
+		bool ModelValidFoliage;
 
 		/// <summary>Number of non-air blocks in this chunk. Used for empty chunk early-out.</summary>
 		int NonAirBlockCount;

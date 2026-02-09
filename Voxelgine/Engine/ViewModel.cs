@@ -286,8 +286,8 @@ namespace Voxelgine.Engine
 						newDesiredOffset = camForward * 0.7f + camRight * 0.6f + camUp * -0.6f;
 						break;
 					case ViewModelRotationMode.GunIronsight:
-							newDesiredOffset = camForward * 0.55f + camRight * 0.045f + camUp * -0.48f;
-							break;
+						newDesiredOffset = camForward * 0.55f + camRight * 0.045f + camUp * -0.48f;
+						break;
 					default:
 						throw new NotImplementedException();
 				}
@@ -392,35 +392,35 @@ namespace Voxelgine.Engine
 			ArmModel.DrawWithMatrix(armMat, lightColor);
 
 			// Draw weapon attached to hand
-				if (WeaponModelLoaded)
+			if (WeaponModelLoaded)
+			{
+				if (!_weaponDrawLogged)
 				{
-					if (!_weaponDrawLogged)
+					_weaponDrawLogged = true;
+					Logging.WriteLine($"ViewModel.DrawViewModel: Drawing weapon! meshCount={WeaponModel.Meshes.Count}, gripOffset={WeaponGripOffset}, lightColor=({lightColor.R},{lightColor.G},{lightColor.B},{lightColor.A})");
+					for (int mi = 0; mi < WeaponModel.Meshes.Count; mi++)
 					{
-						_weaponDrawLogged = true;
-						Logging.WriteLine($"ViewModel.DrawViewModel: Drawing weapon! meshCount={WeaponModel.Meshes.Count}, gripOffset={WeaponGripOffset}, lightColor=({lightColor.R},{lightColor.G},{lightColor.B},{lightColor.A})");
-						for (int mi = 0; mi < WeaponModel.Meshes.Count; mi++)
-						{
-							var m = WeaponModel.Meshes[mi];
-							Logging.WriteLine($"  mesh[{mi}] '{m.Name}': bbox=({m.BBox.Min})-({m.BBox.Max})");
-						}
+						var m = WeaponModel.Meshes[mi];
+						Logging.WriteLine($"  mesh[{mi}] '{m.Name}': bbox=({m.BBox.Min})-({m.BBox.Max})");
 					}
+				}
 
-					Matrix4x4 weaponMat = Matrix4x4.CreateTranslation(WeaponGripOffset) * armMat;
-					WeaponModel.DrawWithMatrix(weaponMat, lightColor);
+				Matrix4x4 weaponMat = Matrix4x4.CreateTranslation(WeaponGripOffset) * armMat;
+				WeaponModel.DrawWithMatrix(weaponMat, lightColor);
 
 				// Extract muzzle point from projectile mesh
 				CustomMesh projectile = WeaponModel.GetMeshByName("projectile");
 				if (projectile != null)
 				{
 					Matrix4x4 muzzleWorld = projectile.GetWorldMatrix(weaponMat);
-							MuzzlePoint = new Vector3(muzzleWorld.M41, muzzleWorld.M42, muzzleWorld.M43);
-							}
-						}
-						else if (!_weaponNotLoadedLogged)
-						{
-							_weaponNotLoadedLogged = true;
-							Logging.WriteLine($"ViewModel.DrawViewModel: Weapon NOT loaded (WeaponModelLoaded=false, IsActive={IsActive}, ArmLoaded={ArmModelLoaded})");
-						}
-					}
+					MuzzlePoint = new Vector3(muzzleWorld.M41, muzzleWorld.M42, muzzleWorld.M43);
+				}
+			}
+			else if (!_weaponNotLoadedLogged)
+			{
+				_weaponNotLoadedLogged = true;
+				Logging.WriteLine($"ViewModel.DrawViewModel: Weapon NOT loaded (WeaponModelLoaded=false, IsActive={IsActive}, ArmLoaded={ArmModelLoaded})");
+			}
+		}
 	}
 }

@@ -158,13 +158,13 @@ namespace Voxelgine.Graphics
 			GenerateRoads(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
 			// Step 6 — Trees (on remaining grass)
-				PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
-				// Step 7 — Foliage (grass plants on remaining grass blocks)
-				PlaceFoliage(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			// Step 7 — Foliage (grass plants on remaining grass blocks)
+			PlaceFoliage(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
-				// Step 8 — Lighting
-				ComputeLighting();
+			// Step 8 — Lighting
+			ComputeLighting();
 		}
 
 		/// <summary>

@@ -371,14 +371,14 @@ namespace Voxelgine.States
 					_simulation.LocalPlayer.UpdatePhysics(_simulation.Map, _simulation.PhysicsData, Dt, InMgr);
 
 					// Record predicted state
-						_prediction.RecordPrediction(
-							_client.LocalTick,
-							_simulation.LocalPlayer.Position,
-							_simulation.LocalPlayer.GetVelocity()
-						);
-					}
+					_prediction.RecordPrediction(
+						_client.LocalTick,
+						_simulation.LocalPlayer.Position,
+						_simulation.LocalPlayer.GetVelocity()
+					);
+				}
 
-					// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
+				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
 				// UpdateLockstep is still called for any non-authoritative cleanup.
 				_simulation.Entities.UpdateLockstep(TotalTime, Dt, InMgr);
 			}
@@ -1785,19 +1785,19 @@ namespace Voxelgine.States
 
 			// Network stats panel — top-left, below HUD info (toggled with F5)
 			_netStatsInfoLabel = new FishUIInfoLabel
-				{
-					Position = new Vector2(4, 4),
-					Size = new Vector2(270, 200),
-					TextColor = FishColor.Black,
-					DrawOutline = false,
-				};
+			{
+				Position = new Vector2(4, 4),
+				Size = new Vector2(270, 200),
+				TextColor = FishColor.Black,
+				DrawOutline = false,
+			};
 			_netStatsPanel = new Panel
-				{
-					Position = new Vector2(screenW - 286, 66),
-					Size = new Vector2(280, 210),
-					Variant = PanelVariant.Dark,
-					Visible = false,
-				};
+			{
+				Position = new Vector2(screenW - 286, 66),
+				Size = new Vector2(280, 210),
+				Variant = PanelVariant.Dark,
+				Visible = false,
+			};
 			_netStatsPanel.Opacity = 0.85f;
 			_netStatsPanel.AddChild(_netStatsInfoLabel);
 			_gui.AddControl(_netStatsPanel);
@@ -2198,43 +2198,43 @@ namespace Voxelgine.States
 			_healthBar.Value = health;
 
 			if (_healthLabel != null)
-					_healthLabel.Text = $"{(int)health} / {(int)maxHealth}";
-			}
+				_healthLabel.Text = $"{(int)health} / {(int)maxHealth}";
+		}
 
-			/// <summary>
-			/// Updates the connection status indicator label with ping and color coding.
-			/// Green (≤50ms), Yellow (51–150ms), Red (>150ms).
-			/// Shows "Reconnecting..." when no data has been received for over 3 seconds.
-			/// </summary>
-			private void UpdateConnectionStatus()
+		/// <summary>
+		/// Updates the connection status indicator label with ping and color coding.
+		/// Green (≤50ms), Yellow (51–150ms), Red (>150ms).
+		/// Shows "Reconnecting..." when no data has been received for over 3 seconds.
+		/// </summary>
+		private void UpdateConnectionStatus()
+		{
+			if (_connectionStatusLabel == null || _client == null)
+				return;
+
+			float currentTime = (float)Raylib.GetTime();
+			float timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
+
+			if (timeSinceReceive > 3f)
 			{
-				if (_connectionStatusLabel == null || _client == null)
-					return;
-
-				float currentTime = (float)Raylib.GetTime();
-				float timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
-
-				if (timeSinceReceive > 3f)
-				{
-					_connectionStatusLabel.Text = "Reconnecting...";
-					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
-					return;
-				}
-
-				int ping = _client.RoundTripTimeMs;
-				_connectionStatusLabel.Text = $"{ping} ms";
-
-				if (ping <= 50)
-					_connectionStatusLabel.SetColorOverride("Text", new FishColor(80, 255, 80, 255));
-				else if (ping <= 150)
-					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 220, 50, 255));
-				else
-					_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+				_connectionStatusLabel.Text = "Reconnecting...";
+				_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+				return;
 			}
 
-			/// <summary>
-			/// Updates the network statistics overlay label with current diagnostic data.
-			/// </summary>
+			int ping = _client.RoundTripTimeMs;
+			_connectionStatusLabel.Text = $"{ping} ms";
+
+			if (ping <= 50)
+				_connectionStatusLabel.SetColorOverride("Text", new FishColor(80, 255, 80, 255));
+			else if (ping <= 150)
+				_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 220, 50, 255));
+			else
+				_connectionStatusLabel.SetColorOverride("Text", new FishColor(255, 80, 80, 255));
+		}
+
+		/// <summary>
+		/// Updates the network statistics overlay label with current diagnostic data.
+		/// </summary>
 		private void UpdateNetStats()
 		{
 			if (_netStatsInfoLabel == null)

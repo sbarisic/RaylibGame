@@ -252,29 +252,29 @@ namespace Voxelgine.Graphics
 				Raylib.DrawBoundingBox(ModelAABB.Offset(ChunkPosition).ToBoundingBox(), Color.Yellow);
 
 			if (ModelValidOpaque)
-				{
-					Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
-					Eng.ChunkDrawCalls++;
-				}
+			{
+				Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
+				Eng.ChunkDrawCalls++;
+			}
 
-				if (ModelValidFoliage)
-				{
-					Raylib.DrawModel(CachedModelFoliage, ChunkPosition, BlockSize, ChunkColor);
-				}
+			if (ModelValidFoliage)
+			{
+				Raylib.DrawModel(CachedModelFoliage, ChunkPosition, BlockSize, ChunkColor);
+			}
 
-				if (HasCustomModelBlocks)
+			if (HasCustomModelBlocks)
+			{
+				for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
 				{
-					for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
-					{
-						var cmb = CachedCustomModelBlocks[i];
-						int gx = (int)ChunkPosition.X + cmb.X;
-						int gy = (int)ChunkPosition.Y + cmb.Y;
-						int gz = (int)ChunkPosition.Z + cmb.Z;
-						CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type, gx, gy, gz);
-						Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X + 0.5f, cmb.Y, cmb.Z + 0.5f));
-						model.DrawWithMatrix(matrix);
-					}
+					var cmb = CachedCustomModelBlocks[i];
+					int gx = (int)ChunkPosition.X + cmb.X;
+					int gy = (int)ChunkPosition.Y + cmb.Y;
+					int gz = (int)ChunkPosition.Z + cmb.Z;
+					CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type, gx, gy, gz);
+					Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X + 0.5f, cmb.Y, cmb.Z + 0.5f));
+					model.DrawWithMatrix(matrix);
 				}
+			}
 		}
 
 		public void DrawTransparent(Vector3 ChunkPosition, ref Frustum Fr)

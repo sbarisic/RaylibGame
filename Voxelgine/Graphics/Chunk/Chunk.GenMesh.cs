@@ -78,28 +78,7 @@ namespace Voxelgine.Graphics
 
 							if (BlockInfo.CustomModel(CurBlock.Type))
 							{
-								if (!XPosSkipFace || !XNegSkipFace || !YPosSkipFace || !YNegSkipFace || !ZPosSkipFace || !ZNegSkipFace)
-								{
-
-									Model Mdl = BlockInfo.GetCustomModel(CurBlock.Type);
-
-									SetBlockTextureUV(CurBlock.Type, Vector3.UnitY, OpaqueVerts);
-
-									for (int j = 0; j < Mdl.MeshCount; j++)
-									{
-										for (int i = 0; i < Mdl.Meshes[j].VertexCount; i++)
-										{
-											Vector3 Vert = ((Vector3*)Mdl.Meshes[j].Vertices)[i];
-											Vector2 UV = new Vector2(0, 1) + ((Vector2*)Mdl.Meshes[j].TexCoords)[i] * new Vector2(1, -1);
-											OpaqueVerts.Add(Vert + new Vector3(0.5f, 0, 0.5f), UV, Vector3.Zero, Color.White);
-										}
-									}
-
-
-
-									Logging.WriteLine("!");
-
-								}
+								continue;
 							}
 							else
 							{

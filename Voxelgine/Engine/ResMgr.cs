@@ -219,8 +219,9 @@ namespace Voxelgine.Engine {
 			string JsonSrc = File.ReadAllText(FilePath);
 			JObject Obj = JObject.Parse(JsonSrc);
 
-			float TexWidth = (float)Obj["texture_size"][0];
-			float TexHeight = (float)Obj["texture_size"][1];
+			JToken texSizeToken = Obj["texture_size"];
+			float TexWidth = texSizeToken != null ? (float)texSizeToken[0] : 16f;
+			float TexHeight = texSizeToken != null ? (float)texSizeToken[1] : 16f;
 
 			MinecraftModel JMdl = new MinecraftModel();
 			JMdl.TextureSize = new Vector2(TexWidth, TexHeight);
@@ -300,6 +301,22 @@ namespace Voxelgine.Engine {
 		public float Angle;
 		public string Axis;
 		public float[] Origin;
+
+		// Blockbench multi-axis rotation format
+		public float X;
+		public float Y;
+		public float Z;
+
+		public Vector3 GetRotationDegrees() {
+			if (Axis != null)
+				return Axis.ToLowerInvariant() switch {
+					"x" => new Vector3(Angle, 0, 0),
+					"y" => new Vector3(0, Angle, 0),
+					"z" => new Vector3(0, 0, Angle),
+					_ => Vector3.Zero
+				};
+			return new Vector3(X, Y, Z);
+		}
 	}
 
 	class MinecraftMdlFace {

@@ -51,7 +51,8 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Particles: Spark effect** — Added `SpawnSpark()` with spark textures (1-4.png). Sparks orient along movement direction via `DrawBillboardPro`, fall slowly with gravity, shrink over 1.2-2.0s lifetime, additive blend, emissive.
 - **Weapons: Gun fire particles** — Gun now spawns fire particles instead of smoke on impact, using the wall normal as initial force direction.
 - **Entities: Door model** — `VEntSlidingDoor` uses `door/door.json` Blockbench model via `CustomModel` with procedurally generated wood texture, facing direction serialization, and server spawn.
-- **Debug: F1 spawn buttons** — Added “Spawn Door” and “Place Campfire” buttons to F1 debug menu (listen server only). Uses `ServerLoop.QueueAction` for thread-safe server-side spawning with `SpawnEntityAndBroadcast` for mid-game entity network sync.
+works for any connected client.
+- **Block Models: Replace OBJ with JSON/Blockbench models** — Replaced OBJ-based custom model baking with JSON/Blockbench `CustomModel` pipeline for barrel, campfire, and torch. Created `torch.json` from `torch.bbmodel`. Custom model blocks render separately with own textures via per-chunk tracking and `DrawWithMatrix()`. Fixed campfire/torch not rendering as 3D models. Removed debug logging from `GenMesh`.
 
 ---
 

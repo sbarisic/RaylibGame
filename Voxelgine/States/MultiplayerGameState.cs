@@ -2076,6 +2076,14 @@ namespace Voxelgine.States
 			btnPlaceCampfire.Clicked += (sender, args) => DebugPlaceCampfire();
 			stack.AddChild(btnPlaceCampfire);
 
+			var btnPlaceTorch = new Button
+			{
+				Text = "Place Torch",
+				Size = new Vector2(140, 36)
+			};
+			btnPlaceTorch.Clicked += (sender, args) => DebugPlaceTorch();
+			stack.AddChild(btnPlaceTorch);
+
 			var btnClose = new Button
 			{
 				Text = "Close",
@@ -2136,6 +2144,28 @@ namespace Voxelgine.States
 				Y = y,
 				Z = z,
 				BlockType = (byte)BlockType.Campfire,
+			};
+			_client.Send(packet, true, (float)Raylib.GetTime());
+		}
+
+		private void DebugPlaceTorch()
+		{
+			var player = _simulation?.LocalPlayer;
+			if (_client == null || !_client.IsConnected || player == null)
+				return;
+
+			Vector3 fwd = player.GetForward();
+			Vector3 pos = player.Position + fwd * 3;
+			int x = (int)MathF.Floor(pos.X);
+			int y = (int)MathF.Floor(pos.Y);
+			int z = (int)MathF.Floor(pos.Z);
+
+			var packet = new DebugPlaceBlockRequestPacket
+			{
+				X = x,
+				Y = y,
+				Z = z,
+				BlockType = (byte)BlockType.Torch,
 			};
 			_client.Send(packet, true, (float)Raylib.GetTime());
 		}

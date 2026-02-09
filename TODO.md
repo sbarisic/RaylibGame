@@ -70,6 +70,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### High Priority
 
 - [ ] **Chunk: GenMesh/GenMeshTransparent optimization** — Profile and optimize opaque and transparent mesh generation methods. Investigate chunk size increase (e.g., 16→24), early-out for empty/solid chunks, memory access patterns, reducing per-face overhead, and audit for redundant mesh rebuilds (e.g., chunks marked dirty multiple times per frame during lighting recomputation) **[CPX: 3]**
+- [ ] **Foliage: Random grass model variety** — Foliage blocks always use `grass1.json`. Randomly select between `grass1`, `grass2`, `grass3` JSON models per block instance during mesh generation. Verify that `ResMgr.GetModel()` correctly loads Blockbench JSON format (currently uses `Raylib.LoadModel` which may not support it), add support into world generator for them
 
 ### Medium Priority
 

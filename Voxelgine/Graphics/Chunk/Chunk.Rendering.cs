@@ -115,25 +115,67 @@ namespace Voxelgine.Graphics
 			CachedTransparentFaces = GenTransparentFaces(chunkWorldPos);
 			TransparentFacesValid = CachedTransparentFaces.Count > 0;
 
-			if (!ModelValidOpaque && !ModelValidTransp)
+			// Collect custom model block positions
+			CachedCustomModelBlocks.Clear();
+			for (int x = 0; x < ChunkSize; x++)
+			{
+				for (int y = 0; y < ChunkSize; y++)
+				{
+
+					for (int z = 0; z < ChunkSize; z++)
+					{
+						PlacedBlock block = Blocks[x + ChunkSize * (y + ChunkSize * z)];
+						if (BlockInfo.CustomModel(block.Type))
+						{
+							CachedCustomModelBlocks.Add(new CustomModelBlock { X = x, Y = y, Z = z, Type = block.Type });
+						}
+					}
+				}
+			}
+
+			HasCustomModelBlocks = CachedCustomModelBlocks.Count > 0;
+
+			if (!ModelValidOpaque && !ModelValidTransp && !HasCustomModelBlocks)
 			{
 				ModelAABB = AABB.Empty;
 			}
 			else
 			{
-				if (!ModelValidOpaque)
-				{
-					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshTransp).ToAABB();
-				}
-				else if (!ModelValidTransp)
-				{
-					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshOpaque).ToAABB();
-				}
-				else
+				if (ModelValidOpaque && ModelValidTransp)
 				{
 					AABB BBOpaque = Raylib.GetMeshBoundingBox(CachedMeshOpaque).ToAABB();
 					AABB BBTransp = Raylib.GetMeshBoundingBox(CachedMeshTransp).ToAABB();
 					ModelAABB = AABB.Union(BBOpaque, BBTransp);
+				}
+				else if (ModelValidOpaque)
+				{
+					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshOpaque).ToAABB();
+				}
+				else if (ModelValidTransp)
+				{
+					ModelAABB = Raylib.GetMeshBoundingBox(CachedMeshTransp).ToAABB();
+				}
+				else
+				{
+					ModelAABB = AABB.Empty;
+				}
+
+				if (HasCustomModelBlocks)
+				{
+					AABB customAABB = AABB.FromMinMax(
+						new Vector3(CachedCustomModelBlocks[0].X, CachedCustomModelBlocks[0].Y, CachedCustomModelBlocks[0].Z),
+						new Vector3(CachedCustomModelBlocks[0].X + 1, CachedCustomModelBlocks[0].Y + 1, CachedCustomModelBlocks[0].Z + 1));
+
+					for (int i = 1; i < CachedCustomModelBlocks.Count; i++)
+					{
+						var cmb = CachedCustomModelBlocks[i];
+						customAABB = AABB.Union(customAABB, AABB.FromMinMax(new Vector3(cmb.X, cmb.Y, cmb.Z), new Vector3(cmb.X + 1, cmb.Y + 1, cmb.Z + 1)));
+					}
+
+					if (ModelAABB.IsEmpty)
+						ModelAABB = customAABB;
+					else
+						ModelAABB = AABB.Union(ModelAABB, customAABB);
 				}
 			}
 		}
@@ -168,6 +210,17 @@ namespace Voxelgine.Graphics
 			{
 				Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
 				Eng.ChunkDrawCalls++;
+			}
+
+			if (HasCustomModelBlocks)
+			{
+				for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
+				{
+					var cmb = CachedCustomModelBlocks[i];
+					CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type);
+					Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X, cmb.Y, cmb.Z));
+					model.DrawWithMatrix(matrix);
+				}
 			}
 		}
 

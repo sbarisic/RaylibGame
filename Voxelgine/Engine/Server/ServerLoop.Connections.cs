@@ -20,10 +20,20 @@ namespace Voxelgine.Engine.Server
 			// Restore saved player state (position, health, velocity, inventory) if available
 			if (_playerData.TryLoad(playerName, out Vector3 savedPos, out float savedHealth, out Vector3 savedVel, inventory))
 			{
-				player.SetPosition(savedPos);
-				player.Health = savedHealth;
-				player.SetVelocity(savedVel);
-				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data (pos={savedPos}, health={savedHealth}).");
+				if (savedHealth <= 0)
+				{
+					// Player was dead when saved — respawn at spawn point with full health
+					player.SetPosition(PlayerSpawnPosition);
+					player.ResetHealth();
+					_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data but was dead, respawning at {PlayerSpawnPosition}.");
+				}
+				else
+				{
+					player.SetPosition(savedPos);
+					player.Health = savedHealth;
+					player.SetVelocity(savedVel);
+					_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data (pos={savedPos}, health={savedHealth}).");
+				}
 			}
 			else
 			{

@@ -335,10 +335,12 @@ namespace Voxelgine.Engine {
 			foreach (MinecraftMdlElement E in JMdl.Elements) {
 				// Rotation origin must be transformed the same way as vertices:
 				// divide by GlobalScale AND add GlobalOffset to match vertex positions
-				Vector3 RotOrig = Utils.ToVec3(E.Rotation.Origin) / GlobalScale + GlobalOffset;
+				Vector3 RotOrig = E.Rotation?.Origin != null
+					? Utils.ToVec3(E.Rotation.Origin) / GlobalScale + GlobalOffset
+					: Vector3.Zero;
 
-				// Convert model's single-axis rotation to Vector3
-				Vector3 baseRotation = AxisAngleToVector3(E.Rotation.Axis, E.Rotation.Angle);
+				// Convert model rotation to Vector3 (supports both single-axis and multi-axis formats)
+				Vector3 baseRotation = E.Rotation?.GetRotationDegrees() ?? Vector3.Zero;
 
 				Vertex3[] ElementVerts = Generate(JMdl, E).ToArray();
 

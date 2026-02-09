@@ -304,29 +304,39 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public static Model GetCustomModel(BlockType BType)
-		{
-			// TODO: Replace all obj models with json ones
+		static Dictionary<BlockType, CustomModel> _blockJsonModelCache = new();
 
-			if (BType == BlockType.Barrel)
+		public static CustomModel GetBlockJsonModel(BlockType BType)
+		{
+			if (_blockJsonModelCache.TryGetValue(BType, out var cached))
+				return cached;
+
+			string jsonPath, texPath;
+			switch (BType)
 			{
-				return ResMgr.GetModel("barrel/barrel.obj");
+				case BlockType.Barrel:
+					jsonPath = "barrel/barrel.json";
+					texPath = "barrel/barrel_tex.png";
+					break;
+				case BlockType.Campfire:
+					jsonPath = "campfire/campfire.json";
+					texPath = "campfire/campfire_tex.png";
+					break;
+				case BlockType.Torch:
+					jsonPath = "torch/torch.json";
+					texPath = "torch/torch_tex.png";
+					break;
+				default:
+					throw new NotImplementedException();
 			}
-			else if (BType == BlockType.Campfire)
-			{
-				return ResMgr.GetModel("campfire/campfire.obj");
-			}
-			else if (BType == BlockType.Torch)
-			{
-				return ResMgr.GetModel("torch/torch.obj");
-			}
-			else if (BType == BlockType.Foliage)
-			{
-				// TODO: Check if json model loading works properly? Choose a random grass1, grass2, or grass3 json model for variety 
-				return ResMgr.GetModel("grass/grass1.json");
-			}
-			else
-				throw new NotImplementedException();
+
+			MinecraftModel jMdl = ResMgr.GetJsonModel(jsonPath);
+			CustomModel model = MeshGenerator.Generate(jMdl);
+			Texture2D texture = ResMgr.GetModelTexture(texPath);
+			model.SetTexture(texture);
+
+			_blockJsonModelCache[BType] = model;
+			return model;
 		}
 	}
 }

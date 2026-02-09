@@ -10,6 +10,15 @@ using Voxelgine.Engine.DI;
 namespace Voxelgine.Graphics
 {
 	/// <summary>
+	/// Tracks a custom model block position within a chunk for separate rendering.
+	/// </summary>
+	public struct CustomModelBlock
+	{
+		public int X, Y, Z;
+		public BlockType Type;
+	}
+
+	/// <summary>
 	/// Represents a transparent block face for depth-sorted rendering.
 	/// Contains 6 vertices (2 triangles) and the center position for sorting.
 	/// </summary>
@@ -85,6 +94,9 @@ namespace Voxelgine.Graphics
 		List<TransparentFace> CachedTransparentFaces;
 		bool TransparentFacesValid;
 
+		List<CustomModelBlock> CachedCustomModelBlocks;
+		bool HasCustomModelBlocks;
+
 		public Color ChunkColor = Color.White;
 
 		public Vector3 GlobalChunkIndex;
@@ -109,6 +121,8 @@ namespace Voxelgine.Graphics
 			ModelValidTransp = ModelValidOpaque = false;
 			TransparentFacesValid = false;
 			CachedTransparentFaces = new List<TransparentFace>();
+			CachedCustomModelBlocks = new List<CustomModelBlock>();
+			HasCustomModelBlocks = false;
 		}
 
 		public PlacedBlock GetBlock(int X, int Y, int Z)

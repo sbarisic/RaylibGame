@@ -97,6 +97,14 @@ namespace Voxelgine.Graphics
 		List<CustomModelBlock> CachedCustomModelBlocks;
 		bool HasCustomModelBlocks;
 
+		/// <summary>Number of non-air blocks in this chunk. Used for empty chunk early-out.</summary>
+		int NonAirBlockCount;
+
+		// Padded block cache (18³) for fast neighbor lookups during mesh generation.
+		// Includes a 1-block border from neighboring chunks, indexed as [(x+1) + PaddedSize * ((y+1) + PaddedSize * (z+1))].
+		const int PaddedSize = ChunkSize + 2;
+		PlacedBlock[] _paddedBlocks;
+
 		public Color ChunkColor = Color.White;
 
 		public Vector3 GlobalChunkIndex;
@@ -116,6 +124,9 @@ namespace Voxelgine.Graphics
 			Blocks = new PlacedBlock[ChunkSize * ChunkSize * ChunkSize];
 			for (int i = 0; i < Blocks.Length; i++)
 				Blocks[i] = new PlacedBlock(BlockType.None);
+
+			NonAirBlockCount = 0;
+			_paddedBlocks = new PlacedBlock[PaddedSize * PaddedSize * PaddedSize];
 
 			Dirty = true;
 			ModelValidTransp = ModelValidOpaque = false;
@@ -143,9 +154,17 @@ namespace Voxelgine.Graphics
 
 		public void SetBlock(int X, int Y, int Z, PlacedBlock Block)
 		{
-			Blocks[X + ChunkSize * (Y + ChunkSize * Z)] = Block;
+			int idx = X + ChunkSize * (Y + ChunkSize * Z);
+			BlockType oldType = Blocks[idx].Type;
+			Blocks[idx] = Block;
+
+			// Update non-air block count
+			if (oldType == BlockType.None && Block.Type != BlockType.None)
+				NonAirBlockCount++;
+			else if (oldType != BlockType.None && Block.Type == BlockType.None)
+				NonAirBlockCount--;
+
 			Dirty = true;
-			// Invalidate sky exposure cache when blocks change
 			SkyExposureCacheValid = false;
 		}
 
@@ -153,6 +172,7 @@ namespace Voxelgine.Graphics
 		{
 			for (int i = 0; i < Blocks.Length; i++)
 				Blocks[i] = Block;
+			NonAirBlockCount = Block.Type != BlockType.None ? Blocks.Length : 0;
 			Dirty = true;
 			SkyExposureCacheValid = false;
 		}
@@ -188,6 +208,57 @@ namespace Voxelgine.Graphics
 			}
 
 			return true;
+		}
+
+		/// <summary>
+		/// Builds the 18³ padded block cache for fast neighbor lookups during mesh generation.
+		/// Fetches a 1-block border from neighboring chunks so all lookups become O(1) array accesses.
+		/// </summary>
+		void BuildPaddedCache()
+		{
+			var padded = _paddedBlocks;
+			PlacedBlock airBlock = new PlacedBlock(BlockType.None);
+
+			// Fill interior from own blocks (x,y,z in [0..ChunkSize-1] → padded index [1..ChunkSize])
+			for (int z = 0; z < ChunkSize; z++)
+			{
+				for (int y = 0; y < ChunkSize; y++)
+				{
+					for (int x = 0; x < ChunkSize; x++)
+					{
+						padded[(x + 1) + PaddedSize * ((y + 1) + PaddedSize * (z + 1))] = Blocks[x + ChunkSize * (y + ChunkSize * z)];
+					}
+				}
+			}
+
+			// Fill border from neighboring chunks (or air if neighbor doesn't exist)
+			// Use GetBlock which handles cross-chunk lookups via WorldMap
+			for (int pz = 0; pz < PaddedSize; pz++)
+			{
+				int z = pz - 1;
+				for (int py = 0; py < PaddedSize; py++)
+				{
+					int y = py - 1;
+					for (int px = 0; px < PaddedSize; px++)
+					{
+						int x = px - 1;
+
+						// Skip interior blocks (already filled above)
+						if (x >= 0 && x < ChunkSize && y >= 0 && y < ChunkSize && z >= 0 && z < ChunkSize)
+							continue;
+
+						padded[px + PaddedSize * (py + PaddedSize * pz)] = GetBlock(x, y, z);
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Reads from the padded block cache. Coordinates are in chunk-local space [-1..ChunkSize].
+		/// </summary>
+		PlacedBlock PaddedGet(int x, int y, int z)
+		{
+			return _paddedBlocks[(x + 1) + PaddedSize * ((y + 1) + PaddedSize * (z + 1))];
 		}
 	}
 }

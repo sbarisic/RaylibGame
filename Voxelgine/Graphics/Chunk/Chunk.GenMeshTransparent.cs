@@ -13,6 +13,11 @@ namespace Voxelgine.Graphics
 		// Generates both front and back faces for glass-like blocks
 		Mesh GenMeshTransparent()
 		{
+			// Early-out for empty chunks
+			if (NonAirBlockCount == 0)
+				return new MeshBuilder().ToMesh();
+
+			// Padded cache is already built by GenMesh (called first in RecalcModel)
 			MeshBuilder TranspVerts = new MeshBuilder();
 
 			for (int x = 0; x < ChunkSize; x++)
@@ -21,9 +26,7 @@ namespace Voxelgine.Graphics
 				{
 					for (int z = 0; z < ChunkSize; z++)
 					{
-						WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 GlobalBlockPos);
-
-						PlacedBlock CurBlock = GetBlock(x, y, z);
+						PlacedBlock CurBlock = _paddedBlocks[(x + 1) + PaddedSize * ((y + 1) + PaddedSize * (z + 1))];
 
 						if (!BlockInfo.IsRendered(CurBlock.Type) || BlockInfo.IsOpaque(CurBlock.Type))
 						{
@@ -40,12 +43,12 @@ namespace Voxelgine.Graphics
 						// Check if this block needs backface rendering
 						bool needsBackface = BlockInfo.NeedsBackfaceRendering(CurBlock.Type);
 
-						BlockType XPosType = GetBlock(x + 1, y, z).Type;
-						BlockType XNegType = GetBlock(x - 1, y, z).Type;
-						BlockType YPosType = GetBlock(x, y + 1, z).Type;
-						BlockType YNegType = GetBlock(x, y - 1, z).Type;
-						BlockType ZPosType = GetBlock(x, y, z + 1).Type;
-						BlockType ZNegType = GetBlock(x, y, z - 1).Type;
+						BlockType XPosType = PaddedGet(x + 1, y, z).Type;
+						BlockType XNegType = PaddedGet(x - 1, y, z).Type;
+						BlockType YPosType = PaddedGet(x, y + 1, z).Type;
+						BlockType YNegType = PaddedGet(x, y - 1, z).Type;
+						BlockType ZPosType = PaddedGet(x, y, z + 1).Type;
+						BlockType ZNegType = PaddedGet(x, y, z - 1).Type;
 
 						// For transparent blocks, skip faces only if the neighbor is the same type (to avoid z-fighting and allow for proper blending)
 						bool XPosSkipFace = (XPosType == CurBlock.Type);
@@ -219,7 +222,7 @@ namespace Voxelgine.Graphics
 				{
 					for (int z = 0; z < ChunkSize; z++)
 					{
-						PlacedBlock CurBlock = GetBlock(x, y, z);
+						PlacedBlock CurBlock = _paddedBlocks[(x + 1) + PaddedSize * ((y + 1) + PaddedSize * (z + 1))];
 						if (!BlockInfo.IsRendered(CurBlock.Type) || BlockInfo.IsOpaque(CurBlock.Type))
 						{
 							continue;
@@ -232,12 +235,12 @@ namespace Voxelgine.Graphics
 
 						Vector3 blockWorldPos = chunkWorldPos + new Vector3(x, y, z) * BlockSize;
 
-						BlockType XPosType = GetBlock(x + 1, y, z).Type;
-						BlockType XNegType = GetBlock(x - 1, y, z).Type;
-						BlockType YPosType = GetBlock(x, y + 1, z).Type;
-						BlockType YNegType = GetBlock(x, y - 1, z).Type;
-						BlockType ZPosType = GetBlock(x, y, z + 1).Type;
-						BlockType ZNegType = GetBlock(x, y, z - 1).Type;
+						BlockType XPosType = PaddedGet(x + 1, y, z).Type;
+						BlockType XNegType = PaddedGet(x - 1, y, z).Type;
+						BlockType YPosType = PaddedGet(x, y + 1, z).Type;
+						BlockType YNegType = PaddedGet(x, y - 1, z).Type;
+						BlockType ZPosType = PaddedGet(x, y, z + 1).Type;
+						BlockType ZNegType = PaddedGet(x, y, z - 1).Type;
 
 						bool XPosSkipFace = (XPosType == CurBlock.Type);
 						bool XNegSkipFace = (XNegType == CurBlock.Type);

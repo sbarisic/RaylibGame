@@ -43,6 +43,32 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
+		/// AO calculation using the padded block cache. Takes block-local xyz and three
+		/// neighbor offsets (ax,ay,az), (bx,by,bz), (cx,cy,cz) relative to the block.
+		/// </summary>
+		Color CalcAOColorPadded(int bx, int by, int bz, int ax, int ay, int az, int bx2, int by2, int bz2, int cx, int cy, int cz, bool useApproximation)
+		{
+			if (useApproximation)
+				return Utils.Color(0.8f);
+
+			int Hits = 0;
+
+			if (BlockInfo.IsOpaque(PaddedGet(bx + ax, by + ay, bz + az).Type))
+				Hits++;
+
+			if (BlockInfo.IsOpaque(PaddedGet(bx + bx2, by + by2, bz + bz2).Type))
+				Hits++;
+
+			if (BlockInfo.IsOpaque(PaddedGet(bx + cx, by + cy, bz + cz).Type))
+				Hits++;
+
+			if (Hits != 0)
+				return Utils.Color(1.0f - (Hits * 0.2f));
+
+			return Utils.Color(1.0f);
+		}
+
+		/// <summary>
 		/// Gets the light color for an opaque block's face by reading from the adjacent block.
 		/// For opaque blocks, the light should come from the neighboring air/transparent block
 		/// that the face is exposed to, not from the opaque block itself.

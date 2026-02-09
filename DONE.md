@@ -78,6 +78,12 @@ works for any connected client.
 
 ---
 
+## Performance
+
+- **Chunk: GenMesh/GenMeshTransparent optimization** — Added padded 18³ block cache (`BuildPaddedCache`) pre-fetching 1-block border from neighbors, converting all per-face lookups to O(1) array access. Added `NonAirBlockCount` tracking for empty chunk early-out (skip entire 16³ iteration). Eliminated redundant `GetBlock`/`IsOpaque` calls by caching 6 neighbor references and flags once per block. Added `CalcAOColorPadded` using integer offsets into padded cache instead of expensive world-space `WorldMap.GetBlock()` calls (TranslateChunkPos + Dictionary lookup per call).
+
+---
+
 ## Code Refactoring
 
 - **Player class file split** — Split `Player.cs` into 6 partial class files: `Player.cs` (core), `Player.Physics.cs`, `Player.Input.cs`, `Player.GUI.cs`, `Player.Rendering.cs`, `Player.Serialization.cs`

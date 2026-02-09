@@ -39,7 +39,7 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
 | **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
-| **Multiplayer** | 🔶 | Client-server authoritative, UDP transport, reliable delivery, client prediction, remote player interpolation, entity/block/combat sync — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) |
+| **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) (only docs + LAN browser on hold) |
 | **NPC/AI** | ⬜ | Basic `VEntNPC` with pathfinding, no behavior trees |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented — see [TODO_MODS.md](TODO_MODS.md) |

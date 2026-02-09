@@ -16,7 +16,7 @@ Planned tasks for implementing the mod system API.
 > - First handle the Uncategorized section, if any similar issues already are on the TODO list, increase their priority instead of adding duplicates
 > - When Uncategorized section is empty, start by fixing Active Bugs (take one at a time)
 > - After Active Bugs, handle the rest of the TODO by priority and complexity (High priority takes precedence, then CPX points) (take one at a time)
-> - Core Infrastructure tasks should be completed before API Layers; API Layers before Scripting; etc.
+> - Core Infrastructure tasks should be completed before API Layers; API Layers before UI & Tooling; etc.
 
 ---
 
@@ -26,13 +26,13 @@ Planned tasks for implementing the mod system API.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| **Primary mod type** | C# plugin assemblies | Full type safety, IDE support, access to all .NET 9 features |
-| **Secondary mod type** | Lua scripts via MoonSharp | Already partially integrated (`Scripting.cs`, `AnimatedEntity` has `[MoonSharpUserData]`), good for simple/quick mods |
+| **Mod type** | C# plugin assemblies | Full type safety, IDE support, access to all .NET 9 features. Single mod technology — no Lua. |
 | **Plugin loading** | `AssemblyLoadContext` | .NET 9 supports safe assembly loading/unloading, mod isolation |
 | **Mod discovery** | `mods/` directory with JSON manifests | Simple convention-based discovery, each mod in its own subfolder |
 | **API exposure** | Interface-based mod API (`IModAPI`) | Mods receive a single API entry point exposing all subsystems; decouples mod code from engine internals |
 | **Event system** | Publish/subscribe event bus | Mods subscribe to game events (block changes, entity spawns, player actions, tick); avoids tight coupling |
 | **Mod lifecycle** | Init → Load → Enable → Tick → Disable → Unload | Clear lifecycle with hooks at each stage |
+| **Multiplayer execution** | Server-authoritative, client presentation | Gameplay mods (world/entity/player changes) run on the server. Client receives changes via existing sync. Client-side mods handle presentation only (particles, sounds, GUI). Mod manifest declares `side` (server/client/both). |
 | **Service integration** | Extend `FishDI` for mod service registration | Mods can register/resolve services using existing DI infrastructure |
 
 ### Systems to Expose
@@ -52,6 +52,7 @@ Planned tasks for implementing the mod system API.
 | **Config** | `GameConfig` | Per-mod configuration load/save |
 | **Logging** | `IFishLogging` | Per-mod prefixed logging |
 | **Pathfinding** | `VoxelPathfinder`, `PathFollower` | Path queries for custom entities |
+| **Networking** | `ServerLoop`, `MultiplayerGameState` | Register custom packet types, send/receive mod data between server and clients |
 
 ### Mod Folder Structure
 
@@ -59,8 +60,7 @@ Planned tasks for implementing the mod system API.
 mods/
 ├── my_mod/
 │   ├── mod.json          # Mod manifest (name, version, author, entry point, dependencies)
-│   ├── MyMod.dll         # C# mod assembly (or)
-│   ├── main.lua          # Lua script entry point
+│   ├── MyMod.dll         # C# mod assembly
 │   └── data/             # Mod-specific assets (textures, models, sounds)
 │       ├── textures/
 │       ├── models/
@@ -78,10 +78,13 @@ mods/
   "description": "A sample mod",
   "entryPoint": "MyMod.dll",
   "modClass": "MyMod.MyModMain",
+  "side": "both",
   "dependencies": [],
   "gameVersion": "0.1.0"
 }
 ```
+
+`side` values: `"server"` (gameplay logic, runs on server only), `"client"` (presentation, runs on client only), `"both"` (default, runs on both).
 
 ---
 
@@ -90,13 +93,13 @@ mods/
 ### High Priority
 
 - [ ] **Event Bus system** — Create a publish/subscribe event bus (`GameEventBus`) that engine systems fire events into and mods can subscribe to. Events: `OnBlockPlaced`, `OnBlockRemoved`, `OnEntitySpawned`, `OnEntityRemoved`, `OnPlayerDamaged`, `OnPlayerMoved`, `OnTick`, `OnLockstepTick`, `OnGameStateChanged`, `OnWorldGenerated`, `OnWorldLoaded`, `OnWorldSaved`. Each event carries relevant data (position, block type, entity ref, etc.). The event bus should be a DI singleton. Engine code must be updated to fire events at appropriate points (`ChunkMap.SetPlacedBlock`, `EntityManager.Spawn`, `GameState`, `Player`, etc.) **[CPX: 5]**
-- [ ] **Mod API interface** — Define `IMod` interface and `ModBase` abstract class that mods implement. `IMod` defines lifecycle methods: `OnInit(IModAPI api)`, `OnEnable()`, `OnDisable()`, `OnTick(float dt)`. `IModAPI` is the single entry point mods use to access all subsystems (world, entities, player, etc.) — mods never reference engine internals directly. Create `IModAPI` interface with properties for each sub-API (`IWorldAPI`, `IEntityAPI`, `IPlayerAPI`, etc.). Place in a new `Voxelgine/Engine/Modding/` directory **[CPX: 3]**
-- [ ] **Mod Loader** — Create `ModLoader` class that discovers mod folders in `mods/`, reads `mod.json` manifests, validates dependencies, and loads C# assemblies via `AssemblyLoadContext`. Handle dependency ordering (topological sort). Report errors via `IFishLogging`. Register as DI singleton. Integrate into `Program.cs` startup after resource initialization but before game state creation **[CPX: 4]**
-- [ ] **Mod Lifecycle Manager** — Create `ModManager` that manages the lifecycle of loaded mods: calls `OnInit` → `OnEnable` during startup, `OnTick` each frame, `OnDisable` → unload during shutdown. Handle mod enable/disable at runtime. Track mod state (Loaded/Enabled/Disabled/Error). Integrate with `GameWindow` tick loop **[CPX: 3]**
+- [ ] **Mod API interface** — Define `IMod` interface and `ModBase` abstract class that mods implement. `IMod` defines lifecycle methods: `OnInit(IModAPI api)`, `OnEnable()`, `OnDisable()`, `OnTick(float dt)`. `IModAPI` is the single entry point mods use to access all subsystems (world, entities, player, etc.) — mods never reference engine internals directly. Create `IModAPI` interface with properties for each sub-API (`IWorldAPI`, `IEntityAPI`, `IPlayerAPI`, etc.). Include `ModSide` enum (`Server`/`Client`/`Both`) for multiplayer-aware mod loading. Place in a new `VoxelgineEngine/Engine/Modding/` directory (Raylib-free so server can load mods too) **[CPX: 3]**
+- [ ] **Mod Loader** — Create `ModLoader` class that discovers mod folders in `mods/`, reads `mod.json` manifests, validates dependencies, and loads C# assemblies via `AssemblyLoadContext`. Handle dependency ordering (topological sort). Filter mods by `side` field based on whether running as server or client. Report errors via `IFishLogging`. Register as DI singleton. Integrate into `Program.cs` startup after resource initialization but before game state creation. Server loads server+both mods; client loads client+both mods **[CPX: 4]**
+- [ ] **Mod Lifecycle Manager** — Create `ModManager` that manages the lifecycle of loaded mods: calls `OnInit` → `OnEnable` during startup, `OnTick` each frame, `OnDisable` → unload during shutdown. Handle mod enable/disable at runtime. Track mod state (Loaded/Enabled/Disabled/Error). Integrate with `GameWindow` tick loop (client) and `ServerLoop` tick (server) **[CPX: 3]**
 
 ### Medium Priority
 
-- [ ] **Mod manifest parsing** — Create `ModManifest` class and JSON deserialization for `mod.json` files. Validate required fields (id, name, version, entryPoint). Support optional fields (dependencies, description, author, gameVersion). Use Newtonsoft.Json (already in project) **[CPX: 1]**
+- [ ] **Mod manifest parsing** — Create `ModManifest` class and JSON deserialization for `mod.json` files. Validate required fields (id, name, version, entryPoint). Support optional fields (dependencies, description, author, gameVersion, side). Default `side` to `"both"` if not specified. Use `System.Text.Json` **[CPX: 1]**
 - [ ] **Mod sandboxing and error handling** — Wrap all mod API calls in try/catch to prevent mod crashes from taking down the engine. Log mod errors with mod ID prefix. Consider `AssemblyLoadContext` isolation for mod assemblies to prevent type conflicts **[CPX: 3]**
 
 ---
@@ -121,22 +124,9 @@ mods/
 ### Lower Priority
 
 - [ ] **Day/Night API** (`IDayNightAPI`) — Expose: `GetTimeOfDay()`, `SetTimeOfDay(hours)`, `GetSkyColor()`, `GetSkyLightMultiplier()`, `IsPaused`, `TimeScale`. Backed by `DayNightCycle` **[CPX: 1]**
-- [ ] **Config API** (`IConfigAPI`) — Expose: `GetModConfig<T>(modId)`, `SaveModConfig(modId, config)`. Per-mod JSON config files in `mods/<modId>/config.json`. Use Newtonsoft.Json for serialization **[CPX: 2]**
+- [ ] **Config API** (`IConfigAPI`) — Expose: `GetModConfig<T>(modId)`, `SaveModConfig(modId, config)`. Per-mod JSON config files in `mods/<modId>/config.json`. Use `System.Text.Json` for serialization **[CPX: 2]**
 - [ ] **Pathfinding API** (`IPathfindingAPI`) — Expose: `FindPath(start, end, entitySize)`, `CreatePathFollower(entity)`. Backed by `VoxelPathfinder`, `PathFollower` **[CPX: 2]**
 - [ ] **Logging API** (`IModLogging`) — Per-mod logging with `[ModID]` prefix. Each mod receives its own `IModLogging` instance. Backed by `IFishLogging` **[CPX: 1]**
-
----
-
-## Lua Scripting
-
-### Medium Priority
-
-- [ ] **Expand Lua scripting integration** — Extend `Scripting.cs` to expose all mod API interfaces to MoonSharp Lua scripts. Register API wrapper types with `[MoonSharpUserData]`. Lua mods use same `mod.json` manifest but with `"entryPoint": "main.lua"`. Create Lua-friendly wrapper functions for common operations. Build on existing `AnimatedEntity` MoonSharp pattern **[CPX: 4]**
-- [ ] **Lua mod lifecycle** — Implement Lua mod loading: read `main.lua`, execute in a sandboxed `Script` context, call conventional functions (`mod_init()`, `mod_enable()`, `mod_tick(dt)`, `mod_disable()`). Each Lua mod gets its own `Script` instance **[CPX: 3]**
-
-### Lower Priority
-
-- [ ] **Lua hot-reload** — Support reloading Lua scripts at runtime without restarting the game. Monitor `.lua` files with `FileSystemWatcher` (similar to existing shader hot-reload in `ResMgr`). Re-execute script and call `mod_init()` on reload **[CPX: 3]**
 
 ---
 
@@ -148,8 +138,8 @@ mods/
 
 ### Lower Priority
 
-- [ ] **In-game mod console** — Add a toggleable console window (e.g., tilde key) that shows mod log output and allows executing Lua commands. Use `FishUIManager` for the console GUI. Useful for debugging mods **[CPX: 3]**
-- [ ] **Mod template generator** — Command-line tool or script that scaffolds a new mod folder with `mod.json`, starter C# project file or `main.lua`, and `data/` directory **[CPX: 2]**
+- [ ] **In-game mod console** — Add a toggleable console window (e.g., tilde key) that shows mod log output. Use `FishUIManager` for the console GUI. Useful for debugging mods **[CPX: 3]**
+- [ ] **Mod template generator** — Command-line tool or script that scaffolds a new mod folder with `mod.json`, starter C# project file, and `data/` directory **[CPX: 2]**
 
 ---
 
@@ -158,14 +148,13 @@ mods/
 ### Medium Priority
 
 - [ ] **Mod API reference** — Document all `IModAPI` interfaces with XML docs and generate a reference page. Include code examples for common operations **[CPX: 2]**
-- [ ] **Modding getting started guide** — Step-by-step guide: creating a mod folder, writing `mod.json`, implementing `IMod`, building and loading a C# mod, and writing a Lua mod **[CPX: 2]**
+- [ ] **Modding getting started guide** — Step-by-step guide: creating a mod folder, writing `mod.json`, implementing `IMod`, building and loading a C# mod. Cover server-side vs client-side mod patterns **[CPX: 2]**
 
 ### Lower Priority
 
 - [ ] **Example: Sample mod** — Implement a sample mod demonstrating the API **[CPX: 2]**
 - [ ] **Example: Custom block mod** — Demonstrate registering a new block type with custom texture and properties **[CPX: 1]**
 - [ ] **Example: Custom entity mod** — Demonstrate spawning a custom entity type with behavior **[CPX: 2]**
-- [ ] **Example: Lua script mod** — Demonstrate a Lua mod that spawns particles on block break **[CPX: 1]**
 
 ---
 
@@ -177,38 +166,40 @@ mods/
 
 ### Uncategorized
 
-- Restructure TODO_MODS.md, the plan is to have C# only mods. Multiplayer is planned too, so plan for that.
+*No uncategorized items*
 
 ---
 
 ## Notes
 
-- The existing `Scripting.cs` already calls `UserData.RegisterAssembly()` and exposes `AnimatedEntity` — build on this foundation
 - `BlockType` is currently a `ushort` enum — supporting dynamic/mod-defined block types will require an ID registry system mapping names to runtime IDs
 - Static classes (`ResMgr`, `GraphicsUtils`, `CustomModel`) need wrapper APIs since mods shouldn't access engine statics directly
 - The event bus is the foundation — most API layers depend on it for notifying mods about game events
 - Maintain the "dependency-free" philosophy for the mod API — mods should only reference the API assembly, not engine internals
-- Mod API interfaces should be in a separate assembly/namespace (`Voxelgine.ModAPI`) so mod authors can reference it independently
+- Mod API interfaces should be in `VoxelgineEngine` (Raylib-free) so both the client and dedicated server can load mods
 - Consider publishing the mod API as a NuGet package in the future for easy mod development
+- Multiplayer: gameplay mods (block/entity/player changes) execute on the server; clients see changes via existing sync packets (block changes, entity snapshots, etc.). Client-side mods (particles, GUI, sounds) are presentation only.
+- Server and client must have the same set of `"both"` mods to ensure custom block type IDs and entity type registrations match
+- The existing `Scripting.cs` (MoonSharp/Lua) is dead code — can be removed when mod system work begins
+- Custom packet types for mod-to-mod communication should use the existing reliable/unreliable channels with a reserved packet ID range
 
 ---
 
 ## Suggested Implementation Order
 
 1. **Event Bus** → foundation for all mod hooks
-2. **Mod API interface** (`IMod`, `IModAPI`) → defines the contract
+2. **Mod API interface** (`IMod`, `IModAPI`, `ModSide`) → defines the contract
 3. **Mod Manifest parsing** → needed by loader
-4. **Mod Loader** → discovers and loads mods
-5. **Mod Lifecycle Manager** → manages mod state
+4. **Mod Loader** → discovers, filters by side, and loads mods
+5. **Mod Lifecycle Manager** → manages mod state on both client and server
 6. **World API** → most fundamental game system
 7. **Entity API** → second most important
 8. **Player API** → mods need player interaction
 9. **Resource API** → mods need to load assets
 10. **Remaining API layers** (items, particles, sound, GUI, input, day/night, config, pathfinding, logging)
-11. **Lua scripting expansion** → builds on C# API
+11. **Sandboxing** → error isolation and hardening
 12. **UI & Tooling** → quality of life
-13. **Sandboxing** → hardening
-14. **Documentation & Examples** → last but important
+13. **Documentation & Examples** → last but important
 
 ---
 

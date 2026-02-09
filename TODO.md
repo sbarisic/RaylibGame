@@ -116,7 +116,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Make the door entity rotate around the Y axis on the left hinge instead of whatever it's doing now
+- Add the ability to emit particles for model blocks in chunks. For example campfire should emit fire every 0.25 seconds
 
 ---
 

@@ -116,6 +116,7 @@ namespace Voxelgine.Engine
 				case BlockType.None:
 				case BlockType.Water:
 				case BlockType.Foliage:
+				case BlockType.Torch:
 					return false;
 			}
 

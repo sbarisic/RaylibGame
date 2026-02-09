@@ -218,7 +218,7 @@ namespace Voxelgine.Graphics
 				{
 					var cmb = CachedCustomModelBlocks[i];
 					CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type);
-					Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X, cmb.Y, cmb.Z));
+					Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X + 0.5f, cmb.Y, cmb.Z + 0.5f));
 					model.DrawWithMatrix(matrix);
 				}
 			}

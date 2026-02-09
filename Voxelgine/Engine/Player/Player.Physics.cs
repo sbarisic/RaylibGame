@@ -116,17 +116,37 @@ namespace Voxelgine.Engine
 			return Vector3.Zero;
 		}
 
+		/// <summary>
+		/// Binary search for the fraction of a move that's collision-free.
+		/// Returns a value in [0, 1] representing how far along the move vector
+		/// the player can travel before colliding with the world.
+		/// </summary>
+		float FindCollisionFraction(ChunkMap map, Vector3 feetPos, Vector3 move, float playerRadius, float playerHeight)
+		{
+			float lo = 0f, hi = 1f;
+			for (int i = 0; i < 6; i++)
+			{
+				float mid = (lo + hi) * 0.5f;
+				Vector3 testPos = feetPos + move * mid;
+				if (map.HasBlocksInBoundsMinMax(
+					testPos - new Vector3(playerRadius, 0, playerRadius),
+					testPos + new Vector3(playerRadius, playerHeight, playerRadius)))
+					hi = mid;
+				else
+					lo = mid;
+			}
+			return lo;
+		}
+
 		private Vector3 QuakeMoveWithCollision(ChunkMap Map, Vector3 pos, Vector3 velocity, float dt, float stepHeight = 0.5f, int maxSlides = 4, bool onGround = false)
 		{
 			float playerRadius = Player.PlayerRadius;
 			float playerHeight = Player.PlayerHeight;
 			Vector3 feetPos = FeetPosition;
 			Vector3 originalVelocity = velocity;
-			Vector3 primalVelocity = velocity;
-			Vector3 move = velocity * dt;
 			LastWallNormal = Vector3.Zero;
 
-			Vector3[] planes = new Vector3[5];
+			Vector3[] planes = new Vector3[maxSlides + 1];
 			int numPlanes = 0;
 
 			// Only add ground plane if moving downward (not when jumping up)
@@ -137,9 +157,10 @@ namespace Voxelgine.Engine
 
 			float timeLeft = dt;
 
-			for (int slide = 0; slide < maxSlides && timeLeft > 0; slide++)
+			for (int slide = 0; slide < maxSlides && timeLeft > 1e-6f; slide++)
 			{
-				Vector3 endPos = feetPos + velocity * timeLeft;
+				Vector3 move = velocity * timeLeft;
+				Vector3 endPos = feetPos + move;
 
 				// Check if move is clear
 				if (!Map.HasBlocksInBoundsMinMax(
@@ -151,10 +172,10 @@ namespace Voxelgine.Engine
 				}
 
 				// Try step up if on ground
-				if (onGround && slide == 0)
+				if (onGround && slide == 0 && stepHeight > 0)
 				{
 					Vector3 stepUp = feetPos + new Vector3(0, stepHeight, 0);
-					Vector3 stepEnd = stepUp + velocity * timeLeft;
+					Vector3 stepEnd = stepUp + move;
 					if (!Map.HasBlocksInBoundsMinMax(
 						stepEnd - new Vector3(playerRadius, 0, playerRadius),
 						stepEnd + new Vector3(playerRadius, playerHeight, playerRadius)))
@@ -164,12 +185,22 @@ namespace Voxelgine.Engine
 					}
 				}
 
-				// Find collision normal
+				// Binary search for how far along the move we can safely travel
+				float fraction = FindCollisionFraction(Map, feetPos, move, playerRadius, playerHeight);
+
+				// Advance position to just before the collision
+				if (fraction > 1e-4f)
+				{
+					feetPos += move * fraction;
+					timeLeft *= (1.0f - fraction);
+				}
+
+				// Find the collision normal at the contact point
 				Vector3 normal = FindCollisionNormal(Map, feetPos, velocity * timeLeft, playerRadius, playerHeight);
 
 				if (normal == Vector3.Zero)
 				{
-					// Stuck - try to nudge out
+					velocity = Vector3.Zero;
 					break;
 				}
 
@@ -179,16 +210,34 @@ namespace Voxelgine.Engine
 					LastWallNormal = normal;
 				}
 
-				// Clip velocity against this plane using shared PhysicsUtils
+				// Clip velocity against this plane
 				velocity = PhysicsUtils.ClipVelocity(velocity, normal);
 
-				// Check if velocity is now moving into a previous plane
+				// Check if clipped velocity moves into any previous plane
 				for (int i = 0; i < numPlanes; i++)
 				{
 					if (Vector3.Dot(velocity, planes[i]) < 0)
 					{
-						// Clip against the previous plane too
+						// Re-clip against the previous plane
 						velocity = PhysicsUtils.ClipVelocity(velocity, planes[i]);
+
+						// If now moving into the current normal's plane, we're in a crease
+						if (Vector3.Dot(velocity, normal) < 0)
+						{
+							// Project velocity along the crease (intersection line of two planes)
+							Vector3 crease = Vector3.Cross(normal, planes[i]);
+							float creaseLenSq = crease.LengthSquared();
+							if (creaseLenSq > 1e-6f)
+							{
+								crease *= 1.0f / MathF.Sqrt(creaseLenSq);
+								velocity = crease * Vector3.Dot(originalVelocity, crease);
+							}
+							else
+							{
+								velocity = Vector3.Zero;
+							}
+						}
+						break;
 					}
 				}
 
@@ -198,14 +247,9 @@ namespace Voxelgine.Engine
 					planes[numPlanes++] = normal;
 				}
 
-				// Calculate how much of the move we completed (approximate)
-				float moveFraction = 0.1f; // Small step to avoid getting stuck
-				feetPos += velocity * timeLeft * moveFraction;
-				timeLeft *= (1.0f - moveFraction);
-
-				// Check if we're not moving anymore
 				if (velocity.LengthSquared() < 0.0001f)
 				{
+					velocity = Vector3.Zero;
 					break;
 				}
 			}

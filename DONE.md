@@ -76,6 +76,7 @@ works for any connected client.
 - **Lighting propagation** — Fixed struct copy bug in PlacedBlock.SetSkylight/SetBlockLightLevel; fixed opaque block face lighting to sample from adjacent air blocks instead of the opaque block itself
 - **Cross-chunk light propagation** — Fixed neighbor chunks not being marked dirty when light propagates across chunk boundaries; glowstone near edges now properly updates adjacent chunk meshes
 - **Chunk mesh lighting seams** — Fixed by splitting lighting computation into reset and compute phases; all chunks now reset before any propagation to prevent cross-chunk values from being overwritten
+- **Physics: Corner collision creep/stick** — Fixed player creeping into blocks and getting stuck when holding forwards into a corner. Replaced blind 10% movement fraction in `QuakeMoveWithCollision` with binary-search collision fraction (`FindCollisionFraction`) and proper multi-plane crease handling that projects velocity along the intersection of two blocking planes
 
 ---
 

@@ -118,7 +118,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- When holding forwards into a corner, the player slowwly creeps along one of the collision planes and gets stuck inside the blocks
+- Split ChunkMap.cs into different ChunkMap.*.cs files for better organization. While at it, find what you can optimize.
 
 ---
 

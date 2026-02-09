@@ -1218,7 +1218,7 @@ namespace Voxelgine.Graphics
 					{
 						Vector3 worldPos = chunkPos + new Vector3(cmb.X + 0.5f, cmb.Y + 0.6f, cmb.Z + 0.5f);
 
-						float forceFactor = 10.6f;
+						float forceFactor = 1.8f;
 						float randomUnitFactor = 0.6f;
 						Vector3 hitNormal = new Vector3(0, 1, 0);
 						if (hitNormal.Y == 0)
@@ -1228,7 +1228,7 @@ namespace Voxelgine.Graphics
 						}
 						Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
 
-						particle.SpawnFire(worldPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+						particle.SpawnFire(worldPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5), noCollide: true, lifetime: 0.9f);
 					}
 				}
 			}

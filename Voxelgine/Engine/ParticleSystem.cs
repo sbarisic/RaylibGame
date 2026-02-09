@@ -51,6 +51,8 @@ namespace Voxelgine.Engine
 
 		public bool IsEmissive;
 		public ParticleBlendMode BlendMode;
+
+		public bool NoCollisions;
 	}
 
 	struct TracerLine
@@ -148,7 +150,7 @@ namespace Voxelgine.Engine
 		/// <param name="Pos">Spawn position</param>
 		/// <param name="InitialForce">Initial force direction (e.g., wall impact normal). Fire will combine this with upward rise.</param>
 		/// <param name="Clr">Tint color (use Color.White for default fire appearance)</param>
-		public void SpawnFire(Vector3 Pos, Vector3 InitialForce, Color Clr, float ScaleFactor = 1.0f)
+		public void SpawnFire(Vector3 Pos, Vector3 InitialForce, Color Clr, float ScaleFactor = 1.0f, bool noCollide = false, float lifetime = 0.6f, float initialScale = 0.8f, bool altBlend = false)
 		{
 			for (int i = 0; i < Particles.Length; i++)
 			{
@@ -167,67 +169,71 @@ namespace Voxelgine.Engine
 					P.Vel = InitialForce * 0.5f + upwardVel;
 
 					P.SpawnedAt = lastGameTime;
-					P.LifeTime = 0.6f + Random.Shared.NextSingle() * 0.4f; // Short-lived: 0.6-1.0 seconds
+					P.LifeTime = lifetime + Random.Shared.NextSingle() * 0.4f; // Short-lived: 0.6-1.0 seconds
 					P.MovePhysics = true;
 					P.Tex = ResMgr.GetFromCollection("fire");
 
-										P.Scaler = 0; // Not used for fire, we use custom shrinking
-										P.InitialScale = (0.8f + Random.Shared.NextSingle() * 0.4f) * ScaleFactor; // 0.8 - 1.2
-										P.Scale = P.InitialScale;
-										P.Rnd = Random.Shared.NextSingle();
-										P.Type = ParticleType.Fire;
-										P.IsEmissive = true;
-										P.BlendMode = ParticleBlendMode.FireType;
+					P.Scaler = 0; // Not used for fire, we use custom shrinking
+					P.InitialScale = (initialScale + Random.Shared.NextSingle() * 0.4f) * ScaleFactor; // 0.8 - 1.2
+					P.Scale = P.InitialScale;
+					P.Rnd = Random.Shared.NextSingle();
+					P.Type = ParticleType.Fire;
+					P.IsEmissive = true;
+					P.BlendMode = ParticleBlendMode.FireType;
+					P.NoCollisions = noCollide;
 
-										return;
-									}
-								}
-							}
+					if (altBlend)
+						P.BlendMode = ParticleBlendMode.Additive;
 
-							/// <summary>
-							/// Spawns a blood particle effect.
-							/// Blood is ejected from the normal direction, falls with gravity, and fades out over ~8 seconds.
-							/// </summary>
-							/// <param name="Pos">Spawn position (hit point on NPC)</param>
-							/// <param name="Normal">Surface normal direction (blood ejects outward from this)</param>
-							/// <param name="ScaleFactor">Size multiplier</param>
-							public void SpawnBlood(Vector3 Pos, Vector3 Normal, float ScaleFactor = 1.0f)
-							{
-								for (int i = 0; i < Particles.Length; i++)
-								{
-									ref Particle P = ref Particles[i];
+					return;
+				}
+			}
+		}
 
-									if (P.Draw == false)
-									{
-										P.Draw = true;
-										P.Pos = Pos;
-										P.Color = Color.White; // Texture provides color
+		/// <summary>
+		/// Spawns a blood particle effect.
+		/// Blood is ejected from the normal direction, falls with gravity, and fades out over ~8 seconds.
+		/// </summary>
+		/// <param name="Pos">Spawn position (hit point on NPC)</param>
+		/// <param name="Normal">Surface normal direction (blood ejects outward from this)</param>
+		/// <param name="ScaleFactor">Size multiplier</param>
+		public void SpawnBlood(Vector3 Pos, Vector3 Normal, float ScaleFactor = 1.0f)
+		{
+			for (int i = 0; i < Particles.Length; i++)
+			{
+				ref Particle P = ref Particles[i];
 
-										// Eject from normal with random spread and slight upward bias
-										float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-										float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-										float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-										float speed = 2.0f + Random.Shared.NextSingle() * 3.0f; // 2-5 units/sec
-										Vector3 spread = new Vector3(spreadX, spreadY + 0.5f, spreadZ);
-										P.Vel = (Normal + spread) * speed;
+				if (P.Draw == false)
+				{
+					P.Draw = true;
+					P.Pos = Pos;
+					P.Color = Color.White; // Texture provides color
 
-										P.SpawnedAt = lastGameTime;
-										P.LifeTime = 6.0f + Random.Shared.NextSingle() * 4.0f; // 6-10 seconds
-										P.MovePhysics = true;
-										P.Tex = ResMgr.GetFromCollection("blood");
+					// Eject from normal with random spread and slight upward bias
+					float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+					float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+					float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+					float speed = 2.0f + Random.Shared.NextSingle() * 3.0f; // 2-5 units/sec
+					Vector3 spread = new Vector3(spreadX, spreadY + 0.5f, spreadZ);
+					P.Vel = (Normal + spread) * speed;
 
-										P.Scaler = 0; // Not used for blood
-										P.InitialScale = (0.4f + Random.Shared.NextSingle() * 0.3f) * ScaleFactor; // 0.4 - 0.7
-										P.Scale = P.InitialScale;
-										P.Rnd = Random.Shared.NextSingle();
-										P.Type = ParticleType.Blood;
-										P.IsEmissive = false;
-										P.BlendMode = ParticleBlendMode.Alpha;
+					P.SpawnedAt = lastGameTime;
+					P.LifeTime = 6.0f + Random.Shared.NextSingle() * 4.0f; // 6-10 seconds
+					P.MovePhysics = true;
+					P.Tex = ResMgr.GetFromCollection("blood");
 
-										return;
-									}
-								}
-							}
+					P.Scaler = 0; // Not used for blood
+					P.InitialScale = (0.4f + Random.Shared.NextSingle() * 0.3f) * ScaleFactor; // 0.4 - 0.7
+					P.Scale = P.InitialScale;
+					P.Rnd = Random.Shared.NextSingle();
+					P.Type = ParticleType.Blood;
+					P.IsEmissive = false;
+					P.BlendMode = ParticleBlendMode.Alpha;
+
+					return;
+				}
+			}
+		}
 
 		/// <summary>
 		/// Spawns a spark particle effect.
@@ -395,7 +401,7 @@ namespace Voxelgine.Engine
 							P.Scale = P.Scale + (P.Scaler * (P.Rnd + 0.5f)) * Dt;
 						}
 
-						if (Test(P.Pos))
+						if (!P.NoCollisions && Test(P.Pos))
 						{
 							P.MovePhysics = false; // Stop moving if the test condition is met
 						}
@@ -454,30 +460,30 @@ namespace Voxelgine.Engine
 
 			Rlgl.DisableDepthMask();
 
-						// Draw tracer lines first (additive blend for glow effect)
-						Raylib.BeginBlendMode(BlendMode.Additive);
-						for (int i = 0; i < Tracers.Length; i++)
-						{
-							ref TracerLine T = ref Tracers[i];
-							if (T.Active)
-							{
-								// Calculate fade based on lifetime progress
-								float lifeProgress = (lastGameTime - T.SpawnedAt) / T.LifeTime;
-								byte alpha = (byte)(255 * (1.0f - lifeProgress));
-								Color fadeColor = new Color(T.Color.R, T.Color.G, T.Color.B, alpha);
+			// Draw tracer lines first (additive blend for glow effect)
+			Raylib.BeginBlendMode(BlendMode.Additive);
+			for (int i = 0; i < Tracers.Length; i++)
+			{
+				ref TracerLine T = ref Tracers[i];
+				if (T.Active)
+				{
+					// Calculate fade based on lifetime progress
+					float lifeProgress = (lastGameTime - T.SpawnedAt) / T.LifeTime;
+					byte alpha = (byte)(255 * (1.0f - lifeProgress));
+					Color fadeColor = new Color(T.Color.R, T.Color.G, T.Color.B, alpha);
 
-								// Draw the tracer line
-								Raylib.DrawLine3D(T.Start, T.End, fadeColor);
+					// Draw the tracer line
+					Raylib.DrawLine3D(T.Start, T.End, fadeColor);
 
-								// Draw a slightly thicker line by offsetting (gives more visibility)
-								Vector3 offset = new Vector3(0.01f, 0, 0);
-								Raylib.DrawLine3D(T.Start + offset, T.End + offset, fadeColor);
-								Raylib.DrawLine3D(T.Start - offset, T.End - offset, fadeColor);
-							}
-						}
-						Raylib.EndBlendMode();
+					// Draw a slightly thicker line by offsetting (gives more visibility)
+					Vector3 offset = new Vector3(0.01f, 0, 0);
+					Raylib.DrawLine3D(T.Start + offset, T.End + offset, fadeColor);
+					Raylib.DrawLine3D(T.Start - offset, T.End - offset, fadeColor);
+				}
+			}
+			Raylib.EndBlendMode();
 
-						bool BlendModeSet = false;
+			bool BlendModeSet = false;
 			ParticleBlendMode CurBlendMode = ParticleBlendMode.Multiply;
 			SetParticleBlendMode(CurBlendMode);
 

@@ -9,8 +9,8 @@ using Voxelgine.Graphics;
 namespace Voxelgine.Engine
 {
 	/// <summary>
-	/// A door entity that slides into the wall when the player approaches.
-	/// Collision is disabled when the door is open.
+	/// A door entity that rotates open around a vertical hinge when the player approaches.
+	/// Collision is disabled when the door is not fully closed.
 	/// </summary>
 	public class VEntSlidingDoor : VoxEntity
 	{
@@ -27,12 +27,11 @@ namespace Voxelgine.Engine
 
 		// Configuration
 		public float TriggerRadius = 3.0f;          // Distance at which door starts opening
-		public float SlideDistance = 1.0f;          // How far the door slides
-		public float SlideSpeed = 3.0f;             // Units per second
-		public Vector3 SlideDirection = Vector3.UnitY; // Direction to slide (default: up)
+		public float OpenAngleDeg = 90f;            // How far the door opens in degrees
+		public float OpenSpeed = 2.0f;              // Progress per second (1.0 = full open)
 		public float OpenDelay = 0.5f;              // Time to stay open after player leaves trigger
 
-		/// <summary>Direction the door faces (used for model orientation).</summary>
+		/// <summary>Direction the door faces (used for model orientation and hinge placement).</summary>
 		public Vector3 FacingDirection = Vector3.UnitZ;
 
 		// JSON model rendering
@@ -40,7 +39,7 @@ namespace Voxelgine.Engine
 		static Texture2D? _doorTexture;
 
 		// Internal state
-		float SlideProgress = 0f;                   // 0 = closed, 1 = fully open
+		float OpenProgress = 0f;                    // 0 = closed, 1 = fully open
 		float OpenTimer = 0f;                       // Timer for open delay
 		Vector3 ClosedPosition;                     // Original position when closed
 		bool CollisionEnabled = true;
@@ -51,19 +50,17 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
-		/// Initialize the door with position and slide direction.
+		/// Initialize the door with position and size.
 		/// </summary>
 		/// <param name="position">Door position when closed</param>
 		/// <param name="size">Door size for collision</param>
-		/// <param name="slideDirection">Direction the door slides (e.g., Vector3.UnitY for up)</param>
-		/// <param name="slideDistance">How far to slide</param>
-		public void Initialize(Vector3 position, Vector3 size, Vector3 slideDirection, float slideDistance = 1.0f)
+		/// <param name="openAngleDeg">Maximum opening angle in degrees</param>
+		public void Initialize(Vector3 position, Vector3 size, float openAngleDeg = 90f)
 		{
 			Position = position;
 			ClosedPosition = position;
 			Size = size;
-			SlideDirection = Vector3.Normalize(slideDirection);
-			SlideDistance = slideDistance;
+			OpenAngleDeg = openAngleDeg;
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
@@ -87,22 +84,20 @@ namespace Voxelgine.Engine
 					if (playerInRange)
 					{
 						State = DoorState.Opening;
+						CollisionEnabled = false;
 					}
 					break;
 
 				case DoorState.Opening:
-					SlideProgress += SlideSpeed * Dt / SlideDistance;
-					if (SlideProgress >= 1.0f)
+					OpenProgress += OpenSpeed * Dt;
+					if (OpenProgress >= 1.0f)
 					{
-						SlideProgress = 1.0f;
+						OpenProgress = 1.0f;
 						State = DoorState.Open;
-						CollisionEnabled = false;
 					}
-					UpdateDoorPosition();
 					break;
 
 				case DoorState.Open:
-					CollisionEnabled = false;
 					if (!playerInRange)
 					{
 						OpenTimer += Dt;
@@ -114,32 +109,25 @@ namespace Voxelgine.Engine
 					}
 					else
 					{
-						OpenTimer = 0f; // Reset timer if player is still in range
+						OpenTimer = 0f;
 					}
 					break;
 
 				case DoorState.Closing:
 					if (playerInRange)
 					{
-						// Player re-entered, open again
 						State = DoorState.Opening;
 						break;
 					}
-					SlideProgress -= SlideSpeed * Dt / SlideDistance;
-					if (SlideProgress <= 0f)
+					OpenProgress -= OpenSpeed * Dt;
+					if (OpenProgress <= 0f)
 					{
-						SlideProgress = 0f;
+						OpenProgress = 0f;
 						State = DoorState.Closed;
 						CollisionEnabled = true;
 					}
-					UpdateDoorPosition();
 					break;
 			}
-		}
-
-		void UpdateDoorPosition()
-		{
-			Position = ClosedPosition + SlideDirection * SlideDistance * SlideProgress;
 		}
 
 		/// <summary>
@@ -162,34 +150,20 @@ namespace Voxelgine.Engine
 
 		protected override void WriteSnapshotExtra(BinaryWriter writer)
 		{
-			// Door state (1 byte)
 			writer.Write((byte)State);
-
-			// Slide progress (4 bytes)
-			writer.Write(SlideProgress);
+			writer.Write(OpenProgress);
 		}
 
 		protected override void ReadSnapshotExtra(BinaryReader reader)
 		{
-			// Door state
 			State = (DoorState)reader.ReadByte();
-
-			// Slide progress
-			SlideProgress = reader.ReadSingle();
-
-			// Update collision state based on door state
-			CollisionEnabled = State == DoorState.Closed || State == DoorState.Closing;
-
-			// Recalculate position from slide progress
-			UpdateDoorPosition();
+			OpenProgress = reader.ReadSingle();
+			CollisionEnabled = State == DoorState.Closed;
 		}
 
 		protected override void WriteSpawnPropertiesExtra(BinaryWriter writer)
 		{
-			writer.Write(SlideDirection.X);
-			writer.Write(SlideDirection.Y);
-			writer.Write(SlideDirection.Z);
-			writer.Write(SlideDistance);
+			writer.Write(OpenAngleDeg);
 			writer.Write(TriggerRadius);
 			writer.Write(ClosedPosition.X);
 			writer.Write(ClosedPosition.Y);
@@ -201,8 +175,7 @@ namespace Voxelgine.Engine
 
 		protected override void ReadSpawnPropertiesExtra(BinaryReader reader)
 		{
-			SlideDirection = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-			SlideDistance = reader.ReadSingle();
+			OpenAngleDeg = reader.ReadSingle();
 			TriggerRadius = reader.ReadSingle();
 			ClosedPosition = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
 			FacingDirection = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
@@ -233,12 +206,28 @@ namespace Voxelgine.Engine
 
 		protected override void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
 		{
-			if (HasModel)
-			{
-				CModel.Position = GetDrawPosition();
-				CModel.LookDirection = FacingDirection;
-				CModel.Draw();
-			}
+			if (!HasModel)
+				return;
+
+			float hingeAngle = -OpenProgress * Utils.ToRad(OpenAngleDeg);
+
+			// Facing rotation (same formula as CustomModel.GetModelMatrix)
+			Vector2 dir = Vector2.Normalize(new Vector2(FacingDirection.X, FacingDirection.Z));
+			float facingAngle = MathF.Atan2(dir.X, dir.Y) + Utils.ToRad(-180);
+
+			// Build hinge rotation matrix:
+			// 1. Translate so the hinge edge (model x=+0.5) is at the Y axis
+			// 2. Rotate around Y by the hinge angle
+			// 3. Translate the hinge edge back
+			// 4. Apply facing rotation
+			// 5. Translate to world position
+			Matrix4x4 mat = Matrix4x4.CreateTranslation(-0.5f, 0, 0)
+				* Matrix4x4.CreateRotationY(hingeAngle)
+				* Matrix4x4.CreateTranslation(0.5f, 0, 0)
+				* Matrix4x4.CreateRotationY(facingAngle)
+				* Matrix4x4.CreateTranslation(GetDrawPosition());
+
+			CModel.DrawWithMatrix(mat);
 		}
 
 		static Texture2D GenerateDoorTexture()

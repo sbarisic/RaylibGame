@@ -74,6 +74,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
+- [ ] **Network: Skip redundant entity snapshots** — `BroadcastEntitySnapshots` sends every entity every tick even when state hasn't changed (e.g., closed doors, stationary pickups). Track last-sent state per entity and skip unchanged snapshots to reduce bandwidth **[CPX: 2]**
+- [ ] **Chunk: Block particle emission** — Add ability for custom model blocks in chunks to emit particles periodically. Campfire blocks should emit fire particles every ~0.25 seconds. Requires per-chunk tracking of particle-emitting block positions and integration with `ParticleSystem` **[CPX: 3]**
 - [ ] **World Gen: Improved ponds** — Make ponds larger and more irregular (noise-based shape instead of circular), ensure water is fully contained by solid blocks (stone/sand) on sides and bottom to prevent spilling **[CPX: 2]**
 
 ### On Hold
@@ -104,7 +106,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-*No Code Refactoring items*
+- [ ] **Merge TODO_MULTIPLAYER.md into TODO.md** — Multiplayer TODO is nearly fully completed. Fold remaining items (LAN server browser, multiplayer docs) into main TODO.md, merge design overview/protocol reference into project overview or a separate reference doc, consolidate DONE_MULTIPLAYER.md into DONE.md, remove TODO_MULTIPLAYER.md and DONE_MULTIPLAYER.md **[CPX: 1]**
 
 ---
 
@@ -116,8 +118,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Make the door entity rotate around the Y axis on the left hinge instead of whatever it's doing now
-- Add the ability to emit particles for model blocks in chunks. For example campfire should emit fire every 0.25 seconds
+*No uncategorized items*
 
 ---
 

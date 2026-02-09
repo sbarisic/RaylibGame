@@ -214,7 +214,7 @@ namespace Voxelgine.Engine.Server
 		{
 			var door = new VEntSlidingDoor();
 			door.SetModelName("door/door.json");
-			door.Initialize(position, new Vector3(1.0f, 2.0f, 0.125f), Vector3.UnitY, 2.0f);
+			door.Initialize(position, new Vector3(1.0f, 2.0f, 0.125f));
 			door.FacingDirection = facingDirection;
 			return door;
 		}

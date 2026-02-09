@@ -25,10 +25,10 @@ namespace Voxelgine.Engine.Server
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
 
-			// Spawn sliding door entity near player spawn
+			// Spawn door entity near player spawn
 			var door = new VEntSlidingDoor();
 			door.SetModelName("door/door.json");
-			door.Initialize(PlayerSpawnPosition + new Vector3(4, 0, 0), new Vector3(1.0f, 2.0f, 0.125f), Vector3.UnitY, 2.0f);
+			door.Initialize(PlayerSpawnPosition + new Vector3(4, 0, 0), new Vector3(1.0f, 2.0f, 0.125f));
 			door.FacingDirection = Vector3.UnitZ;
 			_simulation.Entities.Spawn(_simulation, door);
 

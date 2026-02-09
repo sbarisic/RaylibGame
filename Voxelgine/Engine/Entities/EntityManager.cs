@@ -24,6 +24,12 @@ namespace Voxelgine.Engine
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
 
+		/// <summary>
+		/// Raised on the authority when a player first touches an entity (AABB overlap entry).
+		/// Parameters: entity, touching player.
+		/// </summary>
+		public event Action<VoxEntity, Player> PlayerTouchedEntity;
+
 		public EntityManager(IFishEngineRunner eng)
 		{
 			Entities = new List<VoxEntity>();
@@ -139,6 +145,7 @@ namespace Voxelgine.Engine
 					{
 						Ent._TouchingPlayerIds.Add(player.PlayerId);
 						Ent.OnPlayerTouch(player);
+						PlayerTouchedEntity?.Invoke(Ent, player);
 					}
 					else if (!touching)
 					{

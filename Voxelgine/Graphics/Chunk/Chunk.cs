@@ -5,6 +5,7 @@ using Voxelgine.Engine;
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Graphics
@@ -158,11 +159,11 @@ namespace Voxelgine.Graphics
 			BlockType oldType = Blocks[idx].Type;
 			Blocks[idx] = Block;
 
-			// Update non-air block count
+			// Update non-air block count (Interlocked for thread safety during parallel world gen)
 			if (oldType == BlockType.None && Block.Type != BlockType.None)
-				NonAirBlockCount++;
+				Interlocked.Increment(ref NonAirBlockCount);
 			else if (oldType != BlockType.None && Block.Type == BlockType.None)
-				NonAirBlockCount--;
+				Interlocked.Decrement(ref NonAirBlockCount);
 
 			Dirty = true;
 			SkyExposureCacheValid = false;
@@ -185,6 +186,21 @@ namespace Voxelgine.Graphics
 		public void MarkDirty()
 		{
 			Dirty = true;
+		}
+
+		/// <summary>
+		/// Recomputes NonAirBlockCount by scanning the Blocks array.
+		/// Call after bulk block writes that bypass SetBlock (e.g., deserialization).
+		/// </summary>
+		public void RecomputeNonAirBlockCount()
+		{
+			int count = 0;
+			for (int i = 0; i < Blocks.Length; i++)
+			{
+				if (Blocks[i].Type != BlockType.None)
+					count++;
+			}
+			NonAirBlockCount = count;
 		}
 
 		public void To3D(int Idx, out int X, out int Y, out int Z)

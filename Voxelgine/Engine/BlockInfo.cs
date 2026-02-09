@@ -298,6 +298,7 @@ namespace Voxelgine.Engine
 				case BlockType.Barrel:
 				case BlockType.Campfire:
 				case BlockType.Torch:
+				case BlockType.Foliage:
 					return true;
 
 				default:
@@ -306,9 +307,19 @@ namespace Voxelgine.Engine
 		}
 
 		static Dictionary<BlockType, CustomModel> _blockJsonModelCache = new();
+		static CustomModel[] _foliageVariants;
+		const int FoliageVariantCount = 3;
 
-		public static CustomModel GetBlockJsonModel(BlockType BType)
+		/// <summary>
+		/// Returns the cached custom model for a block type.
+		/// For <see cref="BlockType.Foliage"/>, pass global block coordinates
+		/// to select a deterministic grass variant per position.
+		/// </summary>
+		public static CustomModel GetBlockJsonModel(BlockType BType, int globalX = 0, int globalY = 0, int globalZ = 0)
 		{
+			if (BType == BlockType.Foliage)
+				return GetFoliageVariant(globalX, globalY, globalZ);
+
 			if (_blockJsonModelCache.TryGetValue(BType, out var cached))
 				return cached;
 
@@ -338,6 +349,26 @@ namespace Voxelgine.Engine
 
 			_blockJsonModelCache[BType] = model;
 			return model;
+		}
+
+		static CustomModel GetFoliageVariant(int x, int y, int z)
+		{
+			if (_foliageVariants == null)
+			{
+				_foliageVariants = new CustomModel[FoliageVariantCount];
+				for (int i = 0; i < FoliageVariantCount; i++)
+				{
+					string jsonPath = $"grass/grass{i + 1}.json";
+					MinecraftModel jMdl = ResMgr.GetJsonModel(jsonPath);
+					CustomModel model = MeshGenerator.Generate(jMdl);
+					model.SetTexture(ResMgr.GetModelTexture("grass/grass1_tex.png"));
+					_foliageVariants[i] = model;
+				}
+			}
+
+			int hash = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+			int variant = ((hash % FoliageVariantCount) + FoliageVariantCount) % FoliageVariantCount;
+			return _foliageVariants[variant];
 		}
 	}
 }

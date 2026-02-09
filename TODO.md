@@ -69,13 +69,14 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-- [ ] **Foliage: Random grass model variety** — Foliage blocks always use `grass1.json`. Randomly select between `grass1`, `grass2`, `grass3` JSON models per block instance during mesh generation. Verify that `ResMgr.GetModel()` correctly loads Blockbench JSON format (currently uses `Raylib.LoadModel` which may not support it), add support into world generator for them
+*No high priority items*
 
 ### Medium Priority
 
 - [ ] **Network: Skip redundant entity snapshots** — `BroadcastEntitySnapshots` sends every entity every tick even when state hasn't changed (e.g., closed doors, stationary pickups). Track last-sent state per entity and skip unchanged snapshots to reduce bandwidth **[CPX: 2]**
 - [ ] **Chunk: Block particle emission** — Add ability for custom model blocks in chunks to emit particles periodically. Campfire blocks should emit fire particles every ~0.25 seconds. Requires per-chunk tracking of particle-emitting block positions and integration with `ParticleSystem` **[CPX: 3]**
 - [ ] **World Gen: Improved ponds** — Make ponds larger and more irregular (noise-based shape instead of circular), ensure water is fully contained by solid blocks (stone/sand) on sides and bottom to prevent spilling **[CPX: 2]**
+- [ ] **ViewModel: Submerged lowering** — Rotate the viewmodel downward when the player is in water for visual immersion. Detect water block at player position and apply a downward pitch adjustment in `ViewModel.Update` **[CPX: 2]**
 
 ### On Hold
 

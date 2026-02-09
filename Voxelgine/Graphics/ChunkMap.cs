@@ -158,10 +158,13 @@ namespace Voxelgine.Graphics
 			GenerateRoads(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
 			// Step 6 — Trees (on remaining grass)
-			PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+				PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
-			// Step 7 — Lighting
-			ComputeLighting();
+				// Step 7 — Foliage (grass plants on remaining grass blocks)
+				PlaceFoliage(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+
+				// Step 8 — Lighting
+				ComputeLighting();
 		}
 
 		/// <summary>
@@ -675,6 +678,43 @@ namespace Voxelgine.Graphics
 								GridSetBlock(chunkGrid, bx, ly, bz, BlockType.Leaf, width, gridHeight, length, cs);
 						}
 					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Places foliage (grass plant) blocks on grass surface blocks using noise-based distribution.
+		/// Skips positions already occupied by trees, roads, water, or other blocks.
+		/// </summary>
+		void PlaceFoliage(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		{
+			int gridHeight = chunkGrid.GetLength(1) * cs;
+			const float FoliageNoiseScale = 0.12f;
+			const float FoliageThreshold = 0.35f;
+			const int EdgeMargin = 2;
+
+			for (int x = EdgeMargin; x < width - EdgeMargin; x++)
+			{
+				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
+				{
+					int surfY = surfaceHeight[x * length + z];
+					if (surfY < 0 || surfY + 1 >= gridHeight)
+						continue;
+
+					// Only place foliage on grass blocks
+					if (GridGetBlock(chunkGrid, x, surfY, z, width, gridHeight, length, cs) != BlockType.Grass)
+						continue;
+
+					// Only place if the block above is empty
+					if (GridGetBlock(chunkGrid, x, surfY + 1, z, width, gridHeight, length, cs) != BlockType.None)
+						continue;
+
+					// Noise-based placement for natural distribution
+					float foliageNoise = Noise.CalcPixel2D(x + seed * 7, z + seed * 7, FoliageNoiseScale) / 255f;
+					if (foliageNoise < FoliageThreshold)
+						continue;
+
+					GridSetBlock(chunkGrid, x, surfY + 1, z, BlockType.Foliage, width, gridHeight, length, cs);
 				}
 			}
 		}

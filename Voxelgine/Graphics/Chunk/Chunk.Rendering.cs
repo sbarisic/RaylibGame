@@ -239,15 +239,18 @@ namespace Voxelgine.Graphics
 			}
 
 			if (HasCustomModelBlocks)
-			{
-				for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
 				{
-					var cmb = CachedCustomModelBlocks[i];
-					CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type);
-					Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X + 0.5f, cmb.Y, cmb.Z + 0.5f));
-					model.DrawWithMatrix(matrix);
+					for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
+					{
+						var cmb = CachedCustomModelBlocks[i];
+						int gx = (int)ChunkPosition.X + cmb.X;
+						int gy = (int)ChunkPosition.Y + cmb.Y;
+						int gz = (int)ChunkPosition.Z + cmb.Z;
+						CustomModel model = BlockInfo.GetBlockJsonModel(cmb.Type, gx, gy, gz);
+						Matrix4x4 matrix = Matrix4x4.CreateTranslation(ChunkPosition + new Vector3(cmb.X + 0.5f, cmb.Y, cmb.Z + 0.5f));
+						model.DrawWithMatrix(matrix);
+					}
 				}
-			}
 		}
 
 		public void DrawTransparent(Vector3 ChunkPosition, ref Frustum Fr)

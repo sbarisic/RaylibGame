@@ -43,6 +43,7 @@ namespace Voxelgine.Graphics
 				i += Count;
 			}
 
+			RecomputeNonAirBlockCount();
 			Dirty = true;
 		}
 	}

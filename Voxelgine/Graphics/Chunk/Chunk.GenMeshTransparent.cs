@@ -216,6 +216,10 @@ namespace Voxelgine.Graphics
 		{
 			List<TransparentFace> faces = new List<TransparentFace>();
 
+			// Early-out for empty chunks (padded cache is not built when NonAirBlockCount == 0)
+			if (NonAirBlockCount == 0)
+				return faces;
+
 			for (int x = 0; x < ChunkSize; x++)
 			{
 				for (int y = 0; y < ChunkSize; y++)

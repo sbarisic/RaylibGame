@@ -161,6 +161,7 @@ namespace Voxelgine.Engine.Server
 			_worldTransfer.OnTransferComplete += OnWorldTransferComplete;
 
 			_simulation = new GameSimulation(eng);
+			_simulation.Entities.PlayerTouchedEntity += OnPlayerTouchedEntity;
 		}
 
 		/// <summary>

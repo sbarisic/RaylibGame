@@ -91,5 +91,19 @@ namespace Voxelgine.Engine.Server
 				Properties = properties,
 			};
 		}
+
+		/// <summary>
+		/// Handles entity-player touch events raised by <see cref="EntityManager"/>.
+		/// Refills the player's inventory when they touch a <see cref="VEntPickup"/>.
+		/// </summary>
+		private void OnPlayerTouchedEntity(VoxEntity entity, Player player)
+		{
+			if (entity is VEntPickup && _playerInventories.TryGetValue(player.PlayerId, out ServerInventory inventory))
+			{
+				inventory.ResetToDefaults();
+				_server.SendTo(player.PlayerId, inventory.CreateFullUpdatePacket(), true, CurrentTime);
+				_logging.ServerWriteLine($"Player [{player.PlayerId}] touched pickup — inventory refilled.");
+			}
+		}
 	}
 }

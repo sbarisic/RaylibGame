@@ -54,6 +54,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 works for any connected client.
 - **Block Models: Replace OBJ with JSON/Blockbench models** — Replaced OBJ-based custom model baking with JSON/Blockbench `CustomModel` pipeline for barrel, campfire, and torch. Created `torch.json` from `torch.bbmodel`. Custom model blocks render separately with own textures via per-chunk tracking and `DrawWithMatrix()`. Fixed campfire/torch not rendering as 3D models. Removed debug logging from `GenMesh`.
 - **Door: Hinge rotation** — Converted `VEntSlidingDoor` from linear sliding to Y-axis hinge rotation. Door now rotates around the left edge using a composed matrix (translate hinge to origin → rotate → translate back → facing rotation → world position). Replaced slide fields with `OpenAngleDeg`/`OpenSpeed`/`OpenProgress`. Collision disables immediately when door starts opening. Updated serialization and spawn calls.
+- **Foliage: Random grass variety** — Added `Foliage` as a custom model block type with 3 grass variants (`grass1-3.json`). Deterministic variant selection per block position via spatial hash. Added noise-based foliage placement in world generation on grass surface blocks.
 
 ---
 

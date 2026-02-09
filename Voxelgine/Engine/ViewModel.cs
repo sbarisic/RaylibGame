@@ -82,6 +82,11 @@ namespace Voxelgine.Engine
 		float SwingAngle = 0f;
 		bool IsSwinging = false;
 
+		// Submerged viewmodel lowering
+		float _submergedPitch = 0f;
+		const float SubmergedPitchTarget = -25f; // degrees downward when in water
+		const float SubmergedLerpSpeed = 6f;     // interpolation speed (per-second factor)
+
 		IFishEngineRunner Eng;
 		IFishLogging Logging;
 
@@ -312,6 +317,11 @@ namespace Voxelgine.Engine
 			// Update swing angle
 			SwingAngle = LrpSwing.GetFloat();
 
+			// --- Submerged lowering ---
+			bool isSubmerged = Eng.MultiplayerGameState?.Map?.IsWaterAt(Ply.Position) ?? false;
+			float pitchTarget = isSubmerged ? SubmergedPitchTarget : 0f;
+			_submergedPitch = _submergedPitch + (pitchTarget - _submergedPitch) * MathF.Min(1f, SubmergedLerpSpeed * 0.015f);
+
 			// Calculate absolute position for GameFrameInfo capture
 			ViewModelPos = cam.Position + ViewModelOffset;
 
@@ -346,8 +356,13 @@ namespace Voxelgine.Engine
 				}
 			}
 
-			// Compose: first flip model, then mode adjustment, then camera orientation
-			DesiredVMRot = Quaternion.Normalize(qCam * qModeAdj * qModelFlip);
+			// Submerged pitch adjustment (rotates viewmodel downward when in water)
+			Quaternion qSubmerged = Quaternion.Identity;
+			if (MathF.Abs(_submergedPitch) > 0.01f)
+				qSubmerged = Quaternion.CreateFromAxisAngle(Vector3.UnitX, Utils.ToRad(_submergedPitch));
+
+			// Compose: first flip model, then mode adjustment, then submerged pitch, then camera orientation
+			DesiredVMRot = Quaternion.Normalize(qCam * qSubmerged * qModeAdj * qModelFlip);
 
 			// Smooth rotation interpolation
 			VMRot = Quaternion.Slerp(VMRot, DesiredVMRot, 0.2f);

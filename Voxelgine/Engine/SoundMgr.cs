@@ -14,18 +14,34 @@ namespace Voxelgine.Engine
 	class FancySound
 	{
 		public string Name;
-		public Sound Sound;
+		//public Sound Sound;
 		public float Volume;
+
+		public Sound[] SoundArray;
+		int SoundIdx = 0;
 
 		public FancySound(string Name, Sound Sound, float Volume)
 		{
 			this.Name = Name;
-			this.Sound = Sound;
 			this.Volume = Volume;
+
+			if (Raylib.IsSoundValid(Sound))
+			{
+				this.SoundArray = new Sound[6];
+				SoundArray[0] = Sound;
+
+				for (int i = 1; i < SoundArray.Length; i++)
+				{
+					SoundArray[i] = Raylib.LoadSoundAlias(Sound);
+				}
+			}
 		}
 
 		public void Play(Vector3 Ears, Vector3 Dir, Vector3 Pos)
 		{
+			if (SoundArray == null)
+				return;
+
 			float Dist = Vector3.Distance(Ears, Pos);
 
 			float Vol = Dist * Volume * 0.1f;
@@ -33,8 +49,12 @@ namespace Voxelgine.Engine
 
 			Vol = Math.Clamp(Vol, 0, Volume);
 
-			Raylib.SetSoundVolume(Sound, Vol);
-			Raylib.PlaySound(Sound);
+			Sound S = SoundArray[SoundIdx++];
+			if (SoundIdx >= SoundArray.Length)
+				SoundIdx = 0;
+
+			Raylib.SetSoundVolume(S, Vol);
+			Raylib.PlaySound(S);
 		}
 	}
 
@@ -63,7 +83,7 @@ namespace Voxelgine.Engine
 			LoadCombo("block_place", "data/sound/block/place{0}.wav", 1, 1.0f);
 			LoadCombo("block_break", "data/sound/block/break{0}.wav", 1, 1.0f);
 			LoadCombo("swim", "data/sound/swim/swim{0}.wav", 1, 0.5f);
-			LoadCombo("shoot1", "data/sound/shoot1/shoot{0}.wav", 4, 1.0f);
+			LoadCombo("shoot1", "data/sound/shoot1/shoot{0}.wav", 1, 1.0f);
 		}
 
 		public void LoadSound(string Name, string FilePath, float Volume)

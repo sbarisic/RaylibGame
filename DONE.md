@@ -55,6 +55,8 @@ works for any connected client.
 - **Block Models: Replace OBJ with JSON/Blockbench models** — Replaced OBJ-based custom model baking with JSON/Blockbench `CustomModel` pipeline for barrel, campfire, and torch. Created `torch.json` from `torch.bbmodel`. Custom model blocks render separately with own textures via per-chunk tracking and `DrawWithMatrix()`. Fixed campfire/torch not rendering as 3D models. Removed debug logging from `GenMesh`.
 - **Door: Hinge rotation** — Converted `VEntSlidingDoor` from linear sliding to Y-axis hinge rotation. Door now rotates around the left edge using a composed matrix (translate hinge to origin → rotate → translate back → facing rotation → world position). Replaced slide fields with `OpenAngleDeg`/`OpenSpeed`/`OpenProgress`. Collision disables immediately when door starts opening. Updated serialization and spawn calls.
 - **Foliage: Random grass variety** — Added `Foliage` as a custom model block type with 3 grass variants (`grass1-3.json`). Deterministic variant selection per block position via spatial hash. Added noise-based foliage placement in world generation on grass surface blocks.
+- **World Gen: Improved ponds** — Ponds now use noise-modulated radius for irregular organic shapes (0.55–1.0× base radius per position), are larger (5–10 radius, 2–4 depth), and have a containment pass that seals basin floor with stone and sides with sand to prevent water spilling through gaps.
+- **ViewModel: Submerged lowering** — Viewmodel rotates 25° downward when player is in water, with smooth interpolation in/out. Detects water via `ChunkMap.IsWaterAt` at player eye position.
 
 ---
 
@@ -83,6 +85,7 @@ works for any connected client.
 ## Performance
 
 - **Chunk: GenMesh/GenMeshTransparent optimization** — Added padded 18³ block cache (`BuildPaddedCache`) pre-fetching 1-block border from neighbors, converting all per-face lookups to O(1) array access. Added `NonAirBlockCount` tracking for empty chunk early-out (skip entire 16³ iteration). Eliminated redundant `GetBlock`/`IsOpaque` calls by caching 6 neighbor references and flags once per block. Added `CalcAOColorPadded` using integer offsets into padded cache instead of expensive world-space `WorldMap.GetBlock()` calls (TranslateChunkPos + Dictionary lookup per call).
+- **Network: Skip redundant entity snapshots** — `BroadcastEntitySnapshots` now tracks last-sent state (position, velocity, animation) per entity and skips unchanged snapshots. Stale entries pruned when entities are removed.
 
 ---
 

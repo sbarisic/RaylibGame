@@ -720,16 +720,17 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
-		/// Places small water bodies in terrain depressions.
-		/// Uses noise to select pond centers, carves shallow basins, and fills with water.
+		/// Places water bodies in terrain depressions with irregular, noise-based shapes.
+		/// Carves shallow basins, lines them with stone/sand for containment, and fills with water.
 		/// </summary>
 		void PlaceWaterBodies(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
 		{
 			Random rng = new Random(seed + 2);
 			const float PondNoiseScale = 0.015f;
 			const float PondThreshold = 0.72f;
-			const int PondMinSpacing = 30;
-			const int EdgeMargin = 8;
+			const int PondMinSpacing = 40;
+			const int EdgeMargin = 12;
+			const float ShapeNoiseScale = 0.18f;
 
 			// Find potential pond centers using noise
 			List<(int x, int z)> pondCenters = new();
@@ -769,23 +770,29 @@ namespace Voxelgine.Graphics
 			foreach (var (cx, cz) in pondCenters)
 			{
 				int surfY = surfaceHeight[cx * length + cz];
-				int pondRadius = 3 + rng.Next(4); // 3-6 blocks radius
-				int pondDepth = 1 + rng.Next(3);  // 1-3 blocks deep
+				int pondRadius = 5 + rng.Next(6); // 5-10 blocks radius
+				int pondDepth = 2 + rng.Next(3);  // 2-4 blocks deep
 				int waterLevel = surfY;
+				int outerRadius = pondRadius + 2;  // Extra margin for containment walls and shoreline
 
-				// Carve basin and fill with water
+				// Pass 1: Carve basin with noise-based irregular shape
 				for (int dx = -pondRadius; dx <= pondRadius; dx++)
 				{
 					for (int dz = -pondRadius; dz <= pondRadius; dz++)
 					{
-						float distSq = dx * dx + dz * dz;
-						float radiusSq = pondRadius * pondRadius;
-						if (distSq > radiusSq)
-							continue;
-
 						int bx = cx + dx;
 						int bz = cz + dz;
 						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
+							continue;
+
+						float distSq = dx * dx + dz * dz;
+						float radiusSq = pondRadius * pondRadius;
+
+						// Noise-modulated radius for irregular shape
+						float shapeNoise = Noise.CalcPixel2D(bx + seed * 13, bz + seed * 13, ShapeNoiseScale) / 255f;
+						float localRadiusFactor = 0.55f + shapeNoise * 0.45f; // 0.55-1.0 of radius
+						float localRadiusSq = radiusSq * localRadiusFactor * localRadiusFactor;
+						if (distSq > localRadiusSq)
 							continue;
 
 						int localSurfY = surfaceHeight[bx * length + bz];
@@ -793,7 +800,7 @@ namespace Voxelgine.Graphics
 							continue;
 
 						// Depth tapers toward edges (deeper in center)
-						float edgeFactor = 1f - distSq / radiusSq;
+						float edgeFactor = 1f - distSq / localRadiusSq;
 						int localDepth = Math.Max(1, (int)(pondDepth * edgeFactor + 0.5f));
 
 						// Carve terrain and fill with water
@@ -803,7 +810,6 @@ namespace Voxelgine.Graphics
 							if (carveY < 1)
 								break;
 
-							// Replace terrain with water up to water level
 							if (carveY <= waterLevel)
 								GridSetBlock(chunkGrid, bx, carveY, bz, BlockType.Water, width, worldHeight, length, cs);
 						}
@@ -821,14 +827,48 @@ namespace Voxelgine.Graphics
 					}
 				}
 
-				// Add sand shoreline around the pond
-				for (int dx = -(pondRadius + 1); dx <= pondRadius + 1; dx++)
+				// Pass 2: Seal the basin — ensure every water block has solid neighbors on sides and bottom
+				for (int dx = -outerRadius; dx <= outerRadius; dx++)
 				{
-					for (int dz = -(pondRadius + 1); dz <= pondRadius + 1; dz++)
+					for (int dz = -outerRadius; dz <= outerRadius; dz++)
+					{
+						int bx = cx + dx;
+						int bz = cz + dz;
+						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
+							continue;
+
+						for (int y = waterLevel; y >= Math.Max(1, waterLevel - pondDepth); y--)
+						{
+							if (GridGetBlock(chunkGrid, bx, y, bz, width, worldHeight, length, cs) != BlockType.Water)
+								continue;
+
+							// Check bottom — seal with stone if not solid
+							BlockType below = GridGetBlock(chunkGrid, bx, y - 1, bz, width, worldHeight, length, cs);
+							if (!BlockInfo.IsSolid(below) && below != BlockType.Water)
+								GridSetBlock(chunkGrid, bx, y - 1, bz, BlockType.Stone, width, worldHeight, length, cs);
+
+							// Check 4 horizontal neighbors — seal with sand if not solid and not water
+							ReadOnlySpan<(int nx, int nz)> neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+							foreach (var (nx, nz) in neighbors)
+							{
+								int sx = bx + nx;
+								int sz = bz + nz;
+								BlockType side = GridGetBlock(chunkGrid, sx, y, sz, width, worldHeight, length, cs);
+								if (!BlockInfo.IsSolid(side) && side != BlockType.Water)
+									GridSetBlock(chunkGrid, sx, y, sz, BlockType.Sand, width, worldHeight, length, cs);
+							}
+						}
+					}
+				}
+
+				// Pass 3: Sand shoreline around the pond perimeter
+				for (int dx = -outerRadius; dx <= outerRadius; dx++)
+				{
+					for (int dz = -outerRadius; dz <= outerRadius; dz++)
 					{
 						float distSq = dx * dx + dz * dz;
-						float outerSq = (pondRadius + 1.5f) * (pondRadius + 1.5f);
-						float innerSq = (pondRadius - 0.5f) * (pondRadius - 0.5f);
+						float outerSq = (pondRadius + 2.5f) * (pondRadius + 2.5f);
+						float innerSq = (pondRadius - 1.0f) * (pondRadius - 1.0f);
 						if (distSq > outerSq || distSq < innerSq)
 							continue;
 

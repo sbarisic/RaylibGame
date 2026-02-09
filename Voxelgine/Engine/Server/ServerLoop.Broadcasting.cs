@@ -5,6 +5,22 @@ namespace Voxelgine.Engine.Server
 	public partial class ServerLoop
 	{
 		/// <summary>
+		/// Cached last-sent entity snapshot state for delta suppression.
+		/// </summary>
+		private struct LastEntitySnapshot
+		{
+			public Vector3 Position;
+			public Vector3 Velocity;
+			public byte AnimationState;
+		}
+
+		/// <summary>
+		/// Tracks last-sent snapshot per entity NetworkId. Entries for entities that no longer
+		/// exist are pruned each broadcast pass.
+		/// </summary>
+		private readonly Dictionary<int, LastEntitySnapshot> _lastEntitySnapshots = new();
+
+		/// <summary>
 		/// Broadcasts a <see cref="WorldSnapshotPacket"/> containing all player positions to all clients.
 		/// Sent unreliably at tick rate for remote player interpolation and local player reconciliation.
 		/// </summary>
@@ -41,21 +57,58 @@ namespace Voxelgine.Engine.Server
 		}
 
 		/// <summary>
-		/// Broadcasts <see cref="EntitySnapshotPacket"/> for all entities to all clients.
-		/// Sent unreliably at tick rate for client-side entity interpolation.
+		/// Broadcasts <see cref="EntitySnapshotPacket"/> for entities whose state has changed since
+		/// the last broadcast. Skips entities with identical position, velocity, and animation state
+		/// to reduce bandwidth for stationary entities (closed doors, idle pickups, etc.).
 		/// </summary>
 		private void BroadcastEntitySnapshots(float currentTime)
 		{
+			// Collect live entity IDs to prune stale entries afterwards
+			int liveCount = 0;
+
 			foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
 			{
+				liveCount++;
+				int netId = entity.NetworkId;
+				byte animState = GetEntityAnimationState(entity);
+
+				// Skip if state hasn't changed since last broadcast
+				if (_lastEntitySnapshots.TryGetValue(netId, out var last) &&
+					last.Position == entity.Position &&
+					last.Velocity == entity.Velocity &&
+					last.AnimationState == animState)
+				{
+					continue;
+				}
+
 				var packet = new EntitySnapshotPacket
 				{
-					NetworkId = entity.NetworkId,
+					NetworkId = netId,
 					Position = entity.Position,
 					Velocity = entity.Velocity,
-					AnimationState = GetEntityAnimationState(entity),
+					AnimationState = animState,
 				};
 				_server.Broadcast(packet, false, currentTime);
+
+				_lastEntitySnapshots[netId] = new LastEntitySnapshot
+				{
+					Position = entity.Position,
+					Velocity = entity.Velocity,
+					AnimationState = animState,
+				};
+			}
+
+			// Prune entries for entities that no longer exist
+			if (_lastEntitySnapshots.Count > liveCount)
+			{
+				var staleIds = new List<int>();
+				foreach (int id in _lastEntitySnapshots.Keys)
+				{
+					if (_simulation.Entities.GetEntityByNetworkId(id) == null)
+						staleIds.Add(id);
+				}
+				foreach (int id in staleIds)
+					_lastEntitySnapshots.Remove(id);
 			}
 		}
 

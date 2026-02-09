@@ -39,7 +39,7 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Particles** | 🔶 | `ParticleSystem` with smoke effects |
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
 | **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
-| **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) (only docs + LAN browser on hold) |
+| **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference |
 | **NPC/AI** | ⬜ | Basic `VEntNPC` with pathfinding, no behavior trees |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented — see [TODO_MODS.md](TODO_MODS.md) |
@@ -52,7 +52,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### High Priority
 
-*No high priority items — Multiplayer and Mod System tracked in [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) and [TODO_MODS.md](TODO_MODS.md)*
+*No high priority items — Mod System tracked in [TODO_MODS.md](TODO_MODS.md)*
 
 ### Medium Priority
 
@@ -61,6 +61,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### On Hold
 
 - [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **Multiplayer: LAN server browser** — Broadcast UDP discovery on LAN, servers respond with name/player count/map info, client displays list to select and connect **[CPX: 3]**
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
 ---
@@ -96,6 +97,9 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - [ ] API reference documentation
 - [ ] Getting started guide
 - [ ] Architecture overview
+- [ ] Multiplayer architecture document — technical description of client-server model, prediction/reconciliation, interpolation, and sync strategies
+- [ ] Multiplayer hosting guide — instructions for hosting dedicated/listen servers, CLI arguments, port forwarding, configuration
+- [ ] Network protocol reference — document all packet types, binary formats, and field descriptions
 
 ---
 
@@ -104,7 +108,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Code Refactoring
 
 - [ ] **ChunkMap: Split into partial class files** — Split `ChunkMap.cs` into multiple `ChunkMap.*.cs` files for better organization (e.g., generation, lighting, collision, block access). Identify and apply optimizations during the split **[CPX: 3]**
-- [ ] **Merge TODO_MULTIPLAYER.md into TODO.md** — Multiplayer TODO is nearly fully completed. Fold remaining items (LAN server browser, multiplayer docs) into main TODO.md, merge design overview/protocol reference into project overview or a separate reference doc, consolidate DONE_MULTIPLAYER.md into DONE.md, remove TODO_MULTIPLAYER.md and DONE_MULTIPLAYER.md **[CPX: 1]**
 
 ---
 

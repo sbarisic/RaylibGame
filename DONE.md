@@ -58,12 +58,21 @@ works for any connected client.
 - **World Gen: Improved ponds** — Ponds now use noise-modulated radius for irregular organic shapes (0.55–1.0× base radius per position), are larger (5–10 radius, 2–4 depth), and have a containment pass that seals basin floor with stone and sides with sand to prevent water spilling through gaps.
 - **ViewModel: Submerged lowering** — Viewmodel rotates 25° downward when player is in water, with smooth interpolation in/out. Detects water via `ChunkMap.IsWaterAt` at player eye position.
 - **Chunk: Block particle emission** — Campfire blocks emit fire particles every ~0.25s. `ChunkMap.EmitBlockParticles` iterates visible chunks' `CachedCustomModelBlocks`, spawning fire at campfire positions via `ParticleSystem.SpawnFire`.
+- **Multiplayer: Client-server architecture** — UDP transport with custom reliability layer (`ReliableChannel`), packet fragmentation/batching, RTT measurement. Server-authoritative `GameSimulation` at 66.6 Hz. Up to 10 players. Protocol: 24+ packet types with binary serialization. See [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference.
+- **Multiplayer: Client prediction & reconciliation** — Client-side movement prediction using Quake physics, server reconciliation with input replay, visual correction smoothing. Remote player/entity snapshot interpolation (100ms buffer via `SnapshotBuffer<T>`).
+- **Multiplayer: World sync** — GZip-compressed full world transfer on connect (fragmented, FNV-1a checksum). Delta block changes during play with server authority validation.
+- **Multiplayer: Combat** — Server-authoritative weapon fire resolution (world + entity + player AABB raycast). Predicted fire effects (instant local tracers/particles). Kill feed, player health/respawn (3s timer), player damage sync.
+- **Multiplayer: Listen server mode** — Host Game hosts local `ServerLoop` on background thread + connects `MultiplayerGameState` as client. Dedicated headless server via `VoxelgineServer`. Player state persistence (`PlayerDataStore`), world auto-save (5 min), server console commands.
+- **Multiplayer: Chat & UI** — Connect/Host dialogs, player list (Tab), network stats HUD (F5), death/disconnect overlays, text chat with `/commands`, connection status indicator with ping color coding.
+- **Multiplayer: Remote players** — `RemotePlayer` with humanoid `CustomModel`, `NPCAnimator` (idle/walk/attack), head pitch, held item rendering, billboard name tags with distance fade and obstruction check.
+- **Multiplayer: Procedural world gen** — Noise-based tree placement (6–10 block trunks, leaf canopy), water bodies (sand shoreline, depth tapering), procedural roads (Bresenham paths), terrain height variation (2D noise displacement), dynamic spawn point selection.
 
 ---
 
 ## Documentation
 
 - **Full codebase documentation** — Updated README.md with comprehensive architecture, controls, and project status; added XML documentation to core classes (Player, VoxEntity, ChunkMap, Chunk, PlacedBlock, BlockInfo, GameState, PhysicsUtils, FishUIManager)
+- **WORLDBUILDING.md multiplayer review** — Added cooperative gameplay sections (resource dynamics, base building, combat, social dynamics)
 
 ---
 
@@ -80,6 +89,11 @@ works for any connected client.
 - **Cross-chunk light propagation** — Fixed neighbor chunks not being marked dirty when light propagates across chunk boundaries; glowstone near edges now properly updates adjacent chunk meshes
 - **Chunk mesh lighting seams** — Fixed by splitting lighting computation into reset and compute phases; all chunks now reset before any propagation to prevent cross-chunk values from being overwritten
 - **Physics: Corner collision creep/stick** — Fixed player creeping into blocks and getting stuck when holding forwards into a corner. Replaced blind 10% movement fraction in `QuakeMoveWithCollision` with binary-search collision fraction (`FindCollisionFraction`) and proper multi-plane crease handling that projects velocity along the intersection of two blocking planes
+- **Multiplayer: Prediction tick desync** — Fixed sluggish movement at high ping caused by `LocalTick` freezing during world loading. Server now tracks per-player `LastInputTick` for independent tick comparison.
+- **Multiplayer: Block placement propagation** — Fixed `InventoryUpdatePacket` dropping before simulation existed. Client buffers pre-simulation packets; server re-sends inventory after world transfer.
+- **Multiplayer: Viewmodel rendering** — Fixed viewmodel at wrong screen position (moved overlay to after `EndMode3D`), broken arm orientation (rewrote rotation to clean 3-quaternion composition), direction vectors zero during tick.
+- **Multiplayer: Various network fixes** — Block placing/destroying echo loop, missing remote player avatars on join, raycast face hit precision, weapon effect particle types, `SoundMgr` double-init crash, cross-chunk skylight propagation at chunk boundaries.
+- **Multiplayer: Render distance & lighting** — Reduced render distance to 128 blocks. Deferred relighting for chunks outside render distance via `NeedsRelighting` flag.
 
 ---
 
@@ -87,6 +101,15 @@ works for any connected client.
 
 - **Chunk: GenMesh/GenMeshTransparent optimization** — Added padded 18³ block cache (`BuildPaddedCache`) pre-fetching 1-block border from neighbors, converting all per-face lookups to O(1) array access. Added `NonAirBlockCount` tracking for empty chunk early-out (skip entire 16³ iteration). Eliminated redundant `GetBlock`/`IsOpaque` calls by caching 6 neighbor references and flags once per block. Added `CalcAOColorPadded` using integer offsets into padded cache instead of expensive world-space `WorldMap.GetBlock()` calls (TranslateChunkPos + Dictionary lookup per call).
 - **Network: Skip redundant entity snapshots** — `BroadcastEntitySnapshots` now tracks last-sent state (position, velocity, animation) per entity and skips unchanged snapshots. Stale entries pruned when entities are removed.
+- **Multiplayer: Prediction/reconciliation optimization** — Increased correction threshold (0.01→0.1), added velocity divergence check, visual error smoothing via `_correctionSmoothOffset`. Pre-allocated replay list to eliminate per-reconciliation GC allocation.
+- **Multiplayer: World generation optimization** — Pre-created chunk grid (bypass `SetPlacedBlock`), parallel noise/surface passes, integer bit shifts.
+
+---
+
+## Testing
+
+- **Multiplayer unit tests** — 64 network tests covering packet serialization, `ClientPrediction` thresholds/reconciliation, `ClientInputBuffer` operations, `ReliableChannel` wrap/ACK/retransmission, and `SnapshotBuffer` interpolation.
+- **Network diagnostics** — Categorized logging (`ServerWriteLine`/`ClientWriteLine`), packet logger toggle, `NetworkSimulation` class with configurable latency/loss/jitter and F1 debug menu controls.
 
 ---
 
@@ -97,4 +120,4 @@ works for any connected client.
 - **Particles: Transparent block sorting** � Fixed particles rendering in front of glass/water by reordering draw calls: particles now render before transparent blocks
 - **Logging: Replace Console.* with IFishLogging** � Replaced all `Console.WriteLine` calls with `IFishLogging.WriteLine` via DI across all engine files. Removed unused Flexbox library. Updated README.md.
 - **Mod System: Architecture planning** � Analyzed entire codebase (DI, entities, world, player, weapons, particles, sound, resources, input, GUI, scripting, pathfinding, day/night) and created comprehensive [TODO_MODS.md](TODO_MODS.md) with mod system architecture, API design, implementation plan, and ~30 prioritized subtasks.
-- **Multiplayer System: Architecture planning** � Deep analysis of all engine systems (game loop, FPSCamera, Player, InputMgr, GameState, EntityManager, ChunkMap, serialization, physics, rendering, DI) for multiplayer feasibility. Created comprehensive [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md) with client-server authoritative architecture, UDP transport design, full packet protocol (25+ packet types), client-side prediction with server reconciliation, remote player interpolation, systems impact analysis, and ~50 prioritized subtasks across 8 categories.
+- **Multiplayer System: Architecture & implementation** — Full client-server multiplayer from architecture planning through implementation. Core refactoring: FPSCamera static→instance, `PlayerManager`, `IInputSource` abstraction, `GameSimulation` separation, three-project split (`VoxelgineEngine`/`VoxelgineServer`), `EntityManager` network IDs, `WeaponGun` fire/hit separation, `DayNightCycle` authority, `ViewModel` JSON model migration. `ServerLoop` split into 6 partial class files. `BlockInfo.IsRendered()` centralized for mesh/lighting checks. See [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference.

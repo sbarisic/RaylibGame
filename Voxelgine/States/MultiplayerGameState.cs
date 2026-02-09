@@ -1171,10 +1171,111 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
+		/// Spawns predicted fire effects (tracer and hit particles) based on a local client-side raycast.
+		/// Called immediately on weapon fire so the local player sees instant visual feedback.
+		/// The server's authoritative <see cref="WeaponFireEffectPacket"/> suppresses duplicate visuals for the local player.
+		/// </summary>
+		public void SpawnPredictedFireEffects(Vector3 origin, Vector3 direction, float maxRange)
+		{
+			if (_simulation == null || _particle == null)
+				return;
+
+			Vector3 muzzlePos = origin + direction * 0.5f;
+
+			// --- Raycast against world blocks ---
+			float worldDist = float.MaxValue;
+			Vector3 worldHitPos = Vector3.Zero;
+			Vector3 worldHitNormal = Vector3.Zero;
+
+			if (_simulation.Map.RaycastPrecise(origin, maxRange, direction, out Vector3 preciseHitPoint, out Vector3 faceDir))
+			{
+				worldDist = Vector3.Distance(origin, preciseHitPoint);
+				worldHitPos = preciseHitPoint;
+				worldHitNormal = faceDir;
+			}
+
+			// --- Raycast against entities ---
+			RaycastHit entityHit = _simulation.Entities.Raycast(origin, direction, maxRange);
+
+			// --- Determine closest hit ---
+			FireHitType hitType = FireHitType.None;
+			Vector3 hitPos = origin + direction * maxRange;
+			Vector3 hitNormal = -direction;
+			float closestDist = maxRange;
+			VoxEntity hitEntity = null;
+
+			if (entityHit.Hit && entityHit.Distance < closestDist)
+			{
+				closestDist = entityHit.Distance;
+				hitType = FireHitType.Entity;
+				hitPos = entityHit.HitPosition;
+				hitNormal = entityHit.HitNormal;
+				hitEntity = entityHit.Entity;
+			}
+
+			if (worldDist < closestDist)
+			{
+				closestDist = worldDist;
+				hitType = FireHitType.World;
+				hitPos = worldHitPos;
+				hitNormal = worldHitNormal;
+				hitEntity = null;
+			}
+
+			// Tracer line from muzzle to hit point
+			_particle.SpawnTracer(muzzlePos, hitPos);
+
+			// Hit particles based on predicted hit type
+			switch (hitType)
+			{
+				case FireHitType.Entity:
+					if (hitEntity is VEntNPC)
+					{
+						for (int i = 0; i < 8; i++)
+						{
+							_particle.SpawnBlood(hitPos, hitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+						}
+					}
+					else
+					{
+						for (int i = 0; i < 6; i++)
+						{
+							float forceFactor = 10.6f;
+							float randomUnitFactor = 0.6f;
+							if (hitNormal.Y == 0)
+							{
+								forceFactor *= 2;
+								randomUnitFactor = 0.4f;
+							}
+							Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+							_particle.SpawnSpark(hitPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+						}
+					}
+					break;
+
+				case FireHitType.World:
+					for (int i = 0; i < 6; i++)
+					{
+						float forceFactor = 10.6f;
+						float randomUnitFactor = 0.6f;
+						if (hitNormal.Y == 0)
+						{
+							forceFactor *= 2;
+							randomUnitFactor = 0.4f;
+						}
+						Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+						_particle.SpawnFire(hitPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+					}
+					break;
+			}
+		}
+
+		/// <summary>
 		/// Handles a <see cref="WeaponFireEffectPacket"/> from the server.
 		/// Spawns tracer, blood, and spark particles based on the hit result.
-		/// For the local player, only hit effects are applied (fire effects already played on input).
-		/// For other players, fire sound is also played.
+		/// For the local player, tracer and hit particles are suppressed (already predicted locally);
+		/// only authoritative entity effects (NPC twitch) and unpredictable player-hit blood are applied.
+		/// For other players, full effects and fire sound are played.
 		/// </summary>
 		private void HandleWeaponFireEffect(WeaponFireEffectPacket packet)
 		{
@@ -1182,21 +1283,23 @@ namespace Voxelgine.States
 				return;
 
 			Vector3 muzzlePos = packet.Origin + packet.Direction * 0.5f;
+			bool isLocalPlayer = packet.PlayerId == _client.PlayerId;
 
 			// Play fire sound for other players' shots
-			if (packet.PlayerId != _client.PlayerId && _snd != null)
+			if (!isLocalPlayer && _snd != null)
 			{
 				_snd.PlayCombo("shoot1", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), packet.Origin);
 			}
 
-			// Tracer line from muzzle to hit point
-			_particle.SpawnTracer(muzzlePos, packet.HitPosition);
+			// Tracer line from muzzle to hit point (skip for local player — predicted locally)
+			if (!isLocalPlayer)
+				_particle.SpawnTracer(muzzlePos, packet.HitPosition);
 
 			FireHitType hitType = (FireHitType)packet.HitType;
 			switch (hitType)
 			{
 				case FireHitType.Entity:
-					// Apply NPC twitch if we hit an entity with a model
+					// Always apply authoritative NPC twitch from server
 					bool isNpcHit = false;
 					if (packet.EntityNetworkId != 0)
 					{
@@ -1204,22 +1307,52 @@ namespace Voxelgine.States
 						if (hitEntity is VEntNPC npc)
 						{
 							isNpcHit = true;
-							// Use AABB center as a generic twitch target
 							npc.TwitchBodyPart("body", packet.Direction);
 						}
 					}
 
-					if (isNpcHit)
+					// Particles only for remote players (local player predicted them)
+					if (!isLocalPlayer)
 					{
-						// Blood particles for NPCs
-						for (int i = 0; i < 8; i++)
+						if (isNpcHit)
 						{
-							_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+							for (int i = 0; i < 8; i++)
+							{
+								_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+							}
+						}
+						else
+						{
+							for (int i = 0; i < 6; i++)
+							{
+								float forceFactor = 10.6f;
+								float randomUnitFactor = 0.6f;
+
+								if (packet.HitNormal.Y == 0)
+								{
+									forceFactor *= 2;
+									randomUnitFactor = 0.4f;
+								}
+
+								Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
+								_particle.SpawnSpark(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+							}
 						}
 					}
-					else
+					break;
+
+				case FireHitType.Player:
+					// Always show blood for player hits — client cannot predict these
+					for (int i = 0; i < 8; i++)
 					{
-						// Spark particles for non-NPC entities
+						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
+					}
+					break;
+
+				case FireHitType.World:
+					// Particles only for remote players (local player predicted them)
+					if (!isLocalPlayer)
+					{
 						for (int i = 0; i < 6; i++)
 						{
 							float forceFactor = 10.6f;
@@ -1232,34 +1365,8 @@ namespace Voxelgine.States
 							}
 
 							Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-							_particle.SpawnSpark(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
+							_particle.SpawnFire(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
 						}
-					}
-					break;
-
-				case FireHitType.Player:
-					// Blood particles for player hits
-					for (int i = 0; i < 8; i++)
-					{
-						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
-					}
-					break;
-
-				case FireHitType.World:
-					// Spark particles
-					for (int i = 0; i < 6; i++)
-					{
-						float forceFactor = 10.6f;
-						float randomUnitFactor = 0.6f;
-
-						if (packet.HitNormal.Y == 0)
-						{
-							forceFactor *= 2;
-							randomUnitFactor = 0.4f;
-						}
-
-						Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-						_particle.SpawnFire(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
 					}
 					break;
 			}

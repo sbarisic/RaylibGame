@@ -165,9 +165,7 @@ Game Tick Flow (Client):
 
 > Client-side networking, prediction, interpolation, and rendering of remote players.
 
-### Medium Priority
-
-*No medium priority tasks*
+*All tasks completed — see [DONE_MULTIPLAYER.md](DONE_MULTIPLAYER.md)*
 
 ---
 
@@ -244,7 +242,7 @@ Game Tick Flow (Client):
 
 ### Uncategorized
 
-- In prediction, gunshots and effects are not predicted locally — they only appear when the server confirms the hit. This can feel less responsive, especially at higher latencies. Possible solution: client-side prediction of fire effects based on input and local raycast, with server correction if the hit was different.
+*No uncategorized items*
 
 ---
 

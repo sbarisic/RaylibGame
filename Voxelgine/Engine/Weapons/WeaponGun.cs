@@ -60,6 +60,7 @@ namespace Voxelgine.Engine
 			if (mpState != null && mpState.IsActive)
 			{
 				mpState.SendWeaponFire(E.Start, E.Dir);
+				mpState.SpawnPredictedFireEffects(E.Start, E.Dir, E.MaxLen);
 			}
 		}
 

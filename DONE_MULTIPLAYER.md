@@ -58,6 +58,7 @@ Completed tasks from [TODO_MULTIPLAYER.md](TODO_MULTIPLAYER.md), consolidated an
 - **Client block change handling** — Optimistic local application + `SendPendingBlockChanges()` to server. Clear pending changes after network tick to prevent echo.
 - **Client entity sync** — Entity spawn factory (`CreateEntityByType`), `SnapshotBuffer<EntitySnapshot>` interpolation, animation state mapping. Pending entity packet buffer for pre-world packets.
 - **Client combat effects** — `HandleWeaponFireEffect` with blood (NPC/player), sparks (non-NPC entities), fire (world). Tracer rendering.
+- **Predicted fire effects** — Local raycast (world + entities) on weapon fire for instant tracer and hit particles. Server effects suppressed for local player (tracer, world/entity particles); authoritative NPC twitch and player-hit blood always applied.
 - **Client disconnect handling** — "Connection Lost" overlay with reconnect (R) and menu (ESC) options. Scene remains visible frozen.
 - **Network statistics HUD** — F5 toggle. Ping (color-coded), bandwidth in/out, tick, prediction stats, interpolation buffer counts.
 

@@ -141,7 +141,20 @@ namespace Voxelgine.Graphics
 			CachedTransparentFaces = GenTransparentFaces(chunkWorldPos);
 			TransparentFacesValid = CachedTransparentFaces.Count > 0;
 
-			// Collect custom model block positions
+			// Bake foliage blocks into a single mesh
+			if (ModelValidFoliage)
+			{
+				CachedModelFoliage.Materials[0].Maps[0].Texture.Id = 0;
+				Raylib.UnloadModel(CachedModelFoliage);
+			}
+
+			CachedMeshFoliage = GenMeshFoliage();
+			CachedModelFoliage = Raylib.LoadModelFromMesh(CachedMeshFoliage);
+			CachedModelFoliage.Materials[0].Maps[0].Texture = ResMgr.GetModelTexture("grass/grass1_tex.png");
+			CachedModelFoliage.Materials[0].Shader = ResMgr.GetShader("default");
+			ModelValidFoliage = CachedMeshFoliage.VertexCount > 0;
+
+			// Collect custom model block positions (foliage is baked, not per-block drawn)
 			CachedCustomModelBlocks.Clear();
 			for (int x = 0; x < ChunkSize; x++)
 			{
@@ -151,7 +164,7 @@ namespace Voxelgine.Graphics
 					for (int z = 0; z < ChunkSize; z++)
 					{
 						PlacedBlock block = Blocks[x + ChunkSize * (y + ChunkSize * z)];
-						if (BlockInfo.CustomModel(block.Type))
+						if (BlockInfo.CustomModel(block.Type) && block.Type != BlockType.Foliage)
 						{
 							CachedCustomModelBlocks.Add(new CustomModelBlock { X = x, Y = y, Z = z, Type = block.Type });
 						}
@@ -161,7 +174,7 @@ namespace Voxelgine.Graphics
 
 			HasCustomModelBlocks = CachedCustomModelBlocks.Count > 0;
 
-			if (!ModelValidOpaque && !ModelValidTransp && !HasCustomModelBlocks)
+			if (!ModelValidOpaque && !ModelValidTransp && !ModelValidFoliage && !HasCustomModelBlocks)
 			{
 				ModelAABB = AABB.Empty;
 			}
@@ -184,6 +197,12 @@ namespace Voxelgine.Graphics
 				else
 				{
 					ModelAABB = AABB.Empty;
+				}
+
+				if (ModelValidFoliage)
+				{
+					AABB foliageAABB = Raylib.GetMeshBoundingBox(CachedMeshFoliage).ToAABB();
+					ModelAABB = ModelAABB.IsEmpty ? foliageAABB : AABB.Union(ModelAABB, foliageAABB);
 				}
 
 				if (HasCustomModelBlocks)
@@ -233,12 +252,17 @@ namespace Voxelgine.Graphics
 				Raylib.DrawBoundingBox(ModelAABB.Offset(ChunkPosition).ToBoundingBox(), Color.Yellow);
 
 			if (ModelValidOpaque)
-			{
-				Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
-				Eng.ChunkDrawCalls++;
-			}
+				{
+					Raylib.DrawModel(CachedModelOpaque, ChunkPosition, BlockSize, ChunkColor);
+					Eng.ChunkDrawCalls++;
+				}
 
-			if (HasCustomModelBlocks)
+				if (ModelValidFoliage)
+				{
+					Raylib.DrawModel(CachedModelFoliage, ChunkPosition, BlockSize, ChunkColor);
+				}
+
+				if (HasCustomModelBlocks)
 				{
 					for (int i = 0; i < CachedCustomModelBlocks.Count; i++)
 					{

@@ -158,7 +158,64 @@ namespace Voxelgine.Graphics
 				}
 			}
 
-			return OpaqueVerts.ToMesh();
-		}
-	}
-}
+							return OpaqueVerts.ToMesh();
+							}
+
+							/// <summary>
+							/// Bakes all foliage blocks into a single mesh by extracting vertices from the
+							/// pre-loaded CustomModel variants and transforming them to chunk-local positions.
+							/// Each foliage block's vertices are tinted with the block's light color.
+							/// </summary>
+							Mesh GenMeshFoliage()
+							{
+								if (NonAirBlockCount == 0)
+									return new MeshBuilder().ToMesh();
+
+								// Padded cache is already built by GenMesh (called first in RecalcModel)
+								MeshBuilder foliageVerts = new MeshBuilder();
+
+								for (int x = 0; x < ChunkSize; x++)
+								{
+									for (int y = 0; y < ChunkSize; y++)
+									{
+										for (int z = 0; z < ChunkSize; z++)
+										{
+											PlacedBlock curBlock = _paddedBlocks[(x + 1) + PaddedSize * ((y + 1) + PaddedSize * (z + 1))];
+											if (curBlock.Type != BlockType.Foliage)
+												continue;
+
+											// Sample light from the foliage block (non-opaque, so light propagates into it)
+											Color lightColor = curBlock.GetBlockLight(Vector3.UnitY).ToColor();
+
+											// Compute global position for deterministic variant hash
+											int gx = (int)(GlobalChunkIndex.X * ChunkSize) + x;
+											int gy = (int)(GlobalChunkIndex.Y * ChunkSize) + y;
+											int gz = (int)(GlobalChunkIndex.Z * ChunkSize) + z;
+
+											CustomModel model = BlockInfo.GetBlockJsonModel(BlockType.Foliage, gx, gy, gz);
+
+											// Center model in block (matching the +0.5 XZ offset used by custom model drawing)
+											Matrix4x4 blockMatrix = Matrix4x4.CreateTranslation(new Vector3(x + 0.5f, y, z + 0.5f));
+
+											foreach (CustomMesh cmesh in model.Meshes)
+											{
+												Matrix4x4 worldMatrix = cmesh.Matrix * cmesh.GetCombinedAnimationMatrix() * blockMatrix;
+
+												int vertCount = cmesh.Mesh.VertexCount;
+												for (int v = 0; v < vertCount; v++)
+												{
+													Vector3 pos = Vector3.Transform(cmesh.Mesh.VerticesAs<Vector3>()[v], worldMatrix);
+													Vector2 uv = cmesh.Mesh.TexCoordsAs<Vector2>()[v];
+													Vector3 normal = Vector3.TransformNormal(cmesh.Mesh.NormalsAs<Vector3>()[v], worldMatrix);
+
+													foliageVerts.Add(new Vertex3(pos, uv, normal, lightColor));
+												}
+											}
+										}
+									}
+								}
+
+								return foliageVerts.ToMesh();
+							}
+						}
+					}

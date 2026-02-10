@@ -23,5 +23,13 @@ namespace Voxelgine.Engine.AI
 
 		/// <summary>Unconditional jump to step index (int)Param.</summary>
 		Goto,
+
+		/// <summary>
+		/// Event handler marker. Param = (float)(int)<see cref="AIEvent"/>.
+		/// Skipped during normal sequential execution. When the matching event fires,
+		/// the VM interrupts the current step and jumps here, then advances to the next instruction.
+		/// The handler uses Goto to resume or branch.
+		/// </summary>
+		EventHandler,
 	}
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 using Voxelgine.Engine.DI;
@@ -30,8 +31,15 @@ namespace Voxelgine.Engine.AI
 		private float _timer;
 		private static readonly Random _rng = new();
 
+		// Event system
+		private readonly Dictionary<AIEvent, int> _eventHandlers = new();
+		private readonly Dictionary<AIEvent, float> _eventCooldowns = new();
+		private const float EventCooldownTime = 1f;
+
 		// Tuning
 		private const float PlayerReachDistance = 2.5f;
+		private const float SightCheckInterval = 0.5f;
+		private float _sightCheckTimer;
 
 		public AIRunner(AIStep[] program, IFishLogging logging)
 		{
@@ -39,6 +47,38 @@ namespace Voxelgine.Engine.AI
 			_log = logging;
 			if (_program.Length == 0)
 				throw new ArgumentException("Program must have at least one step.", nameof(program));
+
+			// Scan program for event handler markers and register them
+			for (int i = 0; i < _program.Length; i++)
+			{
+				if (_program[i].Instruction == AIInstruction.EventHandler)
+				{
+					AIEvent evt = (AIEvent)(int)_program[i].Param;
+					_eventHandlers[evt] = i;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Raises an event. If a handler is registered for this event, interrupts the current
+		/// step and jumps to the handler. Subject to a per-event cooldown.
+		/// </summary>
+		public void RaiseEvent(AIEvent evt, int npcNetId)
+		{
+			if (!_eventHandlers.TryGetValue(evt, out int handlerIndex))
+				return;
+
+			// Skip if already at or inside this handler
+			if (_pc == handlerIndex || _pc == handlerIndex + 1)
+				return;
+
+			// Cooldown to prevent spamming
+			if (_eventCooldowns.TryGetValue(evt, out float remaining) && remaining > 0)
+				return;
+
+			_eventCooldowns[evt] = EventCooldownTime;
+			_log?.WriteLine($"[AI:{npcNetId}] EVENT {evt} -> jump to step {handlerIndex}");
+			Advance(handlerIndex);
 		}
 
 		/// <summary>
@@ -48,6 +88,34 @@ namespace Voxelgine.Engine.AI
 		{
 			if (_program.Length == 0)
 				return;
+
+			// Tick event cooldowns
+			List<AIEvent> expired = null;
+			foreach (var kvp in _eventCooldowns)
+			{
+				if (kvp.Value > 0)
+					_eventCooldowns[kvp.Key] = kvp.Value - dt;
+				else
+				{
+					expired ??= new();
+					expired.Add(kvp.Key);
+				}
+			}
+			if (expired != null)
+				foreach (var e in expired)
+					_eventCooldowns.Remove(e);
+
+			// Periodic sight check
+			if (_eventHandlers.ContainsKey(AIEvent.OnPlayerSight))
+			{
+				_sightCheckTimer -= dt;
+				if (_sightCheckTimer <= 0)
+				{
+					_sightCheckTimer = SightCheckInterval;
+					if (FindNearestPlayer(npc, 15f) != null)
+						RaiseEvent(AIEvent.OnPlayerSight, npc.NetworkId);
+				}
+			}
 
 			AIStep step = _program[_pc];
 
@@ -76,6 +144,11 @@ namespace Voxelgine.Engine.AI
 				case AIInstruction.Goto:
 					_log?.WriteLine($"[AI:{npc.NetworkId}] GOTO -> step {(int)step.Param}");
 					Advance((int)step.Param);
+					break;
+
+				case AIInstruction.EventHandler:
+					// Pass-through marker — just advance to next step
+					Advance(_pc + 1);
 					break;
 			}
 		}

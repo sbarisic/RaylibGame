@@ -76,6 +76,24 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
+		/// Called by EntityManager when a player walks into this NPC's collision box.
+		/// Raises the OnPlayerTouch AI event.
+		/// </summary>
+		public override void OnPlayerTouch(Player Ply)
+		{
+			_aiRunner?.RaiseEvent(AIEvent.OnPlayerTouch, NetworkId);
+		}
+
+		/// <summary>
+		/// Called when this NPC is hit by a weapon.
+		/// Raises the OnAttacked AI event.
+		/// </summary>
+		public void OnAttacked()
+		{
+			_aiRunner?.RaiseEvent(AIEvent.OnAttacked, NetworkId);
+		}
+
+		/// <summary>
 		/// Performs a detailed raycast against the NPC's model to determine which body part was hit.
 		/// Takes animation transforms into account.
 		/// </summary>

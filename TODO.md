@@ -56,7 +56,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **AI: Extended instructions & async** — New instructions: Speak(text, duration), Wait(time), LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction). Async variants (AsyncMoveTo, AsyncLookAtTarget, AsyncSpeak) that continue to the next instruction without waiting, enabling concurrent actions like walk-and-shoot **[CPX: 4]**
 
 ### On Hold
 
@@ -74,6 +74,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
+- [ ] **NPC: Speech bubbles** — NPC displays a text bubble above its head with a message visible to nearby players; required by the Speak AI instruction **[CPX: 2]**
 - [ ] **NPC: Head tracking** — NPC rotates head mesh toward the look target (nearest player) instead of only rotating the whole body **[CPX: 2]**
 
 ### On Hold
@@ -119,12 +120,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Add NPC ability to "speak", they should create a text bubble above their head with a message for players to read when they are close enough
-- Add AIInstruction to make NPCs speak
-- Upgrade the AI system to support events, like a single instance of an instruction in the program OnPlayerTouch will interrupt the current AI program and jump to that instruction, the handler decides where to jump with goto
-- Add AI system supported events: OnPlayerTouch, OnPlayerSight, OnAttacked, OnHealthBelow(percentage), OnIdle(time)
-- Add AI instructions: Speak(text, duration), Wait(time), LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction)
-- Add async AI instructions that will continue the next instruction without waiting for this one to finish, so NPC can walk and shoot. AsyncMoveTo(pos), AsyncLookAtTarget(targetID), AsyncSpeak(text, duration)
+*No uncategorized items*
 
 ---
 

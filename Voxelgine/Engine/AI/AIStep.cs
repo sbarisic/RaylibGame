@@ -24,5 +24,10 @@ namespace Voxelgine.Engine.AI
 			Param = param;
 			OnFailGoto = onFailGoto;
 		}
+
+		/// <summary>
+		/// Creates an event handler marker step for the given event type.
+		/// </summary>
+		public static AIStep Handler(AIEvent evt) => new(AIInstruction.EventHandler, (float)(int)evt);
 	}
 }

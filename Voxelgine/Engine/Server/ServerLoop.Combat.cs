@@ -68,13 +68,17 @@ namespace Voxelgine.Engine.Server
 			float closestDist = MaxWeaponRange;
 
 			if (entityHit.Hit && entityHit.Distance < closestDist)
-			{
-				closestDist = entityHit.Distance;
-				hitType = (byte)FireHitType.Entity;
-				hitPos = entityHit.HitPosition;
-				hitNormal = entityHit.HitNormal;
-				hitEntityNetworkId = entityHit.Entity?.NetworkId ?? 0;
-			}
+				{
+					closestDist = entityHit.Distance;
+					hitType = (byte)FireHitType.Entity;
+					hitPos = entityHit.HitPosition;
+					hitNormal = entityHit.HitNormal;
+					hitEntityNetworkId = entityHit.Entity?.NetworkId ?? 0;
+
+					// Notify NPC AI of the attack
+					if (entityHit.Entity is VEntNPC hitNpc)
+						hitNpc.OnAttacked();
+				}
 
 			int hitPlayerId = -1;
 

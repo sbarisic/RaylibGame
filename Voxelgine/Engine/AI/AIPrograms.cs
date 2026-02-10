@@ -7,14 +7,22 @@ namespace Voxelgine.Engine.AI
 	{
 		/// <summary>
 		/// Default NPC behavior: approach nearby players, otherwise wander randomly.
+		/// Reacts to touch and attacks by looking at the player.
 		/// <code>
-		/// 0: IS_PLAYER_NEARBY(15)  → fail: goto 4
-		/// 1: MOVE_TO_PLAYER(15)    → fail: goto 4
-		/// 2: LOOK_AT_PLAYER(15)
-		/// 3: GOTO(0)
-		/// 4: IDLE(5)
-		/// 5: MOVE_RANDOM(10)       → fail: goto 4
-		/// 6: GOTO(0)
+		///  0: IS_PLAYER_NEARBY(15)  → fail: goto 4
+		///  1: MOVE_TO_PLAYER(15)    → fail: goto 4
+		///  2: LOOK_AT_PLAYER(15)
+		///  3: GOTO(0)
+		///  4: IDLE(5)
+		///  5: MOVE_RANDOM(10)       → fail: goto 4
+		///  6: GOTO(0)
+		///  7: EVENT_HANDLER(OnPlayerTouch)
+		///  8: LOOK_AT_PLAYER(15)
+		///  9: IDLE(2)
+		/// 10: GOTO(0)
+		/// 11: EVENT_HANDLER(OnAttacked)
+		/// 12: LOOK_AT_PLAYER(15)
+		/// 13: GOTO(0)
 		/// </code>
 		/// </summary>
 		public static AIStep[] DefaultWander() =>
@@ -25,6 +33,15 @@ namespace Voxelgine.Engine.AI
 			new(AIInstruction.Goto, 0),
 			new(AIInstruction.Idle, 5f),
 			new(AIInstruction.MoveRandom, 10f, onFailGoto: 4),
+			new(AIInstruction.Goto, 0),
+			// OnPlayerTouch handler: look at player, pause, resume
+			AIStep.Handler(AIEvent.OnPlayerTouch),
+			new(AIInstruction.LookAtPlayer, 15f),
+			new(AIInstruction.Idle, 2f),
+			new(AIInstruction.Goto, 0),
+			// OnAttacked handler: look at attacker direction, resume
+			AIStep.Handler(AIEvent.OnAttacked),
+			new(AIInstruction.LookAtPlayer, 15f),
 			new(AIInstruction.Goto, 0),
 		];
 

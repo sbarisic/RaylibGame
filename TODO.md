@@ -56,7 +56,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **AI: Extended instructions & async** — New instructions: LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction). Async variants (AsyncMoveTo, AsyncLookAtTarget, AsyncSpeak) that continue to the next instruction without waiting, enabling concurrent actions like walk-and-shoot **[CPX: 4]**
+- [ ] **AI: Extended instructions, events & programs** — **Instructions:** TargetEntity, MoveToTarget, LookAtTarget, AimAtTarget, PrimaryAttack, SecondaryAttack, MoveToCover(dangerPos), Crouch, StandUp, SetMoveMode(walk/run/jump), PlayAnimation(overlay), EquipWeapon, UnequipWeapon, ChatMessageContains(text, branches). **Events:** OnPlayerChat, OnNPCChat, OnAllyAttacked, OnEnemyKilled, OnLowHealth, OnStuck, OnPlayerInRange, OnEnemyInRange, OnFriendlyInRange. **Programs:** expand FunkyBehavior to exercise all available instructions and events **[CPX: 4]**
 
 ### On Hold
 
@@ -120,7 +120,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Handle TODO instructions in AIEvent and AIInstruction and AIPrograms.cs
+*No uncategorized items*
 
 ---
 

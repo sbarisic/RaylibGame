@@ -69,7 +69,6 @@ namespace Voxelgine.Engine.AI
 			new (AIInstruction.MoveRandom, 10f)
 		];*/
 
-		// TODO: Make this AI program complex. Imagine a random wandering NPC with some interactions. Try to use all available events and instructions.
 		/// <summary>
 		/// Funky NPC behavior: idle, wander, look at player, approach, greet.
 		/// Reacts to damage by fleeing, and to touch by backing away.

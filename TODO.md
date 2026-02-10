@@ -21,7 +21,7 @@ A list of planned features, improvements, and tasks for this project.
 
 ## Project Overview
 
-**Aurora Falls** is a voxel-based 3D game engine built with **Raylib-cs** targeting **.NET 9**.
+**Aurora Falls** is a voxel-based 3D game engine built with **Raylib-cs** targeting **.NET 10**.
 
 Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (shared/Raylib-free), `VoxelgineServer` (dedicated headless server).
 
@@ -119,7 +119,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Do not make foliage generate on every grass block, make it like 10% of the time
+- Water physics - water should "flow" by moving to a lower block position if it is free, it should also move in a random direction on a flat surface if there is a free block in that direction, similar to minecraft but you actually just move the water block around instead of spawning new ones
+- NPCs can get stuck on blocks when trying to pathfind around them, need to add some sort of "unstuck" logic to the pathfinding system to handle this, make pathfinding more robust in general by adding more checks and edge case handling. pathfinding should try to avoid sharp corners, prefer 1 block away if possible
 
 ---
 

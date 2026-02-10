@@ -36,7 +36,8 @@ namespace Voxelgine.Graphics
 			PlaceFoliage(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
 
 			// Step 8 — Lighting
-			ComputeLighting();
+			//ComputeLighting();
+			ResetLighting();
 		}
 
 		/// <summary>

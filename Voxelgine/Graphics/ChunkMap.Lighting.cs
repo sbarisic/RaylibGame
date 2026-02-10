@@ -10,12 +10,20 @@ namespace Voxelgine.Graphics
 {
 	public unsafe partial class ChunkMap
 	{
-		public void ComputeLighting()
+		public void ResetLighting()
 		{
 			var allChunks = GetAllChunks();
 
 			// Reset all chunks in parallel — purely per-chunk, no cross-chunk dependencies
 			Parallel.ForEach(allChunks, c => c.ResetLighting());
+		}
+
+		public void ComputeLighting()
+		{
+			ResetLighting();
+
+			var allChunks = GetAllChunks();
+
 
 			// Compute lighting in parallel using 8-phase coloring
 			ComputeLightingParallel(allChunks);

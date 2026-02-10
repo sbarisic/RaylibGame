@@ -63,6 +63,18 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		private readonly List<BlockChange> _blockChangeLog = new();
 
+		/// <summary>
+		/// Raised after a non-air block is placed (includes replacements).
+		/// Parameters: world X, Y, Z, new BlockType.
+		/// </summary>
+		public event Action<ChunkMap, int, int, int, BlockType> OnBlockPlaced;
+
+		/// <summary>
+		/// Raised after a non-air block is removed (includes replacements).
+		/// Parameters: world X, Y, Z, old BlockType.
+		/// </summary>
+		public event Action<ChunkMap, int, int, int, BlockType> OnBlockRemoved;
+
 		public ChunkMap(IFishEngineRunner Eng)
 		{
 			this.Eng = Eng;
@@ -159,6 +171,15 @@ namespace Voxelgine.Graphics
 				_blockChangeLog.Add(new BlockChange(X, Y, Z, oldType, Block.Type));
 
 			targetChunk.SetBlock(XX, YY, ZZ, Block);
+
+			// Fire block events when the type actually changed
+			if (oldType != Block.Type)
+			{
+				if (oldType != BlockType.None)
+					OnBlockRemoved?.Invoke(this, X, Y, Z, oldType);
+				if (Block.Type != BlockType.None)
+					OnBlockPlaced?.Invoke(this, X, Y, Z, Block.Type);
+			}
 
 			// Recompute lighting if a light-emitting or light-blocking block was placed/removed
 			bool needsLightingUpdate = BlockInfo.EmitsLight(Block.Type) ||

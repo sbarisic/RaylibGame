@@ -119,7 +119,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Add NPC multitexture support, currently there are humanoid.png and humanoid2.png but the NPC code only uses humanoid.png, add support for multiple textures and assign them randomly to spawned NPCs 
+*No uncategorized items*
 
 ---
 

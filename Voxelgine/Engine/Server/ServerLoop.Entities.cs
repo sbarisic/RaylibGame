@@ -24,6 +24,7 @@ namespace Voxelgine.Engine.Server
 			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			npc.SetPosition(_npcSpawnPos);
 			npc.SetModelName("npc/humanoid.json");
+			npc.SetTextureName(VEntNPC.AvailableTextures[Random.Shared.Next(VEntNPC.AvailableTextures.Length)]);
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
 			npc.SetAIProgram(AIPrograms.FunkyBehavior());

@@ -24,6 +24,16 @@ namespace Voxelgine.Engine
 		BoundingBox BBox;
 		NPCAnimator Animator;
 
+		// Skin texture
+		private string _textureName;
+
+		/// <summary>Available NPC skin textures, randomly assigned at spawn.</summary>
+		public static readonly string[] AvailableTextures =
+		[
+			"npc/humanoid.png",
+			"npc/humanoid2.png",
+		];
+
 		// Pathfinding
 		PathFollower _pathFollower;
 		ChunkMap _map;
@@ -92,6 +102,17 @@ namespace Voxelgine.Engine
 
 		/// <summary>Gets the path follower for this NPC (null if not initialized).</summary>
 		public PathFollower GetPathFollower() => _pathFollower;
+
+		/// <summary>
+		/// Sets the NPC skin texture name. Must be called before SetModel or
+		/// will be applied on the next SetModel call. Synced via spawn properties.
+		/// </summary>
+		public void SetTextureName(string textureName)
+		{
+			_textureName = textureName;
+			if (CModel != null && !string.IsNullOrEmpty(textureName))
+				CModel.SetTexture(ResMgr.GetTexture(textureName, Raylib_cs.TextureFilter.Point));
+		}
 
 		/// <summary>
 		/// Assigns an AI behavior program to this NPC.
@@ -323,6 +344,10 @@ namespace Voxelgine.Engine
 			EntModelName = MdlName;
 			MinecraftModel JMdl = ResMgr.GetJsonModel(MdlName);
 			CModel = MeshGenerator.Generate(JMdl);
+
+			// Apply skin texture (if assigned before model load)
+			if (!string.IsNullOrEmpty(_textureName))
+				CModel.SetTexture(ResMgr.GetTexture(_textureName, Raylib_cs.TextureFilter.Point));
 
 			// Set up parent-child hierarchy for proper animation attachment
 			CModel.SetupHumanoidHierarchy();
@@ -753,6 +778,18 @@ namespace Voxelgine.Engine
 			// Zero out tiny values
 			if (_headTrackRotation.LengthSquared() < 0.01f)
 				_headTrackRotation = Vector3.Zero;
+		}
+
+		protected override void WriteSpawnPropertiesExtra(BinaryWriter writer)
+		{
+			writer.Write(_textureName ?? string.Empty);
+		}
+
+		protected override void ReadSpawnPropertiesExtra(BinaryReader reader)
+		{
+			string texName = reader.ReadString();
+			if (!string.IsNullOrEmpty(texName))
+				SetTextureName(texName);
 		}
 
 		protected override void WriteSnapshotExtra(BinaryWriter writer)

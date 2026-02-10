@@ -154,6 +154,10 @@ namespace Voxelgine.Engine.AI
 						TickSpeak(npc, dt, ref step);
 						break;
 
+					case AIInstruction.AsyncSpeak:
+						TickAsyncSpeak(npc, ref step);
+						break;
+
 					case AIInstruction.EventHandler:
 					// Pass-through marker — just advance to next step
 					Advance(_pc + 1);
@@ -207,6 +211,8 @@ namespace Voxelgine.Engine.AI
 
 		private void TickMoveToPlayer(VEntNPC npc, float dt, ref AIStep step)
 		{
+			float stopDistance = step.Param2 > 0 ? step.Param2 : PlayerReachDistance;
+
 			if (_phase == StepPhase.Starting)
 			{
 				Player nearest = FindNearestPlayer(npc, step.Param);
@@ -224,13 +230,13 @@ namespace Voxelgine.Engine.AI
 					return;
 				}
 
-				_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} MOVE_TO_PLAYER start -> player {nearest.PlayerId}");
+				_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} MOVE_TO_PLAYER start -> player {nearest.PlayerId} (stop at {stopDistance:F1})");
 				_phase = StepPhase.Running;
 			}
 
 			// Check if close enough to player or navigation finished
 			Player target = FindNearestPlayer(npc, step.Param);
-			if (target != null && Vector3.Distance(npc.Position, target.Position) < PlayerReachDistance)
+			if (target != null && Vector3.Distance(npc.Position, target.Position) < stopDistance)
 			{
 				_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} MOVE_TO_PLAYER reached player {target.PlayerId}");
 				npc.StopNavigation();
@@ -300,6 +306,15 @@ namespace Voxelgine.Engine.AI
 				_timer -= dt;
 				if (_timer <= 0f)
 					Complete(true, ref step);
+			}
+
+			private void TickAsyncSpeak(VEntNPC npc, ref AIStep step)
+			{
+				string text = step.TextParam ?? "";
+				float duration = MathF.Max(step.Param, 0.5f);
+				npc.Speak(text, duration);
+				_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} ASYNC_SPEAK \"{text}\" ({duration:F1}s)");
+				Complete(true, ref step);
 			}
 
 			// ────────────────────── Helpers ──────────────────────

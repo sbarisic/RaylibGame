@@ -120,7 +120,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Check NPC physics and movement, does it also handle corner collisions like the player where it clips the movement? NPCs sometimes get stuck. Players work fine.
 
 ---
 

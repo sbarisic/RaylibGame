@@ -30,6 +30,9 @@ namespace Voxelgine.Engine.AI
 		/// <summary>Display a speech bubble with TextParam for Param seconds. Always succeeds after the duration.</summary>
 		Speak,
 
+		/// <summary>Display a speech bubble with TextParam for Param seconds and immediately advance to the next instruction.</summary>
+		AsyncSpeak,
+
 		/// <summary>
 		/// Event handler marker. Param = (float)(int)<see cref="AIEvent"/>.
 		/// Skipped during normal sequential execution. When the matching event fires,

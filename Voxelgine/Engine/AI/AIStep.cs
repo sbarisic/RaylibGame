@@ -12,6 +12,9 @@ namespace Voxelgine.Engine.AI
 		/// <summary>Instruction-specific parameter (radius, duration, jump target, etc.).</summary>
 		public float Param;
 
+		/// <summary>Secondary parameter (stop distance for MoveToPlayer, etc.). 0 = use default.</summary>
+		public float Param2;
+
 		/// <summary>
 		/// Step index to jump to when this instruction fails.
 		/// -1 means fall through to the next step (default).
@@ -25,6 +28,7 @@ namespace Voxelgine.Engine.AI
 		{
 			Instruction = instruction;
 			Param = param;
+			Param2 = 0;
 			OnFailGoto = onFailGoto;
 			TextParam = null;
 		}
@@ -38,5 +42,16 @@ namespace Voxelgine.Engine.AI
 		/// Creates a Speak instruction with the given text and duration.
 		/// </summary>
 		public static AIStep SpeakText(string text, float duration) => new(AIInstruction.Speak, duration) { TextParam = text };
+
+		/// <summary>
+		/// Creates an async Speak instruction — displays speech and immediately advances.
+		/// </summary>
+		public static AIStep AsyncSpeakText(string text, float duration) => new(AIInstruction.AsyncSpeak, duration) { TextParam = text };
+
+		/// <summary>
+		/// Creates a MoveToPlayer instruction with a custom stop distance.
+		/// </summary>
+		public static AIStep MoveToPlayerAt(float searchRadius, float stopDistance, int onFailGoto = -1) =>
+			new(AIInstruction.MoveToPlayer, searchRadius, onFailGoto) { Param2 = stopDistance };
 	}
 }

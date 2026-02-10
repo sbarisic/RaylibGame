@@ -50,23 +50,17 @@ namespace Voxelgine.Engine.Server
 		/// <summary>
 		/// Gets a compact animation state byte for an entity.
 		/// 0 = idle, 1 = walk, 2 = attack.
+		/// Derived from velocity since the headless server has no Animator (no GPU model loading).
 		/// </summary>
 		private static byte GetEntityAnimationState(VoxEntity entity)
 		{
-			if (entity is VEntNPC npc)
+			if (entity is VEntNPC)
 			{
-				var animator = npc.GetAnimator();
-				if (animator != null)
-				{
-					return animator.CurrentAnimation switch
-					{
-						"walk" => 1,
-						"attack" => 2,
-						_ => 0,
-					};
-				}
+				float horizontalSpeedSq = entity.Velocity.X * entity.Velocity.X + entity.Velocity.Z * entity.Velocity.Z;
+				if (horizontalSpeedSq > 0.25f) // > 0.5 blocks/s
+					return 1; // walk
 			}
-			return 0;
+			return 0; // idle
 		}
 
 		/// <summary>

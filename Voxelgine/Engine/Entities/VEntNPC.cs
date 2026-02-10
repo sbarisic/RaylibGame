@@ -32,6 +32,7 @@ namespace Voxelgine.Engine
 		private Vector3 _lastStuckCheckPos;
 		private float _stuckCheckTimer;
 		private int _stuckRecalculateAttempts;
+		private int _lastWaypointIndex;
 		private bool _isUnstuckWandering;
 		private Vector3 _originalTarget;
 		private bool _hasOriginalTarget;
@@ -59,6 +60,9 @@ namespace Voxelgine.Engine
 
 		/// <summary>Gets the custom model for this NPC (null if not loaded).</summary>
 		public CustomModel GetCustomModel() => CModel;
+
+		/// <summary>Sets the NPC look direction (used by client-side interpolation).</summary>
+		public void SetLookDirection(Vector3 dir) => _lookDirection = dir;
 
 		/// <summary>Gets the path follower for this NPC (null if not initialized).</summary>
 		public PathFollower GetPathFollower() => _pathFollower;
@@ -148,6 +152,7 @@ namespace Voxelgine.Engine
 			_lastStuckCheckPos = Position;
 			_stuckCheckTimer = 0f;
 			_stuckRecalculateAttempts = 0;
+			_lastWaypointIndex = 0;
 			_isUnstuckWandering = false;
 			_hasOriginalTarget = false;
 			_triedJumpingToUnstuck = false;
@@ -232,7 +237,10 @@ namespace Voxelgine.Engine
 
 					// Check if we've moved enough since last check
 					float distanceMoved = Vector3.Distance(Position, _lastStuckCheckPos);
-					if (distanceMoved < StuckDistanceThreshold)
+					int currentWaypointIdx = _pathFollower.CurrentWaypointIndex;
+					bool waypointAdvanced = currentWaypointIdx > _lastWaypointIndex;
+
+					if (distanceMoved < StuckDistanceThreshold && !waypointAdvanced)
 					{
 						// We're stuck - try different recovery methods
 						HandleStuckRecovery(isGrounded);
@@ -263,6 +271,7 @@ namespace Voxelgine.Engine
 					}
 
 					_lastStuckCheckPos = Position;
+					_lastWaypointIndex = _pathFollower.CurrentWaypointIndex;
 				}
 
 				// Get movement direction from path follower
@@ -390,7 +399,18 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void HandleStuckRecovery(bool isGrounded)
 		{
-			// First, try jumping if we haven't yet and we're grounded
+			// First, try recalculating the path from current (possibly pushed-out) position
+			if (!_triedJumpingToUnstuck && _pathFollower.HasTarget)
+			{
+				Logging.WriteLine("NPC stuck, recalculating path");
+				if (_pathFollower.RecalculatePath(Position))
+				{
+					_triedJumpingToUnstuck = true; // Use this flag to avoid re-recalculating
+					return;
+				}
+			}
+
+			// If recalculating didn't help, try jumping over the obstacle
 			if (!_triedJumpingToUnstuck && isGrounded)
 			{
 				Logging.WriteLine("NPC stuck, trying to jump out");
@@ -399,7 +419,7 @@ namespace Voxelgine.Engine
 				return;
 			}
 
-			// If jumping didn't help, try wandering
+			// If jumping didn't help, try wandering in a random walkable direction
 			_stuckRecalculateAttempts++;
 
 			if (_stuckRecalculateAttempts <= MaxRecalculateAttempts)
@@ -411,12 +431,16 @@ namespace Voxelgine.Engine
 					_hasOriginalTarget = true;
 				}
 
-				// Try wandering in a random direction
 				_isUnstuckWandering = true;
-				_triedJumpingToUnstuck = false; // Reset jump flag for next attempt
+				_triedJumpingToUnstuck = false;
 				Vector3 randomTarget = GetRandomWanderTarget();
 				Logging.WriteLine($"NPC stuck, wandering to random position (attempt {_stuckRecalculateAttempts}/{MaxRecalculateAttempts})");
-				_pathFollower.SetTarget(Position, randomTarget);
+
+				if (!_pathFollower.SetTarget(Position, randomTarget))
+				{
+					// No path to wander target either — try again next tick
+					Logging.WriteLine("NPC could not find wander path, will retry");
+				}
 			}
 			else
 			{
@@ -526,26 +550,29 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private Vector3 GetRandomWanderTarget()
 		{
-			// Try random directions
+			if (_map == null)
+				return Position;
+
+			int currentY = (int)MathF.Floor(Position.Y);
+
+			// Try random directions and pick the first walkable one
 			for (int i = 0; i < 8; i++)
 			{
 				float angle = (float)(_random.NextDouble() * Math.PI * 2);
 				float distance = WanderDistance * (0.5f + (float)_random.NextDouble() * 0.5f);
 
-				Vector3 offset = new Vector3(
-					MathF.Cos(angle) * distance,
-					0,
-					MathF.Sin(angle) * distance
-				);
+				int targetX = (int)MathF.Floor(Position.X + MathF.Cos(angle) * distance);
+				int targetZ = (int)MathF.Floor(Position.Z + MathF.Sin(angle) * distance);
 
-				Vector3 target = Position + offset;
+				bool groundSolid = _map.IsSolid(targetX, currentY - 1, targetZ);
+				bool feetClear = !_map.IsSolid(targetX, currentY, targetZ);
+				bool headClear = !_map.IsSolid(targetX, currentY + 1, targetZ);
 
-				// Check if there's a valid path to this random position
-				// (the pathfinder will handle finding walkable ground)
-				return target;
+				if (groundSolid && feetClear && headClear)
+					return new Vector3(targetX + 0.5f, currentY, targetZ + 0.5f);
 			}
 
-			// Fallback: just offset in a random direction
+			// Fallback: offset slightly from current position
 			return Position + new Vector3(
 				(float)(_random.NextDouble() - 0.5) * WanderDistance * 2,
 				0,

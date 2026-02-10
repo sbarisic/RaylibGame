@@ -17,6 +17,7 @@ namespace Voxelgine.Engine.Pathfinding
 		private const float HorizontalCost = 1.0f;
 		private const float DiagonalCost = 1.414f; // sqrt(2)
 		private const float VerticalCost = 1.5f;   // Slightly discourage vertical movement
+		private const float WallProximityCost = 0.5f; // Extra cost per adjacent solid block (encourages wall clearance)
 
 		// Search limits
 		private const int MaxIterations = 10000;
@@ -265,6 +266,20 @@ namespace Voxelgine.Engine.Pathfinding
 			return true;
 		}
 
+		/// <summary>
+		/// Counts how many solid blocks are adjacent to a position on the horizontal plane.
+		/// Used to add cost penalty near walls so paths prefer open space.
+		/// </summary>
+		private int CountAdjacentWalls(Vector3Int pos)
+		{
+			int count = 0;
+			if (_map.IsSolid(pos.X + 1, pos.Y, pos.Z)) count++;
+			if (_map.IsSolid(pos.X - 1, pos.Y, pos.Z)) count++;
+			if (_map.IsSolid(pos.X, pos.Y, pos.Z + 1)) count++;
+			if (_map.IsSolid(pos.X, pos.Y, pos.Z - 1)) count++;
+			return count;
+		}
+
 		private float GetMovementCost(Vector3Int from, Vector3Int to)
 		{
 			int dx = Math.Abs(to.X - from.X);
@@ -282,6 +297,9 @@ namespace Voxelgine.Engine.Pathfinding
 			// Vertical movement adds cost
 			if (dy > 0)
 				cost += dy * VerticalCost;
+
+			// Wall proximity penalty - prefer paths with clearance from walls
+			cost += CountAdjacentWalls(to) * WallProximityCost;
 
 			return cost;
 		}

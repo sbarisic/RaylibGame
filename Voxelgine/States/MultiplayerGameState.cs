@@ -1090,6 +1090,11 @@ namespace Voxelgine.States
 
 					animator.Update(deltaTime);
 				}
+
+				// Derive look direction from velocity (server syncs velocity but not look direction)
+				Vector3 horizontalVel = new Vector3(entity.Velocity.X, 0, entity.Velocity.Z);
+				if (horizontalVel.LengthSquared() > 0.01f)
+					npc.SetLookDirection(Vector3.Normalize(horizontalVel));
 			}
 
 			// Update cosmetic visuals (rotation) on the client
@@ -1530,24 +1535,8 @@ namespace Voxelgine.States
 			if (string.IsNullOrEmpty(message))
 				return;
 
-			// Handle /commands — route to hosted server if available
-			if (message.StartsWith('/'))
-			{
-				string command = message.Substring(1);
-				var server = Eng.MainMenuState?.HostedServer;
-				if (server != null)
-				{
-					server.ExecuteCommand(command);
-					_chatToast?.Show($"[Command] /{command}", ToastType.Info, ChatMessageDuration);
-				}
-				else
-				{
-					_chatToast?.Show("Commands are only available on the host.", ToastType.Warning, ChatMessageDuration);
-				}
-				return;
-			}
-
-			// Send chat message to server
+			// Send all messages (including /commands) to the server via chat.
+			// The server intercepts messages starting with / and processes them as player commands.
 			if (_client != null && _client.IsConnected)
 			{
 				var packet = new ChatMessagePacket
@@ -1556,6 +1545,9 @@ namespace Voxelgine.States
 					Message = message
 				};
 				_client.Send(packet, true, (float)Raylib.GetTime());
+
+				if (message.StartsWith('/'))
+					_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
 			}
 		}
 
@@ -1911,7 +1903,7 @@ namespace Voxelgine.States
 
 		private void CreateDebugMenu(int screenW, int screenH)
 		{
-			var windowSize = new Vector2(320, 620);
+			var windowSize = new Vector2(320, 660);
 			_debugMenuWindow = new Window
 			{
 				Title = "Debug Menu",
@@ -2086,6 +2078,14 @@ namespace Voxelgine.States
 			btnPlaceTorch.Clicked += (sender, args) => DebugPlaceTorch();
 			stack.AddChild(btnPlaceTorch);
 
+			var btnNpcComeHere = new Button
+			{
+				Text = "NPC Come Here",
+				Size = new Vector2(140, 36)
+			};
+			btnNpcComeHere.Clicked += (sender, args) => SendChatCommand("/comehere");
+			stack.AddChild(btnNpcComeHere);
+
 			var btnClose = new Button
 			{
 				Text = "Close",
@@ -2170,11 +2170,28 @@ namespace Voxelgine.States
 				BlockType = (byte)BlockType.Torch,
 			};
 			_client.Send(packet, true, (float)Raylib.GetTime());
-		}
+			}
 
-		/// <summary>
-		/// Updates the HUD info label with time of day and network stats.
-		/// </summary>
+			/// <summary>
+			/// Sends a chat message to the server. Used by debug buttons to issue /commands.
+			/// </summary>
+			private void SendChatCommand(string message)
+			{
+				if (_client == null || !_client.IsConnected)
+					return;
+
+				var packet = new ChatMessagePacket
+				{
+					PlayerId = _client.PlayerId,
+					Message = message
+				};
+				_client.Send(packet, true, (float)Raylib.GetTime());
+				_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
+			}
+
+			/// <summary>
+			/// Updates the HUD info label with time of day and network stats.
+			/// </summary>
 		private void UpdateHUDInfo()
 		{
 			if (_hudInfoLabel == null || _simulation == null)

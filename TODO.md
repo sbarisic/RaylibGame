@@ -56,11 +56,14 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC`
+	- [ ] Maybe it should be implemented as a behavior tree VM? Like i can give it a list of commands, MOVE_RANDOM_POINT, IS_PLAYER_AROUND, LOOK_AT_PLAYER, ATTACK, ...
+	- [ ] NPC should just implement functions that will, for example for MOVE_RANDOM_POINT pick a random point on the map and then pathfind to it. VM "step" of this "instruction" should complete and it should move to next instruction when player is finished walking
+	- [ ] Maybe add AI instructions that will do nothing if last one succeeded, and do something else if it failed, for example if MOVE_RANDOM_POINT fails (maybe npc is stuck) then it will try to jump or something, or jump to a separate instruction location (like a jmp instruction) for complex logic
 
 ### On Hold
 
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC` **[CPX: 4]**
+- [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
 - [ ] **Multiplayer: LAN server browser** — Broadcast UDP discovery on LAN, servers respond with name/player count/map info, client displays list to select and connect **[CPX: 3]**
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
@@ -119,8 +122,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Water physics - water should "flow" by moving to a lower block position if it is free, it should also move in a random direction on a flat surface if there is a free block in that direction, similar to minecraft but you actually just move the water block around instead of spawning new ones
-- NPCs can get stuck on blocks when trying to pathfind around them, need to add some sort of "unstuck" logic to the pathfinding system to handle this, make pathfinding more robust in general by adding more checks and edge case handling. pathfinding should try to avoid sharp corners, prefer 1 block away if possible
+*No uncategorized items*
 
 ---
 

@@ -210,7 +210,7 @@ namespace Voxelgine.Engine.Server
 
 		private void CmdHelp()
 		{
-			_logging.ServerWriteLine("[CMD] Available commands:");
+			_logging.ServerWriteLine("[CMD] Server console commands:");
 			_logging.ServerWriteLine("  kick <player>  - Kick a player by name or ID");
 			_logging.ServerWriteLine("  ban <player>   - Ban a player by name or ID");
 			_logging.ServerWriteLine("  say <message>  - Broadcast a server message to all players");
@@ -220,6 +220,69 @@ namespace Voxelgine.Engine.Server
 			_logging.ServerWriteLine("  status         - Show server status");
 			_logging.ServerWriteLine("  players        - List connected players");
 			_logging.ServerWriteLine("  help           - Show this help message");
+			_logging.ServerWriteLine("[CMD] Player chat commands (usable by any player via /command):");
+			_logging.ServerWriteLine("  /comehere      - All NPCs navigate to your position");
+		}
+
+		/// <summary>
+		/// Processes a command sent by a player via chat (e.g., /comehere).
+		/// Player commands are separate from server console commands — any connected player can use them.
+		/// </summary>
+		private void HandlePlayerCommand(NetConnection connection, string command)
+		{
+			string[] parts = command.Split(' ', 2, StringSplitOptions.TrimEntries);
+			string cmd = parts[0].ToLowerInvariant();
+			string args = parts.Length > 1 ? parts[1] : string.Empty;
+
+			_logging.ServerWriteLine($"[CMD] Player [{connection.PlayerId}] \"{connection.PlayerName}\" issued: /{command}");
+
+			switch (cmd)
+			{
+				case "comehere":
+					CmdComeHere(connection);
+					break;
+
+				default:
+					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere");
+					break;
+			}
+		}
+
+		/// <summary>
+		/// Commands all NPCs in the world to navigate to the player's current position.
+		/// </summary>
+		private void CmdComeHere(NetConnection connection)
+		{
+			var player = _simulation.Players.GetPlayer(connection.PlayerId);
+			if (player == null)
+			{
+				SendServerMessageTo(connection.PlayerId, "Could not find your player.");
+				return;
+			}
+
+			int count = 0;
+			foreach (var entity in _simulation.Entities.GetAllEntities())
+			{
+				if (entity is VEntNPC npc)
+				{
+					npc.NavigateTo(player.Position);
+					count++;
+				}
+			}
+
+			SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) navigating to your position.");
+		}
+
+		/// <summary>
+		/// Sends a server message to a specific player via chat.
+		/// </summary>
+		private void SendServerMessageTo(int playerId, string message)
+		{
+			_server.SendTo(playerId, new ChatMessagePacket
+			{
+				PlayerId = -1,
+				Message = $"[Server] {message}"
+			}, true, CurrentTime);
 		}
 
 		/// <summary>

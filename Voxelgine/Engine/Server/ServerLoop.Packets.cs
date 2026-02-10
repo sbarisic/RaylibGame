@@ -176,6 +176,13 @@ namespace Voxelgine.Engine.Server
 			if (string.IsNullOrWhiteSpace(message))
 				return;
 
+			// Intercept player commands (messages starting with /)
+			if (message.StartsWith('/'))
+			{
+				HandlePlayerCommand(connection, message.Substring(1));
+				return;
+			}
+
 			_logging.ServerWriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
 
 			// Rebroadcast with correct player ID

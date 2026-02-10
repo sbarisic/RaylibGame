@@ -64,6 +64,7 @@ works for any connected client.
 - **Multiplayer: Combat** — Server-authoritative weapon fire resolution (world + entity + player AABB raycast). Predicted fire effects (instant local tracers/particles). Kill feed, player health/respawn (3s timer), player damage sync.
 - **Multiplayer: Listen server mode** — Host Game hosts local `ServerLoop` on background thread + connects `MultiplayerGameState` as client. Dedicated headless server via `VoxelgineServer`. Player state persistence (`PlayerDataStore`), world auto-save (5 min), server console commands.
 - **Multiplayer: Chat & UI** — Connect/Host dialogs, player list (Tab), network stats HUD (F5), death/disconnect overlays, text chat with `/commands`, connection status indicator with ping color coding.
+- **Multiplayer: Player chat commands** — `/commands` now sent to server via chat (works for all players, not just host). Server intercepts and routes to `HandlePlayerCommand`. Added `/comehere` command (all NPCs navigate to sender). Added "NPC Come Here" button to F1 debug menu. Added `SendServerMessageTo` for per-player server feedback.
 - **Multiplayer: Remote players** — `RemotePlayer` with humanoid `CustomModel`, `NPCAnimator` (idle/walk/attack), head pitch, held item rendering, billboard name tags with distance fade and obstruction check.
 - **Multiplayer: Procedural world gen** — Noise-based tree placement (6–10 block trunks, leaf canopy), water bodies (sand shoreline, depth tapering), procedural roads (Bresenham paths), terrain height variation (2D noise displacement), dynamic spawn point selection.
 
@@ -94,6 +95,8 @@ works for any connected client.
 - **Multiplayer: Viewmodel rendering** — Fixed viewmodel at wrong screen position (moved overlay to after `EndMode3D`), broken arm orientation (rewrote rotation to clean 3-quaternion composition), direction vectors zero during tick.
 - **Multiplayer: Various network fixes** — Block placing/destroying echo loop, missing remote player avatars on join, raycast face hit precision, weapon effect particle types, `SoundMgr` double-init crash, cross-chunk skylight propagation at chunk boundaries.
 - **Multiplayer: Render distance & lighting** — Reduced render distance to 128 blocks. Deferred relighting for chunks outside render distance via `NeedsRelighting` flag.
+- **NPC Pathfinding: Gets stuck on blocks** — Added wall proximity cost to A* (paths prefer 1-block clearance from walls), fixed `GetRandomWanderTarget` always returning first random direction without walkability check, improved stuck recovery order (recalculate path → jump → wander), added waypoint progress tracking to stuck detection.
+- **NPC: No animation or facing direction in multiplayer** — `GetEntityAnimationState` relied on `Animator` which is null on the headless server (no GPU model loading); fixed to derive walk/idle state from velocity. Client now derives NPC look direction from synced velocity via `SetLookDirection`.
 
 ---
 

@@ -104,6 +104,7 @@ works for any connected client.
 - **AI: Wait & Speak instructions** — Added `Wait(time)` (exact duration, no randomness) and `Speak(text, duration)` AI instructions. Added `AIStep.TextParam` for string parameters, `AIStep.SpeakText()` factory. Server auto-broadcasts `EntitySpeechPacket` via dirty flag when any NPC speaks. Implemented `FunkyBehavior` AI program demonstrating the new instructions with event handlers.
 - **AI: AsyncSpeak & MoveToPlayer stop distance** — Added `AsyncSpeak` instruction (fire-and-forget speech), `AIStep.Param2` for secondary parameters, `MoveToPlayerAt(radius, stopDistance)` factory. Fixed MoveToPlayer navigating to exact player position instead of stopping short — now computes a nav target `stopDistance` blocks from the player and includes an early-out if already in range.
 - **NPC: Speech bubble timeout fix** — Speech bubbles never disappeared on the client because `UpdateLockstep` (which ticks the speech timer) only runs server-side. Added `UpdateVisuals` override in `VEntNPC` to tick the speech timer on the client.
+- **GUI: Debug menu window clipping fix** — F1 debug menu content was clipped because the `StackLayout` was added directly to the `Window` without proper content area sizing. Wrapped content in a `ScrollablePane` using `Window.GetContentSize()` and `FishUIAnchor.All` for correct layout.
 
 ---
 

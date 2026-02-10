@@ -1932,8 +1932,9 @@ namespace Voxelgine.States
 				Title = "Debug Menu",
 				Position = new Vector2(screenW / 2f - windowSize.X / 2f, screenH / 2f - windowSize.Y / 2f),
 				Size = windowSize,
-				IsResizable = false,
-				ShowCloseButton = true,
+				IsResizable = true,
+				ResizeHandleSize = 10,
+				ShowCloseButton = false,
 				Visible = false
 			};
 
@@ -1948,8 +1949,9 @@ namespace Voxelgine.States
 				Orientation = StackOrientation.Vertical,
 				Spacing = 10,
 				Position = new Vector2(10, 10),
-				Size = new Vector2(windowSize.X - 40, windowSize.Y - 100),
-				IsTransparent = true
+				Size = new Vector2(windowSize.X - 10, windowSize.Y - 10),
+				IsTransparent = true,
+				Anchor = FishUIAnchor.All
 			};
 
 			// Debug mode (F3 wireframe/debug rendering)

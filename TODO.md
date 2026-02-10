@@ -115,12 +115,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-- [ ] **GUI: Debug menu window clipping** — F1 debug menu window content is clipped incorrectly; investigate FishUI window layout/clipping **[CPX: 2]**
 - [ ] **NPC: Pathfinding still gets stuck** — NPC occasionally gets stuck when traversing a path; investigate whether NPC physics handles corner/edge collisions the same way the player does (slide along walls), consider shifting waypoint positions to avoid edge-of-block precision, and verify `WorldCollision.MoveWithCollision` behavior for NPC sizes **[CPX: 3]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Is there a way to split MultiplayerGameState.cs into smaller files? Multiple different classes? Partial class? Like MultiplayerGameState.*.cs Rename MultiplayerGameState to MPClientGameState
 
 ---
 
@@ -133,6 +132,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - If you encounter features in systems which are required when working on a current improvement/bugfix, extend that system with the required features as part of the current task instead of creating separate TODO entries
 - Problem solutions need to be optimized, performant and well thought out before implementation, avoid quick fixes
 - See MULTIPLAYER.md for multiplayer architecture
+- Keep files below 1000 lines, split when they get too large. Either partial classes or split into multiple smaller classes that handle a single functionality.
 
 ---
 

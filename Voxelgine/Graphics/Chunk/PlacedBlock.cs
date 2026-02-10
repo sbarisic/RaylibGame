@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,10 +13,21 @@ using Voxelgine.Engine;
 namespace Voxelgine.Graphics
 {
 	/// <summary>
+	/// Fixed-size inline array of 6 BlockLight values, one per face direction.
+	/// Stored directly within the PlacedBlock struct (no heap allocation).
+	/// </summary>
+	[InlineArray(6)]
+	public struct BlockLightArray
+	{
+		private BlockLight _element0;
+	}
+
+	/// <summary>
 	/// Represents a block placed in the world with its type and per-face lighting.
 	/// Each block stores 6 light values (one per face) supporting dual-channel lighting.
+	/// Stored as a value type with inline light data for cache-friendly array access.
 	/// </summary>
-	public class PlacedBlock
+	public struct PlacedBlock
 	{
 		/// <summary>The type of block (determines texture, transparency, solidity).</summary>
 		public BlockType Type;
@@ -23,32 +35,24 @@ namespace Voxelgine.Graphics
 		/// <summary>
 		/// Light values for each face direction (6 total).
 		/// Each BlockLight contains skylight and blocklight channels.
+		/// Stored inline within the struct for cache-friendly access.
 		/// </summary>
-		public BlockLight[] Lights;
+		public BlockLightArray Lights;
 
 		public PlacedBlock(BlockType Type, BlockLight DefaultLight)
 		{
-			Lights = new BlockLight[6];
-
-			for (int i = 0; i < Lights.Length; i++)
-				Lights[i] = DefaultLight;
-
 			this.Type = Type;
+			for (int i = 0; i < 6; i++)
+				Lights[i] = DefaultLight;
 		}
 
 		public PlacedBlock(BlockType Type) : this(Type, BlockLight.Black)
 		{
 		}
 
-		public PlacedBlock(PlacedBlock Copy) : this(Copy.Type)
-		{
-			for (int i = 0; i < Lights.Length; i++)
-				Lights[i] = Copy.Lights[i];
-		}
-
 		public void SetAllLights(BlockLight L)
 		{
-			for (int i = 0; i < Lights.Length; i++)
+			for (int i = 0; i < 6; i++)
 				Lights[i] = L;
 		}
 
@@ -64,7 +68,7 @@ namespace Voxelgine.Graphics
 
 		public void SetSkylight(byte level)
 		{
-			for (int i = 0; i < Lights.Length; i++)
+			for (int i = 0; i < 6; i++)
 			{
 				BlockLight light = Lights[i];
 				light.SetSkylight(level);
@@ -74,7 +78,7 @@ namespace Voxelgine.Graphics
 
 		public void SetBlockLightLevel(byte level)
 		{
-			for (int i = 0; i < Lights.Length; i++)
+			for (int i = 0; i < 6; i++)
 			{
 				BlockLight light = Lights[i];
 				light.SetBlockLight(level);
@@ -93,7 +97,7 @@ namespace Voxelgine.Graphics
 		public byte GetMaxSkylight()
 		{
 			byte max = 0;
-			for (int i = 0; i < Lights.Length; i++)
+			for (int i = 0; i < 6; i++)
 				if (Lights[i].Sky > max) max = Lights[i].Sky;
 			return max;
 		}
@@ -104,7 +108,7 @@ namespace Voxelgine.Graphics
 		public byte GetMaxBlockLight()
 		{
 			byte max = 0;
-			for (int i = 0; i < Lights.Length; i++)
+			for (int i = 0; i < 6; i++)
 				if (Lights[i].Block > max) max = Lights[i].Block;
 			return max;
 		}

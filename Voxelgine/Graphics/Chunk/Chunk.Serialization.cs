@@ -38,7 +38,7 @@ namespace Voxelgine.Graphics
 				Block.Read(Reader);
 
 				for (int j = 0; j < Count; j++)
-					Blocks[i + j] = new PlacedBlock(Block);
+					Blocks[i + j] = Block;
 
 				i += Count;
 			}

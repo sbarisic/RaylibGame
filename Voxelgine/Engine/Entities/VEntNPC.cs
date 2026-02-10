@@ -355,14 +355,11 @@ namespace Voxelgine.Engine
 			}
 
 			public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
-		{
-			base.UpdateLockstep(TotalTime, Dt, InMgr);
+			{
+				base.UpdateLockstep(TotalTime, Dt, InMgr);
 
-			// Resolve any block clipping first
-			ResolveBlockCollisions();
-
-			// Check if grounded
-			bool isGrounded = IsGrounded();
+				// Check if grounded
+				bool isGrounded = IsGrounded();
 
 			// Update pathfinding movement
 			if (_pathFollower != null && _pathFollower.IsFollowingPath)
@@ -675,112 +672,6 @@ namespace Voxelgine.Engine
 				(float)(_random.NextDouble() - 0.5) * WanderDistance * 2
 			);
 		}
-
-		/// <summary>
-		/// Checks if the NPC is clipping into solid blocks and pushes it out.
-		/// Uses minimum penetration axis to resolve collisions smoothly.
-		/// </summary>
-		private void ResolveBlockCollisions()
-		{
-			if (_map == null)
-				return;
-
-			// NPC collision bounds (centered on X/Z, feet at Y)
-			float halfWidth = Size.X / 2f;
-			float height = Size.Y;
-			const float skinWidth = 0.02f; // Small buffer to prevent sticking
-
-			// Calculate NPC AABB
-			float minX = Position.X - halfWidth;
-			float maxX = Position.X + halfWidth;
-			float minY = Position.Y;
-			float maxY = Position.Y + height;
-			float minZ = Position.Z - halfWidth;
-			float maxZ = Position.Z + halfWidth;
-
-			// Get block range to check
-			int blockMinX = (int)MathF.Floor(minX);
-			int blockMaxX = (int)MathF.Floor(maxX);
-			int blockMinY = (int)MathF.Floor(minY);
-			int blockMaxY = (int)MathF.Floor(maxY);
-			int blockMinZ = (int)MathF.Floor(minZ);
-			int blockMaxZ = (int)MathF.Floor(maxZ);
-
-			// Check each potentially overlapping block
-				for (int bx = blockMinX; bx <= blockMaxX; bx++)
-				{
-					for (int by = blockMinY; by <= blockMaxY; by++)
-					{
-						for (int bz = blockMinZ; bz <= blockMaxZ; bz++)
-						{
-							if (!_map.IsSolid(bx, by, bz))
-								continue;
-
-							// Block AABB (use float directly from int coords)
-							float bMinX = bx;
-							float bMaxX = bx + 1f;
-							float bMinY = by;
-							float bMaxY = by + 1f;
-							float bMinZ = bz;
-							float bMaxZ = bz + 1f;
-
-							// Check if actually overlapping
-							if (maxX <= bMinX || minX >= bMaxX ||
-								maxY <= bMinY || minY >= bMaxY ||
-								maxZ <= bMinZ || minZ >= bMaxZ)
-								continue;
-
-							// Calculate penetration on each axis
-							float overlapLeft = maxX - bMinX;   // Push -X
-							float overlapRight = bMaxX - minX;  // Push +X
-							float overlapBottom = maxY - bMinY; // Push -Y
-							float overlapTop = bMaxY - minY;    // Push +Y
-							float overlapBack = maxZ - bMinZ;   // Push -Z
-							float overlapFront = bMaxZ - minZ;  // Push +Z
-
-							// Find minimum horizontal penetration (ignore Y for now - gravity handles that)
-							float minOverlapX = MathF.Min(overlapLeft, overlapRight);
-							float minOverlapZ = MathF.Min(overlapBack, overlapFront);
-
-							// Push out on the axis with smallest penetration
-							if (minOverlapX < minOverlapZ)
-							{
-								// Push on X axis
-								if (overlapLeft < overlapRight)
-								{
-									Position.X -= overlapLeft + skinWidth;
-									if (Velocity.X > 0) Velocity.X = 0;
-								}
-								else
-								{
-									Position.X += overlapRight + skinWidth;
-									if (Velocity.X < 0) Velocity.X = 0;
-								}
-							}
-							else
-							{
-								// Push on Z axis
-								if (overlapBack < overlapFront)
-								{
-									Position.Z -= overlapBack + skinWidth;
-									if (Velocity.Z > 0) Velocity.Z = 0;
-								}
-								else
-								{
-									Position.Z += overlapFront + skinWidth;
-									if (Velocity.Z < 0) Velocity.Z = 0;
-								}
-							}
-
-							// Recalculate NPC bounds after push
-							minX = Position.X - halfWidth;
-							maxX = Position.X + halfWidth;
-							minZ = Position.Z - halfWidth;
-							maxZ = Position.Z + halfWidth;
-						}
-					}
-				}
-			}
 
 		protected override void WriteSnapshotExtra(BinaryWriter writer)
 		{

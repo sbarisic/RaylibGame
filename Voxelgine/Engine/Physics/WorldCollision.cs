@@ -35,20 +35,34 @@ namespace Voxelgine.Engine {
 			Vector3 newPos = position;
 			Vector3 move = velocity * dt;
 
+			// Half-extents for centering on X/Z (position is bottom-center)
+			float halfX = size.X * 0.5f;
+			float halfZ = size.Z * 0.5f;
+			float height = size.Y;
+
 			// X axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X + move.X, newPos.Y, newPos.Z), size))
+			Vector3 testX = new Vector3(newPos.X + move.X, newPos.Y, newPos.Z);
+			if (!map.HasBlocksInBoundsMinMax(
+				new Vector3(testX.X - halfX, testX.Y, testX.Z - halfZ),
+				new Vector3(testX.X + halfX, testX.Y + height, testX.Z + halfZ)))
 				newPos.X += move.X;
 			else
 				velocity.X = 0;
 
 			// Y axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z), size))
+			Vector3 testY = new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z);
+			if (!map.HasBlocksInBoundsMinMax(
+				new Vector3(testY.X - halfX, testY.Y, testY.Z - halfZ),
+				new Vector3(testY.X + halfX, testY.Y + height, testY.Z + halfZ)))
 				newPos.Y += move.Y;
 			else
 				velocity.Y = 0;
 
 			// Z axis
-			if (!map.HasBlocksInBounds(new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z), size))
+			Vector3 testZ = new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z);
+			if (!map.HasBlocksInBoundsMinMax(
+				new Vector3(testZ.X - halfX, testZ.Y, testZ.Z - halfZ),
+				new Vector3(testZ.X + halfX, testZ.Y + height, testZ.Z + halfZ)))
 				newPos.Z += move.Z;
 			else
 				velocity.Z = 0;

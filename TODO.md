@@ -107,7 +107,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-*No refactoring items*
+- [ ] **Refactor: Split & rename MultiplayerGameState** — Rename `MultiplayerGameState` to `MPClientGameState` and split into partial class files by responsibility: core/lifecycle, network packet handlers, UI creation/updates, rendering helpers, debug menu. Target <1000 lines per file **[CPX: 3]**
 
 ---
 
@@ -115,11 +115,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-- [ ] **NPC: Pathfinding still gets stuck** — NPC occasionally gets stuck when traversing a path; investigate whether NPC physics handles corner/edge collisions the same way the player does (slide along walls), consider shifting waypoint positions to avoid edge-of-block precision, and verify `WorldCollision.MoveWithCollision` behavior for NPC sizes **[CPX: 3]**
+*No active bugs*
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Is there a way to split MultiplayerGameState.cs into smaller files? Multiple different classes? Partial class? Like MultiplayerGameState.*.cs Rename MultiplayerGameState to MPClientGameState
+*No uncategorized items*
 
 ---
 

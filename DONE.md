@@ -105,6 +105,7 @@ works for any connected client.
 - **AI: AsyncSpeak & MoveToPlayer stop distance** — Added `AsyncSpeak` instruction (fire-and-forget speech), `AIStep.Param2` for secondary parameters, `MoveToPlayerAt(radius, stopDistance)` factory. Fixed MoveToPlayer navigating to exact player position instead of stopping short — now computes a nav target `stopDistance` blocks from the player and includes an early-out if already in range.
 - **NPC: Speech bubble timeout fix** — Speech bubbles never disappeared on the client because `UpdateLockstep` (which ticks the speech timer) only runs server-side. Added `UpdateVisuals` override in `VEntNPC` to tick the speech timer on the client.
 - **GUI: Debug menu window clipping fix** — F1 debug menu content was clipped because the `StackLayout` was added directly to the `Window` without proper content area sizing. Wrapped content in a `ScrollablePane` using `Window.GetContentSize()` and `FishUIAnchor.All` for correct layout.
+- **NPC: Pathfinding stuck fix** — Two root causes: (1) `WorldCollision.MoveWithCollision` used `HasBlocksInBounds(pos, size)` which treats position as AABB min corner, but entity position is bottom-center — collision box was completely offset to one side. Fixed to use `HasBlocksInBoundsMinMax` with proper half-extent centering on X/Z. (2) `VEntNPC.ResolveBlockCollisions` was a redundant collision system that conflicted with `MoveWithCollision` at block corners, causing oscillation/stuck loops. Removed entirely — `MoveWithCollision` now provides correct wall-sliding collision response.
 
 ---
 

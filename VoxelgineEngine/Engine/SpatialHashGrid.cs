@@ -1,67 +1,88 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Voxelgine.Engine {
-	// Spatial hash grid for chunk storage
+	/// <summary>
+	/// Flat spatial hash map keyed by Vector3 position.
+	/// Uses packed long keys for O(1) lookup without per-entry List overhead.
+	/// Items/Values expose struct enumerators for zero-allocation foreach in hot paths.
+	/// </summary>
 	public class SpatialHashGrid<T> {
-		private readonly int bucketSize;
-		private readonly Dictionary<long, List<(Vector3, T)>> buckets = new();
+		readonly Dictionary<long, (Vector3 Key, T Value)> _entries = new();
 
-		public SpatialHashGrid(int bucketSize = 64) {
-			this.bucketSize = bucketSize;
+		static long Pack(Vector3 pos) {
+			int x = (int)MathF.Floor(pos.X);
+			int y = (int)MathF.Floor(pos.Y);
+			int z = (int)MathF.Floor(pos.Z);
+			return (x & 0x1FFFFFL) | ((y & 0x1FFFFFL) << 21) | ((z & 0x1FFFFFL) << 42);
 		}
 
-		private long Hash(Vector3 pos) {
-			int x = (int)pos.X / bucketSize;
-			int y = (int)pos.Y / bucketSize;
-			int z = (int)pos.Z / bucketSize;
-			return ((long)x & 0x1FFFFF) | (((long)y & 0x1FFFFF) << 21) | (((long)z & 0x1FFFFF) << 42);
-		}
+		public int Count => _entries.Count;
 
-		public void Add(Vector3 pos, T value) {
-			long h = Hash(pos);
-			if (!buckets.TryGetValue(h, out var list)) {
-				list = new List<(Vector3, T)>();
-				buckets[h] = list;
-			}
-			list.Add((pos, value));
-		}
+		public void Add(Vector3 pos, T value) => _entries[Pack(pos)] = (pos, value);
 
 		public bool TryGetValue(Vector3 pos, out T value) {
-			long h = Hash(pos);
-			if (buckets.TryGetValue(h, out var list)) {
-				foreach (var (p, v) in list) {
-					if (p == pos) {
-						value = v;
-						return true;
-					}
-				}
+			if (_entries.TryGetValue(Pack(pos), out var entry)) {
+				value = entry.Value;
+				return true;
 			}
 			value = default;
 			return false;
 		}
 
-		public bool ContainsKey(Vector3 pos) => TryGetValue(pos, out _);
+		public bool ContainsKey(Vector3 pos) => _entries.ContainsKey(Pack(pos));
 
-		public void Clear() => buckets.Clear();
+		public void Clear() => _entries.Clear();
 
-		public IEnumerable<T> Values {
-			get {
-				foreach (var list in buckets.Values)
-					foreach (var (_, v) in list)
-						yield return v;
+		public ValuesEnumerable Values => new(_entries);
+
+		public ItemsEnumerable Items => new(_entries);
+
+		public readonly struct ValuesEnumerable {
+			readonly Dictionary<long, (Vector3 Key, T Value)> _dict;
+			internal ValuesEnumerable(Dictionary<long, (Vector3 Key, T Value)> dict) => _dict = dict;
+			public Enumerator GetEnumerator() => new(_dict.GetEnumerator());
+
+			public T[] ToArray() {
+				var arr = new T[_dict.Count];
+				int i = 0;
+				foreach (var e in _dict.Values)
+					arr[i++] = e.Value;
+				return arr;
+			}
+
+			public struct Enumerator {
+				Dictionary<long, (Vector3 Key, T Value)>.Enumerator _inner;
+				internal Enumerator(Dictionary<long, (Vector3 Key, T Value)>.Enumerator inner) => _inner = inner;
+				public bool MoveNext() => _inner.MoveNext();
+				public T Current => _inner.Current.Value.Value;
 			}
 		}
 
-		public IEnumerable<KeyValuePair<Vector3, T>> Items {
-			get {
-				foreach (var list in buckets.Values)
-					foreach (var (p, v) in list)
-						yield return new KeyValuePair<Vector3, T>(p, v);
+		public readonly struct ItemsEnumerable {
+			readonly Dictionary<long, (Vector3 Key, T Value)> _dict;
+			internal ItemsEnumerable(Dictionary<long, (Vector3 Key, T Value)> dict) => _dict = dict;
+			public Enumerator GetEnumerator() => new(_dict.GetEnumerator());
+
+			public KeyValuePair<Vector3, T>[] ToArray() {
+				var arr = new KeyValuePair<Vector3, T>[_dict.Count];
+				int i = 0;
+				foreach (var e in _dict.Values)
+					arr[i++] = new KeyValuePair<Vector3, T>(e.Key, e.Value);
+				return arr;
+			}
+
+			public struct Enumerator {
+				Dictionary<long, (Vector3 Key, T Value)>.Enumerator _inner;
+				internal Enumerator(Dictionary<long, (Vector3 Key, T Value)>.Enumerator inner) => _inner = inner;
+				public bool MoveNext() => _inner.MoveNext();
+				public KeyValuePair<Vector3, T> Current {
+					get {
+						var e = _inner.Current.Value;
+						return new KeyValuePair<Vector3, T>(e.Key, e.Value);
+					}
+				}
 			}
 		}
 	}

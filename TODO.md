@@ -107,7 +107,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-- [ ] **ChunkMap: Split into partial class files** — Split `ChunkMap.cs` into multiple `ChunkMap.*.cs` files for better organization (e.g., generation, lighting, collision, block access). Identify and apply optimizations during the split **[CPX: 3]**
+*No refactoring items*
 
 ---
 
@@ -119,7 +119,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Do not make foliage generate on every grass block, make it like 10% of the time
 
 ---
 
@@ -131,6 +131,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 - Do not use powershell commands unless absolutely necessary
 - If you encounter features in systems which are required when working on a current improvement/bugfix, extend that system with the required features as part of the current task instead of creating separate TODO entries
 - Problem solutions need to be optimized, performant and well thought out before implementation, avoid quick fixes
+- See MULTIPLAYER.md for multiplayer architecture
 
 ---
 

@@ -335,13 +335,26 @@ namespace Voxelgine.Engine
 			Animator.Play("idle");
 
 			if (Size != Vector3.Zero)
-			{
-				Vector3 Off = (BBox.Max - BBox.Min) / 2;
-				ModelOffset = new Vector3(Size.X / 2, 0, Size.Z / 2);
+				{
+					Vector3 Off = (BBox.Max - BBox.Min) / 2;
+					ModelOffset = new Vector3(Size.X / 2, 0, Size.Z / 2);
+				}
 			}
-		}
 
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
+			public override void UpdateVisuals(float Dt)
+			{
+				base.UpdateVisuals(Dt);
+
+				// Tick speech timer on the client (UpdateLockstep only runs server-side)
+				if (_speechTimer > 0)
+				{
+					_speechTimer -= Dt;
+					if (_speechTimer <= 0)
+						_speechText = "";
+				}
+			}
+
+			public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
 		{
 			base.UpdateLockstep(TotalTime, Dt, InMgr);
 

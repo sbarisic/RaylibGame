@@ -33,6 +33,14 @@ namespace Voxelgine.Engine.AI
 		/// <summary>Display a speech bubble with TextParam for Param seconds and immediately advance to the next instruction.</summary>
 		AsyncSpeak,
 
+		// TODO: Add instructions for MoveToEntity, LookAtEntity (entity from event handler), PlayAnimation (with overlay support, like crouching + walking + attacking/shooting)
+		// TargetEntity (stores entity for future Target instructions)
+		// PointAtTarget, MoveToTarget (with configurable stop distance), LookAtTarget, AimAtTarget, PrimaryAttack, SecondaryAttack
+		// MoveToCover(dangerFromPosition) (find cover with no line of sight to the danger position, and move there), Crouch, StandUp, SetMoveMode(walk/walk+jump/run+jump)
+		// Idle should play random available idle anim
+		// ChatMessageContains(text, onFalse: relative jump, onTrue: relative jump (1 by default)) (for events where you get chat either from player or npc)
+		// EquipWeapon, UnequipWeapon
+
 		/// <summary>
 		/// Event handler marker. Param = (float)(int)<see cref="AIEvent"/>.
 		/// Skipped during normal sequential execution. When the matching event fires,

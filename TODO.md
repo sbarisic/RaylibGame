@@ -74,7 +74,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **NPC: Head tracking** — NPC rotates head mesh toward the look target (nearest player) instead of only rotating the whole body **[CPX: 2]**
 
 ### On Hold
 
@@ -119,7 +119,12 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Add entity lighting, they should get the light level of the block they are standing on and change color based on that (multiply color with light level)
+- Add NPC ability to "speak", they should create a text bubble above their head with a message for players to read when they are close enough
+- Add AIInstruction to make NPCs speak
+- Upgrade the AI system to support events, like a single instance of an instruction in the program OnPlayerTouch will interrupt the current AI program and jump to that instruction, the handler decides where to jump with goto
+- Add AI system supported events: OnPlayerTouch, OnPlayerSight, OnAttacked, OnHealthBelow(percentage), OnIdle(time)
+- Add AI instructions: Speak(text, duration), Wait(time), LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction)
+- Add async AI instructions that will continue the next instruction without waiting for this one to finish, so NPC can walk and shoot. AsyncMoveTo(pos), AsyncLookAtTarget(targetID), AsyncSpeak(text, duration)
 
 ---
 

@@ -246,6 +246,17 @@ namespace Voxelgine.Engine {
 		}
 
 		/// <summary>
+		/// Draws the model at its current position/direction with a tint color (e.g., for lighting).
+		/// </summary>
+		public void Draw(Color tint) {
+			Matrix4x4 Model = GetModelMatrix();
+
+			foreach (var Msh in Meshes) {
+				Msh.Draw(Model, tint);
+			}
+		}
+
+		/// <summary>
 		/// Sets the texture for all meshes in this model.
 		/// </summary>
 		public unsafe void SetTexture(Texture2D texture) {

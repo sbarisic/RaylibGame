@@ -227,7 +227,7 @@ namespace Voxelgine.Engine
 				* Matrix4x4.CreateRotationY(facingAngle)
 				* Matrix4x4.CreateTranslation(GetDrawPosition());
 
-			CModel.DrawWithMatrix(mat);
+			CModel.DrawWithMatrix(mat, GetEntityLightColor());
 		}
 
 		static Texture2D GenerateDoorTexture()

@@ -98,6 +98,7 @@ works for any connected client.
 - **NPC Pathfinding: Gets stuck on blocks** — Added wall proximity cost to A* (paths prefer 1-block clearance from walls), fixed `GetRandomWanderTarget` always returning first random direction without walkability check, improved stuck recovery order (recalculate path → jump → wander), added waypoint progress tracking to stuck detection.
 - **NPC: No animation or facing direction in multiplayer** — `GetEntityAnimationState` relied on `Animator` which is null on the headless server (no GPU model loading); fixed to derive walk/idle state from velocity. Client now derives NPC look direction from synced velocity via `SetLookDirection`.
 - **NPC AI: Behavior tree VM** — Added instruction-based AI program system (`AIInstruction`, `AIStep`, `AIRunner`, `AIPrograms`). NPC behavior defined as a list of steps with success/failure branching (like a simple VM). Instructions: `Idle`, `MoveRandom`, `MoveToPlayer`, `IsPlayerNearby`, `LookAtPlayer`, `Goto`. Default program: approach nearby players, otherwise wander randomly. Replaced hardcoded idle wandering in `VEntNPC`.
+- **Graphics: Entity lighting** — All entities and remote players now sample block light level at their feet and tint their model color accordingly. Added `GetEntityLightColor()` to `VoxEntity`, `Draw(Color tint)` to `CustomModel`.
 
 ---
 

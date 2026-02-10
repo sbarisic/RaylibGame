@@ -674,7 +674,7 @@ namespace Voxelgine.Engine
 
 				CModel.Position = GetDrawPosition();
 				CModel.LookDirection = _lookDirection;
-				CModel.Draw();
+				CModel.Draw(GetEntityLightColor());
 
 				if (Eng.DebugMode)
 				{

@@ -250,11 +250,30 @@ namespace Voxelgine.Engine
 			return Position + ModelOffset + CenterOffset;
 		}
 
+		/// <summary>
+		/// Gets the light color at this entity's feet position by sampling the world lighting.
+		/// Returns White if the map is unavailable (headless server or no simulation).
+		/// </summary>
+		protected Color GetEntityLightColor()
+		{
+			var map = _simulation?.Map;
+			if (map == null)
+				return Color.White;
+			return map.GetLightColor(Position);
+		}
+
 		protected virtual void EntityDrawModel(float TimeAlpha, ref GameFrameInfo LastFrame)
 		{
 			if (HasModel)
 			{
-				Raylib.DrawModelEx(EntModel, GetDrawPosition(), Vector3.UnitY, ModelRotationDeg, ModelScale, ModelColor);
+				Color lightColor = GetEntityLightColor();
+				Color tint = new Color(
+					(byte)(ModelColor.R * lightColor.R / 255),
+					(byte)(ModelColor.G * lightColor.G / 255),
+					(byte)(ModelColor.B * lightColor.B / 255),
+					ModelColor.A
+				);
+				Raylib.DrawModelEx(EntModel, GetDrawPosition(), Vector3.UnitY, ModelRotationDeg, ModelScale, tint);
 			}
 		}
 

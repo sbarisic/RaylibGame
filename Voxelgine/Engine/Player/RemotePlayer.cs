@@ -213,7 +213,9 @@ namespace Voxelgine.Engine
 			float yawRad = CameraAngle.X * (MathF.PI / 180f);
 			_model.LookDirection = new Vector3(MathF.Sin(yawRad), 0, MathF.Cos(yawRad));
 
-			_model.Draw();
+			// Sample world lighting at feet position
+			Color lightColor = _eng.MultiplayerGameState?.Map?.GetLightColor(feetPos) ?? Color.White;
+			_model.Draw(lightColor);
 
 			// Draw held item at right hand position
 			DrawHeldItem();

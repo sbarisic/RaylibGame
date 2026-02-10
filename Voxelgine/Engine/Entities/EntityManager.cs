@@ -4,6 +4,9 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+
+using Raylib_cs;
+
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
@@ -183,6 +186,23 @@ namespace Voxelgine.Engine
 					continue;
 
 				Ent.Draw3D(TimeAlpha, ref LastFrame);
+			}
+		}
+
+		/// <summary>
+		/// Draws 2D overlays for all entities (speech bubbles, etc.).
+		/// Called during the 2D rendering pass after EndMode3D.
+		/// </summary>
+		public void Draw2D(Camera3D camera)
+		{
+			for (int i = 0; i < Entities.Count; i++)
+			{
+				VoxEntity Ent = Entities[i];
+
+				if (Ent == null)
+					continue;
+
+				Ent.Draw2D(camera);
 			}
 		}
 

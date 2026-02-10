@@ -49,6 +49,26 @@ namespace Voxelgine.Engine
 		// AI behavior program
 		private AIRunner _aiRunner;
 
+		// Speech bubble
+		private string _speechText = "";
+		private float _speechTimer;
+		private bool _speechDirty;
+
+		/// <summary>Gets the current speech text (empty if not speaking).</summary>
+		public string SpeechText => _speechText;
+
+		/// <summary>Gets the remaining speech duration.</summary>
+		public float SpeechDuration => _speechTimer;
+
+		/// <summary>
+		/// Returns true if speech state changed since last call to <see cref="ConsumeSpeechDirty"/>.
+		/// Used by the server to know when to broadcast an <see cref="EntitySpeechPacket"/>.
+		/// </summary>
+		public bool IsSpeechDirty => _speechDirty;
+
+		/// <summary>Clears the speech dirty flag after broadcasting.</summary>
+		public void ConsumeSpeechDirty() => _speechDirty = false;
+
 		// Hit twitch effect
 		private Dictionary<string, Vector3> _twitchOffsets = new();
 		private const float TwitchDecayRate = 12f;          // How fast twitch decays per second
@@ -91,6 +111,85 @@ namespace Voxelgine.Engine
 		public void OnAttacked()
 		{
 			_aiRunner?.RaiseEvent(AIEvent.OnAttacked, NetworkId);
+		}
+
+		/// <summary>
+		/// Makes the NPC display a speech bubble for the given duration.
+		/// The text is synced to clients via entity snapshots.
+		/// </summary>
+		public void Speak(string text, float duration)
+		{
+			_speechText = text ?? "";
+			_speechTimer = duration;
+			_speechDirty = true;
+		}
+
+		/// <summary>Returns true if the NPC is currently displaying a speech bubble.</summary>
+		public bool IsSpeaking => _speechTimer > 0 && !string.IsNullOrEmpty(_speechText);
+
+		/// <summary>
+		/// Draws a speech bubble above the NPC's head in screen space.
+		/// Called during the 2D rendering pass after EndMode3D.
+		/// </summary>
+		public override void Draw2D(Camera3D camera)
+		{
+			if (!IsSpeaking)
+				return;
+
+			// Speech bubble position: centered above the entity's head
+			Vector3 bubbleWorldPos = GetDrawPosition() + new Vector3(0, Size.Y + 0.4f, 0);
+
+			// Distance check
+			float distance = Vector3.Distance(camera.Position, bubbleWorldPos);
+			if (distance > 24f || distance < 0.5f)
+				return;
+
+			// Check if behind camera
+			Vector3 toTag = Vector3.Normalize(bubbleWorldPos - camera.Position);
+			Vector3 camForward = Vector3.Normalize(camera.Target - camera.Position);
+			if (Vector3.Dot(toTag, camForward) <= 0)
+				return;
+
+			// Project to screen
+			Vector2 screenPos = Raylib.GetWorldToScreen(bubbleWorldPos, camera);
+
+			int screenW = Raylib.GetScreenWidth();
+			int screenH = Raylib.GetScreenHeight();
+			if (screenPos.X < -200 || screenPos.X > screenW + 200 || screenPos.Y < -50 || screenPos.Y > screenH + 50)
+				return;
+
+			// Scale font size with distance
+			float distanceFactor = 1f - Math.Clamp((distance - 3f) / 21f, 0f, 1f);
+			int fontSize = (int)(10 + 10 * distanceFactor);
+
+			// Fade alpha with distance
+			byte alpha = (byte)(255 * Math.Clamp(1f - (distance - 18f) / 6f, 0f, 1f));
+			if (alpha == 0)
+				return;
+
+			// Measure text for centering
+			int textWidth = Raylib.MeasureText(_speechText, fontSize);
+			int padding = 6;
+			int bubbleW = textWidth + padding * 2;
+			int bubbleH = fontSize + padding * 2;
+			int bubbleX = (int)(screenPos.X - bubbleW / 2f);
+			int bubbleY = (int)(screenPos.Y - bubbleH);
+
+			// Draw bubble background
+			Raylib.DrawRectangleRounded(
+				new Rectangle(bubbleX, bubbleY, bubbleW, bubbleH),
+				0.3f, 4, new Color(0, 0, 0, (int)(alpha * 0.7f)));
+
+			// Draw bubble outline
+			Raylib.DrawRectangleRoundedLinesEx(
+				new Rectangle(bubbleX, bubbleY, bubbleW, bubbleH),
+				0.3f, 4, 1f, new Color(255, 255, 255, (int)(alpha * 0.4f)));
+
+			// Draw text
+			Raylib.DrawText(_speechText,
+				bubbleX + padding,
+				bubbleY + padding,
+				fontSize, new Color(255, 255, 255, (int)alpha));
 		}
 
 		/// <summary>
@@ -343,6 +442,14 @@ namespace Voxelgine.Engine
 
 			// AI behavior program
 			_aiRunner?.Tick(this, Dt);
+
+			// Speech timer
+			if (_speechTimer > 0)
+			{
+				_speechTimer -= Dt;
+				if (_speechTimer <= 0)
+					_speechText = "";
+			}
 
 			// Update animation
 			Animator?.Update(Dt);

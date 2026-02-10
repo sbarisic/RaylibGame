@@ -283,6 +283,12 @@ namespace Voxelgine.Engine
 			DrawCollisionBox();
 		}
 
+		/// <summary>
+		/// Draws 2D overlays for this entity (speech bubbles, status icons, etc.).
+		/// Called during the 2D rendering pass after EndMode3D.
+		/// </summary>
+		public virtual void Draw2D(Camera3D camera) { }
+
 		// Draws the collision box at Position with Size
 		/// <summary>
 		/// Writes a compact network snapshot of this entity's state.

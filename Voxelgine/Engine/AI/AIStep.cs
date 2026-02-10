@@ -18,16 +18,25 @@ namespace Voxelgine.Engine.AI
 		/// </summary>
 		public int OnFailGoto;
 
+		/// <summary>Optional text parameter (used by Speak instruction).</summary>
+		public string TextParam;
+
 		public AIStep(AIInstruction instruction, float param = 0, int onFailGoto = -1)
 		{
 			Instruction = instruction;
 			Param = param;
 			OnFailGoto = onFailGoto;
+			TextParam = null;
 		}
 
 		/// <summary>
 		/// Creates an event handler marker step for the given event type.
 		/// </summary>
 		public static AIStep Handler(AIEvent evt) => new(AIInstruction.EventHandler, (float)(int)evt);
+
+		/// <summary>
+		/// Creates a Speak instruction with the given text and duration.
+		/// </summary>
+		public static AIStep SpeakText(string text, float duration) => new(AIInstruction.Speak, duration) { TextParam = text };
 	}
 }

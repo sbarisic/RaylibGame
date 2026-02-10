@@ -24,6 +24,12 @@ namespace Voxelgine.Engine.AI
 		/// <summary>Unconditional jump to step index (int)Param.</summary>
 		Goto,
 
+		/// <summary>Wait exactly Param seconds. Always succeeds. Unlike Idle, no randomness.</summary>
+		Wait,
+
+		/// <summary>Display a speech bubble with TextParam for Param seconds. Always succeeds after the duration.</summary>
+		Speak,
+
 		/// <summary>
 		/// Event handler marker. Param = (float)(int)<see cref="AIEvent"/>.
 		/// Skipped during normal sequential execution. When the matching event fires,

@@ -69,6 +69,46 @@ namespace Voxelgine.Engine.AI
 			new (AIInstruction.MoveRandom, 10f)
 		];*/
 
-		public static AIStep[] FunkyBehavior() => Sentinel();
+		/// <summary>
+		/// Funky NPC behavior: idle, wander, look at player, approach, greet.
+		/// Reacts to damage by fleeing, and to touch by backing away.
+		/// <code>
+		///  0: WAIT(2)
+		///  1: MOVE_RANDOM(5)         → fail: goto 0
+		///  2: LOOK_AT_PLAYER(15)     → fail: goto 0
+		///  3: WAIT(3)
+		///  4: MOVE_TO_PLAYER(15)     → fail: goto 0
+		///  5: SPEAK("Hello my dude!", 3)
+		///  6: GOTO(0)
+		///  7: EVENT_HANDLER(OnAttacked)
+		///  8: SPEAK("Ouwie!", 2)
+		///  9: MOVE_RANDOM(3)         → fail: goto 0
+		/// 10: GOTO(0)
+		/// 11: EVENT_HANDLER(OnPlayerTouch)
+		/// 12: SPEAK("Stop touching me, my dude", 3)
+		/// 13: MOVE_RANDOM(1)         → fail: goto 0
+		/// 14: GOTO(0)
+		/// </code>
+		/// </summary>
+		public static AIStep[] FunkyBehavior() =>
+		[
+			new(AIInstruction.Wait, 2f),
+			new(AIInstruction.MoveRandom, 5f, onFailGoto: 0),
+			new(AIInstruction.LookAtPlayer, 15f, onFailGoto: 0),
+			new(AIInstruction.Wait, 3f),
+			new(AIInstruction.MoveToPlayer, 15f, onFailGoto: 0), // TODO: Extend instruction to specify how many blocks away from player to stop at
+			AIStep.SpeakText("Hello my dude!", 3f), // TODO: Make async, so next instruction starts immediately, NPC can talk and do other things..
+			new(AIInstruction.Goto, 0),
+			// OnAttacked handler: say "Ouwie!" and run away
+			AIStep.Handler(AIEvent.OnAttacked),
+			AIStep.SpeakText("Ouwie!", 2f), // TODO: Make async
+			new(AIInstruction.MoveRandom, 3f, onFailGoto: 0),
+			new(AIInstruction.Goto, 0),
+			// OnPlayerTouch handler: say "Stop touching me" and walk away
+			AIStep.Handler(AIEvent.OnPlayerTouch),
+			AIStep.SpeakText("Stop touching me, my dude", 3f), // TODO: Make async
+			new(AIInstruction.MoveRandom, 1f, onFailGoto: 0),
+			new(AIInstruction.Goto, 0),
+		];
 	}
 }

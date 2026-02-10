@@ -142,11 +142,19 @@ namespace Voxelgine.Engine.AI
 					break;
 
 				case AIInstruction.Goto:
-					_log?.WriteLine($"[AI:{npc.NetworkId}] GOTO -> step {(int)step.Param}");
-					Advance((int)step.Param);
-					break;
+						_log?.WriteLine($"[AI:{npc.NetworkId}] GOTO -> step {(int)step.Param}");
+						Advance((int)step.Param);
+						break;
 
-				case AIInstruction.EventHandler:
+					case AIInstruction.Wait:
+						TickWait(npc, dt, ref step);
+						break;
+
+					case AIInstruction.Speak:
+						TickSpeak(npc, dt, ref step);
+						break;
+
+					case AIInstruction.EventHandler:
 					// Pass-through marker — just advance to next step
 					Advance(_pc + 1);
 					break;
@@ -260,10 +268,41 @@ namespace Voxelgine.Engine.AI
 				npc.SetLookDirection(Vector3.Normalize(dir));
 
 			_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} LOOK_AT_PLAYER -> player {nearest.PlayerId}");
-			Complete(true, ref step);
-		}
+				Complete(true, ref step);
+			}
 
-		// ────────────────────── Helpers ──────────────────────
+			private void TickWait(VEntNPC npc, float dt, ref AIStep step)
+			{
+				if (_phase == StepPhase.Starting)
+				{
+					_timer = MathF.Max(step.Param, 0.1f);
+					_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} WAIT start ({_timer:F1}s)");
+					_phase = StepPhase.Running;
+				}
+
+				_timer -= dt;
+				if (_timer <= 0f)
+					Complete(true, ref step);
+			}
+
+			private void TickSpeak(VEntNPC npc, float dt, ref AIStep step)
+			{
+				if (_phase == StepPhase.Starting)
+				{
+					string text = step.TextParam ?? "";
+					float duration = MathF.Max(step.Param, 0.5f);
+					npc.Speak(text, duration);
+					_timer = duration;
+					_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} SPEAK \"{text}\" ({duration:F1}s)");
+					_phase = StepPhase.Running;
+				}
+
+				_timer -= dt;
+				if (_timer <= 0f)
+					Complete(true, ref step);
+			}
+
+			// ────────────────────── Helpers ──────────────────────
 
 		private void Complete(bool success, ref AIStep step)
 		{

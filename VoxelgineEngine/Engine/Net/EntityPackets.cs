@@ -83,4 +83,31 @@ namespace Voxelgine.Engine
 			AnimationState = reader.ReadByte();
 		}
 	}
+
+	/// <summary>
+	/// Server → Client (reliable). NPC speech bubble display.
+	/// Empty text means the speech bubble should be hidden.
+	/// </summary>
+	public class EntitySpeechPacket : Packet
+	{
+		public override PacketType Type => PacketType.EntitySpeech;
+
+		public int NetworkId { get; set; }
+		public string Text { get; set; } = string.Empty;
+		public float Duration { get; set; }
+
+		public override void Write(BinaryWriter writer)
+		{
+			writer.Write(NetworkId);
+			writer.Write(Text);
+			writer.Write(Duration);
+		}
+
+		public override void Read(BinaryReader reader)
+		{
+			NetworkId = reader.ReadInt32();
+			Text = reader.ReadString();
+			Duration = reader.ReadSingle();
+		}
+	}
 }

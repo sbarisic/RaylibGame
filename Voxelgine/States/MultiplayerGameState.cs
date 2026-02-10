@@ -559,6 +559,9 @@ namespace Voxelgine.States
 				// Remote player name tags (3D projection, stays as Raylib)
 				DrawRemotePlayerNameTags();
 
+				// Entity 2D overlays (speech bubbles)
+				_simulation.Entities.Draw2D(_simulation.LocalPlayer.RenderCam);
+
 				// Update FishUI HUD state
 				UpdateHUDInfo();
 				UpdateHealthBar();
@@ -812,10 +815,14 @@ namespace Voxelgine.States
 					break;
 
 				case EntitySnapshotPacket entitySnapshot:
-					HandleEntitySnapshot(entitySnapshot, currentTime);
-					break;
+						HandleEntitySnapshot(entitySnapshot, currentTime);
+						break;
 
-				case WeaponFireEffectPacket fireEffect:
+					case EntitySpeechPacket entitySpeech:
+						HandleEntitySpeech(entitySpeech);
+						break;
+
+					case WeaponFireEffectPacket fireEffect:
 					HandleWeaponFireEffect(fireEffect);
 					break;
 
@@ -1027,15 +1034,31 @@ namespace Voxelgine.States
 			}
 
 			buffer.Add(new EntitySnapshot
-			{
-				Position = packet.Position,
-				Velocity = packet.Velocity,
-				AnimationState = packet.AnimationState,
-			}, currentTime);
-		}
+				{
+					Position = packet.Position,
+					Velocity = packet.Velocity,
+					AnimationState = packet.AnimationState,
+				}, currentTime);
+			}
 
-		/// <summary>
-		/// Updates entity positions from interpolation buffers. Called each frame.
+			/// <summary>
+			/// Handles an <see cref="EntitySpeechPacket"/> from the server.
+			/// Sets the speech bubble text and duration on the target NPC.
+			/// </summary>
+			private void HandleEntitySpeech(EntitySpeechPacket packet)
+			{
+				if (_simulation == null)
+					return;
+
+				var entity = _simulation.Entities.GetEntityByNetworkId(packet.NetworkId);
+				if (entity is VEntNPC npc)
+				{
+					npc.Speak(packet.Text, packet.Duration);
+				}
+			}
+
+			/// <summary>
+			/// Updates entity positions from interpolation buffers. Called each frame.
 		/// </summary>
 		private void UpdateEntityInterpolation(float currentTime)
 		{

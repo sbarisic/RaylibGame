@@ -56,7 +56,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **AI: Extended instructions & async** — New instructions: Speak(text, duration), Wait(time), LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction). Async variants (AsyncMoveTo, AsyncLookAtTarget, AsyncSpeak) that continue to the next instruction without waiting, enabling concurrent actions like walk-and-shoot **[CPX: 4]**
+- [ ] **AI: Extended instructions & async** — New instructions: LookAtTarget(targetID), PrimaryFire, SecondaryFire, MoveTo(pos), ResetLook, Jump(direction). Async variants (AsyncMoveTo, AsyncLookAtTarget, AsyncSpeak) that continue to the next instruction without waiting, enabling concurrent actions like walk-and-shoot **[CPX: 4]**
 
 ### On Hold
 
@@ -74,7 +74,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **NPC: Speech bubbles** — NPC displays a text bubble above its head with a message visible to nearby players; required by the Speak AI instruction **[CPX: 2]**
 - [ ] **NPC: Head tracking** — NPC rotates head mesh toward the look target (nearest player) instead of only rotating the whole body **[CPX: 2]**
 
 ### On Hold
@@ -116,7 +115,8 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-*No active bugs*
+- [ ] **GUI: Debug menu window clipping** — F1 debug menu window content is clipped incorrectly; investigate FishUI window layout/clipping **[CPX: 2]**
+- [ ] **NPC: Pathfinding still gets stuck** — NPC occasionally gets stuck when traversing a path; consider shifting the target waypoint position to avoid edge-of-block precision issues **[CPX: 2]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 

@@ -224,6 +224,7 @@ namespace Voxelgine.Engine.Server
 			_logging.ServerWriteLine("  /comehere      - All NPCs navigate to your position");
 			_logging.ServerWriteLine("  /day           - Set time to noon");
 			_logging.ServerWriteLine("  /night         - Set time to midnight");
+			_logging.ServerWriteLine("  /speak <text>  - All NPCs display a speech bubble");
 		}
 
 		/// <summary>
@@ -252,8 +253,12 @@ namespace Voxelgine.Engine.Server
 					SetTimeAndNotify(connection.PlayerId, 0f);
 					break;
 
+				case "speak":
+					CmdSpeak(connection, args);
+					break;
+
 				default:
-					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night");
+					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>");
 					break;
 			}
 		}
@@ -291,10 +296,34 @@ namespace Voxelgine.Engine.Server
 			}
 
 			SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) navigating to your position.");
-		}
+			}
 
-		/// <summary>
-		/// Sends a server message to a specific player via chat.
+			/// <summary>
+			/// Commands all NPCs to display a speech bubble with the given text.
+			/// </summary>
+			private void CmdSpeak(NetConnection connection, string text)
+			{
+				if (string.IsNullOrWhiteSpace(text))
+				{
+					SendServerMessageTo(connection.PlayerId, "Usage: /speak <text>");
+					return;
+				}
+
+				int count = 0;
+				foreach (var entity in _simulation.Entities.GetAllEntities())
+				{
+					if (entity is VEntNPC npc)
+					{
+						npc.Speak(text, 5f);
+						count++;
+					}
+				}
+
+				SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) speaking.");
+			}
+
+			/// <summary>
+			/// Sends a server message to a specific player via chat.
 		/// </summary>
 		private void SendServerMessageTo(int playerId, string message)
 		{

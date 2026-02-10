@@ -67,12 +67,24 @@ namespace Voxelgine.Engine.Server
 			int liveCount = 0;
 
 			foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
-			{
-				liveCount++;
-				int netId = entity.NetworkId;
-				byte animState = GetEntityAnimationState(entity);
+				{
+					liveCount++;
+					int netId = entity.NetworkId;
+					byte animState = GetEntityAnimationState(entity);
 
-				// Skip if state hasn't changed since last broadcast
+					// Broadcast speech changes for NPCs
+					if (entity is VEntNPC npc && npc.IsSpeechDirty)
+					{
+						npc.ConsumeSpeechDirty();
+						_server.Broadcast(new EntitySpeechPacket
+						{
+							NetworkId = netId,
+							Text = npc.SpeechText,
+							Duration = npc.SpeechDuration,
+						}, true, currentTime);
+					}
+
+					// Skip if state hasn't changed since last broadcast
 				if (_lastEntitySnapshots.TryGetValue(netId, out var last) &&
 					last.Position == entity.Position &&
 					last.Velocity == entity.Velocity &&

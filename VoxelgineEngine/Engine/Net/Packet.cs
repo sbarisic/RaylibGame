@@ -30,10 +30,11 @@ namespace Voxelgine.Engine
 		WorldData = 0x40,
 		WorldDataComplete = 0x41,
 
-		// Entity (0x30–0x32)
+		// Entity (0x30–0x33)
 		EntitySpawn = 0x30,
 		EntityRemove = 0x31,
 		EntitySnapshot = 0x32,
+		EntitySpeech = 0x33,
 
 		// Combat (0x60–0x62)
 		WeaponFire = 0x60,
@@ -197,6 +198,7 @@ namespace Voxelgine.Engine
 			Register<EntitySpawnPacket>(PacketType.EntitySpawn);
 			Register<EntityRemovePacket>(PacketType.EntityRemove);
 			Register<EntitySnapshotPacket>(PacketType.EntitySnapshot);
+			Register<EntitySpeechPacket>(PacketType.EntitySpeech);
 
 			// Combat
 			Register<WeaponFirePacket>(PacketType.WeaponFire);

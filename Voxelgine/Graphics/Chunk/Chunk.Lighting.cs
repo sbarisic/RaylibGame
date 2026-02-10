@@ -35,8 +35,13 @@ namespace Voxelgine.Graphics
 		// Reusable collections for lighting propagation (avoid allocations)
 		Queue<BlockPos> _skylightQueue;
 		Queue<(int x, int y, int z, byte level)> _blockLightQueue;
-		List<PointLight> _lightSources;
+
+		//List<PointLight> _lightSources;
+		PointLight[] lightSources = new PointLight[32];
+
+
 		bool[] _visitedBlocks; // Flat array: idx = x + ChunkSize*(y + ChunkSize*z)
+		PointLight[] _neighborLightBuffer; // Preallocated buffer for neighbor border light scanning (max 32)
 
 		/// <summary>
 		/// Invalidates the sky exposure cache, forcing recalculation on next lighting compute.
@@ -284,9 +289,10 @@ namespace Voxelgine.Graphics
 		void ComputeBlockLights()
 		{
 			// Reuse light sources list to avoid allocation
-			_lightSources ??= new List<PointLight>(64);
-			_lightSources.Clear();
-			var lightSources = _lightSources;
+			//_lightSources ??= new List<PointLight>(64);
+			//_lightSources.Clear();
+			//var lightSources = _lightSources;
+			int addedLightCount = 0;
 
 			for (int x = 0; x < ChunkSize; x++)
 			{
@@ -306,19 +312,25 @@ namespace Voxelgine.Graphics
 							WorldMap.GetWorldPos(x, y, z, GlobalChunkIndex, out Vector3 worldPos);
 							// Center the light in the block
 							Vector3 lightPos = worldPos + new Vector3(0.5f, 0.5f, 0.5f);
-							lightSources.Add(new PointLight(lightPos, lightLevel, castsShadows: true));
+
+							//lightSources.Add(new PointLight(lightPos, lightLevel, castsShadows: true));
+
+							if (addedLightCount < lightSources.Length)
+								lightSources[addedLightCount++] = new PointLight(lightPos, lightLevel, castsShadows: true);
+
+
+							//addedLightCount++;
 						}
 					}
 				}
 			}
 
 			// Collect light sources from neighboring chunks that can affect this chunk
-			CollectNeighborLightSources(lightSources);
+			addedLightCount = CollectNeighborLightSources(addedLightCount, lightSources);
 
-			// Propagate light from each source with shadow checking
-			foreach (var light in lightSources)
+			for (int i = 0; i < addedLightCount; i++)
 			{
-				PropagateBlockLightWithShadows(light);
+				PropagateBlockLightWithShadows(lightSources[i]);
 			}
 		}
 
@@ -326,9 +338,20 @@ namespace Voxelgine.Graphics
 		/// Collects light-emitting blocks from neighboring chunks that are within
 		/// light propagation range of this chunk's borders.
 		/// </summary>
-		void CollectNeighborLightSources(List<PointLight> lightSources)
+		int CollectNeighborLightSources(/*List<PointLight> lightSources*/ int startIdx, PointLight[] outLights)
 		{
 			const int maxLightRange = 15; // Maximum light propagation distance
+			int outLightsIdx = startIdx;
+
+			if (startIdx < 0)
+				return 0;
+
+			if (startIdx >= outLights.Length)
+				return outLightsIdx;
+
+			// Reuse preallocated buffer for neighbor border light scanning
+			_neighborLightBuffer ??= new PointLight[32];
+			var buffer = _neighborLightBuffer;
 
 			// Check all 26 neighboring chunk directions (6 faces + 12 edges + 8 corners)
 			for (int dx = -1; dx <= 1; dx++)
@@ -347,18 +370,35 @@ namespace Voxelgine.Graphics
 							continue;
 
 						// Scan the border region of the neighbor chunk facing us
-						ScanNeighborBorderForLights(neighborChunk, dx, dy, dz, maxLightRange, lightSources);
+						int count = ScanNeighborBorderForLights(neighborChunk, dx, dy, dz, maxLightRange, buffer);
+
+						for (int i = 0; i < count; i++)
+						{
+							outLights[outLightsIdx++] = buffer[i];
+
+							if (outLightsIdx >= outLights.Length)
+								return outLightsIdx;
+
+							//lightSources.Add(buffer[i]);
+						}
 					}
 				}
 			}
+
+			return outLightsIdx;
 		}
 
 		/// <summary>
 		/// Scans the border region of a neighbor chunk for light sources.
 		/// Only scans blocks within light range of our chunk boundary.
+		/// Writes results into the preallocated <paramref name="lightSources"/> array (max 32).
 		/// </summary>
-		void ScanNeighborBorderForLights(Chunk neighbor, int dx, int dy, int dz, int range, List<PointLight> lightSources)
+		/// <returns>The number of light sources found (up to the array length).</returns>
+		int ScanNeighborBorderForLights(Chunk neighbor, int dx, int dy, int dz, int range, PointLight[] lightSources)
 		{
+			int count = 0;
+			int maxCount = lightSources.Length;
+
 			// Determine which region of the neighbor to scan based on direction
 			// If dx == 1, neighbor is to our +X side, so we scan its low-X border (0 to range)
 			// If dx == -1, neighbor is to our -X side, so we scan its high-X border (ChunkSize-range to ChunkSize)
@@ -369,6 +409,10 @@ namespace Voxelgine.Graphics
 			int zStart = dz == 1 ? 0 : (dz == -1 ? Math.Max(0, ChunkSize - range) : 0);
 			int zEnd = dz == 1 ? Math.Min(range, ChunkSize) : (dz == -1 ? ChunkSize : ChunkSize);
 
+			// Cache neighbor blocks and chunk index locally to avoid repeated field access
+			PlacedBlock[] neighborBlocks = neighbor.Blocks;
+			Vector3 neighborChunkIndex = neighbor.GlobalChunkIndex;
+
 			for (int x = xStart; x < xEnd; x++)
 			{
 				for (int y = yStart; y < yEnd; y++)
@@ -376,18 +420,26 @@ namespace Voxelgine.Graphics
 					for (int z = zStart; z < zEnd; z++)
 					{
 						int idx = x + ChunkSize * (y + ChunkSize * z);
-						PlacedBlock block = neighbor.Blocks[idx];
+						BlockType type = neighborBlocks[idx].Type;
 
-						if (BlockInfo.EmitsLight(block.Type))
+						if (BlockInfo.EmitsLight(type))
 						{
-							byte lightLevel = BlockInfo.GetLightEmission(block.Type);
-							WorldMap.GetWorldPos(x, y, z, neighbor.GlobalChunkIndex, out Vector3 worldPos);
-							Vector3 lightPos = worldPos + new Vector3(0.5f, 0.5f, 0.5f);
-							lightSources.Add(new PointLight(lightPos, lightLevel, castsShadows: true));
+							byte lightLevel = BlockInfo.GetLightEmission(type);
+							WorldMap.GetWorldPos(x, y, z, neighborChunkIndex, out Vector3 worldPos);
+							lightSources[count] = new PointLight(
+								worldPos + new Vector3(0.5f, 0.5f, 0.5f),
+								lightLevel,
+								castsShadows: true);
+							count++;
+
+							if (count >= maxCount)
+								return count;
 						}
 					}
 				}
 			}
+
+			return count;
 		}
 
 		/// <summary>

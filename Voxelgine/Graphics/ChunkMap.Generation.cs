@@ -586,6 +586,10 @@ namespace Voxelgine.Graphics
 					if (foliageNoise < FoliageThreshold)
 						continue;
 
+					int chance = Rnd.Next(0, 100);
+					if (chance > 20)
+						continue;
+
 					GridSetBlock(chunkGrid, x, surfY + 1, z, BlockType.Foliage, width, gridHeight, length, cs);
 				}
 			}

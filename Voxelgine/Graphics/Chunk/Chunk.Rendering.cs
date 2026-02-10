@@ -97,11 +97,21 @@ namespace Voxelgine.Graphics
 			Verts.SetUVOffsetSize(UVPos + new Vector2(0, UVSize.Y), UVSize * new Vector2(1, -1));
 		}
 
+		int DirtyDelayCnt = 0;
+
 		void RecalcModel()
 		{
 			if (!Dirty)
 				return;
 
+			if (Dirty && DirtyDelayCnt < 2)
+			{
+				DirtyDelayCnt++;
+				return;
+
+			}
+
+			DirtyDelayCnt = 0;
 			Dirty = false;
 
 			if (ModelValidOpaque)

@@ -223,7 +223,26 @@ namespace Voxelgine.Engine.AI
 					return;
 				}
 
-				if (!npc.NavigateTo(nearest.Position))
+				// Already within stop distance — succeed immediately
+				float currentDist = Vector3.Distance(npc.Position, nearest.Position);
+				if (currentDist < stopDistance)
+				{
+					_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} MOVE_TO_PLAYER already in range ({currentDist:F1} < {stopDistance:F1})");
+					Complete(true, ref step);
+					return;
+				}
+
+				// Navigate toward a point stopDistance away from the player (not their exact position)
+				Vector3 dirToNpc = npc.Position - nearest.Position;
+				dirToNpc.Y = 0;
+				if (dirToNpc.LengthSquared() > 0.001f)
+					dirToNpc = Vector3.Normalize(dirToNpc);
+				else
+					dirToNpc = Vector3.UnitZ;
+
+				Vector3 navTarget = nearest.Position + dirToNpc * (stopDistance - 0.5f);
+
+				if (!npc.NavigateTo(navTarget))
 				{
 					_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} MOVE_TO_PLAYER failed (no path to player)");
 					Complete(false, ref step);

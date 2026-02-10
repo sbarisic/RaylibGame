@@ -116,11 +116,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Active Bugs
 
 - [ ] **GUI: Debug menu window clipping** — F1 debug menu window content is clipped incorrectly; investigate FishUI window layout/clipping **[CPX: 2]**
-- [ ] **NPC: Pathfinding still gets stuck** — NPC occasionally gets stuck when traversing a path; consider shifting the target waypoint position to avoid edge-of-block precision issues **[CPX: 2]**
+- [ ] **NPC: Pathfinding still gets stuck** — NPC occasionally gets stuck when traversing a path; investigate whether NPC physics handles corner/edge collisions the same way the player does (slide along walls), consider shifting waypoint positions to avoid edge-of-block precision, and verify `WorldCollision.MoveWithCollision` behavior for NPC sizes **[CPX: 3]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Check NPC physics and movement, does it also handle corner collisions like the player where it clips the movement? NPCs sometimes get stuck. Players work fine.
+- NPC speech bubbles never disappear after being shown, they do not time out
 
 ---
 

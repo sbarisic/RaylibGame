@@ -1,6 +1,8 @@
 using System.IO;
 using System.Numerics;
 
+using Voxelgine.Engine.AI;
+
 namespace Voxelgine.Engine.Server
 {
 	public partial class ServerLoop
@@ -24,6 +26,7 @@ namespace Voxelgine.Engine.Server
 			npc.SetModelName("npc/humanoid.json");
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
+			npc.SetAIProgram(AIPrograms.FunkyBehavior());
 
 			// Spawn door entity near player spawn
 			var door = new VEntSlidingDoor();

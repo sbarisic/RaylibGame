@@ -222,6 +222,8 @@ namespace Voxelgine.Engine.Server
 			_logging.ServerWriteLine("  help           - Show this help message");
 			_logging.ServerWriteLine("[CMD] Player chat commands (usable by any player via /command):");
 			_logging.ServerWriteLine("  /comehere      - All NPCs navigate to your position");
+			_logging.ServerWriteLine("  /day           - Set time to noon");
+			_logging.ServerWriteLine("  /night         - Set time to midnight");
 		}
 
 		/// <summary>
@@ -242,10 +244,28 @@ namespace Voxelgine.Engine.Server
 					CmdComeHere(connection);
 					break;
 
+				case "day":
+					SetTimeAndNotify(connection.PlayerId, 12f);
+					break;
+
+				case "night":
+					SetTimeAndNotify(connection.PlayerId, 0f);
+					break;
+
 				default:
-					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere");
+					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night");
 					break;
 			}
+		}
+
+		/// <summary>
+		/// Sets the time of day, broadcasts the change to all clients, and notifies the requesting player.
+		/// </summary>
+		private void SetTimeAndNotify(int playerId, float hours)
+		{
+			_simulation.DayNight.SetTime(hours);
+			_server.Broadcast(new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
+			SendServerMessageTo(playerId, $"Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()}).");
 		}
 
 		/// <summary>

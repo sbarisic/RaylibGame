@@ -275,7 +275,7 @@ namespace Voxelgine.Graphics
 
 						BlockType surfBlock = GridGetBlock(chunkGrid, bx, surfY, bz, width, worldHeight, length, cs);
 						if (surfBlock == BlockType.Grass || surfBlock == BlockType.Dirt)
-							GridSetBlock(chunkGrid, bx, surfY, bz, BlockType.Plank, width, worldHeight, length, cs);
+							GridSetBlock(chunkGrid, bx, surfY, bz, BlockType.Dirt, width, worldHeight, length, cs);
 					}
 				}
 

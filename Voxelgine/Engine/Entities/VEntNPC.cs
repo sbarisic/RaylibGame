@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 using Raylib_cs;
 
+using Voxelgine.Engine.AI;
 using Voxelgine.Engine.Pathfinding;
 using Voxelgine.Graphics;
 
@@ -45,10 +46,8 @@ namespace Voxelgine.Engine
 		private const float JumpVelocity = 5.5f;            // Jump impulse strength (enough for ~1 block)
 		private const float GroundCheckDistance = 0.15f;    // How far below feet to check for ground
 
-		// Idle wandering
-		private float _idleTimer;
-		private const float IdleWanderDelay = 10f;          // Seconds before wandering when idle
-		private const float IdleWanderRadius = 10f;         // Max distance to wander
+		// AI behavior program
+		private AIRunner _aiRunner;
 
 		// Hit twitch effect
 		private Dictionary<string, Vector3> _twitchOffsets = new();
@@ -66,6 +65,15 @@ namespace Voxelgine.Engine
 
 		/// <summary>Gets the path follower for this NPC (null if not initialized).</summary>
 		public PathFollower GetPathFollower() => _pathFollower;
+
+		/// <summary>
+		/// Assigns an AI behavior program to this NPC.
+		/// The program is executed by the server each tick.
+		/// </summary>
+		public void SetAIProgram(AIStep[] program)
+		{
+			_aiRunner = program != null && program.Length > 0 ? new AIRunner(program, Logging) : null;
+		}
 
 		/// <summary>
 		/// Performs a detailed raycast against the NPC's model to determine which body part was hit.
@@ -315,25 +323,8 @@ namespace Voxelgine.Engine
 				}
 			}
 
-			// Idle wandering behavior
-			if (_pathFollower != null && !_pathFollower.IsFollowingPath)
-			{
-				_idleTimer += Dt;
-				if (_idleTimer >= IdleWanderDelay)
-				{
-					_idleTimer = 0f;
-					Vector3? wanderTarget = GetIdleWanderTarget();
-					if (wanderTarget.HasValue)
-					{
-						NavigateTo(wanderTarget.Value);
-					}
-				}
-			}
-			else
-			{
-				// Reset idle timer while navigating
-				_idleTimer = 0f;
-			}
+			// AI behavior program
+			_aiRunner?.Tick(this, Dt);
 
 			// Update animation
 			Animator?.Update(Dt);
@@ -510,39 +501,6 @@ namespace Voxelgine.Engine
 			int blockZ = (int)MathF.Floor(checkPos.Z);
 
 			return _map.IsSolid(blockX, blockY, blockZ);
-		}
-
-		/// <summary>
-		/// Gets a random walkable position at the same height for idle wandering.
-		/// </summary>
-		private Vector3? GetIdleWanderTarget()
-		{
-			if (_map == null)
-				return null;
-
-			int currentY = (int)MathF.Floor(Position.Y);
-
-			// Try several random positions
-			for (int attempt = 0; attempt < 10; attempt++)
-			{
-				float angle = (float)(_random.NextDouble() * Math.PI * 2);
-				float distance = 3f + (float)(_random.NextDouble() * (IdleWanderRadius - 3f));
-
-				int targetX = (int)MathF.Floor(Position.X + MathF.Cos(angle) * distance);
-				int targetZ = (int)MathF.Floor(Position.Z + MathF.Sin(angle) * distance);
-
-				// Check if target position is walkable (solid below, air at feet and head)
-				bool groundSolid = _map.IsSolid(targetX, currentY - 1, targetZ);
-				bool feetClear = !_map.IsSolid(targetX, currentY, targetZ);
-				bool headClear = !_map.IsSolid(targetX, currentY + 1, targetZ);
-
-				if (groundSolid && feetClear && headClear)
-				{
-					return new Vector3(targetX + 0.5f, currentY, targetZ + 0.5f);
-				}
-			}
-
-			return null;
 		}
 
 		/// <summary>

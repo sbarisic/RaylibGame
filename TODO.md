@@ -40,7 +40,7 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
 | **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
 | **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference |
-| **NPC/AI** | ⬜ | Basic `VEntNPC` with pathfinding, no behavior trees |
+| **NPC/AI** | ✅ | `VEntNPC` with A* pathfinding and AI behavior VM (`AIRunner`, `AIPrograms`) |
 | **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
 | **Mod System** | ⬜ | Not implemented — see [TODO_MODS.md](TODO_MODS.md) |
 
@@ -56,10 +56,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **NPC AI System** — Complete NPC entities with AI goals system and behavior trees for `VEntNPC`
-	- [ ] Maybe it should be implemented as a behavior tree VM? Like i can give it a list of commands, MOVE_RANDOM_POINT, IS_PLAYER_AROUND, LOOK_AT_PLAYER, ATTACK, ...
-	- [ ] NPC should just implement functions that will, for example for MOVE_RANDOM_POINT pick a random point on the map and then pathfind to it. VM "step" of this "instruction" should complete and it should move to next instruction when player is finished walking
-	- [ ] Maybe add AI instructions that will do nothing if last one succeeded, and do something else if it failed, for example if MOVE_RANDOM_POINT fails (maybe npc is stuck) then it will try to jump or something, or jump to a separate instruction location (like a jmp instruction) for complex logic
+*No medium priority items*
 
 ### On Hold
 
@@ -122,7 +119,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Add entity lighting, they should get the light level of the block they are standing on and change color based on that (multiply color with light level)
 
 ---
 

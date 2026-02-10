@@ -72,7 +72,45 @@ namespace Voxelgine.Engine
 
 	static class BlockInfo
 	{
-		public static bool IsRendered(BlockType T)
+		// Pre-computed lookup tables for hot-path block queries (indexed by BlockType).
+		// Built once at startup from the canonical switch-based methods below.
+		static readonly bool[] _isRendered;
+		static readonly bool[] _isOpaque;
+		static readonly bool[] _isSolid;
+		static readonly bool[] _emitsLight;
+		static readonly byte[] _lightEmission;
+
+		static BlockInfo()
+		{
+			var values = Enum.GetValues<BlockType>();
+			int count = 0;
+			foreach (var v in values)
+				if ((int)v >= count) count = (int)v + 1;
+
+			_isRendered = new bool[count];
+			_isOpaque = new bool[count];
+			_isSolid = new bool[count];
+			_emitsLight = new bool[count];
+			_lightEmission = new byte[count];
+
+			foreach (var v in values)
+			{
+				int i = (int)v;
+				_isRendered[i] = IsRenderedSwitch(v);
+				_isOpaque[i] = IsOpaqueSwitch(v);
+				_isSolid[i] = IsSolidSwitch(v);
+				_emitsLight[i] = EmitsLightSwitch(v);
+				_lightEmission[i] = GetLightEmissionSwitch(v);
+			}
+		}
+
+		public static bool IsRendered(BlockType T) => _isRendered[(int)T];
+		public static bool IsOpaque(BlockType T) => _isOpaque[(int)T];
+		public static bool IsSolid(BlockType T) => _isSolid[(int)T];
+		public static bool EmitsLight(BlockType T) => _emitsLight[(int)T];
+		public static byte GetLightEmission(BlockType T) => _lightEmission[(int)T];
+
+		static bool IsRenderedSwitch(BlockType T)
 		{
 			switch (T)
 			{
@@ -84,7 +122,7 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public static bool IsOpaque(BlockType T)
+		static bool IsOpaqueSwitch(BlockType T)
 		{
 			switch (T)
 			{
@@ -109,7 +147,7 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public static bool IsSolid(BlockType T)
+		static bool IsSolidSwitch(BlockType T)
 		{
 			switch (T)
 			{
@@ -131,7 +169,7 @@ namespace Voxelgine.Engine
 			return T == BlockType.Water;
 		}
 
-		public static bool EmitsLight(BlockType T)
+		static bool EmitsLightSwitch(BlockType T)
 		{
 			switch (T)
 			{
@@ -148,7 +186,7 @@ namespace Voxelgine.Engine
 		/// <summary>
 		/// Returns the light emission level (0-15) for a block type.
 		/// </summary>
-		public static byte GetLightEmission(BlockType T)
+		static byte GetLightEmissionSwitch(BlockType T)
 		{
 			switch (T)
 			{

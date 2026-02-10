@@ -23,6 +23,19 @@ namespace Voxelgine.Graphics
 			}
 		}
 
+		struct BlockLightEntry
+		{
+			public int X, Y, Z;
+			public byte Level;
+			public BlockLightEntry(int x, int y, int z, byte level)
+			{
+				X = x;
+				Y = y;
+				Z = z;
+				Level = level;
+			}
+		}
+
 		// Static direction arrays for light propagation (avoid allocation per call)
 		static readonly int[] DirX = { 1, -1, 0, 0, 0, 0 };
 		static readonly int[] DirY = { 0, 0, 1, -1, 0, 0 };
@@ -32,15 +45,19 @@ namespace Voxelgine.Graphics
 		bool[] SkyExposureCache;
 		bool SkyExposureCacheValid;
 
-		// Reusable collections for lighting propagation (avoid allocations)
-		Queue<BlockPos> _skylightQueue;
-		Queue<(int x, int y, int z, byte level)> _blockLightQueue;
+		// Reusable arrays for lighting propagation (avoid allocations)
+		const int QueueCapacity = ChunkSize * ChunkSize * ChunkSize * 2;
+		BlockPos[] _skylightQueue;
+		int _skylightHead, _skylightTail;
+		BlockLightEntry[] _blockLightQueue;
+		int _blockLightHead, _blockLightTail;
 
 		//List<PointLight> _lightSources;
 		PointLight[] lightSources = new PointLight[32];
 
 
-		bool[] _visitedBlocks; // Flat array: idx = x + ChunkSize*(y + ChunkSize*z)
+		int[] _visitedGeneration; // Generation-stamped visited: block is visited when _visitedGeneration[idx] == _currentGeneration
+		int _currentGeneration;   // Incremented per light source to avoid clearing the array
 		PointLight[] _neighborLightBuffer; // Preallocated buffer for neighbor border light scanning (max 32)
 
 		/// <summary>
@@ -97,10 +114,10 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void ComputeSkylight()
 		{
-			// Reuse or allocate queue
-			_skylightQueue ??= new Queue<BlockPos>(ChunkSize * ChunkSize);
-			_skylightQueue.Clear();
-			var skylightQueue = _skylightQueue;
+			// Reuse or allocate array
+			_skylightQueue ??= new BlockPos[QueueCapacity];
+			_skylightHead = 0;
+			_skylightTail = 0;
 
 			// Build or use cached sky exposure data
 			if (!SkyExposureCacheValid || SkyExposureCache == null)
@@ -134,7 +151,7 @@ namespace Voxelgine.Graphics
 						{
 							// This block receives full skylight
 							Blocks[idx].SetSkylight(15);
-							skylightQueue.Enqueue(new BlockPos(x, y, z));
+							_skylightQueue[_skylightTail++] = new BlockPos(x, y, z);
 						}
 						else if (BlockInfo.IsOpaque(block.Type))
 						{
@@ -149,10 +166,10 @@ namespace Voxelgine.Graphics
 			// Earlier parallel phases may have written skylight into this chunk's
 			// boundary blocks via cross-chunk propagation. Those values need to be
 			// added to the queue so they continue propagating inward.
-			SeedFromBoundarySkylight(skylightQueue);
+			SeedFromBoundarySkylight();
 
 			// Propagate skylight in all directions with attenuation
-			PropagateSkylight(skylightQueue);
+			PropagateSkylight();
 		}
 
 		/// <summary>
@@ -160,7 +177,7 @@ namespace Voxelgine.Graphics
 		/// skylight values (from cross-chunk writes by earlier parallel phases).
 		/// Adds them to the propagation queue so light continues spreading inward.
 		/// </summary>
-		void SeedFromBoundarySkylight(Queue<BlockPos> queue)
+		void SeedFromBoundarySkylight()
 		{
 			const int last = ChunkSize - 1;
 
@@ -169,14 +186,14 @@ namespace Voxelgine.Graphics
 				for (int b = 0; b < ChunkSize; b++)
 				{
 					// X = 0 and X = last faces
-					TrySeedBoundarySkylight(0, a, b, queue);
-					TrySeedBoundarySkylight(last, a, b, queue);
+					TrySeedBoundarySkylight(0, a, b);
+					TrySeedBoundarySkylight(last, a, b);
 					// Y = 0 and Y = last faces
-					TrySeedBoundarySkylight(a, 0, b, queue);
-					TrySeedBoundarySkylight(a, last, b, queue);
+					TrySeedBoundarySkylight(a, 0, b);
+					TrySeedBoundarySkylight(a, last, b);
 					// Z = 0 and Z = last faces
-					TrySeedBoundarySkylight(a, b, 0, queue);
-					TrySeedBoundarySkylight(a, b, last, queue);
+					TrySeedBoundarySkylight(a, b, 0);
+					TrySeedBoundarySkylight(a, b, last);
 				}
 			}
 		}
@@ -186,14 +203,14 @@ namespace Voxelgine.Graphics
 		/// for further propagation. Blocks already set to 15 by sky-exposure seeding
 		/// are harmless duplicates — the BFS greater-than check prevents re-propagation.
 		/// </summary>
-		void TrySeedBoundarySkylight(int x, int y, int z, Queue<BlockPos> queue)
+		void TrySeedBoundarySkylight(int x, int y, int z)
 		{
 			int idx = x + ChunkSize * (y + ChunkSize * z);
 			if (BlockInfo.IsOpaque(Blocks[idx].Type))
 				return;
 			byte skylight = Blocks[idx].GetMaxSkylight();
 			if (skylight > 1)
-				queue.Enqueue(new BlockPos(x, y, z));
+				_skylightQueue[_skylightTail++] = new BlockPos(x, y, z);
 		}
 
 		/// <summary>
@@ -219,11 +236,17 @@ namespace Voxelgine.Graphics
 		/// <summary>
 		/// Propagates skylight from bright blocks to darker neighbors.
 		/// </summary>
-		void PropagateSkylight(Queue<BlockPos> queue)
+		void PropagateSkylight()
 		{
-			while (queue.Count > 0)
+			// Cache chunk world origin once to avoid per-iteration GetWorldPos calls
+			WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 chunkOrigin);
+			int chunkWorldX = (int)chunkOrigin.X;
+			int chunkWorldY = (int)chunkOrigin.Y;
+			int chunkWorldZ = (int)chunkOrigin.Z;
+
+			while (_skylightHead < _skylightTail)
 			{
-				BlockPos pos = queue.Dequeue();
+				BlockPos pos = _skylightQueue[_skylightHead++];
 
 				if (pos.X < 0 || pos.X >= ChunkSize || pos.Y < 0 || pos.Y >= ChunkSize || pos.Z < 0 || pos.Z >= ChunkSize)
 					continue;
@@ -243,10 +266,9 @@ namespace Voxelgine.Graphics
 					// Handle cross-chunk propagation
 					if (nx < 0 || nx >= ChunkSize || ny < 0 || ny >= ChunkSize || nz < 0 || nz >= ChunkSize)
 					{
-						WorldMap.GetWorldPos(pos.X, pos.Y, pos.Z, GlobalChunkIndex, out Vector3 worldPos);
-						int worldNx = (int)worldPos.X + DirX[d];
-						int worldNy = (int)worldPos.Y + DirY[d];
-						int worldNz = (int)worldPos.Z + DirZ[d];
+						int worldNx = chunkWorldX + pos.X + DirX[d];
+						int worldNy = chunkWorldY + pos.Y + DirY[d];
+						int worldNz = chunkWorldZ + pos.Z + DirZ[d];
 
 						PlacedBlock neighborBlock = WorldMap.GetPlacedBlock(worldNx, worldNy, worldNz, out Chunk neighborChunk);
 						if (neighborChunk == null || BlockInfo.IsOpaque(neighborBlock.Type))
@@ -275,7 +297,7 @@ namespace Voxelgine.Graphics
 					if (newSkylight2 > neighborSkylight2)
 					{
 						Blocks[nidx].SetSkylight(newSkylight2);
-						queue.Enqueue(new BlockPos(nx, ny, nz));
+						_skylightQueue[_skylightTail++] = new BlockPos(nx, ny, nz);
 					}
 				}
 			}
@@ -449,16 +471,17 @@ namespace Voxelgine.Graphics
 		/// </summary>
 		void PropagateBlockLightWithShadows(PointLight light)
 		{
-			// Reuse queue to avoid allocation
-			_blockLightQueue ??= new Queue<(int, int, int, byte)>(512);
-			_blockLightQueue.Clear();
-			var queue = _blockLightQueue;
+			// Reuse array to avoid allocation
+			_blockLightQueue ??= new BlockLightEntry[QueueCapacity];
+			_blockLightHead = 0;
+			_blockLightTail = 0;
 
-			// Reuse visited array - more efficient than HashSet for dense local access
+			// Reuse visited array - generation counter avoids costly Array.Clear per light source
 			const int totalBlocks = ChunkSize * ChunkSize * ChunkSize;
-			_visitedBlocks ??= new bool[totalBlocks];
-			Array.Clear(_visitedBlocks, 0, totalBlocks);
-			var visited = _visitedBlocks;
+			_visitedGeneration ??= new int[totalBlocks];
+			_currentGeneration++;
+			var visited = _visitedGeneration;
+			int gen = _currentGeneration;
 
 			// Start from the light source block
 			int srcX = (int)MathF.Floor(light.Position.X);
@@ -478,18 +501,20 @@ namespace Voxelgine.Graphics
 			if (localX >= 0 && localX < ChunkSize && localY >= 0 && localY < ChunkSize && localZ >= 0 && localZ < ChunkSize)
 			{
 				// Light source is inside this chunk - start from its position
-				queue.Enqueue((localX, localY, localZ, light.Intensity));
+				_blockLightQueue[_blockLightTail++] = new BlockLightEntry(localX, localY, localZ, light.Intensity);
 			}
 			else
 			{
 				// Light source is in a neighbor chunk - find entry points at chunk boundary
 				// Scan boundary blocks that could receive light from this source
-				QueueBoundaryBlocksForExternalLight(light, chunkWorldX, chunkWorldY, chunkWorldZ, queue, visited);
+				QueueBoundaryBlocksForExternalLight(light, chunkWorldX, chunkWorldY, chunkWorldZ, visited, gen);
 			}
 
-			while (queue.Count > 0)
+			while (_blockLightHead < _blockLightTail)
 			{
-				var (x, y, z, level) = queue.Dequeue();
+				BlockLightEntry entry = _blockLightQueue[_blockLightHead++];
+				int x = entry.X, y = entry.Y, z = entry.Z;
+				byte level = entry.Level;
 
 				if (level <= 1)
 					continue;
@@ -533,7 +558,7 @@ namespace Voxelgine.Graphics
 
 					// Within chunk bounds - use array index for visited check (faster than HashSet)
 					int nidx = nx + ChunkSize * (ny + ChunkSize * nz);
-					if (visited[nidx])
+					if (visited[nidx] == gen)
 						continue;
 
 					PlacedBlock neighborBlock2 = Blocks[nidx];
@@ -559,8 +584,8 @@ namespace Voxelgine.Graphics
 					if (newBlockLight2 > neighborBlockLight2)
 					{
 						Blocks[nidx].SetBlockLightLevel(newBlockLight2);
-						visited[nidx] = true;
-						queue.Enqueue((nx, ny, nz, newBlockLight2));
+						visited[nidx] = gen;
+						_blockLightQueue[_blockLightTail++] = new BlockLightEntry(nx, ny, nz, newBlockLight2);
 					}
 				}
 			}
@@ -572,7 +597,7 @@ namespace Voxelgine.Graphics
 		/// Optimized to use integer chunk world coords and array-based visited tracking.
 		/// </summary>
 		void QueueBoundaryBlocksForExternalLight(PointLight light, int chunkWorldX, int chunkWorldY, int chunkWorldZ,
-			Queue<(int x, int y, int z, byte level)> queue, bool[] visited)
+			int[] visited, int gen)
 		{
 			int maxRange = light.Intensity;
 			int lightX = (int)MathF.Floor(light.Position.X);
@@ -635,10 +660,10 @@ namespace Voxelgine.Graphics
 						if (lightLevel > existingLight)
 						{
 							Blocks[idx].SetBlockLightLevel(lightLevel);
-							if (!visited[idx])
+							if (visited[idx] != gen)
 							{
-								visited[idx] = true;
-								queue.Enqueue((x, y, z, lightLevel));
+								visited[idx] = gen;
+								_blockLightQueue[_blockLightTail++] = new BlockLightEntry(x, y, z, lightLevel);
 							}
 						}
 					}

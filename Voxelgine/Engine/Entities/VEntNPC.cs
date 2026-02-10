@@ -74,6 +74,13 @@ namespace Voxelgine.Engine
 		private const float TwitchDecayRate = 12f;          // How fast twitch decays per second
 		private const float TwitchStrength = 25f;           // Max rotation degrees on hit
 
+		// Head tracking
+		private Vector3 _headTrackRotation;                 // Current smoothed head rotation (degrees: X=pitch, Y=yaw)
+		private const float HeadTrackSpeed = 6f;            // Smoothing speed (higher = faster)
+		private const float HeadTrackRange = 12f;           // Max distance to track a player
+		private const float HeadMaxYaw = 70f;               // Max horizontal head turn in degrees
+		private const float HeadMaxPitch = 30f;             // Max vertical head tilt in degrees
+
 		/// <summary>Gets the animator for this NPC (null if model not loaded).</summary>
 		public NPCAnimator GetAnimator() => Animator;
 
@@ -352,6 +359,9 @@ namespace Voxelgine.Engine
 					if (_speechTimer <= 0)
 						_speechText = "";
 				}
+
+				// Head tracking — smoothly rotate head toward nearest player
+				UpdateHeadTracking(Dt);
 			}
 
 			public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
@@ -673,6 +683,78 @@ namespace Voxelgine.Engine
 			);
 		}
 
+		/// <summary>
+		/// Updates head tracking rotation toward the nearest player.
+		/// Computes the angle between the body's forward direction and the direction
+		/// to the target, then smoothly interpolates the head mesh rotation.
+		/// </summary>
+		private void UpdateHeadTracking(float dt)
+		{
+			Vector3 targetRotation = Vector3.Zero;
+
+			GameSimulation sim = GetSimulation();
+			if (sim != null)
+			{
+				// Find nearest player within range
+				Player nearest = null;
+				float nearestDistSq = HeadTrackRange * HeadTrackRange;
+
+				foreach (Player player in sim.Players.GetAllPlayers())
+				{
+					if (player.IsDead)
+						continue;
+
+					float distSq = Vector3.DistanceSquared(Position, player.Position);
+					if (distSq < nearestDistSq)
+					{
+						nearest = player;
+						nearestDistSq = distSq;
+					}
+				}
+
+				if (nearest != null)
+				{
+					// Direction from NPC head to player head
+						Vector3 toPlayer = (nearest.Position + new Vector3(0, 1.5f, 0)) - (Position + new Vector3(0, Size.Y * 0.85f, 0));
+
+					// Body forward direction from look direction (XZ plane)
+					float bodyAngle = MathF.Atan2(_lookDirection.X, _lookDirection.Z);
+
+					// Target direction angle
+					Vector3 toPlayerHoriz = new Vector3(toPlayer.X, 0, toPlayer.Z);
+					if (toPlayerHoriz.LengthSquared() > 0.001f)
+					{
+						float targetAngle = MathF.Atan2(toPlayerHoriz.X, toPlayerHoriz.Z);
+
+						// Relative yaw (difference between target and body heading)
+						float relativeYaw = Utils.ToDeg(targetAngle - bodyAngle);
+
+						// Normalize to -180..180
+						while (relativeYaw > 180f) relativeYaw -= 360f;
+						while (relativeYaw < -180f) relativeYaw += 360f;
+
+						// Clamp to max head turn range
+						relativeYaw = Math.Clamp(relativeYaw, -HeadMaxYaw, HeadMaxYaw);
+
+						// Pitch (vertical)
+							float horizDist = toPlayerHoriz.Length();
+							float pitch = Utils.ToDeg(MathF.Atan2(toPlayer.Y, horizDist));
+						pitch = Math.Clamp(pitch, -HeadMaxPitch, HeadMaxPitch);
+
+						targetRotation = new Vector3(pitch, relativeYaw, 0);
+					}
+				}
+			}
+
+			// Smooth interpolation toward target
+			float t = 1f - MathF.Exp(-HeadTrackSpeed * dt);
+			_headTrackRotation = Vector3.Lerp(_headTrackRotation, targetRotation, t);
+
+			// Zero out tiny values
+			if (_headTrackRotation.LengthSquared() < 0.01f)
+				_headTrackRotation = Vector3.Zero;
+		}
+
 		protected override void WriteSnapshotExtra(BinaryWriter writer)
 		{
 			// Look direction (12 bytes)
@@ -703,7 +785,25 @@ namespace Voxelgine.Engine
 
 				CModel.Position = GetDrawPosition();
 				CModel.LookDirection = _lookDirection;
+
+				// Apply head tracking rotation to the head mesh
+				CustomMesh headMesh = CModel.GetMeshByName("head");
+				Vector3 savedHeadRotation = Vector3.Zero;
+				if (headMesh != null && _headTrackRotation.LengthSquared() > 0.01f)
+				{
+					savedHeadRotation = headMesh.AnimationRotation;
+					headMesh.AnimationRotation += _headTrackRotation;
+					headMesh.UpdateAnimationMatrix();
+				}
+
 				CModel.Draw(GetEntityLightColor());
+
+				// Restore head mesh rotation so animator isn't affected
+				if (headMesh != null && _headTrackRotation.LengthSquared() > 0.01f)
+				{
+					headMesh.AnimationRotation = savedHeadRotation;
+					headMesh.UpdateAnimationMatrix();
+				}
 
 				if (Eng.DebugMode)
 				{

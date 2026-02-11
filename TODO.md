@@ -107,7 +107,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Code Refactoring
 
-- [ ] **Refactor: Split & rename MultiplayerGameState** — Rename `MultiplayerGameState` to `MPClientGameState` and split into partial class files by responsibility: core/lifecycle, network packet handlers, UI creation/updates, rendering helpers, debug menu. Target <1000 lines per file **[CPX: 3]**
+*No refactoring items*
 
 ---
 

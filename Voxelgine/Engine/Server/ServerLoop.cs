@@ -443,7 +443,7 @@ namespace Voxelgine.Engine.Server
 			public float TotalTime { get; set; }
 			public MainMenuStateFishUI MainMenuState { get; set; }
 			public NPCPreviewState NPCPreviewState { get; set; }
-			public MultiplayerGameState MultiplayerGameState { get; set; }
+			public MPClientGameState MultiplayerGameState { get; set; }
 
 			public void Init() { }
 		}

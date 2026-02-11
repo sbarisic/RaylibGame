@@ -111,9 +111,15 @@ works for any connected client.
 
 ---
 
+## Code Cleanup
+
+- **Refactor: Split & rename MultiplayerGameState** — Renamed to `MPClientGameState` and split 2615-line monolith into 4 partial class files: `MPClientGameState.cs` (core/lifecycle/helpers, ~620 lines), `MPClientGameState.Packets.cs` (network handlers, ~870 lines), `MPClientGameState.UI.cs` (FishUI setup/debug menu/HUD updates, ~750 lines), `MPClientGameState.Rendering.cs` (rendering helpers, ~175 lines). Updated all references across `IFishProgram`, `Program.cs`, `ServerLoop`, `BenchmarkSuite`, and `GameSimulation`.
+
+---
+
 ## Performance
 
-- **Chunk: GenMesh/GenMeshTransparent optimization** — Added padded 18³ block cache (`BuildPaddedCache`) pre-fetching 1-block border from neighbors, converting all per-face lookups to O(1) array access. Added `NonAirBlockCount` tracking for empty chunk early-out (skip entire 16³ iteration). Eliminated redundant `GetBlock`/`IsOpaque` calls by caching 6 neighbor references and flags once per block. Added `CalcAOColorPadded` using integer offsets into padded cache instead of expensive world-space `WorldMap.GetBlock()` calls (TranslateChunkPos + Dictionary lookup per call).
+- **Chunk: GenMesh/GenMeshTransparent optimization**
 - **Lighting: Fixed-size array BFS queues** — Replaced `Queue<T>` in skylight/block-light propagation with pre-allocated flat arrays and head/tail indices, eliminating resize copies and GC pressure.
 - **Lighting: Hoisted GetWorldPos in PropagateSkylight** — Cached chunk world origin before BFS loop instead of calling `GetWorldPos` per boundary block.
 - **Lighting: Generation-counter visited tracking** — Replaced `bool[]` + `Array.Clear(4096)` per light source with `int[]` generation stamps, eliminating O(n) clear per light propagation call.

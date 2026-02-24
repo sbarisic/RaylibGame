@@ -148,10 +148,22 @@ namespace Voxelgine.States
 			};
 			scrollPane.AddChild(btnNPCPreview);
 
+			// Effects Preview button
+			var btnEffectsPreview = new Button();
+			btnEffectsPreview.Text = "Effects Preview";
+			btnEffectsPreview.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+			btnEffectsPreview.Size = new Vector2(contentWidth, buttonHeight);
+			btnEffectsPreview.TooltipText = "Preview particle effects with adjustable parameters";
+			btnEffectsPreview.OnButtonPressed += (sender, mbtn, pos) =>
+			{
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.EffectsPreviewState);
+			};
+			scrollPane.AddChild(btnEffectsPreview);
+
 			// Options button
 			var btnOptions = new Button();
 			btnOptions.Text = "Options";
-			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 3);
+			btnOptions.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
 			btnOptions.Size = new Vector2(contentWidth, buttonHeight);
 			btnOptions.TooltipText = "Configure game settings";
 			btnOptions.OnButtonPressed += (sender, mbtn, pos) =>
@@ -164,7 +176,7 @@ namespace Voxelgine.States
 			// Quit button
 			var btnQuit = new Button();
 			btnQuit.Text = "Quit";
-			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 4);
+			btnQuit.Position = new Vector2(margin, margin + (buttonHeight + buttonSpacing) * 5);
 			btnQuit.Size = new Vector2(contentWidth, buttonHeight);
 			btnQuit.TooltipText = "Exit the game";
 			btnQuit.OnButtonPressed += (sender, mbtn, pos) =>

@@ -36,7 +36,7 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Player** | ✅ | `Player`, `FPSCamera` (instance-based), `PlayerManager`, `RemotePlayer`, `ViewModel`, inventory, health/respawn |
 | **Weapons** | ✅ | `Weapon`, `WeaponGun` (fire intent/resolve/effects separation), `WeaponPicker`, `InventoryItem` |
 | **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls, main menu with connect/host dialogs |
-| **Particles** | 🔶 | `ParticleSystem` with smoke effects |
+| **Particles** | 🔶 | `ParticleSystem` with smoke, fire, blood, spark effects and `EffectsPreviewState` |
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
 | **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
 | **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference |
@@ -57,10 +57,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Medium Priority
 
 - [ ] **AI: Extended instructions, events & programs** — **Instructions:** TargetEntity, MoveToTarget, LookAtTarget, AimAtTarget, PrimaryAttack, SecondaryAttack, MoveToCover(dangerPos), Crouch, StandUp, SetMoveMode(walk/run/jump), PlayAnimation(overlay), EquipWeapon, UnequipWeapon, ChatMessageContains(text, branches). **Events:** OnPlayerChat, OnNPCChat, OnAllyAttacked, OnEnemyKilled, OnLowHealth, OnStuck, OnPlayerInRange, OnEnemyInRange, OnFriendlyInRange. **Programs:** expand FunkyBehavior to exercise all available instructions and events **[CPX: 4]**
+- [ ] **Particles: Context-sensitive hit effects** — System that selects which effects to spawn based on hit position, block face, block type, and weapon type (e.g. sparks for stone, nothing for leaves), replacing hardcoded effect logic in weapons/blocks **[CPX: 3]**
+- [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
 
 ### On Hold
 
-- [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
 - [ ] **Multiplayer: LAN server browser** — Broadcast UDP discovery on LAN, servers respond with name/player count/map info, client displays list to select and connect **[CPX: 3]**
 - [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
 
@@ -119,7 +120,10 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-*No uncategorized items*
+- Make default speed for blood particle 0.1
+- When shooting an entity, the sparks particles seem to travel too far away, set them to 0.1 like blood particles and see if that looks better
+- Make the effects preview state more powerful, add ability to pick particle types, colors, textures and parameters to test out different effects without needing to modify code and recompile
+- Make the main menu window taller, not all buttons fit vertically
 
 ---
 

@@ -43,6 +43,7 @@ namespace LightingBenchmarks
         public float TotalTime { get; set; }
         public MainMenuStateFishUI MainMenuState { get; set; }
         public NPCPreviewState NPCPreviewState { get; set; }
+        public EffectsPreviewState EffectsPreviewState { get; set; }
         public MPClientGameState MultiplayerGameState { get; set; }
 
         public void Init()

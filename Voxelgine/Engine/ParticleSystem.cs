@@ -542,6 +542,100 @@ namespace Voxelgine.Engine
 			Rlgl.EnableDepthMask();
 		}
 
+		/// <summary>
+		/// Simplified draw for preview mode — no Player or Frustum required.
+		/// All active particles are drawn (no frustum culling).
+		/// </summary>
+		public void DrawPreview(Camera3D cam, Vector3 camPos)
+		{
+			Max = 0;
+			Drawn = 0;
+			OnScreen = 0;
+
+			int visibleCount = 0;
+
+			for (int i = 0; i < Particles.Length; i++)
+			{
+				ref Particle P = ref Particles[i];
+				Max++;
+
+				if (P.Draw)
+				{
+					Drawn++;
+					SortedIndices[visibleCount] = i;
+					DistanceCache[visibleCount] = Vector3.DistanceSquared(camPos, P.Pos);
+					visibleCount++;
+				}
+			}
+
+			// Sort by distance (back-to-front for proper alpha blending)
+			for (int i = 0; i < visibleCount - 1; i++)
+			{
+				for (int j = i + 1; j < visibleCount; j++)
+				{
+					if (DistanceCache[i] < DistanceCache[j])
+					{
+						(SortedIndices[i], SortedIndices[j]) = (SortedIndices[j], SortedIndices[i]);
+						(DistanceCache[i], DistanceCache[j]) = (DistanceCache[j], DistanceCache[i]);
+					}
+				}
+			}
+
+			Rlgl.DisableDepthMask();
+
+			// Draw tracer lines
+			Raylib.BeginBlendMode(BlendMode.Additive);
+			for (int i = 0; i < Tracers.Length; i++)
+			{
+				ref TracerLine T = ref Tracers[i];
+				if (T.Active)
+				{
+					float lifeProgress = (lastGameTime - T.SpawnedAt) / T.LifeTime;
+					byte alpha = (byte)(255 * (1.0f - lifeProgress));
+					Color fadeColor = new Color(T.Color.R, T.Color.G, T.Color.B, alpha);
+					Raylib.DrawLine3D(T.Start, T.End, fadeColor);
+					Vector3 offset = new Vector3(0.01f, 0, 0);
+					Raylib.DrawLine3D(T.Start + offset, T.End + offset, fadeColor);
+					Raylib.DrawLine3D(T.Start - offset, T.End - offset, fadeColor);
+				}
+			}
+			Raylib.EndBlendMode();
+
+			ParticleBlendMode CurBlendMode = ParticleBlendMode.Multiply;
+			SetParticleBlendMode(CurBlendMode);
+
+			for (int i = 0; i < visibleCount; i++)
+			{
+				ref Particle P = ref Particles[SortedIndices[i]];
+				OnScreen++;
+
+				if (P.BlendMode != CurBlendMode)
+				{
+					CurBlendMode = P.BlendMode;
+					Raylib.EndBlendMode();
+					SetParticleBlendMode(CurBlendMode);
+				}
+
+				Color drawColor = P.Color;
+
+				if (P.Type == ParticleType.Spark && P.Vel.LengthSquared() > 0.01f)
+				{
+					Vector3 sparkUp = Vector3.Normalize(P.Vel);
+					Vector2 sparkSize = new Vector2(P.Scale * 0.3f, P.Scale);
+					Rectangle sparkSrc = new Rectangle(0, 0, P.Tex.Width, P.Tex.Height);
+					Vector2 sparkOrigin = sparkSize * 0.5f;
+					Raylib.DrawBillboardPro(cam, P.Tex, sparkSrc, P.Pos, sparkUp, sparkSize, sparkOrigin, 0f, drawColor);
+				}
+				else
+				{
+					Raylib.DrawBillboard(cam, P.Tex, P.Pos, P.Scale, drawColor);
+				}
+			}
+
+			Raylib.EndBlendMode();
+			Rlgl.EnableDepthMask();
+		}
+
 		void SetParticleBlendMode(ParticleBlendMode Mode)
 		{
 			switch (Mode)

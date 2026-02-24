@@ -23,6 +23,7 @@ namespace Voxelgine
 
 		public MainMenuStateFishUI MainMenuState { get; set; }
 		public NPCPreviewState NPCPreviewState { get; set; }
+		public EffectsPreviewState EffectsPreviewState { get; set; }
 		public MPClientGameState MultiplayerGameState { get; set; }
 
 		//public IFishLogging Logging { get; set; }
@@ -112,7 +113,8 @@ namespace Voxelgine
 			Eng.DebugMode = Debugger.IsAttached;
 			Eng.MainMenuState = new MainMenuStateFishUI(Window, Eng);
 			Eng.NPCPreviewState = new NPCPreviewState(Window, Eng);
-			Eng.MultiplayerGameState = new MPClientGameState(Window, Eng);
+				Eng.EffectsPreviewState = new EffectsPreviewState(Window, Eng);
+				Eng.MultiplayerGameState = new MPClientGameState(Window, Eng);
 
 			Window.SetState(Eng.MainMenuState);
 			Eng.Init();

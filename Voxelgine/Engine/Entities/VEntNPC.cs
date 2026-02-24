@@ -91,6 +91,31 @@ namespace Voxelgine.Engine
 		private const float HeadMaxYaw = 70f;               // Max horizontal head turn in degrees
 		private const float HeadMaxPitch = 30f;             // Max vertical head tilt in degrees
 
+		// Health
+		/// <summary>NPC health. Server-authoritative.</summary>
+		public float Health { get; set; } = 100f;
+
+		/// <summary>Maximum NPC health.</summary>
+		public float MaxHealth { get; set; } = 100f;
+
+		/// <summary>True when health is at or below zero.</summary>
+		public bool IsDead => Health <= 0f;
+
+		/// <summary>Current health as a fraction of max health (0..1).</summary>
+		public float HealthPercent => MaxHealth > 0 ? Health / MaxHealth : 0f;
+
+		/// <summary>Team ID for ally/enemy determination. 0 = neutral (no team).</summary>
+		public int Team { get; set; }
+
+		/// <summary>Whether the NPC is currently crouching.</summary>
+		public bool IsCrouching { get; set; }
+
+		/// <summary>Whether the NPC has a weapon equipped.</summary>
+		public bool WeaponEquipped { get; set; }
+
+		// Animation override timer — suppresses auto walk/idle animation while active
+		private float _animOverrideTimer;
+
 		/// <summary>Gets the animator for this NPC (null if model not loaded).</summary>
 		public NPCAnimator GetAnimator() => Animator;
 
@@ -123,6 +148,48 @@ namespace Voxelgine.Engine
 			_aiRunner = program != null && program.Length > 0 ? new AIRunner(program, Logging) : null;
 		}
 
+		/// <summary>Applies damage to the NPC, clamping health to zero.</summary>
+		public void TakeDamage(float amount)
+		{
+			if (IsDead) return;
+			Health = MathF.Max(0f, Health - amount);
+		}
+
+		/// <summary>Raises an AI event on this NPC's AI runner.</summary>
+		public void RaiseAIEvent(AIEvent evt) => _aiRunner?.RaiseEvent(evt, NetworkId);
+
+		/// <summary>
+		/// Called when a player sends a chat message. Pushes the message to the AI runner
+		/// and raises the OnPlayerChat event.
+		/// </summary>
+		public void OnPlayerChat(string message)
+		{
+			_aiRunner?.PushChatMessage(message);
+			_aiRunner?.RaiseEvent(AIEvent.OnPlayerChat, NetworkId);
+		}
+
+		/// <summary>Sets the NPC's movement speed based on mode name.</summary>
+		public void SetMoveMode(string mode)
+		{
+			if (_pathFollower == null) return;
+			_pathFollower.MoveSpeed = mode switch
+			{
+				"run" => 4.0f,
+				"sprint" => 6.0f,
+				_ => 2.5f, // walk
+			};
+		}
+
+		/// <summary>Sets the NPC crouching state.</summary>
+		public void SetCrouching(bool crouching) => IsCrouching = crouching;
+
+		/// <summary>Plays an animation and suppresses auto walk/idle for the given duration.</summary>
+		public void PlayAnimationOverride(string name, float duration = 2f)
+		{
+			Animator?.Play(name);
+			_animOverrideTimer = duration;
+		}
+
 		/// <summary>
 		/// Called by EntityManager when a player walks into this NPC's collision box.
 		/// Raises the OnPlayerTouch AI event.
@@ -134,11 +201,29 @@ namespace Voxelgine.Engine
 
 		/// <summary>
 		/// Called when this NPC is hit by a weapon.
-		/// Raises the OnAttacked AI event.
+		/// Applies damage and raises the OnAttacked AI event.
+		/// Also notifies allies (same team) via OnAllyAttacked.
 		/// </summary>
-		public void OnAttacked()
+		public void OnAttacked(float damage = 0f)
 		{
+			if (damage > 0f)
+				TakeDamage(damage);
+
 			_aiRunner?.RaiseEvent(AIEvent.OnAttacked, NetworkId);
+
+			// Notify allies
+			if (Team != 0)
+			{
+				var entMgr = GetEntityManager();
+				if (entMgr != null)
+				{
+					foreach (var ent in entMgr.GetAllEntities())
+					{
+						if (ent is VEntNPC otherNpc && otherNpc != this && otherNpc.Team == Team)
+							otherNpc.RaiseAIEvent(AIEvent.OnAllyAttacked);
+					}
+				}
+			}
 		}
 
 		/// <summary>
@@ -150,6 +235,23 @@ namespace Voxelgine.Engine
 			_speechText = text ?? "";
 			_speechTimer = duration;
 			_speechDirty = true;
+
+			// Notify nearby NPCs of speech (server-side only)
+			var entMgr = GetEntityManager();
+			if (entMgr != null && entMgr.IsAuthority)
+			{
+				const float hearingRange = 15f;
+				float rangeSq = hearingRange * hearingRange;
+
+				foreach (var ent in entMgr.GetAllEntities())
+				{
+					if (ent is VEntNPC otherNpc && otherNpc != this)
+					{
+						if (Vector3.DistanceSquared(Position, otherNpc.Position) < rangeSq)
+							otherNpc.RaiseAIEvent(AIEvent.OnNPCChat);
+					}
+				}
+			}
 		}
 
 		/// <summary>Returns true if the NPC is currently displaying a speech bubble.</summary>
@@ -540,17 +642,24 @@ namespace Voxelgine.Engine
 					_twitchOffsets.Remove(key);
 			}
 
-			// Play walk animation when moving, idle when stationary
-			float horizontalSpeed = MathF.Sqrt(Velocity.X * Velocity.X + Velocity.Z * Velocity.Z);
-			if (Animator != null && horizontalSpeed > 0.5f)
+			// Play walk animation when moving, idle when stationary (unless overridden)
+			if (_animOverrideTimer > 0)
 			{
-				if (Animator.CurrentAnimation != "walk")
-					Animator.Play("walk");
+				_animOverrideTimer -= Dt;
 			}
-			else if (Animator != null)
+			else
 			{
-				if (Animator.CurrentAnimation != "idle")
-					Animator.Play("idle");
+				float horizontalSpeed = MathF.Sqrt(Velocity.X * Velocity.X + Velocity.Z * Velocity.Z);
+				if (Animator != null && horizontalSpeed > 0.5f)
+				{
+					if (Animator.CurrentAnimation != "walk")
+						Animator.Play("walk");
+				}
+				else if (Animator != null)
+				{
+					if (Animator.CurrentAnimation != "idle")
+						Animator.Play("idle");
+				}
 			}
 		}
 
@@ -560,6 +669,8 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void HandleStuckRecovery(bool isGrounded)
 		{
+			_aiRunner?.RaiseEvent(AIEvent.OnStuck, NetworkId);
+
 			// First, try recalculating the path from current (possibly pushed-out) position
 			if (!_triedJumpingToUnstuck && _pathFollower.HasTarget)
 			{

@@ -185,6 +185,13 @@ namespace Voxelgine.Engine.Server
 
 			_logging.ServerWriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
 
+			// Notify all NPCs of the player chat message
+			foreach (var ent in _simulation.Entities.GetAllEntities())
+			{
+				if (ent is VEntNPC npc)
+					npc.OnPlayerChat(message);
+			}
+
 			// Rebroadcast with correct player ID
 			var broadcastPacket = new ChatMessagePacket
 			{

@@ -56,7 +56,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **AI: Extended instructions, events & programs** — **Instructions:** TargetEntity, MoveToTarget, LookAtTarget, AimAtTarget, PrimaryAttack, SecondaryAttack, MoveToCover(dangerPos), Crouch, StandUp, SetMoveMode(walk/run/jump), PlayAnimation(overlay), EquipWeapon, UnequipWeapon, ChatMessageContains(text, branches). **Events:** OnPlayerChat, OnNPCChat, OnAllyAttacked, OnEnemyKilled, OnLowHealth, OnStuck, OnPlayerInRange, OnEnemyInRange, OnFriendlyInRange. **Programs:** expand FunkyBehavior to exercise all available instructions and events **[CPX: 4]**
 - [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
 
 ### On Hold

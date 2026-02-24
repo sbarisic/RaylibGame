@@ -40,5 +40,49 @@ namespace Voxelgine.Engine.AI
 		/// The handler uses Goto to resume or branch.
 		/// </summary>
 		EventHandler,
+
+		// ── Extended instructions ──
+
+		/// <summary>Target nearest NPC entity within Param radius. Param2 selects type (0=any, 1=enemy, 2=friendly). Success if found.</summary>
+		TargetEntity,
+
+		/// <summary>Navigate toward the current target entity. Param2=stop distance. Success when in range, failure if no target or no path.</summary>
+		MoveToTarget,
+
+		/// <summary>Instantly face the current target entity. Failure if no target.</summary>
+		LookAtTarget,
+
+		/// <summary>Face and aim at the current target entity. Failure if no target.</summary>
+		AimAtTarget,
+
+		/// <summary>Melee attack on the current target. Param=damage, Param2=range. Failure if no target or out of range.</summary>
+		PrimaryAttack,
+
+		/// <summary>Secondary attack on the current target. Param=damage, Param2=range (defaults longer). Failure if no target or out of range.</summary>
+		SecondaryAttack,
+
+		/// <summary>Navigate to a position with block cover from the current target or nearest player. Param=search radius. Failure if no cover.</summary>
+		MoveToCover,
+
+		/// <summary>Set the NPC to crouching state. Always succeeds.</summary>
+		Crouch,
+
+		/// <summary>Set the NPC to standing state. Always succeeds.</summary>
+		StandUp,
+
+		/// <summary>Set movement speed mode. TextParam = "walk", "run", or "sprint". Always succeeds.</summary>
+		SetMoveMode,
+
+		/// <summary>Play an animation overlay for Param seconds. TextParam = animation name. Always succeeds.</summary>
+		PlayAnimation,
+
+		/// <summary>Set armed state on the NPC. Always succeeds.</summary>
+		EquipWeapon,
+
+		/// <summary>Clear armed state on the NPC. Always succeeds.</summary>
+		UnequipWeapon,
+
+		/// <summary>Check if recent player chat contains TextParam (case-insensitive). Success if found, failure otherwise.</summary>
+		ChatMessageContains,
 	}
 }

@@ -76,8 +76,8 @@ namespace Voxelgine.Engine.Server
 					hitEntityNetworkId = entityHit.Entity?.NetworkId ?? 0;
 
 					// Notify NPC AI of the attack
-					if (entityHit.Entity is VEntNPC hitNpc)
-						hitNpc.OnAttacked();
+						if (entityHit.Entity is VEntNPC hitNpc)
+							hitNpc.OnAttacked(WeaponDamage);
 				}
 
 			int hitPlayerId = -1;

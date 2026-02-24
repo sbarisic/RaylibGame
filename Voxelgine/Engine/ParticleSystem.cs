@@ -210,10 +210,10 @@ namespace Voxelgine.Engine
 					P.Color = Color.White; // Texture provides color
 
 					// Eject from normal with random spread and slight upward bias
-					float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-					float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-					float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
-					float speed = 2.0f + Random.Shared.NextSingle() * 3.0f; // 2-5 units/sec
+						float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+						float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+						float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.5f;
+						float speed = 2.0f + Random.Shared.NextSingle() * 0.1f; // 0.05-0.15 units/sec
 					Vector3 spread = new Vector3(spreadX, spreadY + 0.5f, spreadZ);
 					P.Vel = (Normal + spread) * speed;
 
@@ -246,6 +246,8 @@ namespace Voxelgine.Engine
 		/// <param name="ScaleFactor">Size multiplier</param>
 		public void SpawnSpark(Vector3 Pos, Vector3 Direction, Color Clr, float ScaleFactor = 1.0f)
 		{
+			Direction = Vector3.Normalize(Direction);
+
 			for (int i = 0; i < Particles.Length; i++)
 			{
 				ref Particle P = ref Particles[i];
@@ -257,10 +259,10 @@ namespace Voxelgine.Engine
 					P.Color = Clr;
 
 					// Spark flies in given direction with random spread
-					float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
-					float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
-					float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
-					float speed = 3.0f + Random.Shared.NextSingle() * 4.0f; // 3-7 units/sec
+						float spreadX = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+						float spreadY = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+						float spreadZ = (Random.Shared.NextSingle() - 0.5f) * 1.0f;
+						float speed = 3.0f + Random.Shared.NextSingle() * 0.4f; // 0.05-0.15 units/sec
 					P.Vel = (Direction + new Vector3(spreadX, spreadY, spreadZ)) * speed;
 
 					P.SpawnedAt = lastGameTime;

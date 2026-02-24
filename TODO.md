@@ -14,8 +14,8 @@ A list of planned features, improvements, and tasks for this project.
 
 > How TODO file should be iterated:
 - First handle the Uncategorized section, if any similar issues already are on the TODO list, increase their priority instead of adding duplicates (categorize all at once)
-- When Uncategorized section is empty, start by fixing Active Bugs (take one at a time)
-- After Active Bugs, handle the rest of the TODO file by priority and complexity (High priority takes precedance, then CPX points) (take one at a time).
+- When Uncategorized section is empty, start by fixing Active Bugs
+- After Active Bugs, handle the rest of the TODO file by priority and complexity (High priority takes precedance, then CPX points).
 
 ---
 
@@ -75,11 +75,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-*No medium priority items*
+- [ ] **Particles: Enhanced effects preview** — Add texture picking, extended particle type selection, and more parameter controls to `EffectsPreviewState` for testing effects without code changes **[CPX: 3]**
 
 ### On Hold
 
-- [ ] **GUI: Disabled inventory items** — Draw inventory items as visually disabled when count reaches 0 **[CPX: 1]**
+- [ ] **GUI: Disabled inventory items**
 
 ---
 
@@ -116,14 +116,11 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-*No active bugs*
+- [ ] **GUI: Main menu window too short** — Main menu window not tall enough to fit all buttons vertically **[CPX: 1]**
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 
-- Make default speed for blood particle 0.1
-- When shooting an entity, the sparks particles seem to travel too far away, set them to 0.1 like blood particles and see if that looks better
-- Make the effects preview state more powerful, add ability to pick particle types, colors, textures and parameters to test out different effects without needing to modify code and recompile
-- Make the main menu window taller, not all buttons fit vertically
+*No uncategorized items*
 
 ---
 

@@ -109,6 +109,7 @@ works for any connected client.
 - **NPC: Pathfinding stuck fix** — Two root causes: (1) `WorldCollision.MoveWithCollision` used `HasBlocksInBounds(pos, size)` which treats position as AABB min corner, but entity position is bottom-center — collision box was completely offset to one side. Fixed to use `HasBlocksInBoundsMinMax` with proper half-extent centering on X/Z. (2) `VEntNPC.ResolveBlockCollisions` was a redundant collision system that conflicted with `MoveWithCollision` at block corners, causing oscillation/stuck loops. Removed entirely — `MoveWithCollision` now provides correct wall-sliding collision response.
 - **NPC: Head tracking** — NPC head mesh smoothly rotates toward the nearest player within 12 blocks. Computes relative yaw/pitch between body heading and target direction, clamped to ±70° yaw and ±30° pitch. Applied as an additive offset to the head mesh's `AnimationRotation` during rendering, with exponential smoothing for fluid motion. Does not interfere with animations or twitch effects (save/restore pattern).
 - **NPC: Random skin textures** — Added `_textureName` field and `SetTextureName()` to `VEntNPC` with `AvailableTextures` list (`humanoid.png`, `humanoid2.png`). Server randomly picks a texture at spawn via `Random.Shared`. Synced to clients via `WriteSpawnPropertiesExtra`/`ReadSpawnPropertiesExtra`. Texture applied to `CustomModel` after model load.
+- **Particles: Blood/spark speed** — Reduced default speed for blood and spark particles from 2–5 / 3–7 to ~0.1 units/sec so they don't travel too far on entity hits
 
 ---
 

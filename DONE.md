@@ -112,6 +112,8 @@ works for any connected client.
 - **Particles: Blood/spark speed** — Reduced default speed for blood and spark particles from 2–5 / 3–7 to ~0.1 units/sec so they don't travel too far on entity hits
 - **GUI: Main menu window too short** — Increased main menu window height from 400 to 460 so all 6 buttons fit without clipping
 - **Effects Preview: Export custom particle as C# code** — Added "Export C# Code" button to effects preview that generates a `SpawnMyEffect` method reproducing the current custom particle configuration (type, texture collection/index, blend mode, scale, speed, lifetime, count, color, emissive, physics, spread) and copies it to the clipboard with a notification toast
+- **Effects Preview: Texture browser window** — Replaced texture collection cycling button with a "Browse Textures" button that opens a scrollable browser window listing all `data/textures` folders (with file counts) and individual root textures. Selecting a folder dynamically loads its PNGs as a collection; selecting a file creates a single-texture collection. Added `ResMgr` methods: `GetTextureFolderNames`, `GetTextureFileNames`, `GetTextureFolderFileCount`, `EnsureCollectionFromFolder`, `EnsureCollectionFromFile`
+- **Particles: Context-sensitive hit effects** — Created `HitEffects` system with `HitMaterial` enum (None/Stone/Wood/Earth/Glass) and pre-computed block-to-material lookup. Stone blocks spawn sparks, wood spawns fire+smoke, earth spawns dust, glass spawns bright sparks, foliage/water spawn nothing. Replaced all hardcoded particle logic in `SpawnPredictedFireEffects` and `HandleWeaponFireEffect` with `HitEffects.SpawnBlockHit`/`SpawnEntityHit` calls. Block type resolved from hit position via `GetBlockAtHit`.
 
 ---
 

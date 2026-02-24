@@ -143,6 +143,34 @@ namespace Voxelgine.Engine
 			}
 		}
 
+		public void SpawnSmokeShort(Vector3 Pos, Vector3 Vel, Color Clr)
+		{
+			for (int i = 0; i < Particles.Length; i++)
+			{
+				ref Particle P = ref Particles[i];
+
+				if (P.Draw == false)
+				{
+					P.Draw = true;
+					P.Pos = Pos;
+					P.Color = Clr;
+					P.Vel = Vel;
+					P.SpawnedAt = lastGameTime;
+					P.LifeTime = 0.4f + (float)(Random.Shared.NextDouble() / 10.0f);
+					P.MovePhysics = true;
+					P.Tex = ResMgr.GetFromCollection("smoke");
+					P.Scaler = 0.3f;
+					P.Scale = 1.0f;
+					P.Rnd = Random.Shared.NextSingle();
+					P.Type = ParticleType.Smoke;
+					P.IsEmissive = false;
+					P.BlendMode = ParticleBlendMode.AlphaPremul;
+
+					return;
+				}
+			}
+		}
+
 		/// <summary>
 		/// Spawns a fire particle effect.
 		/// Fire rises upward, is semi-transparent, short-lived, and decreases in size over lifetime.

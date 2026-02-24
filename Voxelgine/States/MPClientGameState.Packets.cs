@@ -666,43 +666,12 @@ namespace Voxelgine.States
 			switch (hitType)
 			{
 				case FireHitType.Entity:
-					if (hitEntity is VEntNPC)
-					{
-						for (int i = 0; i < 8; i++)
-						{
-							_particle.SpawnBlood(hitPos, hitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
-						}
-					}
-					else
-					{
-						for (int i = 0; i < 6; i++)
-						{
-							float forceFactor = 10.6f;
-							float randomUnitFactor = 0.6f;
-							if (hitNormal.Y == 0)
-							{
-								forceFactor *= 2;
-								randomUnitFactor = 0.4f;
-							}
-							Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-							_particle.SpawnSpark(hitPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
-						}
-					}
+					HitEffects.SpawnEntityHit(_particle, hitEntity is VEntNPC, hitPos, hitNormal);
 					break;
 
 				case FireHitType.World:
-					for (int i = 0; i < 6; i++)
-					{
-						float forceFactor = 10.6f;
-						float randomUnitFactor = 0.6f;
-						if (hitNormal.Y == 0)
-						{
-							forceFactor *= 2;
-							randomUnitFactor = 0.4f;
-						}
-						Vector3 rndDir = Vector3.Normalize(hitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-						_particle.SpawnFire(hitPos, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
-					}
+					BlockType predictedBlock = HitEffects.GetBlockAtHit(_simulation.Map, hitPos, hitNormal);
+					HitEffects.SpawnBlockHit(_particle, predictedBlock, hitPos, hitNormal);
 					break;
 			}
 		}
@@ -746,61 +715,23 @@ namespace Voxelgine.States
 					}
 
 					// Particles only for remote players (local player predicted them)
-					if (!isLocalPlayer)
-					{
-						if (isNpcHit)
+						if (!isLocalPlayer)
 						{
-							for (int i = 0; i < 8; i++)
-							{
-								_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
-							}
+							HitEffects.SpawnEntityHit(_particle, isNpcHit, packet.HitPosition, packet.HitNormal);
 						}
-						else
-						{
-							for (int i = 0; i < 6; i++)
-							{
-								float forceFactor = 10.6f;
-								float randomUnitFactor = 0.6f;
-
-								if (packet.HitNormal.Y == 0)
-								{
-									forceFactor *= 2;
-									randomUnitFactor = 0.4f;
-								}
-
-								Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-								_particle.SpawnSpark(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
-							}
-						}
-					}
-					break;
+						break;
 
 				case FireHitType.Player:
 					// Always show blood for player hits — client cannot predict these
-					for (int i = 0; i < 8; i++)
-					{
-						_particle.SpawnBlood(packet.HitPosition, packet.HitNormal * 0.5f, (0.8f + (float)Random.Shared.NextDouble() * 0.4f) * 0.85f);
-					}
+					HitEffects.SpawnEntityHit(_particle, true, packet.HitPosition, packet.HitNormal);
 					break;
 
 				case FireHitType.World:
 					// Particles only for remote players (local player predicted them)
 					if (!isLocalPlayer)
 					{
-						for (int i = 0; i < 6; i++)
-						{
-							float forceFactor = 10.6f;
-							float randomUnitFactor = 0.6f;
-
-							if (packet.HitNormal.Y == 0)
-							{
-								forceFactor *= 2;
-								randomUnitFactor = 0.4f;
-							}
-
-							Vector3 rndDir = Vector3.Normalize(packet.HitNormal + Utils.GetRandomUnitVector() * randomUnitFactor);
-							_particle.SpawnFire(packet.HitPosition, rndDir * forceFactor, Color.White, (float)(Random.Shared.NextDouble() + 0.5));
-						}
+						BlockType hitBlock = HitEffects.GetBlockAtHit(_simulation.Map, packet.HitPosition, packet.HitNormal);
+						HitEffects.SpawnBlockHit(_particle, hitBlock, packet.HitPosition, packet.HitNormal);
 					}
 					break;
 			}

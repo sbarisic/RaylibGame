@@ -57,7 +57,6 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 ### Medium Priority
 
 - [ ] **AI: Extended instructions, events & programs** — **Instructions:** TargetEntity, MoveToTarget, LookAtTarget, AimAtTarget, PrimaryAttack, SecondaryAttack, MoveToCover(dangerPos), Crouch, StandUp, SetMoveMode(walk/run/jump), PlayAnimation(overlay), EquipWeapon, UnequipWeapon, ChatMessageContains(text, branches). **Events:** OnPlayerChat, OnNPCChat, OnAllyAttacked, OnEnemyKilled, OnLowHealth, OnStuck, OnPlayerInRange, OnEnemyInRange, OnFriendlyInRange. **Programs:** expand FunkyBehavior to exercise all available instructions and events **[CPX: 4]**
-- [ ] **Particles: Context-sensitive hit effects** — System that selects which effects to spawn based on hit position, block face, block type, and weapon type (e.g. sparks for stone, nothing for leaves), replacing hardcoded effect logic in weapons/blocks **[CPX: 3]**
 - [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
 
 ### On Hold
@@ -75,7 +74,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Effects Preview: Texture browser window**
+*No medium priority items*
 
 ### On Hold
 

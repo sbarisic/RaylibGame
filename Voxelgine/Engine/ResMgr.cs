@@ -148,6 +148,68 @@ namespace Voxelgine.Engine {
 			throw new FileNotFoundException();
 		}
 
+		public static string[] GetTextureFolderNames() {
+			string basePath = Path.GetFullPath("data/textures");
+			if (!Directory.Exists(basePath))
+				return Array.Empty<string>();
+			return Directory.GetDirectories(basePath)
+				.Select(d => Path.GetFileName(d))
+				.OrderBy(n => n)
+				.ToArray();
+		}
+
+		public static string[] GetTextureFileNames() {
+			string basePath = Path.GetFullPath("data/textures");
+			if (!Directory.Exists(basePath))
+				return Array.Empty<string>();
+			return Directory.GetFiles(basePath, "*.png")
+				.Select(f => Path.GetFileName(f))
+				.OrderBy(n => n)
+				.ToArray();
+		}
+
+		public static int GetTextureFolderFileCount(string folderName) {
+			string folderPath = Path.GetFullPath(Path.Combine("data/textures", folderName));
+			if (!Directory.Exists(folderPath))
+				return 0;
+			return Directory.GetFiles(folderPath, "*.png").Length;
+		}
+
+		public static bool EnsureCollectionFromFolder(string folderName) {
+			if (TexCollections.ContainsKey(folderName))
+				return TexCollections[folderName].Length > 0;
+
+			string folderPath = Path.GetFullPath(Path.Combine("data/textures", folderName));
+			if (!Directory.Exists(folderPath))
+				return false;
+
+			var files = Directory.GetFiles(folderPath, "*.png").OrderBy(f => f).ToArray();
+			if (files.Length == 0)
+				return false;
+
+			var textures = new List<Texture2D>();
+			foreach (var file in files) {
+				string relativePath = Path.Combine(folderName, Path.GetFileName(file));
+				textures.Add(GetTexture(relativePath));
+			}
+			CreateCollection(folderName, textures.ToArray());
+			return true;
+		}
+
+		public static string EnsureCollectionFromFile(string fileName) {
+			string name = Path.GetFileNameWithoutExtension(fileName);
+			if (TexCollections.ContainsKey(name))
+				return name;
+
+			string filePath = Path.GetFullPath(Path.Combine("data/textures", fileName));
+			if (!File.Exists(filePath))
+				return null;
+
+			var tex = GetTexture(fileName);
+			CreateCollection(name, tex);
+			return name;
+		}
+
 		public static Texture2D GetTexture(string FilePath, TextureFilter TexFilt = TextureFilter.Anisotropic16X) {
 			FilePath = Path.GetFullPath(Path.Combine("data/textures", FilePath)).Replace("\\", "/");
 

@@ -43,8 +43,9 @@ namespace Voxelgine.States
 		private const float AutoSpawnInterval = 0.3f;
 
 		// Custom particle settings
-		private string[] _texCollectionNames;
-		private int _texCollectionIdx = 0;
+		private string _selectedCollection;
+		private Button _btnTexBrowse;
+		private Window _browserWindow;
 		private int _texIndex = 0;
 		private ParticleType _customType = ParticleType.Smoke;
 		private ParticleBlendMode _blendMode = ParticleBlendMode.Alpha;
@@ -74,7 +75,8 @@ namespace Voxelgine.States
 				point => Color.White
 			);
 
-			_texCollectionNames = ResMgr.GetCollectionNames();
+			var collectionNames = ResMgr.GetCollectionNames();
+			_selectedCollection = collectionNames.Length > 0 ? collectionNames[0] : "smoke";
 
 			CreateUI();
 		}
@@ -266,22 +268,14 @@ namespace Voxelgine.States
 			};
 			stack.AddChild(btnCustomType);
 
-			// Texture collection selector (cycling button)
-			var btnTexCollection = new Button { Text = $"Texture: {_texCollectionNames[_texCollectionIdx]}", Size = new Vector2(cw, 32) };
-			btnTexCollection.Clicked += (s, e) =>
-			{
-				_texCollectionIdx = (_texCollectionIdx + 1) % _texCollectionNames.Length;
-				btnTexCollection.Text = $"Texture: {_texCollectionNames[_texCollectionIdx]}";
-				int maxIdx = ResMgr.GetCollectionSize(_texCollectionNames[_texCollectionIdx]) - 1;
-				_sliderTexIdx.MaxValue = Math.Max(maxIdx, 1);
-				_texIndex = 0;
-				_sliderTexIdx.Value = 0;
-			};
-			stack.AddChild(btnTexCollection);
+			// Texture collection selector (opens browser window)
+			_btnTexBrowse = new Button { Text = $"Texture: {_selectedCollection}", Size = new Vector2(cw, 32) };
+			_btnTexBrowse.Clicked += (s, e) => ToggleTextureBrowser();
+			stack.AddChild(_btnTexBrowse);
 
 			// Texture index slider
 			stack.AddChild(new Label { Text = "Texture Index:", Size = new Vector2(cw, 18) });
-			int initialMaxIdx = _texCollectionNames.Length > 0 ? ResMgr.GetCollectionSize(_texCollectionNames[0]) - 1 : 0;
+			int initialMaxIdx = ResMgr.GetCollectionSize(_selectedCollection) - 1;
 			_sliderTexIdx = new Slider
 			{
 				Size = new Vector2(cw, 24),
@@ -448,7 +442,7 @@ namespace Voxelgine.States
 
 		private void SpawnCustomEffect()
 		{
-			string collName = _texCollectionNames[_texCollectionIdx];
+			string collName = _selectedCollection;
 			Texture2D tex = ResMgr.GetFromCollectionByIndex(collName, _texIndex);
 			Color clr = new Color(_colorR, _colorG, _colorB, (byte)255);
 			Vector3 spawnPos = new Vector3(0, 1, 0);
@@ -488,7 +482,7 @@ namespace Voxelgine.States
 			var ic = System.Globalization.CultureInfo.InvariantCulture;
 			string typeName = _customType.ToString();
 			string blendName = _blendMode.ToString();
-			string collName = _texCollectionNames[_texCollectionIdx];
+			string collName = _selectedCollection;
 			string scaler = _customType == ParticleType.Smoke ? "0.4f" : "0";
 
 			string F(float v) => v.ToString("F2", ic) + "f";
@@ -535,6 +529,108 @@ namespace Voxelgine.States
 			sb.AppendLine("\t\t}");
 
 			return sb.ToString();
+		}
+
+		private void ToggleTextureBrowser()
+		{
+			if (_browserWindow != null)
+			{
+				bool wasVisible = _browserWindow.Visible;
+				_browserWindow.Visible = !wasVisible;
+				return;
+			}
+
+			_browserWindow = CreateTextureBrowser();
+			_gui.AddControl(_browserWindow);
+		}
+
+		private Window CreateTextureBrowser()
+		{
+			var win = new Window
+			{
+				Title = "Texture Browser",
+				Position = new Vector2(390, 20),
+				Size = new Vector2(280, 500),
+				IsResizable = false,
+				ShowCloseButton = true
+			};
+
+			win.OnClosed += (w) => { win.Visible = false; };
+
+			var scroll = new ScrollablePane
+			{
+				Position = new Vector2(0, 0),
+				Size = win.GetContentSize(),
+				Anchor = FishUIAnchor.All,
+				AutoContentSize = true
+			};
+
+			var stack = new StackLayout
+			{
+				Orientation = StackOrientation.Vertical,
+				Spacing = 4,
+				Position = new Vector2(6, 6),
+				Size = new Vector2(250, 2000),
+				IsTransparent = true
+			};
+
+			float bw = 240;
+
+			// Texture folders
+			stack.AddChild(new Label { Text = "Texture Folders:", Size = new Vector2(bw, 20) });
+
+			string[] folders = ResMgr.GetTextureFolderNames();
+			foreach (string folder in folders)
+			{
+				int fileCount = ResMgr.GetTextureFolderFileCount(folder);
+				if (fileCount == 0)
+					continue;
+
+				var btn = new Button { Text = $"{folder} ({fileCount})", Size = new Vector2(bw, 26) };
+				btn.Clicked += (s, e) =>
+				{
+					if (ResMgr.EnsureCollectionFromFolder(folder))
+						SelectTextureSource(folder);
+				};
+				stack.AddChild(btn);
+			}
+
+			// Individual texture files
+			string[] files = ResMgr.GetTextureFileNames();
+			if (files.Length > 0)
+			{
+				stack.AddChild(new Label { Text = "Individual Textures:", Size = new Vector2(bw, 20) });
+
+				foreach (string file in files)
+				{
+					var btn = new Button { Text = file, Size = new Vector2(bw, 26) };
+					btn.Clicked += (s, e) =>
+					{
+						string name = ResMgr.EnsureCollectionFromFile(file);
+						if (name != null)
+							SelectTextureSource(name);
+					};
+					stack.AddChild(btn);
+				}
+			}
+
+			scroll.AddChild(stack);
+			win.AddChild(scroll);
+			return win;
+		}
+
+		private void SelectTextureSource(string collectionName)
+		{
+			_selectedCollection = collectionName;
+			_btnTexBrowse.Text = $"Texture: {collectionName}";
+
+			int maxIdx = ResMgr.GetCollectionSize(collectionName) - 1;
+			_sliderTexIdx.MaxValue = Math.Max(maxIdx, 1);
+			_texIndex = 0;
+			_sliderTexIdx.Value = 0;
+
+			if (_browserWindow != null)
+				_browserWindow.Visible = false;
 		}
 
 		private void ClearParticles()
@@ -601,7 +697,12 @@ namespace Voxelgine.States
 		private bool IsMouseOverUI()
 		{
 			Vector2 mousePos = Raylib.GetMousePosition();
-			return mousePos.X < 390 && mousePos.Y < 730;
+			if (mousePos.X < 390 && mousePos.Y < 730)
+				return true;
+			if (_browserWindow != null && _browserWindow.Visible &&
+				mousePos.X >= 390 && mousePos.X < 670 && mousePos.Y < 530)
+				return true;
+			return false;
 		}
 
 		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)

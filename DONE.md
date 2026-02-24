@@ -40,7 +40,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Physics Utils** — Created `PhysicsUtils` class with shared collision functions (`ClipVelocity`, `MoveWithCollision`, `Accelerate`, `AirAccelerate`, `ApplyFriction`, `ApplyGravity`). Enhanced `AABB` with `Overlaps()` and helper properties. Refactored `EntityManager` and `Player` to use shared utilities.
 - **Animation System** — Lerp system with comprehensive easing functions (Quad, Cubic, Quart, Quint, Sine, Expo, Circ, Back, Elastic, Bounce)
 - **NPC Animation System** — Added keyframe-based animation for JSON models (`NPCAnimationClip`, `NPCAnimator`). Supports walk, idle, attack, crouch animations. Added `NPCPreviewState` for testing animations from main menu.
-- **Particles: Effects preview menu** — Added `EffectsPreviewState` for testing particle effects (smoke, fire, blood, sparks) from main menu with adjustable parameters (scale, speed, lifetime, count, RGB color), auto-spawn toggle, and orbit camera. Added `ParticleSystem.DrawPreview()` for frustum-free rendering.
+- **Particles: Effects preview** — `EffectsPreviewState` with orbit camera, preset spawn buttons (smoke/fire/blood/sparks), adjustable parameters (scale, speed, lifetime, count, RGB), auto-spawn, scale reference block. Enhanced with custom particle mode: texture collection/index picking, particle type/blend mode selectors, emissive/physics/collision toggles, spread control, and `SpawnCustom` API.
 - **NPC Animation: Save/Load clips**
 - **NPC Animation: Layered playback** � Added `AnimationLayer` class and layer-based API (`PlayOnLayer`, `StopLayer`, `PauseLayer`, `ResumeLayer`, `SetLayerWeight`) to `NPCAnimator` for playing multiple animation clips simultaneously with additive blending.
 - **Player Movement** — Quake-style physics (strafe-jumping, bunny-hopping, air control, clip velocity, swimming)
@@ -110,6 +110,8 @@ works for any connected client.
 - **NPC: Head tracking** — NPC head mesh smoothly rotates toward the nearest player within 12 blocks. Computes relative yaw/pitch between body heading and target direction, clamped to ±70° yaw and ±30° pitch. Applied as an additive offset to the head mesh's `AnimationRotation` during rendering, with exponential smoothing for fluid motion. Does not interfere with animations or twitch effects (save/restore pattern).
 - **NPC: Random skin textures** — Added `_textureName` field and `SetTextureName()` to `VEntNPC` with `AvailableTextures` list (`humanoid.png`, `humanoid2.png`). Server randomly picks a texture at spawn via `Random.Shared`. Synced to clients via `WriteSpawnPropertiesExtra`/`ReadSpawnPropertiesExtra`. Texture applied to `CustomModel` after model load.
 - **Particles: Blood/spark speed** — Reduced default speed for blood and spark particles from 2–5 / 3–7 to ~0.1 units/sec so they don't travel too far on entity hits
+- **GUI: Main menu window too short** — Increased main menu window height from 400 to 460 so all 6 buttons fit without clipping
+- **Effects Preview: Export custom particle as C# code** — Added "Export C# Code" button to effects preview that generates a `SpawnMyEffect` method reproducing the current custom particle configuration (type, texture collection/index, blend mode, scale, speed, lifetime, count, color, emissive, physics, spread) and copies it to the clipboard with a notification toast
 
 ---
 

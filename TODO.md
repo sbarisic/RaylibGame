@@ -36,7 +36,7 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Player** | ✅ | `Player`, `FPSCamera` (instance-based), `PlayerManager`, `RemotePlayer`, `ViewModel`, inventory, health/respawn |
 | **Weapons** | ✅ | `Weapon`, `WeaponGun` (fire intent/resolve/effects separation), `WeaponPicker`, `InventoryItem` |
 | **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls, main menu with connect/host dialogs |
-| **Particles** | 🔶 | `ParticleSystem` with smoke, fire, blood, spark effects and `EffectsPreviewState` |
+| **Particles** | ✅ | `ParticleSystem` with smoke, fire, blood, spark effects and `EffectsPreviewState` with custom particle sandbox |
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
 | **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
 | **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference |
@@ -75,7 +75,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Medium Priority
 
-- [ ] **Particles: Enhanced effects preview** — Add texture picking, extended particle type selection, and more parameter controls to `EffectsPreviewState` for testing effects without code changes **[CPX: 3]**
+- [ ] **Effects Preview: Texture browser window**
 
 ### On Hold
 
@@ -116,7 +116,7 @@ Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
 
 ### Active Bugs
 
-- [ ] **GUI: Main menu window too short** — Main menu window not tall enough to fit all buttons vertically **[CPX: 1]**
+*No active bugs*
 
 ### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
 

@@ -11,7 +11,7 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine
 {
-	enum ParticleType
+	public enum ParticleType
 	{
 		Smoke,
 		Fire,
@@ -19,7 +19,7 @@ namespace Voxelgine.Engine
 		Spark
 	}
 
-	enum ParticleBlendMode
+	public enum ParticleBlendMode
 	{
 		Additive,
 		FireType,
@@ -284,7 +284,43 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
-		/// Spawns a tracer line effect from start to end position.
+		/// Spawns a fully custom particle with explicit control over all parameters.
+		/// Used by the effects preview for testing arbitrary particle configurations.
+		/// </summary>
+		public void SpawnCustom(Vector3 pos, Vector3 vel, Color color, Texture2D tex,
+			float scale, float lifetime, ParticleType type, ParticleBlendMode blendMode,
+			bool emissive, bool physics, bool noCollisions)
+		{
+			for (int i = 0; i < Particles.Length; i++)
+			{
+				ref Particle P = ref Particles[i];
+
+				if (!P.Draw)
+				{
+					P.Draw = true;
+					P.Pos = pos;
+					P.Color = color;
+					P.Vel = vel;
+					P.SpawnedAt = lastGameTime;
+					P.LifeTime = lifetime;
+					P.MovePhysics = physics;
+					P.Tex = tex;
+					P.Scaler = type == ParticleType.Smoke ? 0.4f : 0;
+					P.InitialScale = scale;
+					P.Scale = scale;
+					P.Rnd = Random.Shared.NextSingle();
+					P.Type = type;
+					P.IsEmissive = emissive;
+					P.BlendMode = blendMode;
+					P.NoCollisions = noCollisions;
+
+					return;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Spawns a tracer line effect
 		/// The tracer will fade out over a short duration.
 		/// </summary>
 		/// <param name="start">Start position (gun muzzle).</param>

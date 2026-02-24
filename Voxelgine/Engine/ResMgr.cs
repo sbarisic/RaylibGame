@@ -134,6 +134,20 @@ namespace Voxelgine.Engine {
 			throw new FileNotFoundException();
 		}
 
+		public static string[] GetCollectionNames() => TexCollections.Keys.ToArray();
+
+		public static int GetCollectionSize(string Name) {
+			return TexCollections.TryGetValue(Name, out var arr) ? arr.Length : 0;
+		}
+
+		public static Texture2D GetFromCollectionByIndex(string Name, int Index) {
+			if (TexCollections.TryGetValue(Name, out var arr)) {
+				return arr[Math.Clamp(Index, 0, arr.Length - 1)];
+			}
+
+			throw new FileNotFoundException();
+		}
+
 		public static Texture2D GetTexture(string FilePath, TextureFilter TexFilt = TextureFilter.Anisotropic16X) {
 			FilePath = Path.GetFullPath(Path.Combine("data/textures", FilePath)).Replace("\\", "/");
 

@@ -8,6 +8,8 @@ using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 using Voxelgine.GUI;
 
+using ParticleBlendMode = Voxelgine.Engine.ParticleBlendMode;
+
 namespace Voxelgine.States
 {
 	/// <summary>
@@ -40,6 +42,19 @@ namespace Voxelgine.States
 		private float _autoSpawnTimer;
 		private const float AutoSpawnInterval = 0.3f;
 
+		// Custom particle settings
+		private string[] _texCollectionNames;
+		private int _texCollectionIdx = 0;
+		private int _texIndex = 0;
+		private ParticleType _customType = ParticleType.Smoke;
+		private ParticleBlendMode _blendMode = ParticleBlendMode.Alpha;
+		private bool _emissive = false;
+		private bool _physics = true;
+		private bool _noCollisions = false;
+		private float _spread = 0.3f;
+		private Slider _sliderTexIdx;
+		private float _clipboardTimer;
+
 		public EffectsPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 			_gui = new FishUIManager(window, Eng.DI.GetRequiredService<IFishLogging>());
@@ -58,6 +73,8 @@ namespace Voxelgine.States
 				point => BlockType.None,
 				point => Color.White
 			);
+
+			_texCollectionNames = ResMgr.GetCollectionNames();
 
 			CreateUI();
 		}
@@ -236,6 +253,115 @@ namespace Voxelgine.States
 			sliderB.OnValueChanged += (s, val) => _colorB = (byte)val;
 			stack.AddChild(sliderB);
 
+			// === Custom Particle ===
+			stack.AddChild(new Label { Text = "Custom Particle:", Size = new Vector2(cw, 24) });
+
+			// Particle type selector (cycling button)
+			string[] typeNames = ["Smoke", "Fire", "Blood", "Spark"];
+			var btnCustomType = new Button { Text = $"Type: {typeNames[(int)_customType]}", Size = new Vector2(cw, 32) };
+			btnCustomType.Clicked += (s, e) =>
+			{
+				_customType = (ParticleType)(((int)_customType + 1) % typeNames.Length);
+				btnCustomType.Text = $"Type: {typeNames[(int)_customType]}";
+			};
+			stack.AddChild(btnCustomType);
+
+			// Texture collection selector (cycling button)
+			var btnTexCollection = new Button { Text = $"Texture: {_texCollectionNames[_texCollectionIdx]}", Size = new Vector2(cw, 32) };
+			btnTexCollection.Clicked += (s, e) =>
+			{
+				_texCollectionIdx = (_texCollectionIdx + 1) % _texCollectionNames.Length;
+				btnTexCollection.Text = $"Texture: {_texCollectionNames[_texCollectionIdx]}";
+				int maxIdx = ResMgr.GetCollectionSize(_texCollectionNames[_texCollectionIdx]) - 1;
+				_sliderTexIdx.MaxValue = Math.Max(maxIdx, 1);
+				_texIndex = 0;
+				_sliderTexIdx.Value = 0;
+			};
+			stack.AddChild(btnTexCollection);
+
+			// Texture index slider
+			stack.AddChild(new Label { Text = "Texture Index:", Size = new Vector2(cw, 18) });
+			int initialMaxIdx = _texCollectionNames.Length > 0 ? ResMgr.GetCollectionSize(_texCollectionNames[0]) - 1 : 0;
+			_sliderTexIdx = new Slider
+			{
+				Size = new Vector2(cw, 24),
+				MinValue = 0,
+				MaxValue = Math.Max(initialMaxIdx, 1),
+				Value = 0,
+				Step = 1,
+				ShowValueLabel = true,
+				ValueLabelFormat = "0"
+			};
+			_sliderTexIdx.OnValueChanged += (s, val) => _texIndex = (int)val;
+			stack.AddChild(_sliderTexIdx);
+
+			// Blend mode selector (cycling button)
+			string[] blendNames = ["Additive", "FireType", "AlphaPremul", "Multiply", "Alpha"];
+			var btnBlend = new Button { Text = $"Blend: {blendNames[(int)_blendMode]}", Size = new Vector2(cw, 32) };
+			btnBlend.Clicked += (s, e) =>
+			{
+				_blendMode = (ParticleBlendMode)(((int)_blendMode + 1) % blendNames.Length);
+				btnBlend.Text = $"Blend: {blendNames[(int)_blendMode]}";
+			};
+			stack.AddChild(btnBlend);
+
+			// Emissive toggle
+			var btnEmissive = new Button { Text = "[ ] Emissive", Size = new Vector2(cw, 32) };
+			btnEmissive.Clicked += (s, e) =>
+			{
+				_emissive = !_emissive;
+				btnEmissive.Text = _emissive ? "[X] Emissive" : "[ ] Emissive";
+			};
+			stack.AddChild(btnEmissive);
+
+			// Physics toggle
+			var btnPhysics = new Button { Text = "[X] Physics", Size = new Vector2(cw, 32) };
+			btnPhysics.Clicked += (s, e) =>
+			{
+				_physics = !_physics;
+				btnPhysics.Text = _physics ? "[X] Physics" : "[ ] Physics";
+			};
+			stack.AddChild(btnPhysics);
+
+			// No Collisions toggle
+			var btnNoCollisions = new Button { Text = "[ ] No Collisions", Size = new Vector2(cw, 32) };
+			btnNoCollisions.Clicked += (s, e) =>
+			{
+				_noCollisions = !_noCollisions;
+				btnNoCollisions.Text = _noCollisions ? "[X] No Collisions" : "[ ] No Collisions";
+			};
+			stack.AddChild(btnNoCollisions);
+
+			// Spread slider
+			stack.AddChild(new Label { Text = "Spread:", Size = new Vector2(cw, 18) });
+			var sliderSpread = new Slider
+			{
+				Size = new Vector2(cw, 24),
+				MinValue = 0.0f,
+				MaxValue = 3.0f,
+				Value = 0.3f,
+				Step = 0.05f,
+				ShowValueLabel = true,
+				ValueLabelFormat = "0.00"
+			};
+			sliderSpread.OnValueChanged += (s, val) => _spread = val;
+			stack.AddChild(sliderSpread);
+
+			// Spawn Custom button
+			var btnSpawnCustom = new Button { Text = "Spawn Custom", Size = new Vector2(cw, 40) };
+			btnSpawnCustom.Clicked += (s, e) => SpawnCustomEffect();
+			stack.AddChild(btnSpawnCustom);
+
+			// Export C# Code button
+			var btnExportCode = new Button { Text = "Export C# Code", Size = new Vector2(cw, 32) };
+			btnExportCode.Clicked += (s, e) =>
+			{
+				string code = GenerateCustomParticleCode();
+				Raylib.SetClipboardText(code);
+				_clipboardTimer = 3.0f;
+			};
+			stack.AddChild(btnExportCode);
+
 			// === Controls ===
 			stack.AddChild(new Label { Text = "Controls:", Size = new Vector2(cw, 24) });
 
@@ -320,6 +446,97 @@ namespace Voxelgine.States
 			}
 		}
 
+		private void SpawnCustomEffect()
+		{
+			string collName = _texCollectionNames[_texCollectionIdx];
+			Texture2D tex = ResMgr.GetFromCollectionByIndex(collName, _texIndex);
+			Color clr = new Color(_colorR, _colorG, _colorB, (byte)255);
+			Vector3 spawnPos = new Vector3(0, 1, 0);
+
+			for (int i = 0; i < _count; i++)
+			{
+				Vector3 offset = new Vector3(
+					(Random.Shared.NextSingle() - 0.5f) * _spread,
+					(Random.Shared.NextSingle() - 0.5f) * _spread,
+					(Random.Shared.NextSingle() - 0.5f) * _spread
+				);
+
+				Vector3 vel = new Vector3(
+					(Random.Shared.NextSingle() - 0.5f) * _speed * _spread,
+					_speed * (0.5f + Random.Shared.NextSingle()),
+					(Random.Shared.NextSingle() - 0.5f) * _speed * _spread
+				);
+
+				_particles.SpawnCustom(
+					spawnPos + offset,
+					vel,
+					clr,
+					tex,
+					_scale,
+					_lifetime,
+					_customType,
+					_blendMode,
+					_emissive,
+					_physics,
+					_noCollisions
+				);
+			}
+		}
+
+		private string GenerateCustomParticleCode()
+		{
+			var ic = System.Globalization.CultureInfo.InvariantCulture;
+			string typeName = _customType.ToString();
+			string blendName = _blendMode.ToString();
+			string collName = _texCollectionNames[_texCollectionIdx];
+			string scaler = _customType == ParticleType.Smoke ? "0.4f" : "0";
+
+			string F(float v) => v.ToString("F2", ic) + "f";
+			string B(bool v) => v ? "true" : "false";
+
+			var sb = new System.Text.StringBuilder();
+			sb.AppendLine("\t\t/// <summary>");
+			sb.AppendLine($"\t\t/// Custom particle \u2014 exported from Effects Preview.");
+			sb.AppendLine($"\t\t/// Type: {typeName}, Texture: {collName}[{_texIndex}], Blend: {blendName}");
+			sb.AppendLine("\t\t/// </summary>");
+			sb.AppendLine("\t\tpublic void SpawnMyEffect(Vector3 Pos, Vector3 Direction, Color Clr, float ScaleFactor = 1.0f)");
+			sb.AppendLine("\t\t{");
+			sb.AppendLine("\t\t\tfor (int i = 0; i < Particles.Length; i++)");
+			sb.AppendLine("\t\t\t{");
+			sb.AppendLine("\t\t\t\tref Particle P = ref Particles[i];");
+			sb.AppendLine();
+			sb.AppendLine("\t\t\t\tif (!P.Draw)");
+			sb.AppendLine("\t\t\t\t{");
+			sb.AppendLine("\t\t\t\t\tP.Draw = true;");
+			sb.AppendLine("\t\t\t\t\tP.Pos = Pos;");
+			sb.AppendLine("\t\t\t\t\tP.Color = Clr;");
+			sb.AppendLine();
+			sb.AppendLine($"\t\t\t\t\tfloat spreadX = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
+			sb.AppendLine($"\t\t\t\t\tfloat spreadY = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
+			sb.AppendLine($"\t\t\t\t\tfloat spreadZ = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
+			sb.AppendLine("\t\t\t\t\tP.Vel = Direction + new Vector3(spreadX, spreadY, spreadZ);");
+			sb.AppendLine();
+			sb.AppendLine("\t\t\t\t\tP.SpawnedAt = lastGameTime;");
+			sb.AppendLine($"\t\t\t\t\tP.LifeTime = {F(_lifetime)} + Random.Shared.NextSingle() * {F(_lifetime * 0.4f)};");
+			sb.AppendLine($"\t\t\t\t\tP.MovePhysics = {B(_physics)};");
+			sb.AppendLine($"\t\t\t\t\tP.Tex = ResMgr.GetFromCollectionByIndex(\"{collName}\", {_texIndex});");
+			sb.AppendLine($"\t\t\t\t\tP.Scaler = {scaler};");
+			sb.AppendLine($"\t\t\t\t\tP.InitialScale = ({F(_scale)} + Random.Shared.NextSingle() * {F(_scale * 0.3f)}) * ScaleFactor;");
+			sb.AppendLine("\t\t\t\t\tP.Scale = P.InitialScale;");
+			sb.AppendLine("\t\t\t\t\tP.Rnd = Random.Shared.NextSingle();");
+			sb.AppendLine($"\t\t\t\t\tP.Type = ParticleType.{typeName};");
+			sb.AppendLine($"\t\t\t\t\tP.IsEmissive = {B(_emissive)};");
+			sb.AppendLine($"\t\t\t\t\tP.BlendMode = ParticleBlendMode.{blendName};");
+			sb.AppendLine($"\t\t\t\t\tP.NoCollisions = {B(_noCollisions)};");
+			sb.AppendLine();
+			sb.AppendLine("\t\t\t\t\treturn;");
+			sb.AppendLine("\t\t\t\t}");
+			sb.AppendLine("\t\t\t}");
+			sb.AppendLine("\t\t}");
+
+			return sb.ToString();
+		}
+
 		private void ClearParticles()
 		{
 			// Re-initialize to clear all particles
@@ -370,9 +587,7 @@ namespace Voxelgine.States
 				if (_autoSpawnTimer >= AutoSpawnInterval)
 				{
 					_autoSpawnTimer -= AutoSpawnInterval;
-					// Cycle through all types
-					int typeIdx = (int)(_totalTime / AutoSpawnInterval) % 4;
-					SpawnEffect((ParticleType)typeIdx);
+					SpawnCustomEffect();
 				}
 			}
 
@@ -431,6 +646,13 @@ namespace Voxelgine.States
 			_particles.GetStats(out int onScreen, out int drawn, out int max);
 			_statsLabel.Text = $"Particles: {onScreen}/{drawn}/{max}";
 			_paramLabel.Text = $"Color: ({_colorR},{_colorG},{_colorB})";
+
+			// Clipboard notification
+			if (_clipboardTimer > 0)
+			{
+				_clipboardTimer -= dt;
+				Raylib.DrawText("Code copied to clipboard!", Window.Width / 2 - 130, Window.Height - 60, 20, Color.Lime);
+			}
 
 			// Draw instructions
 			Raylib.DrawText("Drag mouse to rotate | Scroll to zoom", Window.Width - 320, Window.Height - 30, 16, Color.LightGray);

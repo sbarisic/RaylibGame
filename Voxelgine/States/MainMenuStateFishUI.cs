@@ -80,7 +80,7 @@ namespace Voxelgine.States
 		private void CreateMainMenu()
 		{
 			// Calculate centered position
-			var windowSize = new Vector2(320, 400);
+			var windowSize = new Vector2(320, 460);
 			var windowPos = new Vector2(
 				(Window.Width / 2f) - (windowSize.X / 2f),
 				(Window.Height / 1.65f) - (windowSize.Y / 2f)

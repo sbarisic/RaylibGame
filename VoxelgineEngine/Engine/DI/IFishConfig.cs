@@ -15,6 +15,12 @@ namespace Voxelgine.Engine.DI
 
 		public string LogFolder { get; set; }
 
+		public GameLogLevel LogLevel
+		{
+			get => GameLogLevel.Trace;
+			set { }
+		}
+
 		public void LoadFromJson();
 	}
 }

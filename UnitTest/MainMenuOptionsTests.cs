@@ -1,6 +1,7 @@
 using FishUI.Controls;
 using Newtonsoft.Json;
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
 using Voxelgine.Engine.Input;
 using Voxelgine.States;
 
@@ -148,12 +149,16 @@ public sealed class MainMenuOptionsTests
 		GameConfig config = CreateConfig();
 
 		JsonConvert.PopulateObject(legacyJson, config);
-		string roundTrip = JsonConvert.SerializeObject(config);
+		JsonSerializerSettings settings = new();
+		settings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
+		string roundTrip = JsonConvert.SerializeObject(config, settings);
 
 		Assert.Equal(1, config.Monitor);
 		Assert.Equal(1280, config.WindowWidth);
 		Assert.Equal(720, config.WindowHeight);
+		Assert.Equal(GameLogLevel.Trace, config.LogLevel);
 		Assert.Contains("\"UseFSDesktopRes\"", roundTrip, StringComparison.Ordinal);
+		Assert.Contains("\"LogLevel\":\"Trace\"", roundTrip.Replace(" ", string.Empty), StringComparison.Ordinal);
 		Assert.Contains("\"MouseSensitivity\"", roundTrip, StringComparison.Ordinal);
 	}
 

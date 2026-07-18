@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine.Server
 {
@@ -30,7 +31,7 @@ namespace Voxelgine.Engine.Server
 				}
 				catch (Exception ex)
 				{
-					_logging.ServerWriteLine($"[CMD] Error executing '{command}': {ex.Message}");
+					_logging.Log(GameLogLevel.Error, "Command", $"Failed command={command}", ex);
 				}
 			}
 		}

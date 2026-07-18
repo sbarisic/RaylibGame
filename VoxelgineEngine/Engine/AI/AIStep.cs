@@ -36,7 +36,8 @@ namespace Voxelgine.Engine.AI
 		/// <summary>
 		/// Creates an event handler marker step for the given event type.
 		/// </summary>
-		public static AIStep Handler(AIEvent evt) => new(AIInstruction.EventHandler, (float)(int)evt);
+		public static AIStep Handler(AIEvent evt, float cooldownSeconds = 1f) =>
+			new(AIInstruction.EventHandler, (float)(int)evt) { Param2 = cooldownSeconds };
 
 		/// <summary>
 		/// Creates a Speak instruction with the given text and duration.

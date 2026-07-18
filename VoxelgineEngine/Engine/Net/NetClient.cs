@@ -181,6 +181,7 @@ namespace Voxelgine.Engine
 		{
 			_transport = new UdpTransport();
 			_logging = logging;
+			PacketLoggingEnabled = logging?.MinimumLevel <= GameLogLevel.Trace;
 			_worldReceiver.OnWorldDataReady += HandleWorldDataReady;
 			_worldReceiver.OnTransferFailed += HandleWorldTransferFailed;
 		}
@@ -452,7 +453,7 @@ namespace Voxelgine.Engine
 			if (!PacketLoggingEnabled || _logging == null)
 				return;
 
-			_logging.ClientNetworkWriteLine($"[{direction}] {packet.Type} ({packet.Serialize().Length}B) {_serverEndPoint}");
+			_logging.Log(GameLogLevel.Trace, "Network", $"direction={direction} type={packet.Type} bytes={packet.Serialize().Length} endpoint={_serverEndPoint} localTick={LocalTick}");
 		}
 
 		private void SendInternal(Packet packet, bool reliable, float currentTime)

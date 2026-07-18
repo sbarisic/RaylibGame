@@ -6,6 +6,7 @@ using System.IO;
 using System.Numerics;
 using FishUI.Controls;
 using Voxelgine.Engine.Audio;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.States
 {
@@ -15,13 +16,13 @@ namespace Voxelgine.States
 
 		private void OnConnected(ConnectAcceptPacket accept)
 		{
-			_logging.ClientWriteLine($"MPClientGameState: Connected as player {accept.PlayerId}");
+			_logging.Log(GameLogLevel.Info, "Network", $"Connected playerId={accept.PlayerId} serverTick={accept.ServerTick}");
 			_statusText = "Connected! Loading world...";
 		}
 
 		internal void OnDisconnected(string reason)
 		{
-			_logging.ClientWriteLine($"MPClientGameState: Disconnected: {reason}");
+			_logging.Log(GameLogLevel.Info, "Network", $"Disconnected reason={reason}");
 
 			if (_initialized)
 			{
@@ -40,14 +41,14 @@ namespace Voxelgine.States
 
 		private void OnConnectionRejected(string reason)
 		{
-			_logging.ClientWriteLine($"MPClientGameState: Rejected: {reason}");
+			_logging.Log(GameLogLevel.Warning, "Network", $"Connection rejected reason={reason}");
 			_statusText = "";
 			_errorText = $"Connection rejected: {reason}";
 		}
 
 		private void OnWorldDataReady(byte[] compressedData)
 		{
-			_logging.ClientWriteLine($"MPClientGameState: World data received ({compressedData.Length} bytes compressed)");
+			_logging.Log(GameLogLevel.Info, "Network", $"World transfer complete compressedBytes={compressedData.Length}");
 			_statusText = "Building world...";
 
 			try
@@ -158,7 +159,7 @@ namespace Voxelgine.States
 			catch (Exception ex)
 			{
 				DisposeFishGfxVoxelScene();
-				_logging.ClientWriteLine($"MPClientGameState: Failed to load world: {ex}");
+				_logging.Log(GameLogLevel.Error, "Persistence", "Failed to load transferred world.", ex);
 				_statusText = "";
 				_errorText = $"Failed to load world: {ex.Message}";
 			}
@@ -166,7 +167,7 @@ namespace Voxelgine.States
 
 		private void OnWorldTransferFailed(string error)
 		{
-			_logging.ClientWriteLine($"MPClientGameState: World transfer failed: {error}");
+			_logging.Log(GameLogLevel.Error, "Network", $"World transfer failed error={error}");
 			_statusText = "";
 			_errorText = $"World transfer failed: {error}";
 		}
@@ -453,6 +454,18 @@ namespace Voxelgine.States
 			if (entity is VEntNPC npc)
 			{
 				npc.Speak(packet.Text, packet.Duration);
+				if (!string.IsNullOrWhiteSpace(packet.Text))
+				{
+					AppendChatEntry($"NPC #{packet.NetworkId}: {packet.Text}", "Speech");
+				}
+				else
+				{
+					_logging.Log(GameLogLevel.Trace, "Speech", $"Cleared npcId={packet.NetworkId}");
+				}
+			}
+			else
+			{
+				_logging.Log(GameLogLevel.Warning, "Speech", $"Received speech for unknown npcId={packet.NetworkId}");
 			}
 		}
 
@@ -788,8 +801,7 @@ namespace Voxelgine.States
 			}
 
 			string displayText = senderName != null ? $"{senderName}: {packet.Message}" : packet.Message;
-			_chatToast?.Show(displayText, ToastType.Info, ChatMessageDuration);
-			_logging.ClientWriteLine($"[Chat] {displayText}");
+			AppendChatEntry(displayText, "Chat");
 		}
 
 		private void HandleInventoryUpdate(InventoryUpdatePacket packet)

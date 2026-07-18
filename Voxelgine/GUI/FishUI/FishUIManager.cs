@@ -42,7 +42,7 @@ public sealed class FishUIManager : IDisposable
 				Settings,
 				graphicsBackend,
 				inputAdapter,
-				new GameFishUIEvents(logging),
+				new GameFishUIEvents(),
 				graphicsBackend.FileSystem
 			)
 			{
@@ -71,7 +71,7 @@ public sealed class FishUIManager : IDisposable
 			}
 			catch (Exception exception)
 			{
-				logging.WriteLine($"[FishUIManager] Failed to load theme: {exception.Message}");
+				logging.Log(GameLogLevel.Error, "FishUI", "Failed to load theme.", exception);
 			}
 		}
 	}

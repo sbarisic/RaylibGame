@@ -48,8 +48,8 @@ namespace Voxelgine.Engine.AI
 		private readonly Dictionary<AIEvent, int> _eventHandlers = new();
 		private readonly Dictionary<AIEvent, int> _eventHandlerEnds = new();
 		private readonly Dictionary<AIEvent, float> _eventCooldowns = new();
+		private readonly Dictionary<AIEvent, float> _eventCooldownDurations = new();
 		private AIEvent? _activeHandlerEvent;
-		private const float EventCooldownTime = 1f;
 
 		// Tuning
 		private const float PlayerReachDistance = 2.5f;
@@ -90,6 +90,7 @@ namespace Voxelgine.Engine.AI
 				{
 					AIEvent evt = (AIEvent)(int)_program[i].Param;
 					_eventHandlers[evt] = i;
+					_eventCooldownDurations[evt] = MathF.Max(0, _program[i].Param2);
 					handlers.Add((evt, i));
 				}
 			}
@@ -119,14 +120,20 @@ namespace Voxelgine.Engine.AI
 
 			// The active handler owns its full range until control leaves it.
 			if (_activeHandlerEvent == evt)
+			{
+				_log?.Log(GameLogLevel.Trace, "AI", $"npcId={npcNetId} event={evt} suppressed=active-handler pc={_pc}");
 				return;
+			}
 
 			// Cooldown to prevent spamming
 			if (_eventCooldowns.TryGetValue(evt, out float remaining) && remaining > 0)
+			{
+				_log?.Log(GameLogLevel.Trace, "AI", $"npcId={npcNetId} event={evt} suppressed=cooldown remaining={remaining:F2}s pc={_pc}");
 				return;
+			}
 
-			_eventCooldowns[evt] = EventCooldownTime;
-			_log?.WriteLine($"[AI:{npcNetId}] EVENT {evt} -> jump to step {handlerIndex}");
+			_eventCooldowns[evt] = _eventCooldownDurations.GetValueOrDefault(evt, 1f);
+			_log?.Log(GameLogLevel.Debug, "AI", $"npcId={npcNetId} EVENT {evt} handlerStart={handlerIndex} handlerEnd={_eventHandlerEnds[evt]} pc={_pc}");
 			_activeHandlerEvent = evt;
 			Advance(handlerIndex);
 		}

@@ -65,6 +65,44 @@ public sealed class AIRunnerTests
 		Assert.False(runner.ConsumeFirstMatchingChatMessage("else"));
 	}
 
+	[Fact]
+	public void GreetingIsOnlyInPlayerRangeHandlerWithSixtySecondCooldown()
+	{
+		AIStep[] program = AIPrograms.FunkyBehavior();
+		Assert.Single(program, step => step.TextParam == "Hello my dude!");
+		AIStep handler = Assert.Single(program, step =>
+			step.Instruction == AIInstruction.EventHandler
+			&& (AIEvent)(int)step.Param == AIEvent.OnPlayerInRange);
+		Assert.Equal(60f, handler.Param2);
+	}
+
+	[Fact]
+	public void HandlerSpecificCooldownSuppressesEarlyReentry()
+	{
+		TestLogging logging = new();
+		AIRunner runner = new([
+			new AIStep(AIInstruction.Wait, 10),
+			AIStep.Handler(AIEvent.OnPlayerInRange, 60),
+			new AIStep(AIInstruction.Wait, 0.1f),
+			new AIStep(AIInstruction.Goto, 0),
+		], logging);
+		VEntNPC npc = new();
+
+		runner.RaiseEvent(AIEvent.OnPlayerInRange, 4);
+		runner.Tick(npc, 0.01f);
+		runner.Tick(npc, 0.2f);
+		runner.Tick(npc, 0.01f);
+		Assert.Equal(0, runner.ProgramCounter);
+
+		runner.RaiseEvent(AIEvent.OnPlayerInRange, 4);
+		Assert.Equal(0, runner.ProgramCounter);
+		Assert.Contains(logging.Messages, message => message.Contains("suppressed=cooldown", StringComparison.Ordinal));
+
+		runner.Tick(npc, 60f);
+		runner.RaiseEvent(AIEvent.OnPlayerInRange, 4);
+		Assert.Equal(1, runner.ProgramCounter);
+	}
+
 	private static AIStep[] CreateInterruptProgram()
 	{
 		return

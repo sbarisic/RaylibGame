@@ -1,5 +1,7 @@
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
+using Voxelgine.GUI;
 
 #if WINDOWS
 using FishGfx.Graphics;
@@ -34,11 +36,18 @@ public unsafe partial class MPClientGameState
 	private FishGfxEntityRenderAssets _fishEntityAssets;
 	private readonly Dictionary<int, FishGfxRemotePlayerRenderAdapter> _fishRemotePlayers = new();
 	private readonly Dictionary<int, FishGfxNpcRenderAdapter> _fishNpcs = new();
+	private readonly Dictionary<int, SpeechOcclusionCache> _speechOcclusion = new();
 	private FishGfxSlidingDoorRenderAdapter _fishDoorRenderer;
 	private FishGfxPickupRenderAdapter _fishPickupRenderer;
 	private GameCameraState _fishCameraState;
 	private GameCameraState _previousFishCameraState;
 	private bool _hasPreviousFishCameraState;
+
+	private sealed class SpeechOcclusionCache
+	{
+		public float NextCheckTime;
+		public bool Occluded;
+	}
 #endif
 
 	private bool IsUsingFishGfx => _gameWindow is IFishGfxGameWindow;
@@ -147,7 +156,7 @@ public unsafe partial class MPClientGameState
 		}
 		catch (Exception exception)
 		{
-			_logging?.WriteLine($"FishGfx entity assets are unavailable: {exception.Message}");
+			_logging?.Log(GameLogLevel.Error, "Assets", "FishGfx entity assets are unavailable.", exception);
 			_fishEntityAssets?.Dispose();
 			_fishEntityAssets = null;
 		}
@@ -167,6 +176,7 @@ public unsafe partial class MPClientGameState
 		_fishCelestial = null;
 		_fishRemotePlayers.Clear();
 		_fishNpcs.Clear();
+		_speechOcclusion.Clear();
 		_fishDoorRenderer = null;
 		_fishPickupRenderer = null;
 		_fishEntityAssets?.Dispose();
@@ -299,6 +309,7 @@ public unsafe partial class MPClientGameState
 
 	public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
 	{
+		UpdateNpcSpeechOverlay(timing.TotalTime);
 		if (_initialized && _simulation?.LocalPlayer is not null)
 		{
 			if (_simulation.Map.GetBlock(_fishCameraState.Position) == BlockType.Water)
@@ -321,6 +332,75 @@ public unsafe partial class MPClientGameState
 		}
 
 		_gui?.Render(pass, timing.DeltaTime, timing.TotalTime);
+	}
+
+	private void UpdateNpcSpeechOverlay(float totalTime)
+	{
+		if (_npcSpeechOverlay is null || !_initialized || _simulation is null)
+		{
+			return;
+		}
+
+		List<NpcSpeechBubbleItem> visible = new();
+		Vector3 cameraPosition = _fishCameraState.Position;
+		Vector3 cameraForward = Vector3.Normalize(_fishCameraState.Target - cameraPosition);
+		IFishGfxGameWindow fishWindow = (IFishGfxGameWindow)_gameWindow;
+		Vector2 framebuffer = fishWindow.RenderWindow.FramebufferSize;
+		Vector2 logicalScale = new(
+			Window.Width / MathF.Max(1, framebuffer.X),
+			Window.Height / MathF.Max(1, framebuffer.Y)
+		);
+
+		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
+		{
+			if (entity is not VEntNPC npc
+				|| string.IsNullOrWhiteSpace(npc.SpeechText)
+				|| npc.SpeechDuration <= 0
+				|| !_fishNpcs.TryGetValue(npc.NetworkId, out FishGfxNpcRenderAdapter adapter))
+			{
+				continue;
+			}
+
+			EntityRenderBounds bounds = adapter.GetAnimationBounds();
+			Vector3 anchor = new(bounds.Center.X, bounds.Max.Y + 0.2f, bounds.Center.Z);
+			Vector3 offset = anchor - cameraPosition;
+			float distance = offset.Length();
+			if (distance > 48 || distance <= 0.001f || Vector3.Dot(offset, cameraForward) <= 0)
+				continue;
+
+			if (!_speechOcclusion.TryGetValue(npc.NetworkId, out SpeechOcclusionCache cache))
+			{
+				cache = new SpeechOcclusionCache();
+				_speechOcclusion[npc.NetworkId] = cache;
+			}
+			if (totalTime >= cache.NextCheckTime)
+			{
+				cache.NextCheckTime = totalTime + 0.1f;
+				Vector3 direction = offset / distance;
+				cache.Occluded = _simulation.Map.RaycastPrecise(
+					cameraPosition,
+					MathF.Max(0, distance - 0.2f),
+					direction,
+					out _,
+					out _
+				);
+			}
+			if (cache.Occluded)
+				continue;
+
+			Vector3 framebufferPoint = _fishWorldCamera.WorldToScreen(anchor);
+			Vector2 logicalPoint = new(framebufferPoint.X * logicalScale.X, framebufferPoint.Y * logicalScale.Y);
+			if (logicalPoint.X < 0 || logicalPoint.X > Window.Width || logicalPoint.Y < 0 || logicalPoint.Y > Window.Height)
+				continue;
+
+			visible.Add(new NpcSpeechBubbleItem(npc.NetworkId, npc.SpeechText, logicalPoint, distance));
+		}
+		foreach (int staleId in _speechOcclusion.Keys.Where(id => !_fishNpcs.ContainsKey(id)).ToArray())
+		{
+			_speechOcclusion.Remove(staleId);
+		}
+
+		_npcSpeechOverlay.SetItems(visible);
 	}
 
 	private void DrawFishGfxGameplayGeometry(RenderPass pass)

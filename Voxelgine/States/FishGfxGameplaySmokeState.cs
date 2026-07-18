@@ -10,6 +10,7 @@ using Voxelgine.FishGfxClient.Rendering;
 using Voxelgine.FishGfxClient.Viewmodel;
 using Voxelgine.FishGfxClient.Voxels;
 using Voxelgine.Graphics;
+using Voxelgine.GUI;
 
 namespace Voxelgine.States;
 
@@ -33,6 +34,8 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 	private readonly FishGfxSlidingDoorRenderAdapter door;
 	private readonly FishGfxPickupRenderAdapter pickup;
 	private readonly FishGfxViewModelRenderer viewmodelAssetProbe;
+	private readonly FishUIManager gui;
+	private readonly NpcSpeechBubbleOverlay speechOverlay;
 	private readonly GameCameraState cameraState = new(
 		new Vector3(8, 8, -14),
 		new Vector3(8, 2, 7),
@@ -73,6 +76,12 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		door = entityAssets.CreateSlidingDoorAdapter();
 		pickup = entityAssets.CreatePickupAdapter();
 		viewmodelAssetProbe = new FishGfxViewModelRenderer(window);
+		gui = new FishUIManager(window, engine.DI.GetRequiredService<IFishLogging>());
+		speechOverlay = new NpcSpeechBubbleOverlay
+		{
+			Size = new Vector2(window.Width, window.Height),
+		};
+		gui.AddControl(speechOverlay);
 
 		for (int index = 0; index < 12; index++)
 		{
@@ -95,6 +104,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 
 	public override void BeginFrame(in FrameTiming timing)
 	{
+		gui.Update(timing.DeltaTime, timing.TotalTime);
 		voxelScene.Update(camera);
 		particles.Update(timing.DeltaTime);
 		npc.Update(
@@ -109,7 +119,20 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 			),
 			timing.DeltaTime
 		);
+		Vector3 projected = camera.WorldToScreen(npc.GetAnimationBounds().Max + new Vector3(-0.4f, 0.2f, -0.4f));
+		Vector2 framebuffer = window.RenderWindow.FramebufferSize;
+		speechOverlay.Size = new Vector2(window.Width, window.Height);
+		speechOverlay.SetItems([
+			new NpcSpeechBubbleItem(
+				1,
+				"NPC #1: Automatic speech bubble validation",
+				new Vector2(projected.X * window.Width / framebuffer.X, projected.Y * window.Height / framebuffer.Y),
+				Vector3.Distance(cameraState.Position, new Vector3(6, 2.8f, 8))
+			),
+		]);
 	}
+
+	public override void BeginInputFrame() => gui.BeginInputFrame();
 
 	public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
 	{
@@ -164,6 +187,11 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		);
 	}
 
+	public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
+	{
+		gui.Render(pass, timing.DeltaTime, timing.TotalTime);
+	}
+
 	public override void Dispose()
 	{
 		if (disposed)
@@ -171,6 +199,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 			return;
 		}
 		viewmodelAssetProbe.Dispose();
+		gui.Dispose();
 		entityAssets.Dispose();
 		particles.Dispose();
 		celestial.Dispose();

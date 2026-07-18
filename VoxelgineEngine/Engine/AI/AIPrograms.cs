@@ -75,19 +75,15 @@ namespace Voxelgine.Engine.AI
 		/// <code>
 		///  0: SET_MOVE_MODE("run")
 		///  1: WAIT(2)
-		///  2: IS_PLAYER_NEARBY(15)              → fail: goto 7
-		///  3: MOVE_TO_PLAYER(15, stop=3)        → fail: goto 7
-		///  4: LOOK_AT_PLAYER(15)
-		///  5: ASYNC_SPEAK("Hello my dude!", 3)
-		///  6: GOTO(0)
-		///  7: TARGET_ENTITY(15, any)            → fail: goto 11
-		///  8: MOVE_TO_TARGET(stop=3)            → fail: goto 11
-		///  9: LOOK_AT_TARGET                    → fail: goto 11
-		/// 10: ASYNC_SPEAK("Hey there, NPC!", 2)
-		/// 11: CHAT_CONTAINS("hello")            → fail: goto 13
-		/// 12: ASYNC_SPEAK("Someone said hello!", 3)
-		/// 13: IDLE(3)
-		/// 14: MOVE_RANDOM(8)                    → fail: goto 13
+		///  2: TARGET_ENTITY(15, any)            → fail: goto 6
+		///  3: MOVE_TO_TARGET(stop=3)            → fail: goto 6
+		///  4: LOOK_AT_TARGET                    → fail: goto 6
+		///  5: ASYNC_SPEAK("Hey there, NPC!", 2)
+		///  6: CHAT_CONTAINS("hello")            → fail: goto 8
+		///  7: ASYNC_SPEAK("Someone said hello!", 3)
+		///  8: IDLE(3)
+		///  9: MOVE_RANDOM(8)                    → fail: goto 8
+		/// 10-14: reserved loop padding
 		/// 15: GOTO(0)
 		/// -- Event handlers --
 		/// 16: EVENT_HANDLER(OnAttacked)
@@ -112,10 +108,10 @@ namespace Voxelgine.Engine.AI
 		/// 35: EVENT_HANDLER(OnStuck)
 		/// 36: ASYNC_SPEAK("I'm stuck!", 2)
 		/// 37: GOTO(0)
-		/// 38: EVENT_HANDLER(OnPlayerInRange)
+		/// 38: EVENT_HANDLER(OnPlayerInRange, cooldown=60)
 		/// 39: LOOK_AT_PLAYER(15)
-		/// 40: EQUIP_WEAPON
-		/// 41: PLAY_ANIMATION("idle", 2)
+		/// 40: ASYNC_SPEAK("Hello my dude!", 3)
+		/// 41: EQUIP_WEAPON
 		/// 42: WAIT(2)
 		/// 43: UNEQUIP_WEAPON
 		/// 44: GOTO(0)
@@ -155,25 +151,22 @@ namespace Voxelgine.Engine.AI
 		/// </summary>
 		public static AIStep[] FunkyBehavior() =>
 		[
-			// Main loop: set speed, check for players, greet them
+			// Main loop: interact with other NPCs, react to chat, and wander.
 			AIStep.SetMode("run"),                                              //  0
 			new(AIInstruction.Wait, 2f),                                        //  1
-			new(AIInstruction.IsPlayerNearby, 15f, onFailGoto: 7),              //  2
-			AIStep.MoveToPlayerAt(15f, 3f, onFailGoto: 7),                      //  3
-			new(AIInstruction.LookAtPlayer, 15f),                               //  4
-			AIStep.AsyncSpeakText("Hello my dude!", 3f),                        //  5
-			new(AIInstruction.Goto, 0),                                         //  6
-			// Check for nearby NPC entities
-			new(AIInstruction.TargetEntity, 15f, onFailGoto: 11),               //  7
-			AIStep.MoveToTargetAt(3f, onFailGoto: 11),                          //  8
-			new(AIInstruction.LookAtTarget, 0, onFailGoto: 11),                 //  9
-			AIStep.AsyncSpeakText("Hey there, NPC!", 2f),                       // 10
-			// Check if anyone said "hello" in chat
-			AIStep.ChatContains("hello", onFailGoto: 13),                       // 11
-			AIStep.AsyncSpeakText("Someone said hello!", 3f),                   // 12
-			// Otherwise just idle and wander
-			new(AIInstruction.Idle, 3f),                                        // 13
-			new(AIInstruction.MoveRandom, 8f, onFailGoto: 13),                  // 14
+			new(AIInstruction.TargetEntity, 15f, onFailGoto: 6),                //  2
+			AIStep.MoveToTargetAt(3f, onFailGoto: 6),                           //  3
+			new(AIInstruction.LookAtTarget, 0, onFailGoto: 6),                  //  4
+			AIStep.AsyncSpeakText("Hey there, NPC!", 2f),                       //  5
+			AIStep.ChatContains("hello", onFailGoto: 8),                        //  6
+			AIStep.AsyncSpeakText("Someone said hello!", 3f),                   //  7
+			new(AIInstruction.Idle, 3f),                                        //  8
+			new(AIInstruction.MoveRandom, 8f, onFailGoto: 8),                   //  9
+			new(AIInstruction.Goto, 0),                                         // 10
+			new(AIInstruction.Idle, 0.1f),                                      // 11 (reserved)
+			new(AIInstruction.Goto, 0),                                         // 12 (reserved)
+			new(AIInstruction.Idle, 0.1f),                                      // 13 (reserved)
+			new(AIInstruction.Goto, 0),                                         // 14 (reserved)
 			new(AIInstruction.Goto, 0),                                         // 15
 
 			// ── Event handlers ──
@@ -208,11 +201,11 @@ namespace Voxelgine.Engine.AI
 			AIStep.AsyncSpeakText("I'm stuck!", 2f),                            // 36
 			new(AIInstruction.Goto, 0),                                         // 37
 
-			// OnPlayerInRange: look, equip weapon briefly, then unequip
-			AIStep.Handler(AIEvent.OnPlayerInRange),                            // 38
+			// OnPlayerInRange: greet once per approach, with a 60-second cooldown.
+			AIStep.Handler(AIEvent.OnPlayerInRange, 60f),                       // 38
 			new(AIInstruction.LookAtPlayer, 15f),                               // 39
-			new(AIInstruction.EquipWeapon),                                     // 40
-			AIStep.PlayAnim("idle", 2f),                                        // 41
+			AIStep.AsyncSpeakText("Hello my dude!", 3f),                        // 40
+			new(AIInstruction.EquipWeapon),                                     // 41
 			new(AIInstruction.Wait, 2f),                                        // 42
 			new(AIInstruction.UnequipWeapon),                                   // 43
 			new(AIInstruction.Goto, 0),                                         // 44

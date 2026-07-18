@@ -9,6 +9,7 @@ namespace VoxelgineServer
 			int port = 7777;
 			int seed = 666;
 			bool forceRegen = false;
+			Voxelgine.Engine.DI.GameLogLevel logLevel = Voxelgine.Engine.DI.GameLogLevel.Trace;
 
 			for (int i = 0; i < args.Length; i++)
 			{
@@ -28,18 +29,27 @@ namespace VoxelgineServer
 						forceRegen = true;
 						break;
 
+					case "--log-level" when i + 1 < args.Length:
+						if (!Enum.TryParse(args[++i], true, out logLevel))
+						{
+							Console.Error.WriteLine("Invalid --log-level. Use Trace, Debug, Info, Warning, Error, or Fatal.");
+							return;
+						}
+						break;
+
 					case "--help":
 						Console.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 						Console.WriteLine("Usage: VoxelgineServer [options]");
 						Console.WriteLine("  --port <port>   UDP port to listen on (default: 7777)");
 						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
 						Console.WriteLine("  --force-regen   Force world regeneration even if save file exists");
+						Console.WriteLine("  --log-level     Minimum console.log level (default: Trace)");
 						Console.WriteLine("  --help          Show this help message");
 						return;
 				}
 			}
 
-			using ServerLoop server = new ServerLoop();
+			using ServerLoop server = new ServerLoop(logLevel);
 
 			Console.CancelKeyPress += (_, e) =>
 			{
@@ -60,9 +70,9 @@ namespace VoxelgineServer
 						server.ExecuteCommand(line);
 					}
 				}
-				catch (Exception)
+				catch (Exception exception)
 				{
-					// stdin not available (e.g., redirected/piped with no input)
+					server.Log(Voxelgine.Engine.DI.GameLogLevel.Error, "ConsoleInput", "Console input thread failed.", exception);
 				}
 			});
 			consoleThread.IsBackground = true;

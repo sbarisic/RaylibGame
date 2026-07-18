@@ -63,7 +63,7 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 			assets = new GameAssetStore(
 				RenderWindow.Graphics,
 				AppContext.BaseDirectory,
-				logging.WriteLine
+				(level, message) => logging.Log(level, "Assets", message)
 			);
 			graph = new GameRenderGraph(RenderWindow.Graphics, assets, config.Msaa);
 			source = new FishGfxInputSource(RenderWindow, config);
@@ -149,6 +149,7 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
 		ArgumentNullException.ThrowIfNull(nextState);
+		logging.Log(GameLogLevel.Info, "State", $"Transition old={state?.GetType().Name ?? "None"} new={nextState.GetType().Name}");
 		state?.SwapFrom();
 		state = nextState;
 		RenderWindow.CaptureCursor = false;

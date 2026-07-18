@@ -8,22 +8,25 @@ namespace Voxelgine.Engine
 		private const string ConsoleLogFileName = "console.log";
 		private static readonly object ProcessLock = new();
 		private static ConsoleLogSession processSession;
+		private static int processSessionUsers;
 		private readonly string logFolder;
 		private ConsoleLogSession session;
-		private bool isServer;
-		private bool ownsProcessSession;
+		private string source = "CLIENT";
 		private bool disposed;
 
 		public FishLogging(IFishConfig config)
 		{
 			ArgumentNullException.ThrowIfNull(config);
 			logFolder = config.LogFolder;
+			MinimumLevel = config.LogLevel;
 		}
 
-		public void Init(bool isServer = false)
+		public GameLogLevel MinimumLevel { get; set; }
+
+		public void Init(bool IsServer = false)
 		{
 			ObjectDisposedException.ThrowIf(disposed, this);
-			this.isServer = isServer;
+			source = IsServer ? "SERVER" : "CLIENT";
 
 			lock (ProcessLock)
 			{
@@ -36,42 +39,44 @@ namespace Voxelgine.Engine
 				{
 					string folder = ResolveLogFolder(logFolder);
 					Directory.CreateDirectory(folder);
-					processSession = new ConsoleLogSession(
-						Path.Combine(folder, ConsoleLogFileName)
-					);
-					ownsProcessSession = true;
+					processSession = new ConsoleLogSession(Path.Combine(folder, ConsoleLogFileName));
 				}
 
 				session = processSession;
+				processSessionUsers++;
 			}
 		}
 
-		public void WriteLine(string message)
+		public void Log(
+			GameLogLevel level,
+			string category,
+			string message,
+			Exception exception = null
+		)
 		{
+			if (level < MinimumLevel)
+			{
+				return;
+			}
+
 			ConsoleLogSession activeSession = session
 				?? throw new InvalidOperationException("Logging must be initialized before use.");
-			activeSession.WriteEngineLine(message, GetPrefix() + message);
+			activeSession.WriteStructured(source, level, NormalizeCategory(category), message ?? string.Empty);
+			if (exception is not null)
+			{
+				activeSession.WriteStructured(source, level, NormalizeCategory(category), exception.ToString());
+			}
 		}
 
-		public void ServerWriteLine(string message)
-		{
-			WriteLine(message);
-		}
+		public void WriteLine(string message) => Log(GameLogLevel.Debug, "General", message);
 
-		public void ClientWriteLine(string message)
-		{
-			WriteLine(message);
-		}
+		public void ServerWriteLine(string message) => Log(GameLogLevel.Debug, "Server", message);
 
-		public void ServerNetworkWriteLine(string message)
-		{
-			WriteLine("[NETWORK] " + message);
-		}
+		public void ClientWriteLine(string message) => Log(GameLogLevel.Debug, "Client", message);
 
-		public void ClientNetworkWriteLine(string message)
-		{
-			WriteLine("[NETWORK] " + message);
-		}
+		public void ServerNetworkWriteLine(string message) => Log(GameLogLevel.Trace, "Network", message);
+
+		public void ClientNetworkWriteLine(string message) => Log(GameLogLevel.Trace, "Network", message);
 
 		public void Dispose()
 		{
@@ -82,22 +87,24 @@ namespace Voxelgine.Engine
 
 			lock (ProcessLock)
 			{
-				if (ownsProcessSession && ReferenceEquals(processSession, session))
+				if (session is not null)
 				{
-					processSession.Dispose();
-					processSession = null;
+					processSessionUsers--;
+					if (processSessionUsers == 0 && ReferenceEquals(processSession, session))
+					{
+						processSession.Dispose();
+						processSession = null;
+					}
 				}
 
 				session = null;
-				ownsProcessSession = false;
 				disposed = true;
 			}
 		}
 
-		private string GetPrefix()
+		private static string NormalizeCategory(string category)
 		{
-			string source = isServer ? "[SERVER]" : "[CLIENT]";
-			return $"[{DateTime.Now:HH:mm:ss.fff}]{source} ";
+			return string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
 		}
 
 		private static string ResolveLogFolder(string configuredFolder)
@@ -120,21 +127,13 @@ namespace Voxelgine.Engine
 			{
 				originalOutput = Console.Out;
 				originalError = Console.Error;
-				FileStream stream = new(
-					path,
-					FileMode.Create,
-					FileAccess.Write,
-					FileShare.Read
-				);
-				logWriter = new StreamWriter(stream, new UTF8Encoding(false))
-				{
-					AutoFlush = true,
-				};
+				FileStream stream = new(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+				logWriter = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true };
 
 				try
 				{
-					Console.SetOut(new TeeTextWriter(originalOutput, logWriter, writeLock));
-					Console.SetError(new TeeTextWriter(originalError, logWriter, writeLock));
+					Console.SetOut(new StructuredConsoleWriter(originalOutput, this));
+					Console.SetError(new StructuredConsoleWriter(originalError, this));
 				}
 				catch
 				{
@@ -145,14 +144,19 @@ namespace Voxelgine.Engine
 				}
 			}
 
-			public void WriteEngineLine(string consoleMessage, string fileMessage)
+			public void WriteStructured(string source, GameLogLevel level, string category, string text)
 			{
 				ObjectDisposedException.ThrowIf(disposed, this);
+				string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
 				lock (writeLock)
 				{
-					originalOutput.WriteLine(consoleMessage);
+					foreach (string line in lines)
+					{
+						string formatted = $"[{DateTime.Now:HH:mm:ss.fff}][{source}][{level.ToString().ToUpperInvariant()}][{category}] {line}";
+						originalOutput.WriteLine(formatted);
+						logWriter.WriteLine(formatted);
+					}
 					originalOutput.Flush();
-					logWriter.WriteLine(fileMessage);
 				}
 			}
 
@@ -163,6 +167,8 @@ namespace Voxelgine.Engine
 					return;
 				}
 
+				Console.Out.Flush();
+				Console.Error.Flush();
 				Console.SetOut(originalOutput);
 				Console.SetError(originalError);
 				lock (writeLock)
@@ -173,77 +179,66 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		private sealed class TeeTextWriter : TextWriter
+		private sealed class StructuredConsoleWriter : TextWriter
 		{
 			private readonly TextWriter consoleWriter;
-			private readonly TextWriter logWriter;
-			private readonly object writeLock;
+			private readonly ConsoleLogSession session;
+			private readonly StringBuilder pending = new();
 
-			public TeeTextWriter(
-				TextWriter consoleWriter,
-				TextWriter logWriter,
-				object writeLock
-			)
+			public StructuredConsoleWriter(TextWriter consoleWriter, ConsoleLogSession session)
 			{
 				this.consoleWriter = consoleWriter;
-				this.logWriter = logWriter;
-				this.writeLock = writeLock;
+				this.session = session;
 			}
 
 			public override Encoding Encoding => consoleWriter.Encoding;
 
 			public override void Write(char value)
 			{
-				lock (writeLock)
+				if (value == '\n')
 				{
-					consoleWriter.Write(value);
-					logWriter.Write(value);
+					FlushPending();
+				}
+				else if (value != '\r')
+				{
+					pending.Append(value);
 				}
 			}
 
 			public override void Write(string value)
 			{
-				lock (writeLock)
+				if (value is null)
 				{
-					consoleWriter.Write(value);
-					logWriter.Write(value);
+					return;
 				}
-			}
-
-			public override void Write(char[] buffer, int index, int count)
-			{
-				lock (writeLock)
+				foreach (char character in value)
 				{
-					consoleWriter.Write(buffer, index, count);
-					logWriter.Write(buffer, index, count);
-				}
-			}
-
-			public override void WriteLine()
-			{
-				lock (writeLock)
-				{
-					consoleWriter.WriteLine();
-					logWriter.WriteLine();
+					Write(character);
 				}
 			}
 
 			public override void WriteLine(string value)
 			{
-				lock (writeLock)
-				{
-					consoleWriter.WriteLine(value);
-					logWriter.WriteLine(value);
-				}
+				Write(value);
+				FlushPending();
 			}
+
+			public override void WriteLine() => FlushPending();
 
 			public override void Flush()
 			{
-				lock (writeLock)
+				if (pending.Length > 0)
 				{
-					consoleWriter.Flush();
-					logWriter.Flush();
+					FlushPending();
 				}
+				consoleWriter.Flush();
+			}
+
+			private void FlushPending()
+			{
+				string line = pending.ToString();
+				pending.Clear();
+				session.WriteStructured("PROCESS", GameLogLevel.Trace, "Console", line);
 			}
 		}
 	}

@@ -211,7 +211,7 @@ public partial class MainMenuStateFishUI
 
 		try
 		{
-			hostedServer = new ServerLoop();
+			hostedServer = new ServerLoop(Eng.DI.GetRequiredService<IFishConfig>().LogLevel);
 			hostThread = new Thread(() =>
 			{
 				try
@@ -220,7 +220,7 @@ public partial class MainMenuStateFishUI
 				}
 				catch (Exception exception)
 				{
-					logging.WriteLine($"Hosted server error: {exception.Message}");
+					logging.Log(GameLogLevel.Error, "HostedServer", "Hosted server thread failed.", exception);
 				}
 			})
 			{

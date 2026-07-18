@@ -28,6 +28,13 @@ namespace Voxelgine.States
 			int screenW = _gameWindow.Width;
 			int screenH = _gameWindow.Height;
 
+			_npcSpeechOverlay = new NpcSpeechBubbleOverlay
+			{
+				Position = Vector2.Zero,
+				Size = new Vector2(screenW, screenH),
+			};
+			_gui.AddControl(_npcSpeechOverlay);
+
 			_loadingStatusLabel = new Label
 			{
 				Text = "",
@@ -146,11 +153,23 @@ namespace Voxelgine.States
 			_chatToast.TextColor = FishColor.White;
 			_gui.AddControl(_chatToast);
 
+			_chatHistoryBox = new MultiLineEditbox
+			{
+				Position = new Vector2(10, screenH - 414),
+				Size = new Vector2(500, 220),
+				ReadOnly = true,
+				WordWrap = true,
+				ShowLineNumbers = false,
+				Visible = false,
+				Text = _chatHistory.Text,
+			};
+			_gui.AddControl(_chatHistoryBox);
+
 			// Chat input panel — bottom-left, hidden by default
 			_chatInputPanel = new Panel
 			{
 				Position = new Vector2(10, screenH - 186),
-				Size = new Vector2(400, 30),
+				Size = new Vector2(500, 30),
 				Visible = false,
 			};
 			_chatInputPanel.Opacity = 0.85f;
@@ -159,7 +178,7 @@ namespace Voxelgine.States
 			{
 				Placeholder = "Type a message...",
 				Position = new Vector2(2, 2),
-				Size = new Vector2(396, 26),
+				Size = new Vector2(496, 26),
 			};
 			_chatInputPanel.AddChild(_chatInputBox);
 			_gui.AddControl(_chatInputPanel);
@@ -785,6 +804,10 @@ namespace Voxelgine.States
 			// Chat input panel — bottom-left
 			if (_chatInputPanel != null)
 				_chatInputPanel.Position = new Vector2(10, screenH - 186);
+			if (_chatHistoryBox != null)
+				_chatHistoryBox.Position = new Vector2(10, screenH - 414);
+			if (_npcSpeechOverlay != null)
+				_npcSpeechOverlay.Size = new Vector2(screenW, screenH);
 
 			// Player list panel — centered
 			if (_playerListPanel != null)

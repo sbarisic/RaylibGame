@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Numerics;
+using System.Diagnostics;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine.Server
 {
@@ -18,10 +20,12 @@ namespace Voxelgine.Engine.Server
 		private const int DataVersion = 2;
 
 		private readonly string _directory;
+		private readonly IFishLogging _logging;
 
-		public PlayerDataStore(string directory = "data/players")
+		public PlayerDataStore(string directory = "data/players", IFishLogging logging = null)
 		{
 			_directory = directory;
+			_logging = logging;
 		}
 
 		/// <summary>
@@ -31,6 +35,7 @@ namespace Voxelgine.Engine.Server
 		{
 			try
 			{
+				Stopwatch stopwatch = Stopwatch.StartNew();
 				Directory.CreateDirectory(_directory);
 				string filePath = GetFilePath(playerName);
 
@@ -51,10 +56,12 @@ namespace Voxelgine.Engine.Server
 					inventory.Write(writer);
 				else
 					new ServerInventory().Write(writer);
+				writer.Flush();
+				_logging?.Log(GameLogLevel.Debug, "Persistence", $"Saved player name={playerName} path={Path.GetFullPath(filePath)} bytes={fs.Length} version={DataVersion} durationMs={stopwatch.Elapsed.TotalMilliseconds:F1}");
 			}
-			catch (Exception)
+			catch (Exception exception)
 			{
-				// Silently ignore save failures — logged by caller if needed
+				_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to save player name={playerName} path={Path.GetFullPath(GetFilePath(playerName))}", exception);
 			}
 		}
 
@@ -74,6 +81,7 @@ namespace Voxelgine.Engine.Server
 
 			try
 			{
+				Stopwatch stopwatch = Stopwatch.StartNew();
 				using var fs = File.OpenRead(filePath);
 				using var reader = new BinaryReader(fs);
 
@@ -90,10 +98,12 @@ namespace Voxelgine.Engine.Server
 					inventory.Read(reader);
 				}
 
+				_logging?.Log(GameLogLevel.Debug, "Persistence", $"Loaded player name={playerName} path={Path.GetFullPath(filePath)} bytes={fs.Length} version={version} durationMs={stopwatch.Elapsed.TotalMilliseconds:F1}");
 				return true;
 			}
-			catch (Exception)
+			catch (Exception exception)
 			{
+				_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to load player name={playerName} path={Path.GetFullPath(filePath)}", exception);
 				return false;
 			}
 		}

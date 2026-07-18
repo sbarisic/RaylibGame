@@ -534,7 +534,7 @@ public partial class MainMenuStateFishUI
 		{
 			previous.ApplyTo(config);
 			optionsStatusLabel.Text = "Could not save settings";
-			logging.WriteLine($"Options apply failed: {exception.Message}");
+			logging.Log(GameLogLevel.Error, "Configuration", "Options apply/save failed; restored previous configuration.", exception);
 			UpdateOptionsDirtyState();
 		}
 	}

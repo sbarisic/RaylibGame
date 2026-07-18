@@ -92,6 +92,9 @@ namespace Voxelgine.States
 		private ToastNotification _chatToast;
 		private Panel _chatInputPanel;
 		private Textbox _chatInputBox;
+		private MultiLineEditbox _chatHistoryBox;
+		private NpcSpeechBubbleOverlay _npcSpeechOverlay;
+		private readonly ChatHistoryBuffer _chatHistory = new(200);
 		private readonly GameplayInputOwnership _inputOwnership = new();
 		private readonly NetworkInputSource _neutralInputSource = new();
 		private readonly InputMgr _neutralInputManager;
@@ -189,7 +192,7 @@ namespace Voxelgine.States
 			{
 				_statusText = "";
 				_errorText = $"Failed to connect: {ex.Message}";
-				_logging.ClientWriteLine($"MPClientGameState: Connection failed: {ex.Message}");
+				_logging.Log(GameLogLevel.Error, "Network", $"Connection failed endpoint={host}:{port}", ex);
 			}
 		}
 
@@ -202,6 +205,7 @@ namespace Voxelgine.States
 				_gui.InputEnabled = _inputOwnership.UiInputEnabled;
 			}
 			ApplyInputOwnership();
+			_logging.Log(GameLogLevel.Debug, "Input", $"mode={_inputOwnership.Mode} state=active");
 		}
 
 		public override void SwapFrom()
@@ -353,7 +357,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.ClientWriteLine($"MPClientGameState: Tick exception: {ex}");
+				_logging.Log(GameLogLevel.Error, "Update", "Multiplayer variable update failed.", ex);
 			}
 		}
 
@@ -414,7 +418,7 @@ namespace Voxelgine.States
 			}
 			catch (Exception ex)
 			{
-				_logging.ClientWriteLine($"MPClientGameState: UpdateLockstep exception: {ex}");
+				_logging.Log(GameLogLevel.Error, "Update", "Multiplayer fixed update failed.", ex);
 			}
 		}
 
@@ -427,12 +431,18 @@ namespace Voxelgine.States
 
 			if (_chatInputPanel != null)
 				_chatInputPanel.Visible = true;
+			if (_chatHistoryBox != null)
+			{
+				_chatHistoryBox.Visible = true;
+				_chatHistoryBox.ScrollToEnd();
+			}
 			if (_chatInputBox != null)
 			{
 				_chatInputBox.Text = "";
 				_gui?.UI.FocusControl(_chatInputBox);
 			}
 			ApplyInputOwnership();
+			_logging.Log(GameLogLevel.Debug, "Input", "mode=Chat cursor=visible focus=chat-input");
 		}
 
 		private void CloseChatInput()
@@ -443,10 +453,13 @@ namespace Voxelgine.States
 			_inputOwnership.CloseOverlay();
 			if (_chatInputPanel != null)
 				_chatInputPanel.Visible = false;
+			if (_chatHistoryBox != null)
+				_chatHistoryBox.Visible = false;
 			if (_chatInputBox != null)
 				_chatInputBox.Text = "";
 			_gui?.UI.ClearFocus();
 			ApplyInputOwnership();
+			_logging.Log(GameLogLevel.Debug, "Input", "mode=Gameplay cursor=captured focus=none reason=chat-closed");
 		}
 
 		private void ToggleDebugMenu()
@@ -461,6 +474,7 @@ namespace Voxelgine.States
 					_debugMenuWindow.BringToFront();
 			}
 			ApplyInputOwnership();
+			_logging.Log(GameLogLevel.Debug, "Input", $"mode={_inputOwnership.Mode} cursor={(_inputOwnership.CursorCaptured ? "captured" : "visible")}");
 		}
 
 		private void CloseDebugMenu()
@@ -473,6 +487,7 @@ namespace Voxelgine.States
 				_debugMenuWindow.Visible = false;
 			_gui?.UI.ClearFocus();
 			ApplyInputOwnership();
+			_logging.Log(GameLogLevel.Debug, "Input", "mode=Gameplay cursor=captured focus=none reason=debug-closed");
 		}
 
 		private void ApplyInputOwnership()
@@ -521,15 +536,37 @@ namespace Voxelgine.States
 				_client.Send(packet, true, GetClientTime());
 
 				if (message.StartsWith('/'))
-					_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
+					AppendChatEntry($"[Command] {message}", "Chat");
 			}
+		}
+
+		private void AppendChatEntry(string text, string category)
+		{
+			if (string.IsNullOrWhiteSpace(text))
+				return;
+
+			_chatToast?.Show(text, ToastType.Info, ChatMessageDuration);
+			_chatHistory.Add(text);
+			if (_chatHistoryBox != null)
+			{
+				_chatHistoryBox.Text = _chatHistory.Text;
+				_chatHistoryBox.ScrollToEnd();
+			}
+			_logging.Log(GameLogLevel.Info, category, text);
 		}
 
 		private void DisconnectAndReturn(string reason)
 		{
 			if (_client != null && _client.IsConnected)
 			{
-				try { _client.Disconnect(reason, GetClientTime()); } catch { }
+				try
+				{
+					_client.Disconnect(reason, GetClientTime());
+				}
+				catch (Exception exception)
+				{
+					_logging.Log(GameLogLevel.Warning, "Network", $"Disconnect send failed reason={reason}", exception);
+				}
 			}
 			Cleanup();
 			Window.SetState(Eng.AsClient().MainMenuState);
@@ -567,6 +604,7 @@ namespace Voxelgine.States
 			_pendingPlayerJoins.Clear();
 			_pendingEntityPackets.Clear();
 			_entitySnapshots.Clear();
+			_chatHistory.Clear();
 
 			// FishUI controls are owned by _gui; null the references
 			_loadingStatusLabel = null;
@@ -592,6 +630,8 @@ namespace Voxelgine.States
 			_chatToast = null;
 			_chatInputPanel = null;
 			_chatInputBox = null;
+			_chatHistoryBox = null;
+			_npcSpeechOverlay = null;
 			_inputOwnership.ResetMode();
 			_playerListPanel = null;
 			_playerListInfoLabel = null;

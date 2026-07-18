@@ -12,41 +12,51 @@ namespace Voxelgine.Engine
 	{
 		const string ConfigFileName = "data/config.json";
 
-		public int Monitor;
-		public int WindowWidth { get; set; }
+		public int Monitor = -1;
 
-		public int WindowHeight { get; set; }
+		public int WindowWidth { get; set; } = 1920;
 
-		public bool Fullscreen;
-		public bool UseFSDesktopRes;
-		public bool Borderless;
-		public bool SetFocused;
-		public bool Resizable;
+		public int WindowHeight { get; set; } = 1080;
 
-		public int TargetFPS;
-		public float MouseSensitivity;
+		public bool Fullscreen = false;
+
+		public bool UseFSDesktopRes = true;
+
+		public bool Borderless = false;
+
+		public bool SetFocused = true;
+
+		public bool Resizable = true;
+
+		public int TargetFPS = -1;
+
+		public float MouseSensitivity = 0.35f;
 
 		public string Title { get; set; } = "Aurora Falls";
 
 		public string LogFolder { get; set; } = "data";
 
 		[SettingsHidden]
-		public bool HighDpiWindow;
-
-		public bool VSync;
-		public bool Msaa;
+		public GameLogLevel LogLevel { get; set; } = GameLogLevel.Debug;
 
 		[SettingsHidden]
-		public int LastOptWnd_X;
+		public bool HighDpiWindow = true;
+
+		public bool VSync = true;
+
+		public bool Msaa = true;
 
 		[SettingsHidden]
-		public int LastOptWnd_Y;
+		public int LastOptWnd_X = 0;
 
 		[SettingsHidden]
-		public int LastOptWnd_W;
+		public int LastOptWnd_Y = 0;
 
 		[SettingsHidden]
-		public int LastOptWnd_H;
+		public int LastOptWnd_W = 0;
+
+		[SettingsHidden]
+		public int LastOptWnd_H = 0;
 
 		[SettingsHidden]
 		public KeyValuePair<InputKey, PhysicalMouseButton>[] MouseButtonDown;
@@ -57,33 +67,8 @@ namespace Voxelgine.Engine
 		[SettingsHidden]
 		public KeyValuePair<InputKey, KeyValuePair<PhysicalKey, PhysicalKey>>[] TwoKeysDown;
 
-		public void SetDefaults()
-		{
-			Monitor = -1;
-			WindowWidth = 1920;
-			WindowHeight = 1080;
-			Fullscreen = false;
-			UseFSDesktopRes = true;
-			Borderless = false;
-			SetFocused = true;
-			TargetFPS = -1;
-			MouseSensitivity = 0.35f;
-			HighDpiWindow = true;
-			VSync = true;
-			Msaa = true;
-			Resizable = true;
-
-
-			LastOptWnd_X = 0;
-			LastOptWnd_Y = 0;
-			LastOptWnd_W = 0;
-			LastOptWnd_H = 0;
-		}
-
 		public GameConfig(IFishEngineRunner _)
 		{
-			SetDefaults();
-
 			MouseButtonDown = Array.Empty<KeyValuePair<InputKey, PhysicalMouseButton>>();
 			KeyDown = Array.Empty<KeyValuePair<InputKey, PhysicalKey>>();
 			TwoKeysDown = Array.Empty<KeyValuePair<InputKey, KeyValuePair<PhysicalKey, PhysicalKey>>>();
@@ -91,11 +76,7 @@ namespace Voxelgine.Engine
 
 		public void SaveToJson()
 		{
-			JsonSerializerSettings JSS = new JsonSerializerSettings();
-			JSS.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
-			JSS.Converters.Add(new PhysicalKeyJsonConverter());
-			JSS.Converters.Add(new PhysicalMouseButtonJsonConverter());
-			string json = JsonConvert.SerializeObject(this, Formatting.Indented, JSS);
+			string json = JsonConvert.SerializeObject(this, Formatting.Indented, CreateJsonSettings());
 			File.WriteAllText(ConfigFileName, json);
 		}
 
@@ -104,10 +85,19 @@ namespace Voxelgine.Engine
 			if (!File.Exists(ConfigFileName))
 				return;
 			string json = File.ReadAllText(ConfigFileName);
-			JsonSerializerSettings settings = new JsonSerializerSettings();
+			JsonConvert.PopulateObject(json, this, CreateJsonSettings());
+		}
+
+		internal static JsonSerializerSettings CreateJsonSettings()
+		{
+			JsonSerializerSettings settings = new();
+			// The specific compatibility converters must precede StringEnumConverter.
+			// Otherwise legacy Raylib names such as Zero and Kp0 are interpreted as
+			// raw PhysicalKey enum members and fail before compatibility mapping runs.
 			settings.Converters.Add(new PhysicalKeyJsonConverter());
 			settings.Converters.Add(new PhysicalMouseButtonJsonConverter());
-			JsonConvert.PopulateObject(json, this, settings);
+			settings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
+			return settings;
 		}
 
 		public void GenerateDefaultKeybinds()

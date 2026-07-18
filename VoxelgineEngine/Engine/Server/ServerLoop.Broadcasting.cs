@@ -1,4 +1,5 @@
 using System.Numerics;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine.Server
 {
@@ -82,6 +83,9 @@ namespace Voxelgine.Engine.Server
 							Text = npc.SpeechText,
 							Duration = npc.SpeechDuration,
 						}, true, currentTime);
+						_logging.Log(GameLogLevel.Debug, "Speech", string.IsNullOrWhiteSpace(npc.SpeechText)
+							? $"Broadcast clear npcId={netId}"
+							: $"Broadcast npcId={netId} duration={npc.SpeechDuration:F2}s text={npc.SpeechText}");
 					}
 
 					// Skip if state hasn't changed since last broadcast

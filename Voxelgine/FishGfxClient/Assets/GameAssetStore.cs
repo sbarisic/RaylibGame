@@ -3,6 +3,7 @@ using FishGfx.Formats;
 using FishGfx.Graphics;
 using FishGfx.Graphics.Drawables;
 using System.Collections.Concurrent;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.FishGfxClient.Assets;
 
@@ -10,7 +11,7 @@ public sealed class GameAssetStore : IDisposable
 {
 	private readonly GraphicsContext graphics;
 	private readonly string root;
-	private readonly Action<string> log;
+	private readonly Action<GameLogLevel, string> log;
 	private readonly Dictionary<string, IAssetSlot> assets = new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, HashSet<string>> assetsByFile = new(StringComparer.OrdinalIgnoreCase);
 	private readonly object assetIndexLock = new();
@@ -19,11 +20,11 @@ public sealed class GameAssetStore : IDisposable
 	private int graphicsThreadId;
 	private bool disposed;
 
-	public GameAssetStore(GraphicsContext graphics, string resourceRoot, Action<string> log = null)
+	public GameAssetStore(GraphicsContext graphics, string resourceRoot, Action<GameLogLevel, string> log = null)
 	{
 		this.graphics = graphics ?? throw new ArgumentNullException(nameof(graphics));
 		root = Path.GetFullPath(resourceRoot ?? AppContext.BaseDirectory);
-		this.log = log ?? (_ => { });
+		this.log = log ?? ((_, _) => { });
 		graphicsThreadId = Environment.CurrentManagedThreadId;
 
 		watcher = new FileSystemWatcher(root)
@@ -88,6 +89,7 @@ public sealed class GameAssetStore : IDisposable
 		T value = loader();
 		AssetSlot<T> slot = new(id, value, loader);
 		assets.Add(id, slot);
+		log(GameLogLevel.Trace, $"Registered id={id} type={typeof(T).Name} sources={string.Join(';', sourcePaths)}");
 
 		lock (assetIndexLock)
 		{
@@ -154,10 +156,11 @@ public sealed class GameAssetStore : IDisposable
 			{
 				slot.ReloadAndSwap();
 				successful++;
+				log(GameLogLevel.Debug, $"Reloaded and swapped id={id}");
 			}
 			catch (Exception ex)
 			{
-				log($"[Assets] Reload of '{id}' failed; retaining the previous resource: {ex.Message}");
+				log(GameLogLevel.Error, $"Reload failed id={id}; retained previous resource. {ex}");
 			}
 		}
 
@@ -213,6 +216,7 @@ public sealed class GameAssetStore : IDisposable
 		foreach (string id in ids)
 		{
 			reloadQueue.Enqueue(id);
+			log(GameLogLevel.Trace, $"Queued reload id={id} path={fullPath}");
 		}
 	}
 

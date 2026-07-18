@@ -5,6 +5,7 @@ using Voxelgine.Audio;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
 using Voxelgine.FishGfxClient;
+using Voxelgine.GUI;
 using Voxelgine.States;
 
 namespace Voxelgine;
@@ -52,8 +53,23 @@ internal static class Program
 		}
 		IFishLogging logging = services.GetRequiredService<IFishLogging>();
 		logging.Init();
-		logging.WriteLine("Aurora Falls - Voxelgine Engine");
-		logging.WriteLine($"Running on {Utils.GetOSName()}");
+		FishUI.FishUIDebug.Logger = new FishUILoggingAdapter(logging);
+		FishUI.FishUIDebug.Enabled = true;
+		FishUI.FishUIDebug.LogControlEvents = true;
+		UnhandledExceptionEventHandler unhandledExceptionHandler = (_, eventArgs) =>
+		{
+			logging.Log(GameLogLevel.Fatal, "BackgroundThread", "Unhandled AppDomain exception.", eventArgs.ExceptionObject as Exception);
+		};
+		EventHandler<UnobservedTaskExceptionEventArgs> unobservedTaskHandler = (_, eventArgs) =>
+		{
+			logging.Log(GameLogLevel.Error, "Task", "Unobserved task exception.", eventArgs.Exception);
+			eventArgs.SetObserved();
+		};
+		AppDomain.CurrentDomain.UnhandledException += unhandledExceptionHandler;
+		TaskScheduler.UnobservedTaskException += unobservedTaskHandler;
+		logging.Log(GameLogLevel.Info, "Startup", "Aurora Falls - Voxelgine Engine");
+		logging.Log(GameLogLevel.Info, "Startup", $"Build={GetBuildConfiguration()} processId={Environment.ProcessId} logLevel={logging.MinimumLevel}");
+		logging.Log(GameLogLevel.Info, "Startup", $"OS={Utils.GetOSName()} workingDirectory={Environment.CurrentDirectory} baseDirectory={AppContext.BaseDirectory}");
 
 		IAudioSystem audio = services.GetRequiredService<IAudioSystem>();
 		InitializeAudio(audio, logging);
@@ -80,34 +96,49 @@ internal static class Program
 		}
 		catch (Exception exception)
 		{
-			logging.WriteLine($"Unhandled exception:{Environment.NewLine}{exception}");
+			logging.Log(GameLogLevel.Fatal, "MainLoop", "Unhandled client exception.", exception);
 			throw;
 		}
 		finally
 		{
 			try
 			{
+				logging.Log(GameLogLevel.Debug, "Shutdown", "Disposing game states.");
 				DisposeStates(engine, automaticState);
 			}
 			finally
 			{
 				try
 				{
+					logging.Log(GameLogLevel.Debug, "Shutdown", "Stopping and disposing audio.");
 					DisposeAudio(audio);
 				}
 				finally
 				{
 					try
 					{
+						logging.Log(GameLogLevel.Debug, "Shutdown", "Disposing graphics window and resources.");
 						window?.Dispose();
 					}
 					finally
 					{
+						logging.Log(GameLogLevel.Info, "Shutdown", "Client shutdown complete.");
+						AppDomain.CurrentDomain.UnhandledException -= unhandledExceptionHandler;
+						TaskScheduler.UnobservedTaskException -= unobservedTaskHandler;
 						(logging as IDisposable)?.Dispose();
 					}
 				}
 			}
 		}
+	}
+
+	private static string GetBuildConfiguration()
+	{
+#if DEBUG
+		return "Debug";
+#else
+		return "Release";
+#endif
 	}
 
 	private static void DisposeStates(IClientEngineRunner engine, GameStateImpl automaticState)
@@ -180,7 +211,7 @@ internal static class Program
 			IFishLogging logging = provider.GetRequiredService<IFishLogging>();
 			return new AudioSystem(new AudioSystemOptions
 			{
-				Log = logging.WriteLine
+				Log = message => logging.Log(GameLogLevel.Debug, "Audio", message)
 			});
 		});
 		_ = services.Build();
@@ -194,15 +225,13 @@ internal static class Program
 		{
 			AudioCueBank.LoadDefault().RegisterWith(audio);
 			audio.SetBusGain(AudioBus.Master, 0.7f);
-			logging.WriteLine(audio.IsAvailable
+			logging.Log(audio.IsAvailable ? GameLogLevel.Info : GameLogLevel.Warning, "Audio", audio.IsAvailable
 				? "miniaudio initialized."
 				: "miniaudio unavailable; continuing silently.");
 		}
 		catch (Exception exception)
 		{
-			logging.WriteLine(
-				$"Audio cue bank failed to load; continuing silently: {exception.Message}"
-			);
+			logging.Log(GameLogLevel.Error, "Audio", "Audio cue bank failed to load; continuing silently.", exception);
 		}
 	}
 

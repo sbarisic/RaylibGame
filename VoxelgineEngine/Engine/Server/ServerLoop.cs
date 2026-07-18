@@ -87,7 +87,7 @@ namespace Voxelgine.Engine.Server
 		/// can match predictions to the correct tick during reconciliation.
 		/// </summary>
 		private readonly Dictionary<int, int> _lastInputTicks = new();
-		private readonly PlayerDataStore _playerData = new();
+		private readonly PlayerDataStore _playerData;
 
 		private float _lastTimeSyncTime;
 
@@ -126,7 +126,7 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		public NetServer Server => _server;
 
-		public ServerLoop()
+		public ServerLoop(GameLogLevel minimumLogLevel = GameLogLevel.Trace)
 		{
 			_di = new FishDI();
 			_di.AddSingleton<IFishEngineRunner, ServerEngineRunner>();
@@ -143,10 +143,13 @@ namespace Voxelgine.Engine.Server
 			_eng = eng;
 
 			ServerConfig cfg = _di.GetRequiredService<ServerConfig>();
-			cfg.LogFolder = "server_logs";
+			cfg.LogFolder = "data";
+			cfg.LogLevel = minimumLogLevel;
 
 			_logging = _di.GetRequiredService<IFishLogging>();
 			_logging.Init(true);
+			_playerData = new PlayerDataStore("data/players", _logging);
+			_logging.Log(GameLogLevel.Info, "Startup", $"Server initialized processId={Environment.ProcessId} logLevel={minimumLogLevel} workingDirectory={Environment.CurrentDirectory}");
 
 			_server = new NetServer(_logging);
 #if DEBUG
@@ -224,6 +227,11 @@ namespace Voxelgine.Engine.Server
 		public void Stop()
 		{
 			_running = false;
+		}
+
+		public void Log(GameLogLevel level, string category, string message, Exception exception = null)
+		{
+			_logging.Log(level, category, message, exception);
 		}
 
 		private void RunLoop()
@@ -365,7 +373,7 @@ namespace Voxelgine.Engine.Server
 			}
 			catch (Exception ex)
 			{
-				_logging.ServerWriteLine($"ERROR: Failed to save world: {ex.Message}");
+				_logging.Log(GameLogLevel.Error, "Persistence", $"Failed to save world path={Path.GetFullPath(MapFile)}", ex);
 			}
 		}
 
@@ -430,7 +438,8 @@ namespace Voxelgine.Engine.Server
 			public int WindowWidth { get; set; } = 0;
 			public int WindowHeight { get; set; } = 0;
 			public string Title { get; set; } = "VoxelgineServer";
-			public string LogFolder { get; set; } = "server_logs";
+			public string LogFolder { get; set; } = "data";
+			public GameLogLevel LogLevel { get; set; } = GameLogLevel.Trace;
 			public void LoadFromJson() { }
 		}
 

@@ -17,12 +17,14 @@ internal sealed class FishGfxEntityModel : IDisposable
 	private const float DegreesToRadians = MathF.PI / 180;
 	private readonly List<ModelPart> parts = new();
 	private readonly Dictionary<string, ModelPart> partsByName = new(StringComparer.Ordinal);
+	private readonly Winding winding;
 	private bool disposed;
 
 	public FishGfxEntityModel(GraphicsContext graphics, EntityModelSource source)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		ArgumentNullException.ThrowIfNull(source);
+		winding = source.FrontFaceWinding;
 
 		try
 		{
@@ -61,6 +63,10 @@ internal sealed class FishGfxEntityModel : IDisposable
 		ArgumentNullException.ThrowIfNull(texture);
 
 		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		using IDisposable stateScope = pass.PushState(pass.State with
+		{
+			Winding = winding,
+		});
 		foreach (ModelPart part in parts)
 		{
 			part.Mesh.DefaultColor = tint;

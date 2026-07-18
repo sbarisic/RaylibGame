@@ -75,9 +75,9 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			"entity.humanoid.alternate-texture",
 			Path.Combine(textures, EntityAssetIds.HumanoidTextureAlternate)
 		);
-		AssetHandle<Texture> doorTexture = window.Assets.LoadTexture(
+		AssetHandle<Texture> doorTexture = window.Assets.Register(
 			"entity.door.texture",
-			Path.Combine(models, EntityAssetIds.SlidingDoorTexture)
+			() => SlidingDoorTextureFactory.Create(window.RenderWindow.Graphics)
 		);
 		AssetHandle<Texture> orbTexture = window.Assets.LoadTexture(
 			"entity.orb.texture",

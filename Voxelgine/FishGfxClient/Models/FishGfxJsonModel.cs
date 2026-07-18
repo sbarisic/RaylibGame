@@ -45,6 +45,10 @@ public sealed class FishGfxJsonModel
 
 	public void Draw(RenderPass pass, Vector3 position, Vector3 scale, Quaternion rotation)
 	{
+		using IDisposable stateScope = pass.PushState(pass.State with
+		{
+			Winding = Winding.CounterClockwise,
+		});
 		using IDisposable modelScope = pass.PushModel(Camera.CreateModel(position, scale, rotation));
 		pass.DrawMesh(mesh.Value, texture.Value);
 	}

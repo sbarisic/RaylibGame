@@ -196,14 +196,15 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 	public void Render(float interpolationAlpha)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
-		if (state is null)
+		GameStateImpl renderingState = state;
+		if (renderingState is null)
 		{
 			return;
 		}
 
 		timing = timing with { InterpolationAlpha = interpolationAlpha };
-		state.BeginFrame(timing);
-		renderGraph.Render(state, timing, RenderWindow.FramebufferSize);
+		renderingState.BeginFrame(timing);
+		renderGraph.Render(renderingState, timing, RenderWindow.FramebufferSize);
 		ApplyFrameLimiter();
 	}
 

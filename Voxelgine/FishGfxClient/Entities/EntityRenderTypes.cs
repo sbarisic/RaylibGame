@@ -17,7 +17,6 @@ public static class EntityAssetIds
 	public const string SlidingDoorModel = "door/door.json";
 	public const string ExperienceOrbModel = "orb_xp/orb_xp.obj";
 
-	internal const string SlidingDoorTexture = "door/door_tex.png";
 	internal const string ExperienceOrbTexture = "orb_xp/orb_xp.png";
 }
 

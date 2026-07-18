@@ -114,6 +114,15 @@ internal static class Program
 			automaticState = new FishGfxGameplaySmokeState(window, engine);
 			return automaticState;
 		}
+		if (args.Contains("--fishgfx-auto-transition", StringComparer.OrdinalIgnoreCase))
+		{
+			automaticState = new FishGfxStateTransitionSmokeState(
+				window,
+				engine,
+				engine.MainMenuState
+			);
+			return automaticState;
+		}
 		if (args.Contains("--fishgfx-auto-npc", StringComparer.OrdinalIgnoreCase))
 		{
 			return engine.NPCPreviewState;

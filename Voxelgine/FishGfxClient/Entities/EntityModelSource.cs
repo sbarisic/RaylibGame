@@ -1,6 +1,7 @@
 #if WINDOWS
 using FishGfx;
 using FishGfx.Formats;
+using FishGfx.Graphics;
 using System.Numerics;
 using System.Text.Json;
 using Voxelgine.Engine.Geometry;
@@ -14,7 +15,13 @@ internal sealed class EntityModelSource
 	private static readonly int[] TriangleOrder = [0, 1, 2, 3, 0, 2];
 	private readonly List<EntityModelPartSource> parts = new();
 
+	private EntityModelSource(Winding winding)
+	{
+		FrontFaceWinding = winding;
+	}
+
 	public IReadOnlyList<EntityModelPartSource> Parts => parts;
+	public Winding FrontFaceWinding { get; }
 
 	public static EntityModelSource LoadBlockModel(string path)
 	{
@@ -30,7 +37,7 @@ internal sealed class EntityModelSource
 				throw new FormatException("Block model requires an elements array.");
 			}
 
-			EntityModelSource source = new();
+			EntityModelSource source = new(Winding.CounterClockwise);
 			int index = 0;
 			foreach (JsonElement element in elements.EnumerateArray())
 			{
@@ -52,7 +59,7 @@ internal sealed class EntityModelSource
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(path);
 		IReadOnlyList<GenericMesh> meshes = ObjModelSerializer.Load(path);
-		EntityModelSource source = new();
+		EntityModelSource source = new(Winding.Clockwise);
 		int index = 0;
 		foreach (GenericMesh generic in meshes)
 		{

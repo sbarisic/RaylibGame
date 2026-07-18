@@ -124,6 +124,38 @@ public sealed class PlayerPhysicsCorrectionTests
 		Assert.Equal(new Vector3(6f, -3f, 1.2f), velocity);
 	}
 
+	[Theory]
+	[InlineData(89.9f)]
+	[InlineData(-89.9f)]
+	public unsafe void ForwardInputHasNoArbitraryHorizontalDirectionAtVerticalPitch(float pitch)
+	{
+		Player player = CreatePlayer();
+		player.Camera.CamAngle = new Vector3(0f, pitch, 0f);
+		player.UpdateDirectionVectors();
+		player.ApplyPhysicsState(new PlayerPhysicsState(
+			new Vector3(0.5f, 10f, 0.5f),
+			Vector3.Zero,
+			0f,
+			0f,
+			0f,
+			0f,
+			Vector3.Zero,
+			false,
+			false));
+		NetworkInputSource source = new();
+		InputMgr input = new(source);
+		InputState state = new();
+		state.KeysDown[(int)InputKey.W] = true;
+		source.SetState(state);
+		input.Tick(0f);
+
+		player.UpdatePhysics(new PhysicsWorld(new ChunkMap()), new PhysData(), 0.015f, input);
+		PlayerPhysicsState result = player.CapturePhysicsState();
+
+		Assert.Equal(0f, result.Velocity.X);
+		Assert.Equal(0f, result.Velocity.Z);
+	}
+
 	[Fact]
 	public unsafe void RepeatedCorrectionsRemainExactForTenThousandTicks()
 	{

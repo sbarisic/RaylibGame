@@ -363,7 +363,7 @@ namespace Voxelgine.Engine
 		{
 			Vector3 forward = GetForward();
 			forward.Y = 0f;
-			forward = forward.LengthSquared() > 0.0001f ? Vector3.Normalize(forward) : Vector3.UnitX;
+			forward = forward.LengthSquared() > 0.0001f ? Vector3.Normalize(forward) : Vector3.Zero;
 
 			Vector3 left = GetLeft();
 			left.Y = 0f;

@@ -58,7 +58,7 @@ namespace Voxelgine.Engine
 			// Debug info label
 			InfoLbl = new FishUIInfoLabel
 			{
-				Position = new Vector2(20, 40),
+				Position = new Vector2(20, 140),
 				Size = new Vector2(300, 250),
 				Visible = Eng.DebugMode
 			};

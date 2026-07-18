@@ -20,6 +20,28 @@ public partial class MainMenuStateFishUI
 		165,
 		240,
 	};
+	private static readonly int[] ChunkDrawDistancePresets =
+	{
+		64,
+		96,
+		GameConfig.DefaultMaxChunkDrawDistance,
+		128,
+		160,
+		192,
+		256,
+		320,
+	};
+	private static readonly int[] ChunkMeshUploadBudgetPresets =
+	{
+		4,
+		8,
+		12,
+		16,
+		GameConfig.DefaultChunkMeshUploadBudget,
+		32,
+		48,
+		64,
+	};
 	private static readonly GameResolution[] StandardWindowedResolutions =
 	{
 		new GameResolution(640, 480, false),
@@ -41,6 +63,8 @@ public partial class MainMenuStateFishUI
 	private DropDown displayModeDropDown;
 	private DropDown resolutionDropDown;
 	private DropDown frameRateDropDown;
+	private DropDown chunkDrawDistanceDropDown;
+	private DropDown chunkMeshUploadBudgetDropDown;
 	private ToggleSwitch vsyncToggle;
 	private ToggleSwitch msaaToggle;
 	private Slider sensitivitySlider;
@@ -67,6 +91,7 @@ public partial class MainMenuStateFishUI
 
 		CreateDisplayOptions(tabs.AddTab("Display").Content);
 		CreateControlOptions(tabs.AddTab("Controls").Content);
+		CreatePerformanceOptions(tabs.AddTab("Performance").Content);
 		CreateAdvancedOptions(tabs.AddTab("Advanced").Content);
 
 		var defaultsButton = new Button
@@ -249,6 +274,54 @@ public partial class MainMenuStateFishUI
 		resizableToggle.OnToggleChanged += (_, value) => SetDraftValue(() => optionsDraft.Resizable = value);
 	}
 
+	private void CreatePerformanceOptions(Panel content)
+	{
+		chunkDrawDistanceDropDown = CreateDropDown("options_chunk_draw_distance");
+		AddOptionRow(
+			content,
+			24,
+			"Chunk Draw Distance",
+			"Maximum chunk-rendering distance in world blocks.",
+			chunkDrawDistanceDropDown
+		);
+		chunkDrawDistanceDropDown.OnItemSelected += (_, item) =>
+		{
+			if (synchronizingOptions || item.UserData is not int drawDistance)
+			{
+				return;
+			}
+
+			optionsDraft.MaxChunkDrawDistance = drawDistance;
+			UpdateOptionsDirtyState();
+		};
+
+		chunkMeshUploadBudgetDropDown = CreateDropDown("options_chunk_mesh_upload_budget");
+		AddOptionRow(
+			content,
+			100,
+			"Chunk Mesh Uploads",
+			"Maximum completed chunk meshes uploaded per frame.",
+			chunkMeshUploadBudgetDropDown
+		);
+		chunkMeshUploadBudgetDropDown.OnItemSelected += (_, item) =>
+		{
+			if (synchronizingOptions || item.UserData is not int meshUploadBudget)
+			{
+				return;
+			}
+
+			optionsDraft.ChunkMeshUploadBudget = meshUploadBudget;
+			UpdateOptionsDirtyState();
+		};
+
+		content.AddChild(new Label
+		{
+			Text = "Higher values load distant scenery faster, but increase CPU, GPU, and upload work.",
+			Position = new Vector2(18, 184),
+			Size = new Vector2(580, 44),
+		});
+	}
+
 	private static DropDown CreateDropDown(string id)
 	{
 		return new DropDown
@@ -330,6 +403,7 @@ public partial class MainMenuStateFishUI
 			vsyncToggle.IsOn = optionsDraft.VSync;
 			msaaToggle.IsOn = optionsDraft.Msaa;
 			RefreshFrameRateChoices();
+			RefreshOptimizationChoices();
 			sensitivitySlider.Value = optionsDraft.MouseSensitivity;
 			RefreshSensitivityLabel();
 			focusToggle.IsOn = optionsDraft.SetFocused;
@@ -449,6 +523,42 @@ public partial class MainMenuStateFishUI
 		}
 
 		SelectItem(frameRateDropDown, item => item.UserData is int value && value == optionsDraft.TargetFps);
+	}
+
+	private void RefreshOptimizationChoices()
+	{
+		RefreshIntegerChoices(
+			chunkDrawDistanceDropDown,
+			ChunkDrawDistancePresets,
+			optionsDraft.MaxChunkDrawDistance,
+			value => $"{value} blocks"
+		);
+		RefreshIntegerChoices(
+			chunkMeshUploadBudgetDropDown,
+			ChunkMeshUploadBudgetPresets,
+			optionsDraft.ChunkMeshUploadBudget,
+			value => $"{value} per frame"
+		);
+	}
+
+	private static void RefreshIntegerChoices(
+		DropDown dropDown,
+		IEnumerable<int> presets,
+		int selectedValue,
+		Func<int, string> format)
+	{
+		dropDown.ClearItems();
+		foreach (int value in presets.Distinct())
+		{
+			dropDown.AddItem(new DropDownItem(format(value), value));
+		}
+
+		if (!dropDown.Items.Any(item => item.UserData is int value && value == selectedValue))
+		{
+			dropDown.AddItem(new DropDownItem($"{format(selectedValue)} (Current)", selectedValue));
+		}
+
+		SelectItem(dropDown, item => item.UserData is int value && value == selectedValue);
 	}
 
 	private static void SelectItem(DropDown dropDown, Func<DropDownItem, bool> predicate)
@@ -571,5 +681,7 @@ public partial class MainMenuStateFishUI
 		displayModeDropDown?.Close();
 		resolutionDropDown?.Close();
 		frameRateDropDown?.Close();
+		chunkDrawDistanceDropDown?.Close();
+		chunkMeshUploadBudgetDropDown?.Close();
 	}
 }

@@ -11,6 +11,12 @@ namespace Voxelgine.Engine
 	public class GameConfig : IFishConfig
 	{
 		const string ConfigFileName = "data/config.json";
+		public const int DefaultMaxChunkDrawDistance = 108;
+		public const int MinimumMaxChunkDrawDistance = 32;
+		public const int MaximumMaxChunkDrawDistance = 512;
+		public const int DefaultChunkMeshUploadBudget = 24;
+		public const int MinimumChunkMeshUploadBudget = 1;
+		public const int MaximumChunkMeshUploadBudget = 128;
 
 		public int Monitor = -1;
 
@@ -37,7 +43,7 @@ namespace Voxelgine.Engine
 		public string LogFolder { get; set; } = "data";
 
 		[SettingsHidden]
-		public GameLogLevel LogLevel { get; set; } = GameLogLevel.Debug;
+		public GameLogLevel LogLevel { get; set; } = GameLogLevel.Debug; // Leave default to Debug, i'll change to Trace when required
 
 		[SettingsHidden]
 		public bool HighDpiWindow = true;
@@ -45,6 +51,10 @@ namespace Voxelgine.Engine
 		public bool VSync = true;
 
 		public bool Msaa = true;
+
+		public int MaxChunkDrawDistance = DefaultMaxChunkDrawDistance;
+
+		public int ChunkMeshUploadBudget = DefaultChunkMeshUploadBudget;
 
 		[SettingsHidden]
 		public int LastOptWnd_X = 0;

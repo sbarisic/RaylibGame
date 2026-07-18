@@ -17,15 +17,14 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly CampfireEmitterIndex campfires = new();
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
+	private readonly VoxelRendererOptions rendererOptions;
 	private float skyLightMultiplier = 1;
 	private byte minimumAmbientLight;
 	private int resetPending;
 	private bool disposed;
 
-	public FishGfxVoxelScene(
-		GraphicsContext graphics,
-		GameAssetStore assetStore,
-		ChunkMap source)
+	public FishGfxVoxelScene(GraphicsContext graphics, GameAssetStore assetStore, ChunkMap source,
+		int maxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance, int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		this.source = source ?? throw new ArgumentNullException(nameof(source));
@@ -35,6 +34,21 @@ public sealed class FishGfxVoxelScene : IDisposable
 			World,
 			assets.Palette,
 			new VoxelLightingOptions { UpdateBudget = 65_536 });
+		rendererOptions = new VoxelRendererOptions
+		{
+			WorkerCount = Math.Max(2, Environment.ProcessorCount - 1),
+			MaxRenderDistance = Math.Clamp(
+				maxChunkDrawDistance,
+				GameConfig.MinimumMaxChunkDrawDistance,
+				GameConfig.MaximumMaxChunkDrawDistance
+			),
+			MeshUploadBudget = Math.Clamp(
+				chunkMeshUploadBudget,
+				GameConfig.MinimumChunkMeshUploadBudget,
+				GameConfig.MaximumChunkMeshUploadBudget
+			),
+			MeshUploadTimeBudgetMilliseconds = 2,
+		};
 		Renderer = new VoxelRenderer(
 			graphics,
 			World,
@@ -42,13 +56,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			assets.Atlas,
 			assets.AtlasLayout,
 			Lighting,
-			new VoxelRendererOptions
-			{
-				WorkerCount = Math.Max(2, Environment.ProcessorCount - 1),
-				MaxRenderDistance = 108,
-				MeshUploadBudget = 24,
-				MeshUploadTimeBudgetMilliseconds = 2,
-			});
+			rendererOptions);
 
 		source.BlockChanged += QueueChange;
 		source.WorldReset += QueueReset;
@@ -68,6 +76,25 @@ public sealed class FishGfxVoxelScene : IDisposable
 	public IReadOnlyList<VoxelFireEmitter> FireParticleEmitters => campfires.ParticleEmitters;
 
 	public int TorchCount => campfires.TorchCount;
+
+	public int MaxChunkDrawDistance => (int)rendererOptions.MaxRenderDistance;
+
+	public int ChunkMeshUploadBudget => rendererOptions.MeshUploadBudget;
+
+	public void SetOptimizationSettings(int maxChunkDrawDistance, int chunkMeshUploadBudget)
+	{
+		ThrowIfDisposed();
+		rendererOptions.MaxRenderDistance = Math.Clamp(
+			maxChunkDrawDistance,
+			GameConfig.MinimumMaxChunkDrawDistance,
+			GameConfig.MaximumMaxChunkDrawDistance
+		);
+		rendererOptions.MeshUploadBudget = Math.Clamp(
+			chunkMeshUploadBudget,
+			GameConfig.MinimumChunkMeshUploadBudget,
+			GameConfig.MaximumChunkMeshUploadBudget
+		);
+	}
 
 	public void SetEnvironmentLighting(float skyMultiplier, byte ambientLight)
 	{

@@ -84,6 +84,7 @@ namespace Voxelgine.States
 
 		// FishUI HUD controls — Connection status
 		private Label _connectionStatusLabel;
+		private Label _frameRateLabel;
 
 		// FishUI HUD controls — Player list
 		private Panel _playerListPanel;
@@ -630,6 +631,8 @@ namespace Voxelgine.States
 			_connectionLostMenuLabel = null;
 			_debugMenuWindow = null;
 			_connectionStatusLabel = null;
+			_frameRateLabel = null;
+			_frameRateCounter.Reset();
 			_chatToast = null;
 			_chatInputPanel = null;
 			_chatInputBox = null;

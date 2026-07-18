@@ -69,6 +69,41 @@ public sealed class MainMenuOptionsTests
 		Assert.Equal(768, destination.WindowHeight);
 	}
 
+	[Fact]
+	public void CustomOptimizationSettingsSurviveDraftRoundTrip()
+	{
+		GameConfig config = CreateConfig();
+		config.MaxChunkDrawDistance = 173;
+		config.ChunkMeshUploadBudget = 37;
+
+		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
+		GameConfig destination = CreateConfig();
+		draft.ApplyTo(destination);
+
+		Assert.Equal(173, destination.MaxChunkDrawDistance);
+		Assert.Equal(37, destination.ChunkMeshUploadBudget);
+	}
+
+	[Theory]
+	[InlineData(1, 0, GameConfig.MinimumMaxChunkDrawDistance, GameConfig.MinimumChunkMeshUploadBudget)]
+	[InlineData(173, 37, 173, 37)]
+	[InlineData(4096, 999, GameConfig.MaximumMaxChunkDrawDistance, GameConfig.MaximumChunkMeshUploadBudget)]
+	public void OptimizationSettingsAreClamped(
+		int configuredDistance,
+		int configuredUploadBudget,
+		int expectedDistance,
+		int expectedUploadBudget)
+	{
+		GameConfig config = CreateConfig();
+		config.MaxChunkDrawDistance = configuredDistance;
+		config.ChunkMeshUploadBudget = configuredUploadBudget;
+
+		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
+
+		Assert.Equal(expectedDistance, draft.MaxChunkDrawDistance);
+		Assert.Equal(expectedUploadBudget, draft.ChunkMeshUploadBudget);
+	}
+
 	[Theory]
 	[InlineData(-10f, GameOptionsDraft.MinimumMouseSensitivity)]
 	[InlineData(0.2f, 0.2f)]
@@ -160,6 +195,8 @@ public sealed class MainMenuOptionsTests
 		Assert.Contains("\"UseFSDesktopRes\"", roundTrip, StringComparison.Ordinal);
 		Assert.Contains("\"LogLevel\":\"Trace\"", roundTrip.Replace(" ", string.Empty), StringComparison.Ordinal);
 		Assert.Contains("\"MouseSensitivity\"", roundTrip, StringComparison.Ordinal);
+		Assert.Equal(GameConfig.DefaultMaxChunkDrawDistance, config.MaxChunkDrawDistance);
+		Assert.Equal(GameConfig.DefaultChunkMeshUploadBudget, config.ChunkMeshUploadBudget);
 	}
 
 	[Fact]

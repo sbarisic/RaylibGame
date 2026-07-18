@@ -24,6 +24,7 @@ public unsafe partial class MPClientGameState
 	private float _clientFrameTime;
 	private float _clientDeltaTime;
 	private bool _hasClientFrameTime;
+	private readonly RollingFrameRateCounter _frameRateCounter = new();
 
 #if WINDOWS
 	private readonly RenderQueue _fishRenderQueue = new();
@@ -132,10 +133,13 @@ public unsafe partial class MPClientGameState
 			return;
 		}
 
+		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
 		_fishVoxelScene = new FishGfxVoxelScene(
 			fishWindow.RenderWindow.Graphics,
 			fishWindow.Assets,
-			_simulation.Map
+			_simulation.Map,
+			config.MaxChunkDrawDistance,
+			config.ChunkMeshUploadBudget
 		);
 		_fishCelestial = new FishGfxCelestialLayer(fishWindow);
 		_fishParticleAssets ??= FishGfxGameplayParticleAssets.Register(fishWindow.Assets);
@@ -146,8 +150,8 @@ public unsafe partial class MPClientGameState
 		);
 		_logging?.Log(
 			GameLogLevel.Debug,
-			"Particles",
-			$"Indexed voxel fire emitters campfires={_fishVoxelScene.CampfirePositions.Count} torches={_fishVoxelScene.TorchCount}"
+			"VoxelRenderer",
+			$"Configured drawDistance={_fishVoxelScene.MaxChunkDrawDistance} meshUploadBudget={_fishVoxelScene.ChunkMeshUploadBudget}; indexed fire emitters campfires={_fishVoxelScene.CampfirePositions.Count} torches={_fishVoxelScene.TorchCount}"
 		);
 		_fishAmbience = new FishGfxAmbienceSession(
 			Eng.DI.GetRequiredService<IAudioSystem>(),
@@ -764,6 +768,11 @@ public unsafe partial class MPClientGameState
 
 	private void UpdateFishGfxUi(in FrameTiming timing)
 	{
+		if (timing.DeltaTime > 0)
+		{
+			_frameRateCounter.Update(timing.TotalTime, timing.DeltaTime);
+		}
+
 		_totalTime = timing.TotalTime;
 		if (!_initialized)
 		{

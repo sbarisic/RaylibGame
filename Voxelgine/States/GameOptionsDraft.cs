@@ -41,6 +41,10 @@ internal sealed record GameOptionsDraft
 
 	public bool Msaa { get; set; }
 
+	public int MaxChunkDrawDistance { get; set; }
+
+	public int ChunkMeshUploadBudget { get; set; }
+
 	public bool SetFocused { get; set; }
 
 	public bool Resizable { get; set; }
@@ -72,6 +76,16 @@ internal sealed record GameOptionsDraft
 			),
 			VSync = config.VSync,
 			Msaa = config.Msaa,
+			MaxChunkDrawDistance = Math.Clamp(
+				config.MaxChunkDrawDistance,
+				GameConfig.MinimumMaxChunkDrawDistance,
+				GameConfig.MaximumMaxChunkDrawDistance
+			),
+			ChunkMeshUploadBudget = Math.Clamp(
+				config.ChunkMeshUploadBudget,
+				GameConfig.MinimumChunkMeshUploadBudget,
+				GameConfig.MaximumChunkMeshUploadBudget
+			),
 			SetFocused = config.SetFocused,
 			Resizable = config.Resizable,
 		};
@@ -88,6 +102,8 @@ internal sealed record GameOptionsDraft
 			MouseSensitivity = 0.35f,
 			VSync = true,
 			Msaa = true,
+			MaxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
+			ChunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
 			SetFocused = true,
 			Resizable = true,
 		};
@@ -106,6 +122,16 @@ internal sealed record GameOptionsDraft
 		);
 		config.VSync = VSync;
 		config.Msaa = Msaa;
+		config.MaxChunkDrawDistance = Math.Clamp(
+			MaxChunkDrawDistance,
+			GameConfig.MinimumMaxChunkDrawDistance,
+			GameConfig.MaximumMaxChunkDrawDistance
+		);
+		config.ChunkMeshUploadBudget = Math.Clamp(
+			ChunkMeshUploadBudget,
+			GameConfig.MinimumChunkMeshUploadBudget,
+			GameConfig.MaximumChunkMeshUploadBudget
+		);
 		config.SetFocused = SetFocused;
 		config.Resizable = Resizable;
 

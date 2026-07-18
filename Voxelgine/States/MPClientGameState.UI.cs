@@ -110,6 +110,16 @@ namespace Voxelgine.States
 			};
 			_gui.AddControl(_connectionStatusLabel);
 
+			_frameRateLabel = new Label
+			{
+				Text = "FPS: --",
+				Position = new Vector2(screenW - 120, 32),
+				Size = new Vector2(110, 22),
+				Alignment = Align.Right,
+			};
+			_frameRateLabel.SetColorOverride("Text", FishColor.White);
+			_gui.AddControl(_frameRateLabel);
+
 			// Health bar — bottom-center, fuel-style zones (red-yellow-green)
 			int barW = 200;
 			int barH = 20;
@@ -626,6 +636,14 @@ namespace Voxelgine.States
 		/// </summary>
 		private void UpdateConnectionStatus()
 		{
+			if (_frameRateLabel != null)
+			{
+				double framesPerSecond = _frameRateCounter.FramesPerSecond;
+				_frameRateLabel.Text = framesPerSecond > 0
+					? $"FPS: {framesPerSecond:0}"
+					: "FPS: --";
+			}
+
 			if (_connectionStatusLabel == null || _client == null)
 				return;
 
@@ -796,6 +814,8 @@ namespace Voxelgine.States
 			// Connection status indicator — top-right
 			if (_connectionStatusLabel != null)
 				_connectionStatusLabel.Position = new Vector2(screenW - 120, 10);
+			if (_frameRateLabel != null)
+				_frameRateLabel.Position = new Vector2(screenW - 120, 32);
 
 			// Chat toast — bottom-left above input
 			if (_chatToast != null)

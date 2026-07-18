@@ -418,6 +418,7 @@ namespace Voxelgine.Engine.Server
 			_disposed = true;
 			Stop();
 			_server.Dispose();
+			(_logging as IDisposable)?.Dispose();
 		}
 
 		/// <summary>

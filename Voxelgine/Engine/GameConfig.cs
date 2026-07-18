@@ -97,7 +97,7 @@ namespace Voxelgine.Engine
 
 		public string Title { get; set; } = "Aurora Falls";
 
-		public string LogFolder { get; set; } = "data/logs";
+		public string LogFolder { get; set; } = "data";
 
 		[SettingsHidden]
 		public bool HighDpiWindow;

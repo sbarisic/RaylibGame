@@ -69,35 +69,57 @@ internal static class Program
 			engine.Init();
 			RunLoop(args, engine, services, window, audio, logging, initialState);
 		}
+		catch (Exception exception)
+		{
+			logging.WriteLine($"Unhandled exception:{Environment.NewLine}{exception}");
+			throw;
+		}
 		finally
 		{
 			try
 			{
-				automaticState?.Dispose();
-				engine.MultiplayerGameState?.Dispose();
-				engine.EffectsPreviewState?.Dispose();
-				engine.NPCPreviewState?.Dispose();
-				engine.MainMenuState?.Dispose();
+				DisposeStates(engine, automaticState);
 			}
 			finally
 			{
 				try
 				{
-					audio.StopAll();
-					audio.Update(0);
+					DisposeAudio(audio);
 				}
 				finally
 				{
 					try
 					{
-						audio.Dispose();
+						window?.Dispose();
 					}
 					finally
 					{
-						window?.Dispose();
+						(logging as IDisposable)?.Dispose();
 					}
 				}
 			}
+		}
+	}
+
+	private static void DisposeStates(IClientEngineRunner engine, GameStateImpl automaticState)
+	{
+		automaticState?.Dispose();
+		engine.MultiplayerGameState?.Dispose();
+		engine.EffectsPreviewState?.Dispose();
+		engine.NPCPreviewState?.Dispose();
+		engine.MainMenuState?.Dispose();
+	}
+
+	private static void DisposeAudio(IAudioSystem audio)
+	{
+		try
+		{
+			audio.StopAll();
+			audio.Update(0);
+		}
+		finally
+		{
+			audio.Dispose();
 		}
 	}
 

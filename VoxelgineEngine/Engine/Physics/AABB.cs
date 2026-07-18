@@ -14,23 +14,27 @@ namespace Voxelgine.Engine
 		public Vector3 Position;
 		public Vector3 Size;
 
-		public bool IsEmpty
-		{
-			get; private set;
-		}
+		public bool IsEmpty =>
+			!float.IsFinite(Position.X) ||
+			!float.IsFinite(Position.Y) ||
+			!float.IsFinite(Position.Z) ||
+			!float.IsFinite(Size.X) ||
+			!float.IsFinite(Size.Y) ||
+			!float.IsFinite(Size.Z) ||
+			Size.X <= 0 ||
+			Size.Y <= 0 ||
+			Size.Z <= 0;
 
 		public AABB()
 		{
 			Position = Vector3.Zero;
 			Size = Vector3.One;
-			Calc();
 		}
 
 		public AABB(Vector3 Position, Vector3 Size)
 		{
 			this.Position = Position;
 			this.Size = Size;
-			Calc();
 		}
 
 		public AABB Offset(Vector3 Offset)
@@ -40,14 +44,12 @@ namespace Voxelgine.Engine
 
 		public bool Contains(Vector3 Point)
 		{
+			if (IsEmpty)
+				return false;
+
 			return Point.X >= Position.X && Point.X <= Position.X + Size.X &&
 				   Point.Y >= Position.Y && Point.Y <= Position.Y + Size.Y &&
 				   Point.Z >= Position.Z && Point.Z <= Position.Z + Size.Z;
-		}
-
-		void Calc()
-		{
-			IsEmpty = Size.X == 0 && Size.Y == 0 && Size.Z == 0;
 		}
 
 		public Vector3[] GetCorners()
@@ -71,6 +73,11 @@ namespace Voxelgine.Engine
 
 		public static AABB Union(AABB A, AABB B)
 		{
+			if (A.IsEmpty)
+				return B;
+			if (B.IsEmpty)
+				return A;
+
 			Vector3 min = Vector3.Min(A.Position, B.Position);
 			Vector3 max = Vector3.Max(A.Position + A.Size, B.Position + B.Size);
 			return new AABB(min, max - min);
@@ -81,14 +88,17 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public bool Overlaps(AABB other)
 		{
+			if (IsEmpty || other.IsEmpty)
+				return false;
+
 			Vector3 aMin = Position;
 			Vector3 aMax = Position + Size;
 			Vector3 bMin = other.Position;
 			Vector3 bMax = other.Position + other.Size;
 
-			return aMin.X <= bMax.X && aMax.X >= bMin.X &&
-				   aMin.Y <= bMax.Y && aMax.Y >= bMin.Y &&
-				   aMin.Z <= bMax.Z && aMax.Z >= bMin.Z;
+			return aMin.X < bMax.X && aMax.X > bMin.X &&
+				   aMin.Y < bMax.Y && aMax.Y > bMin.Y &&
+				   aMin.Z < bMax.Z && aMax.Z > bMin.Z;
 		}
 
 		/// <summary>

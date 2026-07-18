@@ -44,30 +44,11 @@ namespace Voxelgine.Engine.Server
 		/// Unpacks the key bitmask into an <see cref="InputState"/>, sets the camera angle,
 		/// and feeds the state into the player's <see cref="NetworkInputSource"/>.
 		/// </summary>
-		private unsafe void HandleInputState(NetConnection connection, InputStatePacket inputPacket)
+		private void HandleInputState(NetConnection connection, InputStatePacket inputPacket)
 		{
 			int playerId = connection.PlayerId;
-
-			if (!_playerInputSources.TryGetValue(playerId, out var inputSource))
-				return;
-
-			Player player = _simulation.Players.GetPlayer(playerId);
-			if (player == null)
-				return;
-
-			// Unpack key bitmask into InputState
-			InputState state = new InputState();
-			inputPacket.UnpackKeys(ref state);
-			state.MouseWheel = inputPacket.MouseWheel;
-
-			// Feed the input into the player's NetworkInputSource
-			inputSource.SetState(state);
-
-			// Track the most recent client tick for prediction reconciliation
-			_lastInputTicks[playerId] = inputPacket.TickNumber;
-
-			// Set the camera angle from the packet (Vector2 yaw/pitch → Vector3 with Z=0)
-			player.SetCamAngle(new Vector3(inputPacket.CameraAngle.X, inputPacket.CameraAngle.Y, 0));
+			if (_playerCommandQueues.TryGetValue(playerId, out ServerCommandQueue commandQueue))
+				commandQueue.Enqueue(inputPacket);
 		}
 
 		/// <summary>

@@ -66,6 +66,7 @@ namespace Voxelgine.Engine
 		public Vector3 Position { get; set; }
 		public Vector3 Velocity { get; set; }
 		public byte AnimationState { get; set; }
+		public byte[] SnapshotData { get; set; } = Array.Empty<byte>();
 
 		public override void Write(BinaryWriter writer)
 		{
@@ -73,6 +74,8 @@ namespace Voxelgine.Engine
 			writer.WriteVector3(Position);
 			writer.WriteVector3(Velocity);
 			writer.Write(AnimationState);
+			writer.Write(SnapshotData.Length);
+			writer.Write(SnapshotData);
 		}
 
 		public override void Read(BinaryReader reader)
@@ -81,6 +84,12 @@ namespace Voxelgine.Engine
 			Position = reader.ReadVector3();
 			Velocity = reader.ReadVector3();
 			AnimationState = reader.ReadByte();
+			int length = reader.ReadInt32();
+			if (length < 0 || length > 1024 * 1024)
+				throw new InvalidDataException($"Invalid entity snapshot length: {length}.");
+			SnapshotData = reader.ReadBytes(length);
+			if (SnapshotData.Length != length)
+				throw new EndOfStreamException("Entity snapshot ended before all state data was read.");
 		}
 	}
 

@@ -4,6 +4,42 @@ using System.Numerics;
 
 namespace Voxelgine.Engine
 {
+	/// <summary>A single session-local player command.</summary>
+	public struct InputCommand
+	{
+		public int TickNumber;
+		public ulong KeysBitmask;
+		public Vector2 CameraAngle;
+		public float MouseWheel;
+
+		public static unsafe InputCommand FromState(int tickNumber, InputState state, Vector2 cameraAngle)
+		{
+			ulong mask = 0;
+			int count = Math.Min((int)InputKey.InputKeyCount, 64);
+			for (int i = 0; i < count; i++)
+			{
+				if (state.KeysDown[i])
+					mask |= 1UL << i;
+			}
+
+			return new InputCommand
+			{
+				TickNumber = tickNumber,
+				KeysBitmask = mask,
+				CameraAngle = cameraAngle,
+				MouseWheel = state.MouseWheel,
+			};
+		}
+
+		public unsafe void UnpackKeys(ref InputState state)
+		{
+			int count = Math.Min((int)InputKey.InputKeyCount, 64);
+			for (int i = 0; i < count; i++)
+				state.KeysDown[i] = (KeysBitmask & (1UL << i)) != 0;
+			state.MouseWheel = MouseWheel;
+		}
+	}
+
 	/// <summary>
 	/// Client → Server (unreliable). Sends local player input state for a tick.
 	/// Key states are packed into a bitmask for compact transmission.
@@ -12,26 +48,59 @@ namespace Voxelgine.Engine
 	{
 		public override PacketType Type => PacketType.InputState;
 
-		public int TickNumber { get; set; }
-		public ulong KeysBitmask { get; set; }
-		public Vector2 CameraAngle { get; set; }
-		public float MouseWheel { get; set; }
+		/// <summary>Newest command first, followed by up to three older commands.</summary>
+		public InputCommand[] Commands { get; set; } = Array.Empty<InputCommand>();
+
+		// Compatibility accessors refer to the newest command.
+		public int TickNumber
+		{
+			get => GetNewest().TickNumber;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.TickNumber = value;
+				SetNewest(command);
+			}
+		}
+		public ulong KeysBitmask
+		{
+			get => GetNewest().KeysBitmask;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.KeysBitmask = value;
+				SetNewest(command);
+			}
+		}
+		public Vector2 CameraAngle
+		{
+			get => GetNewest().CameraAngle;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.CameraAngle = value;
+				SetNewest(command);
+			}
+		}
+		public float MouseWheel
+		{
+			get => GetNewest().MouseWheel;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.MouseWheel = value;
+				SetNewest(command);
+			}
+		}
 
 		/// <summary>
 		/// Packs an <see cref="InputState"/> struct's key states into the bitmask.
 		/// </summary>
 		public unsafe void PackKeys(InputState state)
 		{
-			ulong mask = 0;
-			int count = Math.Min((int)InputKey.InputKeyCount, 64);
-
-			for (int i = 0; i < count; i++)
-			{
-				if (state.KeysDown[i])
-					mask |= 1UL << i;
-			}
-
-			KeysBitmask = mask;
+			InputCommand newest = GetNewest();
+			newest = InputCommand.FromState(newest.TickNumber, state, newest.CameraAngle);
+			SetNewest(newest);
 		}
 
 		/// <summary>
@@ -39,29 +108,49 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public unsafe void UnpackKeys(ref InputState state)
 		{
-			int count = Math.Min((int)InputKey.InputKeyCount, 64);
-
-			for (int i = 0; i < count; i++)
-			{
-				state.KeysDown[i] = (KeysBitmask & (1UL << i)) != 0;
-			}
+			GetNewest().UnpackKeys(ref state);
 		}
 
 		public override void Write(BinaryWriter writer)
 		{
-			writer.Write(TickNumber);
-			writer.Write(KeysBitmask);
-			writer.WriteVector2(CameraAngle);
-			writer.Write(MouseWheel);
+			if (Commands.Length is < 1 or > 4)
+				throw new InvalidDataException("Input packets must contain one to four commands.");
+
+			writer.Write((byte)Commands.Length);
+			for (int i = 0; i < Commands.Length; i++)
+			{
+				writer.Write(Commands[i].TickNumber);
+				writer.Write(Commands[i].KeysBitmask);
+				writer.WriteVector2(Commands[i].CameraAngle);
+				writer.Write(Commands[i].MouseWheel);
+			}
 		}
 
 		public override void Read(BinaryReader reader)
 		{
-			TickNumber = reader.ReadInt32();
-			KeysBitmask = reader.ReadUInt64();
-			CameraAngle = reader.ReadVector2();
-			MouseWheel = reader.ReadSingle();
+			int count = reader.ReadByte();
+			if (count is < 1 or > 4)
+				throw new InvalidDataException($"Invalid input command count: {count}.");
+
+			Commands = new InputCommand[count];
+			for (int i = 0; i < count; i++)
+			{
+				Commands[i].TickNumber = reader.ReadInt32();
+				Commands[i].KeysBitmask = reader.ReadUInt64();
+				Commands[i].CameraAngle = reader.ReadVector2();
+				Commands[i].MouseWheel = reader.ReadSingle();
+			}
 		}
+
+		private InputCommand GetNewest() => Commands.Length == 0 ? default : Commands[0];
+
+		private void SetNewest(InputCommand command)
+		{
+			if (Commands.Length == 0)
+				Commands = new InputCommand[1];
+			Commands[0] = command;
+		}
+
 	}
 
 	/// <summary>
@@ -119,6 +208,7 @@ namespace Voxelgine.Engine
 			public Vector2 CameraAngle;
 			public float Health;
 			public byte AnimationState;
+			public PlayerPhysicsState PhysicsState;
 
 			/// <summary>
 			/// The tick number of the last <see cref="InputStatePacket"/> the server
@@ -145,6 +235,7 @@ namespace Voxelgine.Engine
 				writer.Write(Players[i].Health);
 				writer.Write(Players[i].AnimationState);
 				writer.Write(Players[i].LastInputTick);
+				WritePhysicsState(writer, Players[i].PhysicsState);
 			}
 		}
 
@@ -163,7 +254,33 @@ namespace Voxelgine.Engine
 				Players[i].Health = reader.ReadSingle();
 				Players[i].AnimationState = reader.ReadByte();
 				Players[i].LastInputTick = reader.ReadInt32();
+				Players[i].PhysicsState = ReadPhysicsState(reader);
 			}
 		}
+
+		private static void WritePhysicsState(BinaryWriter writer, in PlayerPhysicsState state)
+		{
+			writer.WriteVector3(state.Position);
+			writer.WriteVector3(state.Velocity);
+			writer.Write(state.GroundGraceRemaining);
+			writer.Write(state.JumpCooldownRemaining);
+			writer.Write(state.RecentJumpRemaining);
+			writer.Write(state.HeadBumpCooldownRemaining);
+			writer.WriteVector3(state.LastWallNormal);
+			writer.Write(state.WasGrounded);
+			writer.Write(state.WasInWater);
+		}
+
+		private static PlayerPhysicsState ReadPhysicsState(BinaryReader reader) => new(
+			reader.ReadVector3(),
+			reader.ReadVector3(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadVector3(),
+			reader.ReadBoolean(),
+			reader.ReadBoolean()
+		);
 	}
 }

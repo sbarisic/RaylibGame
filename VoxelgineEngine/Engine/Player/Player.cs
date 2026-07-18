@@ -16,7 +16,6 @@ public unsafe partial class Player : IDisposable
 	public const float PlayerRadius = 0.4f;
 
 	private readonly Stopwatch LegTimer = Stopwatch.StartNew();
-	private readonly Stopwatch JumpCounter = Stopwatch.StartNew();
 	private long LastWalkSound;
 	private long LastJumpSound;
 	private long LastCrashSound;

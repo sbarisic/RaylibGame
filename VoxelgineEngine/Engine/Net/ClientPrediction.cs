@@ -13,11 +13,11 @@ namespace Voxelgine.Engine
 		/// <summary>The tick number this state corresponds to.</summary>
 		public int TickNumber;
 
-		/// <summary>The predicted eye-level position after physics for this tick.</summary>
-		public Vector3 Position;
+		/// <summary>The complete deterministic state after this command.</summary>
+		public PlayerPhysicsState PhysicsState;
 
-		/// <summary>The predicted velocity after physics for this tick.</summary>
-		public Vector3 Velocity;
+		public Vector3 Position => PhysicsState.Position;
+		public Vector3 Velocity => PhysicsState.Velocity;
 	}
 
 	/// <summary>
@@ -59,6 +59,7 @@ namespace Voxelgine.Engine
 		/// Divergent velocity causes future predictions to drift even when current position is close.
 		/// </summary>
 		public const float VelocityCorrectionThreshold = 0.5f;
+		public const float StateCorrectionThreshold = 0.0001f;
 
 		/// <summary>
 		/// Position error beyond which the correction is applied as an instant snap
@@ -74,7 +75,7 @@ namespace Voxelgine.Engine
 		private readonly PredictedState[] _stateBuffer = new PredictedState[BufferSize];
 
 		/// <summary>
-		/// The last server tick that was processed via <see cref="ProcessServerSnapshot"/>.
+		/// The last authoritative command tick processed via <see cref="ProcessServerSnapshot"/>.
 		/// Used to avoid reprocessing the same or older snapshots.
 		/// </summary>
 		public int LastServerTick { get; private set; } = -1;
@@ -100,12 +101,26 @@ namespace Voxelgine.Engine
 		/// <param name="velocity">The player's velocity after physics.</param>
 		public void RecordPrediction(int tickNumber, Vector3 position, Vector3 velocity)
 		{
+			RecordPrediction(tickNumber, new PlayerPhysicsState(
+				position,
+				velocity,
+				0f,
+				0f,
+				0f,
+				0f,
+				Vector3.Zero,
+				false,
+				false
+			));
+		}
+
+		public void RecordPrediction(int tickNumber, in PlayerPhysicsState physicsState)
+		{
 			int index = tickNumber % BufferSize;
 			if (index < 0) index += BufferSize;
 
 			_stateBuffer[index].TickNumber = tickNumber;
-			_stateBuffer[index].Position = position;
-			_stateBuffer[index].Velocity = velocity;
+			_stateBuffer[index].PhysicsState = physicsState;
 		}
 
 		/// <summary>
@@ -116,7 +131,7 @@ namespace Voxelgine.Engine
 		/// <remarks>
 		/// If this method returns true, the caller must:
 		/// <list type="number">
-		/// <item>Snap the player to <paramref name="serverPosition"/> and <paramref name="serverVelocity"/>.</item>
+		/// <item>Apply the complete authoritative physics state.</item>
 		/// <item>Retrieve buffered inputs via <c>ClientInputBuffer.GetInputsInRange(lastInputTick, currentTick)</c>.</item>
 		/// <item>For each buffered input: set the camera angle, update direction vectors,
 		/// feed the input into an <see cref="InputMgr"/> via <see cref="NetworkInputSource"/>,
@@ -131,6 +146,21 @@ namespace Voxelgine.Engine
 			int lastInputTick,
 			Vector3 serverPosition,
 			Vector3 serverVelocity)
+		{
+			return ProcessServerSnapshot(lastInputTick, new PlayerPhysicsState(
+				serverPosition,
+				serverVelocity,
+				0f,
+				0f,
+				0f,
+				0f,
+				Vector3.Zero,
+				false,
+				false
+			));
+		}
+
+		public bool ProcessServerSnapshot(int lastInputTick, in PlayerPhysicsState serverState)
 		{
 			LastCorrectionDistance = 0f;
 
@@ -158,7 +188,8 @@ namespace Voxelgine.Engine
 			}
 
 			// Compare predicted position with server position
-			float posError = Vector3.Distance(_stateBuffer[index].Position, serverPosition);
+			PlayerPhysicsState predicted = _stateBuffer[index].PhysicsState;
+			float posError = Vector3.Distance(predicted.Position, serverState.Position);
 			LastCorrectionDistance = posError;
 
 			if (posError > CorrectionThreshold)
@@ -169,14 +200,28 @@ namespace Voxelgine.Engine
 
 			// Compare predicted velocity with server velocity — divergent velocity
 			// causes future prediction drift even when current position is close
-			float velError = Vector3.Distance(_stateBuffer[index].Velocity, serverVelocity);
+			float velError = Vector3.Distance(predicted.Velocity, serverState.Velocity);
 			if (velError > VelocityCorrectionThreshold)
 			{
 				ReconciliationCount++;
 				return true;
 			}
 
-			// Prediction was accurate — no correction needed
+			bool deterministicStateDiffers =
+				MathF.Abs(predicted.GroundGraceRemaining - serverState.GroundGraceRemaining) > StateCorrectionThreshold ||
+				MathF.Abs(predicted.JumpCooldownRemaining - serverState.JumpCooldownRemaining) > StateCorrectionThreshold ||
+				MathF.Abs(predicted.RecentJumpRemaining - serverState.RecentJumpRemaining) > StateCorrectionThreshold ||
+				MathF.Abs(predicted.HeadBumpCooldownRemaining - serverState.HeadBumpCooldownRemaining) > StateCorrectionThreshold ||
+				Vector3.DistanceSquared(predicted.LastWallNormal, serverState.LastWallNormal) > StateCorrectionThreshold * StateCorrectionThreshold ||
+				predicted.WasGrounded != serverState.WasGrounded ||
+				predicted.WasInWater != serverState.WasInWater;
+
+			if (deterministicStateDiffers)
+			{
+				ReconciliationCount++;
+				return true;
+			}
+
 			return false;
 		}
 

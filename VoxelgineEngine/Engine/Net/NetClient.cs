@@ -139,8 +139,8 @@ namespace Voxelgine.Engine
 		public bool IsConnected => State != ClientState.Disconnected;
 
 		/// <summary>
-		/// The local tick counter. Initialized from the server tick on connection acceptance.
-		/// The game loop should increment this each fixed timestep and use it to label
+		/// Session-local input command sequence. It starts at zero when loading finishes;
+		/// the game loop increments it before producing command one and uses it to label
 		/// outgoing <see cref="InputStatePacket"/> packets.
 		/// </summary>
 		public int LocalTick { get; set; }
@@ -341,6 +341,7 @@ namespace Voxelgine.Engine
 		{
 			if (State == ClientState.Loading)
 			{
+				LocalTick = 0;
 				State = ClientState.Playing;
 			}
 		}
@@ -420,7 +421,7 @@ namespace Voxelgine.Engine
 
 			_connection.PlayerId = accept.PlayerId;
 			_connection.State = ConnectionState.Connected;
-			LocalTick = accept.ServerTick;
+			LocalTick = 0;
 			State = ClientState.Loading;
 
 			_logging?.ClientNetworkWriteLine($"Connected as player [{accept.PlayerId}], server tick {accept.ServerTick}");

@@ -44,7 +44,10 @@ namespace Voxelgine.Engine {
 		/// Creates an entity AABB from position and size.
 		/// </summary>
 		public static AABB CreateEntityAABB(Vector3 position, Vector3 size) {
-			return new AABB(position, size);
+			return new AABB(
+				new Vector3(position.X - size.X * 0.5f, position.Y, position.Z - size.Z * 0.5f),
+				size
+			);
 		}
 
 		/// <summary>
@@ -83,6 +86,13 @@ namespace Voxelgine.Engine {
 		/// Applies ground friction to velocity.
 		/// </summary>
 		public static void ApplyFriction(ref Vector3 velocity, float friction, float dt) {
+			ApplyPlanarFriction(ref velocity, friction, dt);
+		}
+
+		/// <summary>
+		/// Applies friction to the horizontal plane while preserving vertical velocity.
+		/// </summary>
+		public static void ApplyPlanarFriction(ref Vector3 velocity, float friction, float dt) {
 			float speed = MathF.Sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z);
 			if (speed < 0.1f) {
 				velocity.X = 0;
@@ -98,6 +108,14 @@ namespace Voxelgine.Engine {
 
 			velocity.X *= newspeed;
 			velocity.Z *= newspeed;
+		}
+
+		/// <summary>
+		/// Applies linear drag uniformly to all velocity axes.
+		/// </summary>
+		public static void ApplyDrag(ref Vector3 velocity, float drag, float dt) {
+			float scale = MathF.Max(0f, 1f - drag * dt);
+			velocity *= scale;
 		}
 
 		/// <summary>

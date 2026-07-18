@@ -102,6 +102,12 @@ namespace Voxelgine.Engine
 			_inputSource = inputSource;
 		}
 
+		public void Reset()
+		{
+			InputState_Cur = default;
+			InputState_Last = default;
+		}
+
 		public void Tick(float GameTime)
 		{
 			InputState_Last = InputState_Cur;

@@ -79,14 +79,8 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private readonly Dictionary<int, InputMgr> _playerInputMgrs = new();
 		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
+		private readonly Dictionary<int, ServerCommandQueue> _playerCommandQueues = new();
 		private readonly Dictionary<int, ServerInventory> _playerInventories = new();
-
-		/// <summary>
-		/// Tracks the tick number of the last <see cref="InputStatePacket"/> received
-		/// from each player. Included in <see cref="WorldSnapshotPacket"/> so clients
-		/// can match predictions to the correct tick during reconciliation.
-		/// </summary>
-		private readonly Dictionary<int, int> _lastInputTicks = new();
 		private readonly PlayerDataStore _playerData;
 
 		private float _lastTimeSyncTime;
@@ -329,32 +323,36 @@ namespace Voxelgine.Engine.Server
 		/// Runs authoritative physics for all connected players.
 		/// For each player: ticks their <see cref="InputMgr"/> (which reads from <see cref="NetworkInputSource"/>),
 		/// updates direction vectors from the camera angle, and runs <see cref="Player.UpdatePhysics"/>.
-		/// If no input has been received for a player, the last known input is automatically repeated
-		/// because <see cref="NetworkInputSource"/> retains its state between ticks.
+		/// Commands are simulated in exact session-local sequence order. Up to four
+		/// contiguous commands are processed for each player per server frame.
 		/// </summary>
 		private void ProcessPlayerPhysics(float dt)
 		{
-			ChunkMap map = _simulation.Map;
 			PhysData physData = _simulation.PhysicsData;
 
 			foreach (Player player in _simulation.Players.GetAllPlayers())
 			{
 				int playerId = player.PlayerId;
 
-				if (player.IsDead)
+				if (!_playerInputMgrs.TryGetValue(playerId, out InputMgr inputMgr) ||
+					!_playerInputSources.TryGetValue(playerId, out NetworkInputSource inputSource) ||
+					!_playerCommandQueues.TryGetValue(playerId, out ServerCommandQueue commandQueue))
 					continue;
 
-				if (!_playerInputMgrs.TryGetValue(playerId, out InputMgr inputMgr))
-					continue;
+				commandQueue.BeginFrame();
+				for (int processed = 0; processed < 4 && commandQueue.TryDequeue(out InputCommand command); processed++)
+				{
+					InputState state = new();
+					command.UnpackKeys(ref state);
+					inputSource.SetState(state);
+					inputMgr.Tick(CurrentTime);
 
-				// Tick the InputMgr so it polls the NetworkInputSource (captures current vs last state)
-				inputMgr.Tick(CurrentTime);
+					player.SetCamAngle(new Vector3(command.CameraAngle.X, command.CameraAngle.Y, 0));
+					player.UpdateDirectionVectors();
 
-				// Update cached direction vectors from the camera angle
-				player.UpdateDirectionVectors();
-
-				// Run authoritative Quake-style physics
-				player.UpdatePhysics(map, physData, dt, inputMgr);
+					if (!player.IsDead)
+						player.UpdatePhysics(_simulation.PhysicsWorld, physData, dt, inputMgr);
+				}
 			}
 		}
 

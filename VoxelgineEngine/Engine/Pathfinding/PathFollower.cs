@@ -5,6 +5,11 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Pathfinding
 {
+	public readonly record struct PathSteering(
+		Vector3 HorizontalDirection,
+		bool JumpRequested,
+		bool Completed);
+
 	/// <summary>
 	/// Component that enables an entity to follow paths calculated by VoxelPathfinder.
 	/// Handles path following, waypoint management, and movement direction calculation.
@@ -21,6 +26,9 @@ namespace Voxelgine.Engine.Pathfinding
 		/// Distance threshold to consider a waypoint reached.
 		/// </summary>
 		public float WaypointReachDistance { get; set; } = 0.5f;
+
+		/// <summary>Vertical tolerance required before a waypoint can advance.</summary>
+		public float WaypointVerticalTolerance { get; set; } = 0.5f;
 
 		/// <summary>
 		/// Movement speed in blocks per second.
@@ -111,52 +119,49 @@ namespace Voxelgine.Engine.Pathfinding
 		/// <param name="currentPosition">Current entity position.</param>
 		/// <param name="deltaTime">Time since last update.</param>
 		/// <returns>Normalized movement direction, or Vector3.Zero if not moving.</returns>
-		public Vector3 Update(Vector3 currentPosition, float deltaTime)
+		public PathSteering Step(Vector3 currentPosition)
 		{
 			if (!IsFollowingPath)
 			{
-				if (_hasTarget && Vector3.Distance(currentPosition, _targetPosition) < TargetReachDistance)
+				if (_hasTarget && IsWithinTolerance(
+					currentPosition,
+					_targetPosition,
+					TargetReachDistance,
+					WaypointVerticalTolerance))
 				{
 					HasReachedTarget = true;
 				}
-				return Vector3.Zero;
+				return new PathSteering(Vector3.Zero, false, HasReachedTarget);
 			}
 
 			Vector3 currentWaypoint = _currentPath[_currentWaypointIndex];
-
-			// Check if we've reached the current waypoint (2D distance for horizontal movement)
-			float horizontalDist = MathF.Sqrt(
-				MathF.Pow(currentPosition.X - currentWaypoint.X, 2) +
-				MathF.Pow(currentPosition.Z - currentWaypoint.Z, 2)
-			);
-
-			if (horizontalDist < WaypointReachDistance)
+			while (IsWithinTolerance(
+				currentPosition,
+				currentWaypoint,
+				WaypointReachDistance,
+				WaypointVerticalTolerance))
 			{
 				_currentWaypointIndex++;
 
 				if (_currentWaypointIndex >= _currentPath.Count)
 				{
-					// Path complete
 					HasReachedTarget = true;
-					return Vector3.Zero;
+					return new PathSteering(Vector3.Zero, false, true);
 				}
 
 				currentWaypoint = _currentPath[_currentWaypointIndex];
 			}
 
-			// Calculate direction to current waypoint
 			Vector3 direction = currentWaypoint - currentPosition;
-
-			// Only use horizontal direction for ground movement
-			// Vertical movement is handled by physics (jumping/falling)
+			bool jumpRequested = direction.Y > WaypointVerticalTolerance;
 			direction.Y = 0;
 
 			if (direction.LengthSquared() > 0.001f)
-			{
-				return Vector3.Normalize(direction);
-			}
+				direction = Vector3.Normalize(direction);
+			else
+				direction = Vector3.Zero;
 
-			return Vector3.Zero;
+			return new PathSteering(direction, jumpRequested, false);
 		}
 
 		/// <summary>
@@ -166,24 +171,7 @@ namespace Voxelgine.Engine.Pathfinding
 		/// <returns>Velocity vector for horizontal movement.</returns>
 		public Vector3 GetMoveVelocity(Vector3 currentPosition)
 		{
-			Vector3 direction = Update(currentPosition, 0);
-			return direction * MoveSpeed;
-		}
-
-		/// <summary>
-		/// Returns true if the entity should jump (current waypoint is higher than position).
-		/// </summary>
-		/// <param name="currentPosition">Current entity position.</param>
-		/// <returns>True if jump is needed to reach next waypoint.</returns>
-		public bool ShouldJump(Vector3 currentPosition)
-		{
-			if (!IsFollowingPath)
-				return false;
-
-			Vector3 currentWaypoint = _currentPath[_currentWaypointIndex];
-
-			// Jump if waypoint is above current position
-			return currentWaypoint.Y > currentPosition.Y + 0.5f;
+			return Step(currentPosition).HorizontalDirection * MoveSpeed;
 		}
 
 		/// <summary>
@@ -237,6 +225,19 @@ namespace Voxelgine.Engine.Pathfinding
 			}
 
 			return true;
+		}
+
+		private static bool IsWithinTolerance(
+			Vector3 position,
+			Vector3 target,
+			float horizontalTolerance,
+			float verticalTolerance)
+		{
+			float deltaX = position.X - target.X;
+			float deltaZ = position.Z - target.Z;
+			float horizontalDistanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+			return horizontalDistanceSquared <= horizontalTolerance * horizontalTolerance &&
+				MathF.Abs(position.Y - target.Y) <= verticalTolerance;
 		}
 	}
 }

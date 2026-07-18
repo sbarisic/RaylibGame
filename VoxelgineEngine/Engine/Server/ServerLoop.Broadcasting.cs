@@ -10,9 +10,8 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private struct LastEntitySnapshot
 		{
-			public Vector3 Position;
-			public Vector3 Velocity;
 			public byte AnimationState;
+			public byte[] SnapshotData;
 		}
 
 		/// <summary>
@@ -41,7 +40,10 @@ namespace Voxelgine.Engine.Server
 			{
 				Player p = allPlayers[i];
 				Vector3 camAngle = p.GetCamAngle();
-				_lastInputTicks.TryGetValue(p.PlayerId, out int lastInputTick);
+				int lastInputTick = _playerCommandQueues.TryGetValue(p.PlayerId, out ServerCommandQueue commandQueue)
+					? commandQueue.LastSimulatedCommandTick
+					: 0;
+				PlayerPhysicsState physicsState = p.CapturePhysicsState();
 				snapshot.Players[i] = new WorldSnapshotPacket.PlayerEntry
 				{
 					PlayerId = p.PlayerId,
@@ -51,6 +53,7 @@ namespace Voxelgine.Engine.Server
 					Health = p.Health,
 					AnimationState = GetPlayerAnimationState(p),
 					LastInputTick = lastInputTick,
+					PhysicsState = physicsState,
 				};
 			}
 
@@ -72,6 +75,7 @@ namespace Voxelgine.Engine.Server
 					liveCount++;
 					int netId = entity.NetworkId;
 					byte animState = GetEntityAnimationState(entity);
+					byte[] snapshotData = entity.CaptureSnapshot();
 
 					// Broadcast speech changes for NPCs
 					if (entity is VEntNPC npc && npc.IsSpeechDirty)
@@ -90,9 +94,8 @@ namespace Voxelgine.Engine.Server
 
 					// Skip if state hasn't changed since last broadcast
 				if (_lastEntitySnapshots.TryGetValue(netId, out var last) &&
-					last.Position == entity.Position &&
-					last.Velocity == entity.Velocity &&
-					last.AnimationState == animState)
+					last.AnimationState == animState &&
+					last.SnapshotData.AsSpan().SequenceEqual(snapshotData))
 				{
 					continue;
 				}
@@ -103,14 +106,14 @@ namespace Voxelgine.Engine.Server
 					Position = entity.Position,
 					Velocity = entity.Velocity,
 					AnimationState = animState,
+					SnapshotData = snapshotData,
 				};
 				_server.Broadcast(packet, false, currentTime);
 
 				_lastEntitySnapshots[netId] = new LastEntitySnapshot
 				{
-					Position = entity.Position,
-					Velocity = entity.Velocity,
 					AnimationState = animState,
+					SnapshotData = snapshotData,
 				};
 			}
 

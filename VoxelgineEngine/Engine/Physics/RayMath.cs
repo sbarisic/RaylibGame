@@ -30,6 +30,15 @@ namespace Voxelgine.Engine
 			hitDistance = 0f;
 			hitNormal = Vector3.Zero;
 
+			if (aabb.IsEmpty || !IsFinite(rayOrigin) || !IsFinite(rayDir) || !float.IsFinite(maxDistance) || maxDistance < 0f)
+				return false;
+
+			float directionLengthSquared = rayDir.LengthSquared();
+			if (directionLengthSquared <= 1e-12f)
+				return false;
+
+			rayDir /= MathF.Sqrt(directionLengthSquared);
+
 			Vector3 min = aabb.Min;
 			Vector3 max = aabb.Max;
 
@@ -37,6 +46,7 @@ namespace Voxelgine.Engine
 			float tMin = float.NegativeInfinity;
 			float tMax = float.PositiveInfinity;
 			Vector3 normalMin = Vector3.Zero;
+			Vector3 normalMax = Vector3.Zero;
 
 			// X slab
 			if (MathF.Abs(rayDir.X) > 1e-8f)
@@ -53,7 +63,7 @@ namespace Voxelgine.Engine
 				}
 
 				if (t1 > tMin) { tMin = t1; normalMin = n1; }
-				if (t2 < tMax) tMax = t2;
+				if (t2 < tMax) { tMax = t2; normalMax = n2; }
 			}
 			else if (rayOrigin.X < min.X || rayOrigin.X > max.X)
 			{
@@ -75,7 +85,7 @@ namespace Voxelgine.Engine
 				}
 
 				if (t1 > tMin) { tMin = t1; normalMin = n1; }
-				if (t2 < tMax) tMax = t2;
+				if (t2 < tMax) { tMax = t2; normalMax = n2; }
 			}
 			else if (rayOrigin.Y < min.Y || rayOrigin.Y > max.Y)
 			{
@@ -97,7 +107,7 @@ namespace Voxelgine.Engine
 				}
 
 				if (t1 > tMin) { tMin = t1; normalMin = n1; }
-				if (t2 < tMax) tMax = t2;
+				if (t2 < tMax) { tMax = t2; normalMax = n2; }
 			}
 			else if (rayOrigin.Z < min.Z || rayOrigin.Z > max.Z)
 			{
@@ -110,9 +120,16 @@ namespace Voxelgine.Engine
 
 			// Use tMin if in front of ray, otherwise use tMax (ray starts inside box)
 			hitDistance = tMin >= 0 ? tMin : tMax;
-			hitNormal = tMin >= 0 ? normalMin : -normalMin;
+			hitNormal = tMin >= 0 ? normalMin : normalMax;
 
 			return hitDistance <= maxDistance;
+		}
+
+		private static bool IsFinite(Vector3 value)
+		{
+			return float.IsFinite(value.X) &&
+				float.IsFinite(value.Y) &&
+				float.IsFinite(value.Z);
 		}
 	}
 }

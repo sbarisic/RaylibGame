@@ -5,95 +5,97 @@ namespace Voxelgine.Graphics
 {
 	public unsafe partial class ChunkMap
 	{
-		public Vector3 RaycastPos(
+		public bool TryRaycast(
 			Vector3 origin,
-			float distance,
 			Vector3 direction,
-			out Vector3 faceDirection)
+			float maximumDistance,
+			out VoxelRaycastHit hit)
 		{
-			Vector3 hitPosition = Vector3.Zero;
-			Vector3 hitFace = Vector3.Zero;
-			bool found = Utils.Raycast(origin, direction, distance, (x, y, z, face) =>
+			hit = default;
+			if (!IsFinite(origin) ||
+				!IsFinite(direction) ||
+				!float.IsFinite(maximumDistance) ||
+				maximumDistance < 0f)
 			{
-				if (!BlockInfo.IsSolid(GetBlock(x, y, z)))
-					return false;
-
-				hitPosition = new Vector3(x, y, z);
-				hitFace = face;
-				return true;
-			});
-
-			faceDirection = hitFace;
-			return found ? hitPosition : Vector3.Zero;
-		}
-
-		public bool RaycastPrecise(
-			Vector3 origin,
-			float distance,
-			Vector3 direction,
-			out Vector3 hitPoint,
-			out Vector3 faceDirection)
-		{
-			Vector3 blockPosition = RaycastPos(origin, distance, direction, out faceDirection);
-			if (blockPosition == Vector3.Zero)
-			{
-				hitPoint = Vector3.Zero;
 				return false;
 			}
 
-			float planeValue;
-			float directionComponent;
-			float originComponent;
-			if (MathF.Abs(faceDirection.X) > 0.5f)
-			{
-				planeValue = faceDirection.X > 0f ? blockPosition.X + 1f : blockPosition.X;
-				directionComponent = direction.X;
-				originComponent = origin.X;
-			}
-			else if (MathF.Abs(faceDirection.Y) > 0.5f)
-			{
-				planeValue = faceDirection.Y > 0f ? blockPosition.Y + 1f : blockPosition.Y;
-				directionComponent = direction.Y;
-				originComponent = origin.Y;
-			}
-			else
-			{
-				planeValue = faceDirection.Z > 0f ? blockPosition.Z + 1f : blockPosition.Z;
-				directionComponent = direction.Z;
-				originComponent = origin.Z;
-			}
+			float directionLengthSquared = direction.LengthSquared();
+			if (directionLengthSquared <= 1e-12f)
+				return false;
 
-			if (MathF.Abs(directionComponent) < 1e-8f)
+			direction /= MathF.Sqrt(directionLengthSquared);
+			int x = (int)MathF.Floor(origin.X);
+			int y = (int)MathF.Floor(origin.Y);
+			int z = (int)MathF.Floor(origin.Z);
+			if (IsSolid(x, y, z))
 			{
-				hitPoint = blockPosition + new Vector3(0.5f) + faceDirection * 0.5f;
+				hit = new VoxelRaycastHit(x, y, z, origin, Vector3.Zero, 0f);
 				return true;
 			}
 
-			float amount = (planeValue - originComponent) / directionComponent;
-			hitPoint = origin + direction * amount;
-			return true;
+			int stepX = Math.Sign(direction.X);
+			int stepY = Math.Sign(direction.Y);
+			int stepZ = Math.Sign(direction.Z);
+			float deltaX = stepX == 0 ? float.PositiveInfinity : MathF.Abs(1f / direction.X);
+			float deltaY = stepY == 0 ? float.PositiveInfinity : MathF.Abs(1f / direction.Y);
+			float deltaZ = stepZ == 0 ? float.PositiveInfinity : MathF.Abs(1f / direction.Z);
+			float nextX = InitialBoundaryDistance(origin.X, direction.X, x, stepX);
+			float nextY = InitialBoundaryDistance(origin.Y, direction.Y, y, stepY);
+			float nextZ = InitialBoundaryDistance(origin.Z, direction.Z, z, stepZ);
+
+			while (true)
+			{
+				float distance;
+				Vector3 normal;
+				if (nextX <= nextY && nextX <= nextZ)
+				{
+					distance = nextX;
+					if (distance > maximumDistance)
+						return false;
+					x += stepX;
+					nextX += deltaX;
+					normal = new Vector3(-stepX, 0f, 0f);
+				}
+				else if (nextY <= nextZ)
+				{
+					distance = nextY;
+					if (distance > maximumDistance)
+						return false;
+					y += stepY;
+					nextY += deltaY;
+					normal = new Vector3(0f, -stepY, 0f);
+				}
+				else
+				{
+					distance = nextZ;
+					if (distance > maximumDistance)
+						return false;
+					z += stepZ;
+					nextZ += deltaZ;
+					normal = new Vector3(0f, 0f, -stepZ);
+				}
+
+				if (IsSolid(x, y, z))
+				{
+					hit = new VoxelRaycastHit(x, y, z, origin + direction * distance, normal, distance);
+					return true;
+				}
+			}
 		}
 
-		public bool Collide(Vector3 position, Vector3 probeDirection, out Vector3 collisionNormal)
+		private static bool IsFinite(Vector3 value) =>
+			float.IsFinite(value.X) &&
+			float.IsFinite(value.Y) &&
+			float.IsFinite(value.Z);
+
+		private static float InitialBoundaryDistance(float origin, float direction, int cell, int step)
 		{
-			Vector3 probe = position + probeDirection * 0.1f;
-			if (BlockInfo.IsSolid(GetBlock(
-				(int)MathF.Floor(probe.X),
-				(int)MathF.Floor(probe.Y),
-				(int)MathF.Floor(probe.Z))))
-			{
-				collisionNormal = probeDirection == Vector3.Zero
-					? Vector3.Zero
-					: -Vector3.Normalize(probeDirection);
-				return true;
-			}
-
-			collisionNormal = Vector3.Zero;
-			return false;
+			if (step == 0)
+				return float.PositiveInfinity;
+			float boundary = step > 0 ? cell + 1f : cell;
+			return (boundary - origin) / direction;
 		}
-
-		public bool HasBlocksInBounds(Vector3 position, Vector3 size, bool solidOnly = true) =>
-			HasBlocksInBoundsMinMax(position, position + size, solidOnly);
 
 		public bool IsSolid(int x, int y, int z) => BlockInfo.IsSolid(GetBlock(x, y, z));
 
@@ -101,37 +103,6 @@ namespace Voxelgine.Graphics
 			(int)MathF.Floor(position.X),
 			(int)MathF.Floor(position.Y),
 			(int)MathF.Floor(position.Z));
-
-		public bool HasBlocksInBoundsMinMax(Vector3 minimum, Vector3 maximum, bool solidOnly = true)
-		{
-			int minimumX = (int)MathF.Floor(minimum.X);
-			int minimumY = (int)MathF.Floor(minimum.Y);
-			int minimumZ = (int)MathF.Floor(minimum.Z);
-			int maximumX = (int)MathF.Floor(maximum.X);
-			int maximumY = (int)MathF.Floor(maximum.Y);
-			int maximumZ = (int)MathF.Floor(maximum.Z);
-
-			for (int x = minimumX; x <= maximumX; x++)
-			{
-				for (int y = minimumY; y <= maximumY; y++)
-				{
-					for (int z = minimumZ; z <= maximumZ; z++)
-					{
-						if (solidOnly)
-						{
-							if (IsSolid(x, y, z))
-								return true;
-						}
-						else if (GetBlock(x, y, z) != BlockType.None)
-						{
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
 
 		public Engine.Pathfinding.VoxelPathfinder CreatePathfinder(
 			int entityHeight = 2,

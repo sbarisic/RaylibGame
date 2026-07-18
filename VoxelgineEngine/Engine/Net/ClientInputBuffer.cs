@@ -37,6 +37,7 @@ namespace Voxelgine.Engine
 		public const int BufferSize = 128;
 
 		private readonly BufferedInput[] _buffer = new BufferedInput[BufferSize];
+		private readonly bool[] _occupied = new bool[BufferSize];
 		private int _count;
 
 		// Pre-allocated list reused by GetInputsInRange to avoid per-reconciliation allocation
@@ -63,18 +64,29 @@ namespace Voxelgine.Engine
 			_buffer[index].TickNumber = tickNumber;
 			_buffer[index].State = state;
 			_buffer[index].CameraAngle = cameraAngle;
+			_occupied[index] = true;
 
 			if (_count < BufferSize)
 				_count++;
 
-			var packet = new InputStatePacket
+			var commands = new List<InputCommand>(4)
 			{
-				TickNumber = tickNumber,
-				CameraAngle = cameraAngle,
-				MouseWheel = state.MouseWheel,
+				InputCommand.FromState(tickNumber, state, cameraAngle),
 			};
-			packet.PackKeys(state);
-			return packet;
+
+			for (int previousTick = tickNumber - 1; previousTick >= tickNumber - 3; previousTick--)
+			{
+				if (TryGetInput(previousTick, out BufferedInput previous))
+				{
+					commands.Add(InputCommand.FromState(
+						previous.TickNumber,
+						previous.State,
+						previous.CameraAngle
+					));
+				}
+			}
+
+			return new InputStatePacket { Commands = commands.ToArray() };
 		}
 
 		/// <summary>
@@ -86,7 +98,7 @@ namespace Voxelgine.Engine
 			int index = tickNumber % BufferSize;
 			if (index < 0) index += BufferSize;
 
-			if (_buffer[index].TickNumber == tickNumber)
+			if (_occupied[index] && _buffer[index].TickNumber == tickNumber)
 			{
 				input = _buffer[index];
 				return true;
@@ -117,7 +129,7 @@ namespace Voxelgine.Engine
 				int index = tick % BufferSize;
 				if (index < 0) index += BufferSize;
 
-				if (_buffer[index].TickNumber == tick)
+				if (_occupied[index] && _buffer[index].TickNumber == tick)
 				{
 					_replayList.Add(_buffer[index]);
 				}
@@ -132,6 +144,7 @@ namespace Voxelgine.Engine
 		public void Clear()
 		{
 			Array.Clear(_buffer, 0, BufferSize);
+			Array.Clear(_occupied, 0, BufferSize);
 			_count = 0;
 		}
 	}

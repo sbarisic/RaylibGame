@@ -73,6 +73,12 @@ namespace Voxelgine.Engine
 		/// <summary>Current presentation offset, such as pickup bobbing.</summary>
 		public Vector3 PresentationOffset => _presentationOffset;
 
+		/// <summary>How this entity participates in world and player physics.</summary>
+		public virtual EntityPhysicsProperties PhysicsProperties => EntityPhysicsProperties.DynamicTrigger;
+
+		/// <summary>World-space collision bounds using the documented bottom-center position.</summary>
+		public AABB WorldBounds => PhysicsUtils.CreateEntityAABB(Position, Size);
+
 		/// <summary>Current vertical presentation offset used by bobbing entities.</summary>
 		public float VerticalModelOffset => _presentationOffset.Y;
 
@@ -203,7 +209,7 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>World-space center used as the entity's light source.</summary>
-		public Vector3 GetLightSourcePosition() => Position + Size / 2f;
+		public Vector3 GetLightSourcePosition() => Position + new Vector3(0f, Size.Y * 0.5f, 0f);
 
 		public bool EmitsLight() => LightEmission > 0;
 
@@ -242,6 +248,28 @@ namespace Voxelgine.Engine
 
 		protected virtual void ReadSnapshotExtra(BinaryReader reader)
 		{
+		}
+
+		/// <summary>Serializes the complete replicated entity state.</summary>
+		public byte[] CaptureSnapshot()
+		{
+			using var stream = new MemoryStream();
+			using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+				WriteSnapshot(writer);
+			return stream.ToArray();
+		}
+
+		/// <summary>Applies state produced by <see cref="CaptureSnapshot"/>.</summary>
+		public void ApplySnapshot(byte[] snapshot)
+		{
+			if (snapshot == null)
+				throw new ArgumentNullException(nameof(snapshot));
+
+			using var stream = new MemoryStream(snapshot, writable: false);
+			using var reader = new BinaryReader(stream);
+			ReadSnapshot(reader);
+			if (stream.Position != stream.Length)
+				throw new InvalidDataException("Entity snapshot contains trailing data.");
 		}
 	}
 }

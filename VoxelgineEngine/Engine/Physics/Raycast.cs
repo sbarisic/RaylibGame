@@ -46,17 +46,19 @@ namespace Voxelgine.Engine
 		{
 			if (entity == null)
 				return RaycastHit.None;
+			if (!TryNormalize(rayDir, out Vector3 normalizedDirection))
+				return RaycastHit.None;
 
 			AABB entityAABB = PhysicsUtils.CreateEntityAABB(entity.Position, entity.Size);
 
-			if (RayMath.RayIntersectsAABB(rayOrigin, rayDir, entityAABB, maxDistance, out float dist, out Vector3 normal))
+			if (RayMath.RayIntersectsAABB(rayOrigin, normalizedDirection, entityAABB, maxDistance, out float dist, out Vector3 normal))
 			{
 				return new RaycastHit
 				{
 					Hit = true,
 					Entity = entity,
 					Distance = dist,
-					HitPosition = rayOrigin + rayDir * dist,
+					HitPosition = rayOrigin + normalizedDirection * dist,
 					HitNormal = normal
 				};
 			}
@@ -80,6 +82,9 @@ namespace Voxelgine.Engine
 			float maxDistance = 1000f,
 			VoxEntity excludeEntity = null)
 		{
+			if (!TryNormalize(rayDir, out Vector3 normalizedDirection))
+				return RaycastHit.None;
+
 			RaycastHit closestHit = RaycastHit.None;
 			float closestDist = maxDistance;
 
@@ -90,7 +95,7 @@ namespace Voxelgine.Engine
 
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(entity.Position, entity.Size);
 
-				if (RayMath.RayIntersectsAABB(rayOrigin, rayDir, entityAABB, closestDist, out float dist, out Vector3 normal))
+				if (RayMath.RayIntersectsAABB(rayOrigin, normalizedDirection, entityAABB, closestDist, out float dist, out Vector3 normal))
 				{
 					if (dist < closestDist)
 					{
@@ -100,7 +105,7 @@ namespace Voxelgine.Engine
 							Hit = true,
 							Entity = entity,
 							Distance = dist,
-							HitPosition = rayOrigin + rayDir * dist,
+							HitPosition = rayOrigin + normalizedDirection * dist,
 							HitNormal = normal
 						};
 					}
@@ -126,6 +131,9 @@ namespace Voxelgine.Engine
 			float maxDistance = 1000f,
 			VoxEntity excludeEntity = null)
 		{
+			if (!TryNormalize(rayDir, out Vector3 normalizedDirection))
+				return new List<RaycastHit>();
+
 			var hits = new List<RaycastHit>();
 
 			foreach (var entity in entities)
@@ -135,14 +143,14 @@ namespace Voxelgine.Engine
 
 				AABB entityAABB = PhysicsUtils.CreateEntityAABB(entity.Position, entity.Size);
 
-				if (RayMath.RayIntersectsAABB(rayOrigin, rayDir, entityAABB, maxDistance, out float dist, out Vector3 normal))
+				if (RayMath.RayIntersectsAABB(rayOrigin, normalizedDirection, entityAABB, maxDistance, out float dist, out Vector3 normal))
 				{
 					hits.Add(new RaycastHit
 					{
 						Hit = true,
 						Entity = entity,
 						Distance = dist,
-						HitPosition = rayOrigin + rayDir * dist,
+						HitPosition = rayOrigin + normalizedDirection * dist,
 						HitNormal = normal
 					});
 				}
@@ -151,6 +159,18 @@ namespace Voxelgine.Engine
 			// Sort by distance (closest first)
 			hits.Sort((a, b) => a.Distance.CompareTo(b.Distance));
 			return hits;
+		}
+
+		private static bool TryNormalize(Vector3 direction, out Vector3 normalized)
+		{
+			float lengthSquared = direction.LengthSquared();
+			if (!float.IsFinite(lengthSquared) || lengthSquared <= 1e-12f)
+			{
+				normalized = Vector3.Zero;
+				return false;
+			}
+			normalized = direction / MathF.Sqrt(lengthSquared);
+			return true;
 		}
 	}
 }

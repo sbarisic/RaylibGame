@@ -316,7 +316,7 @@ public sealed class FishGfxNpcRenderAdapter
 		state = newState;
 		animation.SetBaseAnimation(state.AnimationName);
 		animation.Update(deltaSeconds, state.HeadRotation);
-		Vector3 position = state.Position + new Vector3(state.Size.X * 0.5f, 0, state.Size.Z * 0.5f);
+		Vector3 position = state.Position;
 		rootTransform = EntityTransformMath.CreateFacing(position, state.LookDirection);
 		hasState = true;
 	}
@@ -407,7 +407,7 @@ public sealed class FishGfxSlidingDoorRenderAdapter
 		float hingeAngle = -Math.Clamp(state.OpenProgress, 0, 1)
 			* state.OpenAngleDegrees
 			* MathF.PI / 180;
-		Vector3 position = state.Position + new Vector3(state.Size.X * 0.5f, 0, state.Size.Z * 0.5f);
+		Vector3 position = state.Position;
 		return Matrix4x4.CreateTranslation(-0.5f, 0, 0)
 			* Matrix4x4.CreateRotationY(hingeAngle)
 			* Matrix4x4.CreateTranslation(0.5f, 0, 0)

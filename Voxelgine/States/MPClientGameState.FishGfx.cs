@@ -377,11 +377,10 @@ public unsafe partial class MPClientGameState
 			{
 				cache.NextCheckTime = totalTime + 0.1f;
 				Vector3 direction = offset / distance;
-				cache.Occluded = _simulation.Map.RaycastPrecise(
+				cache.Occluded = _simulation.Map.TryRaycast(
 					cameraPosition,
-					MathF.Max(0, distance - 0.2f),
 					direction,
-					out _,
+					MathF.Max(0, distance - 0.2f),
 					out _
 				);
 			}
@@ -441,8 +440,8 @@ public unsafe partial class MPClientGameState
 				default:
 					FishGfxGameplayPrimitives.DrawWireBox(
 						pass,
-						entity.Position,
-						entity.Position + entity.Size,
+						entity.WorldBounds.Min,
+						entity.WorldBounds.Max,
 						FishColor.Amber
 					);
 					break;

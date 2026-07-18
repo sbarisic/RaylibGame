@@ -261,8 +261,7 @@ namespace Voxelgine.States
 					// Local player — reconciliation using server's last-processed input tick
 					bool needsCorrection = _prediction.ProcessServerSnapshot(
 						entry.LastInputTick,
-						entry.Position,
-						entry.Velocity
+						entry.PhysicsState
 					);
 
 					if (needsCorrection)
@@ -270,15 +269,14 @@ namespace Voxelgine.States
 						// Capture pre-correction position for visual smoothing
 						Vector3 preCorrection = _simulation.LocalPlayer.Position;
 
-						PredictionReconciler.Reconcile(
+						_predictionReconciler.Reconcile(
 							_simulation.LocalPlayer,
-							entry.Position,
-							entry.Velocity,
+							entry.PhysicsState,
 							entry.LastInputTick,
 							_client.LocalTick,
 							_inputBuffer,
 							_prediction,
-							_simulation.Map,
+							_simulation.PhysicsWorld,
 							_simulation.PhysicsData,
 							DeltaTime
 						);
@@ -425,6 +423,19 @@ namespace Voxelgine.States
 			var entity = _simulation.Entities.GetEntityByNetworkId(packet.NetworkId);
 			if (entity == null)
 				return;
+
+			// Replicated state such as a door's solid/open state must become authoritative
+			// immediately so prediction uses the same colliders as the server. Preserve the
+			// current presentation position; position and velocity continue through the
+			// interpolation buffer below.
+			Vector3 presentationPosition = entity.Position;
+			Vector3 presentationVelocity = entity.Velocity;
+			if (packet.SnapshotData.Length > 0)
+			{
+				entity.ApplySnapshot(packet.SnapshotData);
+				entity.Position = presentationPosition;
+				entity.Velocity = presentationVelocity;
+			}
 
 			// Add to interpolation buffer
 			if (!_entitySnapshots.TryGetValue(packet.NetworkId, out var buffer))
@@ -611,11 +622,11 @@ namespace Voxelgine.States
 			Vector3 worldHitPos = Vector3.Zero;
 			Vector3 worldHitNormal = Vector3.Zero;
 
-			if (_simulation.Map.RaycastPrecise(origin, maxRange, direction, out Vector3 preciseHitPoint, out Vector3 faceDir))
+			if (_simulation.Map.TryRaycast(origin, direction, maxRange, out VoxelRaycastHit voxelHit))
 			{
-				worldDist = Vector3.Distance(origin, preciseHitPoint);
-				worldHitPos = preciseHitPoint;
-				worldHitNormal = faceDir;
+				worldDist = voxelHit.Distance;
+				worldHitPos = voxelHit.Point;
+				worldHitNormal = voxelHit.Normal;
 			}
 
 			// --- Raycast against entities ---

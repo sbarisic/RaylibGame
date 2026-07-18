@@ -220,17 +220,14 @@ namespace Voxelgine.Engine
 				if (InMgr.IsInputPressed(InputKey.E))
 				{
 					Vector3 Start = Position;
-					Vector3 End = Map.RaycastPos(Start, 1.5f, GetForward(), out Vector3 Face);
-
-					if (Face.Y == 1)
-						End.Y -= 0.001f;
-
-					PlacedBlock Blk = Map.GetPlacedBlock((int)End.X, (int)End.Y, (int)End.Z, out Chunk Chk);
-
-					if (Blk.Type == BlockType.CraftingTable)
+					if (Map.TryRaycast(Start, GetForward(), 1.5f, out VoxelRaycastHit hit))
 					{
-						Logging.WriteLine($"Craft! {Face}, ({End.X - Math.Floor(End.X)}, {End.Z - Math.Floor(End.Z)})");
-						return;
+						PlacedBlock Blk = Map.GetPlacedBlock(hit.X, hit.Y, hit.Z, out Chunk Chk);
+						if (Blk.Type == BlockType.CraftingTable)
+						{
+							Logging.WriteLine($"Craft! {hit.Normal}, ({hit.Point.X - Math.Floor(hit.Point.X)}, {hit.Point.Z - Math.Floor(hit.Point.Z)})");
+							return;
+						}
 					}
 					Inventory.SelectNext();
 				}

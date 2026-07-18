@@ -26,6 +26,7 @@ namespace Voxelgine.States
 		private NetClient _client;
 		private ClientInputBuffer _inputBuffer;
 		private ClientPrediction _prediction;
+		private readonly PredictionReconciler _predictionReconciler = new();
 		private string _serverHost;
 		private int _serverPort;
 		private string _playerName;
@@ -398,7 +399,7 @@ namespace Voxelgine.States
 				{
 					// Apply local prediction (same physics as server)
 					_simulation.LocalPlayer.UpdatePhysics(
-						_simulation.Map,
+						_simulation.PhysicsWorld,
 						_simulation.PhysicsData,
 						Dt,
 						simulationInputManager
@@ -407,8 +408,7 @@ namespace Voxelgine.States
 					// Record predicted state
 					_prediction.RecordPrediction(
 						_client.LocalTick,
-						_simulation.LocalPlayer.Position,
-						_simulation.LocalPlayer.GetVelocity()
+						_simulation.LocalPlayer.CapturePhysicsState()
 					);
 				}
 
@@ -605,6 +605,9 @@ namespace Voxelgine.States
 			_pendingEntityPackets.Clear();
 			_entitySnapshots.Clear();
 			_chatHistory.Clear();
+			_predictionReconciler.Reset();
+			_neutralInputSource.SetState(default);
+			_neutralInputManager.Reset();
 
 			// FishUI controls are owned by _gui; null the references
 			_loadingStatusLabel = null;

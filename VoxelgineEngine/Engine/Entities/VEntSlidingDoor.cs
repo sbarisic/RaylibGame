@@ -34,6 +34,15 @@ namespace Voxelgine.Engine
 		/// <summary>Normalized open amount consumed by renderer-neutral adapters.</summary>
 		public float OpenAmount => _openProgress;
 
+		public override EntityPhysicsProperties PhysicsProperties => new(
+			SimulateMotion: false,
+			AffectedByGravity: false,
+			CollidesWithVoxels: false,
+			BlocksPlayers: _collisionEnabled,
+			BlocksEntities: _collisionEnabled,
+			GeneratesTouchEvents: false
+		);
+
 		public VEntSlidingDoor()
 		{
 			IsRotating = false;
@@ -52,12 +61,19 @@ namespace Voxelgine.Engine
 			base.UpdateLockstep(totalTime, deltaTime, inputManager);
 
 			GameSimulation simulation = GetSimulation();
-			if (simulation?.LocalPlayer == null)
+			if (simulation == null)
 				return;
 
-			Vector3 doorCenter = Position + Size * 0.5f;
-			float distanceToPlayer = Vector3.Distance(doorCenter, simulation.LocalPlayer.Position);
-			bool playerInRange = distanceToPlayer <= TriggerRadius;
+			Vector3 doorCenter = Position + new Vector3(0f, Size.Y * 0.5f, 0f);
+			bool playerInRange = false;
+			foreach (Player player in simulation.Players.GetAllPlayers())
+			{
+				if (!player.IsDead && Vector3.DistanceSquared(doorCenter, player.Position) <= TriggerRadius * TriggerRadius)
+				{
+					playerInRange = true;
+					break;
+				}
+			}
 
 			switch (State)
 			{
@@ -117,7 +133,7 @@ namespace Voxelgine.Engine
 		public AABB GetCollisionAABB()
 		{
 			return _collisionEnabled
-				? new AABB(Position, Position + Size)
+				? WorldBounds
 				: AABB.Empty;
 		}
 

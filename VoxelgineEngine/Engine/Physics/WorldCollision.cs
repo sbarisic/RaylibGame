@@ -1,73 +1,104 @@
+using System;
 using System.Numerics;
-using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine {
-	/// <summary>
-	/// World-dependent collision utilities that require ChunkMap access.
-	/// Separated from PhysicsUtils (pure math) for project split.
-	/// </summary>
-	public static class WorldCollision {
-		/// <summary>
-		/// Tests if a position with given size overlaps any blocks in the world.
-		/// </summary>
-		public static bool CollidesWithWorld(ChunkMap map, Vector3 position, Vector3 size) {
-			return map.HasBlocksInBounds(position, size);
+namespace Voxelgine.Engine;
+
+public readonly record struct PhysicsMoveResult(
+	Vector3 Position,
+	Vector3 Velocity,
+	bool Grounded,
+	Vector3 GroundNormal,
+	Vector3 WallNormal);
+
+/// <summary>
+/// Shared swept movement and collision response for players and entities.
+/// Positions use bottom-center coordinates.
+/// </summary>
+public static class WorldCollision
+{
+	public const float CollisionSkin = 0.001f;
+
+	public static PhysicsMoveResult MoveAndSlide(
+		PhysicsWorld world,
+		Vector3 position,
+		Vector3 size,
+		Vector3 velocity,
+		float deltaTime,
+		PhysicsCollisionMask mask,
+		int maximumSlides = 4,
+		VoxEntity ignoredEntity = null)
+	{
+		if (!IsFinite(position) || !IsFinite(size) || !IsFinite(velocity) || !float.IsFinite(deltaTime) || deltaTime < 0f)
+			return new PhysicsMoveResult(position, Vector3.Zero, false, Vector3.Zero, Vector3.Zero);
+
+		AABB bounds = PhysicsUtils.CreateEntityAABB(position, size);
+		if (bounds.IsEmpty)
+			return new PhysicsMoveResult(position, Vector3.Zero, false, Vector3.Zero, Vector3.Zero);
+
+		Vector3 currentPosition = position;
+		Vector3 currentVelocity = velocity;
+		bool grounded = false;
+		Vector3 groundNormal = Vector3.Zero;
+		Vector3 wallNormal = Vector3.Zero;
+
+		for (int iteration = 0; iteration < maximumSlides; iteration++)
+		{
+			bounds = PhysicsUtils.CreateEntityAABB(currentPosition, size);
+			if (!world.SweepAabb(bounds, Vector3.Zero, mask, out SweepHit overlap, ignoredEntity) || overlap.PenetrationDepth <= 0f)
+				break;
+
+			currentPosition += overlap.Normal * (overlap.PenetrationDepth + CollisionSkin);
+			ClipIntoPlane(ref currentVelocity, overlap.Normal);
 		}
 
-		/// <summary>
-		/// Tests if an AABB overlaps any blocks in the world.
-		/// </summary>
-		public static bool CollidesWithWorld(ChunkMap map, AABB aabb) {
-			return map.HasBlocksInBoundsMinMax(aabb.Min, aabb.Max);
+		float timeRemaining = deltaTime;
+		for (int slide = 0; slide < maximumSlides && timeRemaining > 1e-6f; slide++)
+		{
+			Vector3 delta = currentVelocity * timeRemaining;
+			if (delta.LengthSquared() <= 1e-12f)
+				break;
+
+			bounds = PhysicsUtils.CreateEntityAABB(currentPosition, size);
+			if (!world.SweepAabb(bounds, delta, mask, out SweepHit hit, ignoredEntity))
+			{
+				currentPosition += delta;
+				break;
+			}
+
+			float deltaLength = delta.Length();
+			float safeFraction = MathF.Max(0f, hit.Fraction - CollisionSkin / deltaLength);
+			currentPosition += delta * safeFraction;
+			timeRemaining *= MathF.Max(0f, 1f - hit.Fraction);
+
+			for (int normalIndex = 0; normalIndex < hit.NormalCount; normalIndex++)
+			{
+				Vector3 normal = hit.GetNormal(normalIndex);
+				if (normal.Y > 0.7f && velocity.Y <= 0f)
+				{
+					grounded = true;
+					groundNormal = normal;
+				}
+				else if (MathF.Abs(normal.Y) < 0.7f)
+				{
+					wallNormal = normal;
+				}
+
+				ClipIntoPlane(ref currentVelocity, normal);
+			}
 		}
 
-		/// <summary>
-		/// Performs axis-separated movement with collision response.
-		/// Returns the new position after collision.
-		/// </summary>
-		/// <param name="map">The chunk map for collision testing.</param>
-		/// <param name="position">Current position (bottom-center for entities, or feet position).</param>
-		/// <param name="size">Size of the collision box.</param>
-		/// <param name="velocity">Current velocity (modified on collision).</param>
-		/// <param name="dt">Delta time.</param>
-		/// <returns>New position after collision.</returns>
-		public static Vector3 MoveWithCollision(ChunkMap map, Vector3 position, Vector3 size, ref Vector3 velocity, float dt) {
-			Vector3 newPos = position;
-			Vector3 move = velocity * dt;
-
-			// Half-extents for centering on X/Z (position is bottom-center)
-			float halfX = size.X * 0.5f;
-			float halfZ = size.Z * 0.5f;
-			float height = size.Y;
-
-			// X axis
-			Vector3 testX = new Vector3(newPos.X + move.X, newPos.Y, newPos.Z);
-			if (!map.HasBlocksInBoundsMinMax(
-				new Vector3(testX.X - halfX, testX.Y, testX.Z - halfZ),
-				new Vector3(testX.X + halfX, testX.Y + height, testX.Z + halfZ)))
-				newPos.X += move.X;
-			else
-				velocity.X = 0;
-
-			// Y axis
-			Vector3 testY = new Vector3(newPos.X, newPos.Y + move.Y, newPos.Z);
-			if (!map.HasBlocksInBoundsMinMax(
-				new Vector3(testY.X - halfX, testY.Y, testY.Z - halfZ),
-				new Vector3(testY.X + halfX, testY.Y + height, testY.Z + halfZ)))
-				newPos.Y += move.Y;
-			else
-				velocity.Y = 0;
-
-			// Z axis
-			Vector3 testZ = new Vector3(newPos.X, newPos.Y, newPos.Z + move.Z);
-			if (!map.HasBlocksInBoundsMinMax(
-				new Vector3(testZ.X - halfX, testZ.Y, testZ.Z - halfZ),
-				new Vector3(testZ.X + halfX, testZ.Y + height, testZ.Z + halfZ)))
-				newPos.Z += move.Z;
-			else
-				velocity.Z = 0;
-
-			return newPos;
-		}
+		return new PhysicsMoveResult(currentPosition, currentVelocity, grounded, groundNormal, wallNormal);
 	}
+
+	private static void ClipIntoPlane(ref Vector3 velocity, Vector3 normal)
+	{
+		float into = Vector3.Dot(velocity, normal);
+		if (into < 0f)
+			velocity -= normal * into;
+	}
+
+	private static bool IsFinite(Vector3 value) =>
+		float.IsFinite(value.X) &&
+		float.IsFinite(value.Y) &&
+		float.IsFinite(value.Z);
 }

@@ -179,17 +179,25 @@ public class InventoryItem
 		});
 	}
 
-	public virtual Vector3 Raycast(
+	public virtual bool TryRaycast(
 		ChunkMap map,
 		Vector3 start,
 		Vector3 direction,
 		float maximumLength,
+		out Vector3 hitPoint,
 		out Vector3 normal
 	)
 	{
-		return map.RaycastPrecise(start, maximumLength, direction, out Vector3 hit, out normal)
-			? hit
-			: Vector3.Zero;
+		if (map.TryRaycast(start, direction, maximumLength, out VoxelRaycastHit hit))
+		{
+			hitPoint = hit.Point;
+			normal = hit.Normal;
+			return true;
+		}
+
+		hitPoint = Vector3.Zero;
+		normal = Vector3.Zero;
+		return false;
 	}
 
 	public virtual bool PlaceBlock(

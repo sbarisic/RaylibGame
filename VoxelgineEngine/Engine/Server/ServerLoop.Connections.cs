@@ -47,6 +47,7 @@ namespace Voxelgine.Engine.Server
 			var inputMgr = new InputMgr(inputSource);
 			_playerInputSources[playerId] = inputSource;
 			_playerInputMgrs[playerId] = inputMgr;
+			_playerCommandQueues[playerId] = new ServerCommandQueue();
 
 			// Send PlayerJoined for all existing players to the new client
 			foreach (Player existing in _simulation.Players.GetAllPlayers())
@@ -65,6 +66,7 @@ namespace Voxelgine.Engine.Server
 			{
 				var spawnPacket = BuildEntitySpawnPacket(entity);
 				_server.SendTo(playerId, spawnPacket, true, CurrentTime);
+				_server.SendTo(playerId, BuildEntitySnapshotPacket(entity), true, CurrentTime);
 			}
 
 			// Add the new player to the simulation
@@ -114,12 +116,12 @@ namespace Voxelgine.Engine.Server
 			// Clean up per-player input pipeline
 			_playerInputMgrs.Remove(playerId);
 			_playerInputSources.Remove(playerId);
+			_playerCommandQueues.Remove(playerId);
 
 			// Clean up respawn timer, attack timer, inventory, and input tick tracking
 			_respawnTimers.Remove(playerId);
 			_playerAttackEndTimes.Remove(playerId);
 			_playerInventories.Remove(playerId);
-			_lastInputTicks.Remove(playerId);
 
 			// Remove from simulation
 			_simulation.Players.RemovePlayer(playerId);

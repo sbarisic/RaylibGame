@@ -121,18 +121,39 @@ namespace Voxelgine.Engine
 		void UpdateEntityPhysics(VoxEntity Ent, float Dt)
 		{
 			GameSimulation sim = Ent.GetSimulation();
-			ChunkMap map = sim.Map;
+			if (sim == null)
+				return;
 
-			// Apply gravity
-			PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
+			EntityPhysicsProperties properties = Ent.PhysicsProperties;
+			if (properties.SimulateMotion)
+			{
+				if (properties.AffectedByGravity)
+					PhysicsUtils.ApplyGravity(ref Ent.Velocity, 9.81f, Dt);
 
-			// Move with axis-separated collision
-			Ent.Position = WorldCollision.MoveWithCollision(map, Ent.Position, Ent.Size, ref Ent.Velocity, Dt);
+				if (properties.CollidesWithVoxels)
+				{
+					PhysicsMoveResult result = WorldCollision.MoveAndSlide(
+						sim.PhysicsWorld,
+						Ent.Position,
+						Ent.Size,
+						Ent.Velocity,
+						Dt,
+						PhysicsCollisionMask.Entity,
+						ignoredEntity: Ent
+					);
+					Ent.Position = result.Position;
+					Ent.Velocity = result.Velocity;
+				}
+				else
+				{
+					Ent.Position += Ent.Velocity * Dt;
+				}
+			}
 
 			// --- Player collision check using AABB ---
-			if (sim != null)
+			if (properties.GeneratesTouchEvents)
 			{
-				AABB entityAABB = PhysicsUtils.CreateEntityAABB(Ent.Position, Ent.Size);
+				AABB entityAABB = Ent.WorldBounds;
 
 				foreach (Player player in sim.Players.GetAllPlayers())
 				{

@@ -29,6 +29,9 @@ namespace Voxelgine.Engine
 		/// <summary>Physics constants (movement, gravity, friction, etc.).</summary>
 		public PhysData PhysicsData { get; }
 
+		/// <summary>Shared collision view over the voxel map and replicated entities.</summary>
+		public PhysicsWorld PhysicsWorld { get; }
+
 		public GameSimulation(IFishEngineRunner eng)
 		{
 			PhysicsData = new PhysData();
@@ -38,6 +41,7 @@ namespace Voxelgine.Engine
 			Players = new PlayerManager();
 			Entities = new EntityManager(eng);
 			Map = new ChunkMap();
+			PhysicsWorld = new PhysicsWorld(Map, Entities);
 		}
 
 		private static void ApplyDayNightLighting(DayNightLightingState lighting)

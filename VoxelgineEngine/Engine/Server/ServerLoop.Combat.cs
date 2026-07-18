@@ -47,11 +47,11 @@ namespace Voxelgine.Engine.Server
 			Vector3 worldHitNormal = Vector3.Zero;
 			float worldDist = float.MaxValue;
 
-			if (_simulation.Map.RaycastPrecise(origin, MaxWeaponRange, direction, out Vector3 preciseHitPoint, out Vector3 faceDir))
+			if (_simulation.Map.TryRaycast(origin, direction, MaxWeaponRange, out VoxelRaycastHit voxelHit))
 			{
-				worldDist = Vector3.Distance(origin, preciseHitPoint);
-				worldHitPos = preciseHitPoint;
-				worldHitNormal = faceDir;
+				worldDist = voxelHit.Distance;
+				worldHitPos = voxelHit.Point;
+				worldHitNormal = voxelHit.Normal;
 			}
 
 			// --- Raycast against entities ---

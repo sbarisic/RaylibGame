@@ -90,6 +90,18 @@ namespace Voxelgine.Engine.Server
 			};
 		}
 
+		private static EntitySnapshotPacket BuildEntitySnapshotPacket(VoxEntity entity)
+		{
+			return new EntitySnapshotPacket
+			{
+				NetworkId = entity.NetworkId,
+				Position = entity.Position,
+				Velocity = entity.Velocity,
+				AnimationState = GetEntityAnimationState(entity),
+				SnapshotData = entity.CaptureSnapshot(),
+			};
+		}
+
 		/// <summary>
 		/// Handles entity-player touch events raised by <see cref="EntityManager"/>.
 		/// Refills the player's inventory when they touch a <see cref="VEntPickup"/>.

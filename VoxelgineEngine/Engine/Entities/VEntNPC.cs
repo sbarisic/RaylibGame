@@ -424,8 +424,8 @@ namespace Voxelgine.Engine
 					_lastWaypointIndex = _pathFollower.CurrentWaypointIndex;
 				}
 
-				// Get movement direction from path follower
-				Vector3 moveDir = _pathFollower.Update(Position, Dt);
+				PathSteering steering = _pathFollower.Step(Position);
+				Vector3 moveDir = steering.HorizontalDirection;
 
 				if (moveDir.LengthSquared() > 0.001f)
 				{
@@ -449,7 +449,7 @@ namespace Voxelgine.Engine
 				if (isGrounded)
 				{
 					// Jump if path requires it (waypoint is higher)
-					if (_pathFollower.ShouldJump(Position))
+					if (steering.JumpRequested)
 					{
 						Jump();
 					}

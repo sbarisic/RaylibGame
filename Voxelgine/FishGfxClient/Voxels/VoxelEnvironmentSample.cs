@@ -34,4 +34,25 @@ public static class VoxelEnvironmentSampling
 
 		return Math.Clamp(total / skyLightProbes.Length, 0, 1);
 	}
+
+	public static byte CombineLightLevel(
+		int skyLight,
+		int blockLight,
+		float skyLightMultiplier,
+		int minimumAmbientLight)
+	{
+		if (!float.IsFinite(skyLightMultiplier))
+		{
+			throw new ArgumentOutOfRangeException(nameof(skyLightMultiplier));
+		}
+
+		float adjustedSky = Math.Clamp(skyLight, 0, MaximumSkyLight)
+			* Math.Clamp(skyLightMultiplier, 0, 1);
+		int combined = Math.Max(
+			(int)MathF.Round(adjustedSky),
+			Math.Clamp(blockLight, 0, MaximumSkyLight)
+		);
+		combined = Math.Max(combined, Math.Clamp(minimumAmbientLight, 0, MaximumSkyLight));
+		return (byte)combined;
+	}
 }

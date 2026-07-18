@@ -294,16 +294,19 @@ namespace Voxelgine.Engine.Server
 			// their own AI and don't process player input, so we pass null.
 			_simulation.Entities.UpdateLockstep(totalTime, dt, null);
 
-			// 9. Broadcast authoritative player positions to all clients
+			// 9. Kill and remove NPCs which fell out of the world
+			RemoveFallenNpcs();
+
+			// 10. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
 
-			// 10. Broadcast pending block changes to all clients
+			// 11. Broadcast pending block changes to all clients
 			BroadcastBlockChanges(totalTime);
 
-			// 11. Broadcast entity snapshots to all clients
+			// 12. Broadcast entity snapshots to all clients
 			BroadcastEntitySnapshots(totalTime);
 
-			// 12. Periodic auto-save
+			// 13. Periodic auto-save
 			if (totalTime - _lastAutoSaveTime >= AutoSaveInterval)
 			{
 				_lastAutoSaveTime = totalTime;

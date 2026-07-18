@@ -194,11 +194,6 @@ namespace Voxelgine.Engine.Server
 		}
 
 		/// <summary>
-		/// Y position below which a player is considered out of bounds and killed.
-		/// </summary>
-		private const float VoidThreshold = -50f;
-
-		/// <summary>
 		/// Kills players who have fallen below the world bounds.
 		/// The respawn system will reset their position after <see cref="RespawnDelay"/>.
 		/// </summary>
@@ -209,7 +204,7 @@ namespace Voxelgine.Engine.Server
 				if (player.IsDead)
 					continue;
 
-				if (player.Position.Y < VoidThreshold)
+				if (WorldBoundsPolicy.IsBelowVoid(player.Position))
 				{
 					player.TakeDamage(player.MaxHealth);
 					_respawnTimers[player.PlayerId] = CurrentTime;

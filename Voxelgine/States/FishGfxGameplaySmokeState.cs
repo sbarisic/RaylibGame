@@ -105,7 +105,16 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 	public override void BeginFrame(in FrameTiming timing)
 	{
 		gui.Update(timing.DeltaTime, timing.TotalTime);
+		voxelScene.SetEnvironmentLighting(
+			dayNight.SkyLightMultiplier,
+			dayNight.AmbientLight
+		);
 		voxelScene.Update(camera);
+		particles.UpdateVoxelEmitters(
+			timing.DeltaTime,
+			cameraState.Position,
+			voxelScene.FireParticleEmitters
+		);
 		particles.Update(timing.DeltaTime);
 		npc.Update(
 			new NpcRenderState(

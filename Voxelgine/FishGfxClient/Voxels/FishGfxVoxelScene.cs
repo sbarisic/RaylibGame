@@ -17,6 +17,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly CampfireEmitterIndex campfires = new();
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
+	private float skyLightMultiplier = 1;
+	private byte minimumAmbientLight;
 	private int resetPending;
 	private bool disposed;
 
@@ -63,6 +65,26 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	public IReadOnlyList<Vector3> CampfirePositions => campfires.Positions;
 
+	public IReadOnlyList<VoxelFireEmitter> FireParticleEmitters => campfires.ParticleEmitters;
+
+	public int TorchCount => campfires.TorchCount;
+
+	public void SetEnvironmentLighting(float skyMultiplier, byte ambientLight)
+	{
+		ThrowIfDisposed();
+		if (!float.IsFinite(skyMultiplier))
+		{
+			throw new ArgumentOutOfRangeException(nameof(skyMultiplier));
+		}
+
+		skyLightMultiplier = Math.Clamp(skyMultiplier, 0, 1);
+		minimumAmbientLight = (byte)Math.Clamp(
+			(int)ambientLight,
+			0,
+			VoxelEnvironmentSampling.MaximumSkyLight
+		);
+	}
+
 	public void ProcessPendingChanges()
 	{
 		ThrowIfDisposed();
@@ -108,9 +130,21 @@ public sealed class FishGfxVoxelScene : IDisposable
 		VoxelBlockLight block = light.Block;
 
 		return new Rgba32(
-			ScaleLight(Math.Max(sky, block.Red)),
-			ScaleLight(Math.Max(sky, block.Green)),
-			ScaleLight(Math.Max(sky, block.Blue)));
+			ScaleLight(VoxelEnvironmentSampling.CombineLightLevel(
+				sky,
+				block.Red,
+				skyLightMultiplier,
+				minimumAmbientLight)),
+			ScaleLight(VoxelEnvironmentSampling.CombineLightLevel(
+				sky,
+				block.Green,
+				skyLightMultiplier,
+				minimumAmbientLight)),
+			ScaleLight(VoxelEnvironmentSampling.CombineLightLevel(
+				sky,
+				block.Blue,
+				skyLightMultiplier,
+				minimumAmbientLight)));
 	}
 
 	public VoxelEnvironmentSample SampleEnvironment(Vector3 worldPosition)

@@ -144,6 +144,11 @@ public unsafe partial class MPClientGameState
 			_fishParticleAssets.Value,
 			_fishVoxelScene
 		);
+		_logging?.Log(
+			GameLogLevel.Debug,
+			"Particles",
+			$"Indexed voxel fire emitters campfires={_fishVoxelScene.CampfirePositions.Count} torches={_fishVoxelScene.TorchCount}"
+		);
 		_fishAmbience = new FishGfxAmbienceSession(
 			Eng.DI.GetRequiredService<IAudioSystem>(),
 			_fishVoxelScene
@@ -232,6 +237,11 @@ public unsafe partial class MPClientGameState
 		ConfigureFishCamera(_fishWorldCamera, _fishCameraState, framebufferSize);
 		ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, player.Position);
 		_fishVoxelScene.Update(_fishWorldCamera);
+		_fishParticles?.UpdateVoxelEmitters(
+			timing.DeltaTime,
+			_fishCameraState.Position,
+			_fishVoxelScene.FireParticleEmitters
+		);
 		_fishParticles?.Update(timing.DeltaTime);
 		_fishAmbience?.Update(
 			timing.DeltaTime,
@@ -889,6 +899,7 @@ public unsafe partial class MPClientGameState
 		var sun = dayNight.SunColor;
 		var sky = dayNight.SkyColor;
 		float daylight = Math.Clamp(dayNight.SkyLightMultiplier, 0, 1);
+		scene.SetEnvironmentLighting(daylight, dayNight.AmbientLight);
 		FishColor directionalColor = sun.A == 0
 			? new FishColor(145, 165, 215)
 			: new FishColor(sun.R, sun.G, sun.B);

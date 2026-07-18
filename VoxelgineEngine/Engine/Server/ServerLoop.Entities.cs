@@ -2,6 +2,7 @@ using System.IO;
 using System.Numerics;
 
 using Voxelgine.Engine.AI;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine.Server
 {
@@ -49,6 +50,36 @@ namespace Voxelgine.Engine.Server
 			var packet = BuildEntitySpawnPacket(entity);
 			_server.Broadcast(packet, true, CurrentTime);
 			_logging.ServerWriteLine($"Spawned {entity.EntityTypeName} (netId={entity.NetworkId}) at {entity.Position}");
+		}
+
+		/// <summary>
+		/// Kills and removes NPCs which fell through the world, then reliably tells
+		/// clients to discard their replicated presentation state.
+		/// </summary>
+		private void RemoveFallenNpcs()
+		{
+			foreach (VEntNPC npc in WorldBoundsPolicy.KillFallenNpcs(
+				_simulation.Entities.GetAllEntities()
+			))
+			{
+				int networkId = npc.NetworkId;
+				float lastY = npc.Position.Y;
+				if (!_simulation.Entities.Remove(npc))
+				{
+					continue;
+				}
+
+				_lastEntitySnapshots.Remove(networkId);
+				_server.Broadcast(new EntityRemovePacket
+				{
+					NetworkId = networkId,
+				}, true, CurrentTime);
+				_logging.Log(
+					GameLogLevel.Info,
+					"Entities",
+					$"Removed NPC npcId={networkId} reason=void y={lastY:F2}"
+				);
+			}
 		}
 
 		/// <summary>

@@ -22,6 +22,8 @@ public sealed class FishGfxGameplayParticles : IDisposable
 	private readonly Tracer[] tracers;
 	private readonly ConcurrentQueue<SpawnRequest> pendingParticles = new();
 	private readonly ConcurrentQueue<TracerRequest> pendingTracers = new();
+	private readonly VoxelFireEmissionScheduler voxelFireScheduler = new();
+	private readonly List<VoxelFireEmission> voxelFireEmissions = new();
 	private readonly Random random;
 	private int pendingParticleCount;
 	private int pendingTracerCount;
@@ -191,6 +193,57 @@ public sealed class FishGfxGameplayParticles : IDisposable
 		return true;
 	}
 
+	public void UpdateVoxelEmitters(
+		float deltaSeconds,
+		Vector3 listenerPosition,
+		IReadOnlyList<VoxelFireEmitter> emitters)
+	{
+		ThrowIfDisposed();
+		voxelFireScheduler.Advance(
+			deltaSeconds,
+			listenerPosition,
+			emitters,
+			voxelFireEmissions
+		);
+
+		foreach (VoxelFireEmission emission in voxelFireEmissions)
+		{
+			Vector3 center = emission.Emitter.Position;
+			if (emission.Kind == VoxelFireEmissionKind.Smoke)
+			{
+				Vector3 smokePosition = center + new Vector3(
+					NextSigned(0.12f),
+					0.55f,
+					NextSigned(0.12f)
+				);
+				EnqueueShortSmoke(
+					smokePosition,
+					new Vector3(NextSigned(0.08f), 0.7f, NextSigned(0.08f)),
+					new Rgba32(150, 145, 135)
+				);
+				continue;
+			}
+
+			bool isCampfire = emission.Emitter.Type == BlockType.Campfire;
+			float spread = isCampfire ? 0.18f : 0.04f;
+			Vector3 flamePosition = center + new Vector3(
+				NextSigned(spread),
+				isCampfire ? 0.18f : 0.3f,
+				NextSigned(spread)
+			);
+			EnqueueFire(
+				flamePosition,
+				new Vector3(NextSigned(0.1f), 0.25f, NextSigned(0.1f)),
+				Rgba32.White,
+				isCampfire ? 0.55f : 0.25f,
+				noCollision: true,
+				lifetime: isCampfire ? 0.65f : 0.5f,
+				initialScale: 0.8f,
+				additive: true
+			);
+		}
+	}
+
 	public void Update(float deltaSeconds)
 	{
 		ThrowIfDisposed();
@@ -353,6 +406,8 @@ public sealed class FishGfxGameplayParticles : IDisposable
 		ThrowIfDisposed();
 		Array.Clear(particles);
 		Array.Clear(tracers);
+		voxelFireScheduler.Reset();
+		voxelFireEmissions.Clear();
 		while (pendingParticles.TryDequeue(out _))
 		{
 			Interlocked.Decrement(ref pendingParticleCount);

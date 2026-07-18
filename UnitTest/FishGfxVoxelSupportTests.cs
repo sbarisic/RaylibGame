@@ -1,6 +1,7 @@
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.FishGfxClient.Effects;
 using Voxelgine.FishGfxClient.Voxels;
 using Voxelgine.Graphics;
 using Voxelgine.States;
@@ -51,6 +52,77 @@ public sealed class FishGfxVoxelSupportTests
 		Assert.Equal(new[] { new Vector3(1.5f, 2.5f, 3.5f) }, original);
 	}
 
+	[Fact]
+	public void CampfireIndex_TracksCampfiresAndTorchesForParticleEmission()
+	{
+		ChunkMap map = CreateMap();
+		map.SetBlock(4, 5, 6, BlockType.Torch);
+		map.SetBlock(-2, 3, 1, BlockType.Campfire);
+		CampfireEmitterIndex index = new();
+
+		index.Reset(map.CaptureChunks());
+
+		Assert.Equal(1, index.Count);
+		Assert.Equal(1, index.TorchCount);
+		Assert.Equal(
+			new[]
+			{
+				new VoxelFireEmitter(BlockType.Campfire, new Vector3(-1.5f, 3.5f, 1.5f)),
+				new VoxelFireEmitter(BlockType.Torch, new Vector3(4.5f, 5.5f, 6.5f)),
+			},
+			index.ParticleEmitters
+		);
+
+		index.Apply(new BlockChange(4, 5, 6, BlockType.Torch, BlockType.Stone));
+		index.Apply(new BlockChange(8, 9, 10, BlockType.None, BlockType.Torch));
+
+		Assert.Equal(1, index.TorchCount);
+		Assert.Contains(
+			new VoxelFireEmitter(BlockType.Torch, new Vector3(8.5f, 9.5f, 10.5f)),
+			index.ParticleEmitters
+		);
+	}
+
+	[Fact]
+	public void FireEmissionScheduler_EmitsBothVoxelTypesAtStableRates()
+	{
+		VoxelFireEmissionScheduler scheduler = new();
+		List<VoxelFireEmission> output = new();
+		VoxelFireEmitter campfire = new(BlockType.Campfire, new Vector3(1.5f, 2.5f, 3.5f));
+		VoxelFireEmitter torch = new(BlockType.Torch, new Vector3(2.5f, 2.5f, 3.5f));
+
+		scheduler.Advance(0, Vector3.Zero, [campfire, torch], output);
+
+		Assert.Equal(3, output.Count);
+		Assert.Contains(new VoxelFireEmission(campfire, VoxelFireEmissionKind.Flame), output);
+		Assert.Contains(new VoxelFireEmission(campfire, VoxelFireEmissionKind.Smoke), output);
+		Assert.Contains(new VoxelFireEmission(torch, VoxelFireEmissionKind.Flame), output);
+
+		scheduler.Advance(0.1f, Vector3.Zero, [campfire, torch], output);
+		Assert.Empty(output);
+
+		scheduler.Advance(0.02f, Vector3.Zero, [campfire, torch], output);
+		Assert.Equal(
+			new VoxelFireEmission(campfire, VoxelFireEmissionKind.Flame),
+			Assert.Single(output)
+		);
+	}
+
+	[Fact]
+	public void FireEmissionScheduler_IgnoresEmittersOutsideTheEffectRange()
+	{
+		VoxelFireEmissionScheduler scheduler = new();
+		List<VoxelFireEmission> output = new();
+		VoxelFireEmitter distant = new(
+			BlockType.Torch,
+			new Vector3(VoxelFireEmissionScheduler.MaximumDistance + 1, 0, 0)
+		);
+
+		scheduler.Advance(1, Vector3.Zero, [distant], output);
+
+		Assert.Empty(output);
+	}
+
 	[Theory]
 	[InlineData(-1, 0)]
 	[InlineData(0, 0)]
@@ -74,6 +146,25 @@ public sealed class FishGfxVoxelSupportTests
 		Assert.Equal(
 			0,
 			VoxelEnvironmentSampling.CalculateOutdoorExposure(ReadOnlySpan<byte>.Empty));
+	}
+
+	[Theory]
+	[InlineData(15, 0, 1, 0, 15)]
+	[InlineData(15, 0, 0.15f, 1, 2)]
+	[InlineData(15, 10, 0.15f, 1, 10)]
+	[InlineData(0, 0, 0, 2, 2)]
+	[InlineData(30, 30, 2, 30, 15)]
+	public void CombineLightLevel_AppliesDayNightWithoutDimmingBlockLight(
+		int sky,
+		int block,
+		float multiplier,
+		int ambient,
+		int expected)
+	{
+		Assert.Equal(
+			expected,
+			VoxelEnvironmentSampling.CombineLightLevel(sky, block, multiplier, ambient)
+		);
 	}
 
 	private static ChunkMap CreateMap()

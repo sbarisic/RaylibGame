@@ -46,7 +46,9 @@ namespace Voxelgine.Engine.AI
 
 		// Event system
 		private readonly Dictionary<AIEvent, int> _eventHandlers = new();
+		private readonly Dictionary<AIEvent, int> _eventHandlerEnds = new();
 		private readonly Dictionary<AIEvent, float> _eventCooldowns = new();
+		private AIEvent? _activeHandlerEvent;
 		private const float EventCooldownTime = 1f;
 
 		// Tuning
@@ -63,6 +65,10 @@ namespace Voxelgine.Engine.AI
 
 		// Low health tracking
 		private bool _lowHealthFired;
+		private bool _playerSightPresent;
+		private bool _playerInRangePresent;
+		private bool _enemyInRangePresent;
+		private bool _friendlyInRangePresent;
 
 		// Range check timers
 		private float _rangeCheckTimer;
@@ -76,16 +82,31 @@ namespace Voxelgine.Engine.AI
 			if (_program.Length == 0)
 				throw new ArgumentException("Program must have at least one step.", nameof(program));
 
-			// Scan program for event handler markers and register them
+			// Scan program for event handler markers and register their instruction ranges.
+			List<(AIEvent Event, int Start)> handlers = new();
 			for (int i = 0; i < _program.Length; i++)
 			{
 				if (_program[i].Instruction == AIInstruction.EventHandler)
 				{
 					AIEvent evt = (AIEvent)(int)_program[i].Param;
 					_eventHandlers[evt] = i;
+					handlers.Add((evt, i));
 				}
 			}
+
+			for (int i = 0; i < handlers.Count; i++)
+			{
+				(AIEvent evt, int start) = handlers[i];
+				if (_eventHandlers[evt] != start)
+					continue;
+
+				_eventHandlerEnds[evt] = i + 1 < handlers.Count
+					? handlers[i + 1].Start
+					: _program.Length;
+			}
 		}
+
+		internal int ProgramCounter => _pc;
 
 		/// <summary>
 		/// Raises an event. If a handler is registered for this event, interrupts the current
@@ -96,8 +117,8 @@ namespace Voxelgine.Engine.AI
 			if (!_eventHandlers.TryGetValue(evt, out int handlerIndex))
 				return;
 
-			// Skip if already at or inside this handler
-			if (_pc == handlerIndex || _pc == handlerIndex + 1)
+			// The active handler owns its full range until control leaves it.
+			if (_activeHandlerEvent == evt)
 				return;
 
 			// Cooldown to prevent spamming
@@ -106,6 +127,7 @@ namespace Voxelgine.Engine.AI
 
 			_eventCooldowns[evt] = EventCooldownTime;
 			_log?.WriteLine($"[AI:{npcNetId}] EVENT {evt} -> jump to step {handlerIndex}");
+			_activeHandlerEvent = evt;
 			Advance(handlerIndex);
 		}
 
@@ -150,7 +172,8 @@ namespace Voxelgine.Engine.AI
 				if (_sightCheckTimer <= 0)
 				{
 					_sightCheckTimer = SightCheckInterval;
-					if (FindNearestPlayer(npc, 15f) != null)
+					bool isPresent = FindNearestPlayer(npc, 15f) != null;
+					if (EnteredPresence(ref _playerSightPresent, isPresent))
 						RaiseEvent(AIEvent.OnPlayerSight, npc.NetworkId);
 				}
 			}
@@ -174,19 +197,30 @@ namespace Voxelgine.Engine.AI
 
 				if (_eventHandlers.ContainsKey(AIEvent.OnPlayerInRange))
 				{
-					if (FindNearestPlayer(npc, ProximityRange) != null)
+					bool isPresent = FindNearestPlayer(npc, ProximityRange) != null;
+					if (EnteredPresence(ref _playerInRangePresent, isPresent))
 						RaiseEvent(AIEvent.OnPlayerInRange, npc.NetworkId);
 				}
 
 				if (_eventHandlers.ContainsKey(AIEvent.OnEnemyInRange))
 				{
-					if (FindNearestEntity(npc, ProximityRange, EntityTargetType.Enemy) != null)
+					bool isPresent = FindNearestEntity(
+						npc,
+						ProximityRange,
+						EntityTargetType.Enemy
+					) != null;
+					if (EnteredPresence(ref _enemyInRangePresent, isPresent))
 						RaiseEvent(AIEvent.OnEnemyInRange, npc.NetworkId);
 				}
 
 				if (_eventHandlers.ContainsKey(AIEvent.OnFriendlyInRange))
 				{
-					if (FindNearestEntity(npc, ProximityRange, EntityTargetType.Friendly) != null)
+					bool isPresent = FindNearestEntity(
+						npc,
+						ProximityRange,
+						EntityTargetType.Friendly
+					) != null;
+					if (EnteredPresence(ref _friendlyInRangePresent, isPresent))
 						RaiseEvent(AIEvent.OnFriendlyInRange, npc.NetworkId);
 				}
 
@@ -736,16 +770,7 @@ namespace Voxelgine.Engine.AI
 		private void TickChatMessageContains(VEntNPC npc, ref AIStep step)
 		{
 			string searchText = step.TextParam ?? "";
-			bool found = false;
-
-			foreach (var msg in _chatBuffer)
-			{
-				if (msg.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-				{
-					found = true;
-					break;
-				}
-			}
+			bool found = ConsumeFirstMatchingChatMessage(searchText);
 
 			_log?.WriteLine($"[AI:{npc.NetworkId}] step {_pc} CHAT_CONTAINS \"{searchText}\" -> {(found ? "yes" : "no")}");
 			Complete(found, ref step);
@@ -765,9 +790,47 @@ namespace Voxelgine.Engine.AI
 		{
 			int prev = _pc;
 			_pc = target % _program.Length;
+			if (_activeHandlerEvent is AIEvent activeEvent
+				&& (!IsInsideHandler(activeEvent, _pc)))
+			{
+				_activeHandlerEvent = null;
+			}
 			_phase = StepPhase.Starting;
 			_timer = 0f;
 			_log?.WriteLine($"[AI] advance {prev} -> {_pc} ({_program[_pc].Instruction})");
+		}
+
+		private bool IsInsideHandler(AIEvent evt, int programCounter)
+		{
+			return _eventHandlers.TryGetValue(evt, out int start)
+				&& _eventHandlerEnds.TryGetValue(evt, out int end)
+				&& programCounter >= start
+				&& programCounter < end;
+		}
+
+		internal bool ConsumeFirstMatchingChatMessage(string searchText)
+		{
+			bool found = false;
+			int messageCount = _chatBuffer.Count;
+			for (int i = 0; i < messageCount; i++)
+			{
+				string message = _chatBuffer.Dequeue();
+				if (!found && message.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+				{
+					found = true;
+					continue;
+				}
+
+				_chatBuffer.Enqueue(message);
+			}
+			return found;
+		}
+
+		internal static bool EnteredPresence(ref bool wasPresent, bool isPresent)
+		{
+			bool entered = isPresent && !wasPresent;
+			wasPresent = isPresent;
+			return entered;
 		}
 
 		private static void FaceEntity(VEntNPC npc, VoxEntity target)

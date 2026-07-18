@@ -127,10 +127,11 @@ internal sealed class EntityModelSource
 			{
 				int cornerIndex = TriangleOrder[triangleIndex];
 				Vector2 localUv = RotateFaceUv(cornerUvs[cornerIndex], faceRotation);
-				Vector2 uv = new(
+				Vector2 logicalUv = new(
 					float.Lerp(sourceUv.X, sourceUv.Z, localUv.X),
 					float.Lerp(sourceUv.Y, sourceUv.W, localUv.Y)
 				);
+				Vector2 uv = new(logicalUv.X, 1 - logicalUv.Y);
 				vertices.Add(new FishVertex3(corners[cornerIndex], uv, FishColor.White));
 			}
 		}

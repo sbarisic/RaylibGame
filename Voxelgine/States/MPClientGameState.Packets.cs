@@ -95,16 +95,6 @@ namespace Voxelgine.States
 				ply.Init(_simulation.Map);
 				_logging.ClientWriteLine("MPClientGameState: Player.Init complete");
 
-				ply.OnMenuToggled = (cursorVisible) =>
-				{
-					if (_debugMenuWindow != null)
-					{
-						_debugMenuWindow.Visible = cursorVisible;
-						if (cursorVisible)
-							_debugMenuWindow.BringToFront();
-					}
-				};
-
 				_logging.ClientWriteLine("MPClientGameState: SetPosition...");
 				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
 				_logging.ClientWriteLine("MPClientGameState: SetPosition complete");
@@ -161,8 +151,7 @@ namespace Voxelgine.States
 				_statusText = "";
 				_errorText = "";
 
-				_simulation.LocalPlayer.CursorDisabled = true;
-				SetCursorCaptured(true);
+				ApplyInputOwnership();
 
 				_logging.ClientWriteLine("MPClientGameState: World loaded, entering gameplay");
 			}

@@ -304,8 +304,7 @@ namespace Voxelgine.States
 
 			_debugMenuWindow.OnClosed += (window) =>
 			{
-				_debugMenuWindow.Visible = false;
-				(_simulation?.LocalPlayer as ClientPlayer)?.ToggleMouse(false);
+				CloseDebugMenu();
 			};
 
 			var stack = new StackLayout
@@ -482,8 +481,7 @@ namespace Voxelgine.States
 			};
 			btnClose.Clicked += (sender, args) =>
 			{
-				_debugMenuWindow.Visible = false;
-				(_simulation?.LocalPlayer as ClientPlayer)?.ToggleMouse(false);
+				CloseDebugMenu();
 			};
 			stack.AddChild(btnClose);
 

@@ -92,7 +92,9 @@ namespace Voxelgine.States
 		private ToastNotification _chatToast;
 		private Panel _chatInputPanel;
 		private Textbox _chatInputBox;
-		private bool _chatOpen;
+		private readonly GameplayInputOwnership _inputOwnership = new();
+		private readonly NetworkInputSource _neutralInputSource = new();
+		private readonly InputMgr _neutralInputManager;
 
 		// Buffer for PlayerJoined packets received before simulation is created
 		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
@@ -142,6 +144,7 @@ namespace Voxelgine.States
 		{
 			_gameWindow = window;
 			_logging = eng.DI.GetRequiredService<IFishLogging>();
+			_neutralInputManager = new InputMgr(_neutralInputSource);
 		}
 
 		/// <summary>
@@ -175,6 +178,7 @@ namespace Voxelgine.States
 
 			// Create FishUI for loading screen
 			_gui = new FishUIManager(_gameWindow, _logging);
+			_gui.InputEnabled = _inputOwnership.UiInputEnabled;
 			CreateLoadingUI();
 
 			try
@@ -192,19 +196,22 @@ namespace Voxelgine.States
 		public override void SwapTo()
 		{
 			base.SwapTo();
+			_inputOwnership.Activate();
 			if (_gui is not null)
 			{
-				_gui.InputEnabled = true;
+				_gui.InputEnabled = _inputOwnership.UiInputEnabled;
 			}
-			SetCursorCaptured(_initialized && !_chatOpen);
+			ApplyInputOwnership();
 		}
 
 		public override void SwapFrom()
 		{
+			_inputOwnership.Deactivate();
 			if (_gui is not null)
 			{
-				_gui.InputEnabled = false;
+				_gui.InputEnabled = _inputOwnership.UiInputEnabled;
 			}
+			ApplyInputOwnership();
 			base.SwapFrom();
 		}
 
@@ -280,16 +287,7 @@ namespace Voxelgine.States
 					_simulation.Map.MarkAllChunksDirty();
 				}
 
-				// Toggle network statistics overlay
-				if (Window.InMgr.IsInputPressed(InputKey.F5))
-					_showNetStats = !_showNetStats;
-
-				// Toggle player list overlay
-				if (Window.InMgr.IsInputPressed(InputKey.Tab))
-					_showPlayerList = !_showPlayerList;
-
-				// Chat input handling
-				if (_chatOpen)
+				if (_inputOwnership.Mode == GameplayInputMode.Chat)
 				{
 					if (Window.InMgr.IsInputPressed(InputKey.Enter))
 					{
@@ -299,12 +297,28 @@ namespace Voxelgine.States
 					{
 						CloseChatInput();
 					}
-					return; // Consume all other input while chat is open
+
+					TickWorldWithoutGameplayInput();
+					return;
+				}
+
+				if (Window.InMgr.IsInputPressed(InputKey.F1))
+				{
+					ToggleDebugMenu();
+					TickWorldWithoutGameplayInput();
+					return;
+				}
+
+				if (_inputOwnership.Mode == GameplayInputMode.DebugMenu)
+				{
+					TickWorldWithoutGameplayInput();
+					return;
 				}
 
 				if (Window.InMgr.IsInputPressed(InputKey.Enter))
 				{
 					OpenChatInput();
+					TickWorldWithoutGameplayInput();
 					return;
 				}
 
@@ -315,6 +329,13 @@ namespace Voxelgine.States
 					return;
 				}
 
+				// Gameplay hotkeys are unavailable while Chat or DebugMenu owns input.
+				if (Window.InMgr.IsInputPressed(InputKey.F5))
+					_showNetStats = !_showNetStats;
+
+				if (Window.InMgr.IsInputPressed(InputKey.Tab))
+					_showPlayerList = !_showPlayerList;
+
 				// Update game systems
 				// Discard block changes logged by server-broadcasted BlockChangePackets
 				// (processed during _client.Tick above) so they are not echoed back as
@@ -323,10 +344,7 @@ namespace Voxelgine.States
 				_simulation.Map.ClearPendingChanges();
 
 				_simulation.Map.Tick();
-				if (!HandleFishGfxCursorToggle(_simulation.LocalPlayer))
-				{
-					(_simulation.LocalPlayer as ClientPlayer)?.Tick(Window.InMgr);
-				}
+				(_simulation.LocalPlayer as ClientPlayer)?.Tick(Window.InMgr);
 				(_simulation.LocalPlayer as ClientPlayer)?.TickGUI(Window.InMgr, _simulation.Map);
 				(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
 
@@ -351,10 +369,22 @@ namespace Voxelgine.States
 				// Increment client tick
 				_client.LocalTick++;
 
-				// Record input and send to server
+				InputState simulationInput = CreateSimulationInputState(
+					InMgr.State,
+					_inputOwnership.Mode
+				);
+				InputMgr simulationInputManager = InMgr;
+				if (_inputOwnership.GameplayInputSuppressed)
+				{
+					_neutralInputSource.SetState(simulationInput);
+					_neutralInputManager.Tick(TotalTime);
+					simulationInputManager = _neutralInputManager;
+				}
+
+				// Record the same effective input used by local prediction and send it to the server.
 				var inputPacket = _inputBuffer.Record(
 					_client.LocalTick,
-					InMgr.State,
+					simulationInput,
 					new Vector2(_simulation.LocalPlayer.Camera.CamAngle.X, _simulation.LocalPlayer.Camera.CamAngle.Y)
 				);
 				_client.Send(inputPacket, false, currentTime);
@@ -363,7 +393,12 @@ namespace Voxelgine.States
 				if (!_simulation.LocalPlayer.IsDead)
 				{
 					// Apply local prediction (same physics as server)
-					_simulation.LocalPlayer.UpdatePhysics(_simulation.Map, _simulation.PhysicsData, Dt, InMgr);
+					_simulation.LocalPlayer.UpdatePhysics(
+						_simulation.Map,
+						_simulation.PhysicsData,
+						Dt,
+						simulationInputManager
+					);
 
 					// Record predicted state
 					_prediction.RecordPrediction(
@@ -375,7 +410,7 @@ namespace Voxelgine.States
 
 				// Entity AI/physics are server-authoritative; IsAuthority=false skips them.
 				// UpdateLockstep is still called for any non-authoritative cleanup.
-				_simulation.Entities.UpdateLockstep(TotalTime, Dt, InMgr);
+				_simulation.Entities.UpdateLockstep(TotalTime, Dt, simulationInputManager);
 			}
 			catch (Exception ex)
 			{
@@ -387,22 +422,83 @@ namespace Voxelgine.States
 
 		private void OpenChatInput()
 		{
-			_chatOpen = true;
+			if (!_inputOwnership.OpenChat())
+				return;
+
 			if (_chatInputPanel != null)
 				_chatInputPanel.Visible = true;
 			if (_chatInputBox != null)
+			{
 				_chatInputBox.Text = "";
-			SetCursorCaptured(false);
+				_gui?.UI.FocusControl(_chatInputBox);
+			}
+			ApplyInputOwnership();
 		}
 
 		private void CloseChatInput()
 		{
-			_chatOpen = false;
+			if (_inputOwnership.Mode != GameplayInputMode.Chat)
+				return;
+
+			_inputOwnership.CloseOverlay();
 			if (_chatInputPanel != null)
 				_chatInputPanel.Visible = false;
 			if (_chatInputBox != null)
 				_chatInputBox.Text = "";
-			SetCursorCaptured(true);
+			_gui?.UI.ClearFocus();
+			ApplyInputOwnership();
+		}
+
+		private void ToggleDebugMenu()
+		{
+			if (!_inputOwnership.ToggleDebugMenu())
+				return;
+
+			if (_debugMenuWindow is not null)
+			{
+				_debugMenuWindow.Visible = _inputOwnership.Mode == GameplayInputMode.DebugMenu;
+				if (_debugMenuWindow.Visible)
+					_debugMenuWindow.BringToFront();
+			}
+			ApplyInputOwnership();
+		}
+
+		private void CloseDebugMenu()
+		{
+			if (_inputOwnership.Mode != GameplayInputMode.DebugMenu)
+				return;
+
+			_inputOwnership.CloseOverlay();
+			if (_debugMenuWindow is not null)
+				_debugMenuWindow.Visible = false;
+			_gui?.UI.ClearFocus();
+			ApplyInputOwnership();
+		}
+
+		private void ApplyInputOwnership()
+		{
+			bool captureCursor = _initialized && _inputOwnership.CursorCaptured;
+			if (_simulation?.LocalPlayer is Player player)
+				player.CursorDisabled = captureCursor;
+			SetCursorCaptured(captureCursor);
+		}
+
+		private void TickWorldWithoutGameplayInput()
+		{
+			_simulation.Map.ClearPendingChanges();
+			_simulation.Map.Tick();
+			(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
+			SendPendingBlockChanges(GetClientTime());
+		}
+
+		internal static InputState CreateSimulationInputState(
+			InputState source,
+			GameplayInputMode mode
+		)
+		{
+			return mode == GameplayInputMode.Gameplay
+				? source
+				: new InputState { GameTime = source.GameTime };
 		}
 
 		private void SubmitChatMessage()
@@ -496,7 +592,7 @@ namespace Voxelgine.States
 			_chatToast = null;
 			_chatInputPanel = null;
 			_chatInputBox = null;
-			_chatOpen = false;
+			_inputOwnership.ResetMode();
 			_playerListPanel = null;
 			_playerListInfoLabel = null;
 			_showPlayerList = false;

@@ -77,23 +77,6 @@ public unsafe partial class MPClientGameState
 		}
 	}
 
-	private bool HandleFishGfxCursorToggle(Player player)
-	{
-#if WINDOWS
-		if (!IsUsingFishGfx || !Window.InMgr.IsInputPressed(InputKey.F1))
-		{
-			return false;
-		}
-
-		player.CursorDisabled = !player.CursorDisabled;
-		SetCursorCaptured(player.CursorDisabled);
-		player.OnMenuToggled?.Invoke(!player.CursorDisabled);
-		return true;
-#else
-		return false;
-#endif
-	}
-
 	private static void ReadFishGfxSpawnProperties(VoxEntity entity, BinaryReader reader)
 	{
 		Vector3 size = new(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());

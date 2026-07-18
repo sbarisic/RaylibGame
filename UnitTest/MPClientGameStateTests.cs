@@ -4,7 +4,7 @@ using Voxelgine.States;
 
 namespace UnitTest;
 
-public sealed class MPClientGameStateTests
+public sealed unsafe class MPClientGameStateTests
 {
 	[Fact]
 	public void ClientClockUsesApplicationTimeBeforeFirstStateTick()
@@ -29,6 +29,98 @@ public sealed class MPClientGameStateTests
 
 		Assert.Equal(1, context.Window.StateChangeCount);
 		Assert.Null(context.Window.LastState);
+	}
+
+	[Fact]
+	public void GameplayUiIsEnabledWhenCreatedAfterStateActivation()
+	{
+		GameplayInputOwnership ownership = new();
+
+		ownership.Activate();
+
+		Assert.True(ownership.UiInputEnabled);
+		Assert.True(ownership.CursorCaptured);
+	}
+
+	[Fact]
+	public void ChatAndDebugMenuOwnInputExclusively()
+	{
+		GameplayInputOwnership ownership = new();
+		ownership.Activate();
+
+		Assert.True(ownership.ToggleDebugMenu());
+		Assert.Equal(GameplayInputMode.DebugMenu, ownership.Mode);
+		Assert.True(ownership.GameplayInputSuppressed);
+		Assert.False(ownership.CursorCaptured);
+
+		Assert.True(ownership.ToggleDebugMenu());
+		Assert.Equal(GameplayInputMode.Gameplay, ownership.Mode);
+		Assert.True(ownership.CursorCaptured);
+
+		Assert.True(ownership.OpenChat());
+		Assert.Equal(GameplayInputMode.Chat, ownership.Mode);
+		Assert.False(ownership.ToggleDebugMenu());
+		Assert.Equal(GameplayInputMode.Chat, ownership.Mode);
+		Assert.True(ownership.GameplayInputSuppressed);
+		Assert.False(ownership.CursorCaptured);
+
+		ownership.CloseOverlay();
+		Assert.Equal(GameplayInputMode.Gameplay, ownership.Mode);
+		Assert.True(ownership.CursorCaptured);
+
+		ownership.Deactivate();
+		Assert.False(ownership.UiInputEnabled);
+		Assert.False(ownership.CursorCaptured);
+	}
+
+	[Theory]
+	[InlineData((int)GameplayInputMode.Chat)]
+	[InlineData((int)GameplayInputMode.DebugMenu)]
+	public void UiModesProduceNeutralNetworkAndPredictionInput(int modeValue)
+	{
+		GameplayInputMode mode = (GameplayInputMode)modeValue;
+		InputState source = new()
+		{
+			GameTime = 42.5f,
+			MousePos = new System.Numerics.Vector2(320, 180),
+			MouseWheel = 2,
+		};
+		source.KeysDown[(int)InputKey.W] = true;
+		source.KeysDown[(int)InputKey.Num3] = true;
+		source.KeysDown[(int)InputKey.Click_Left] = true;
+
+		InputState neutral = MPClientGameState.CreateSimulationInputState(source, mode);
+		ClientInputBuffer buffer = new();
+		InputStatePacket packet = buffer.Record(7, neutral, new System.Numerics.Vector2(15, -10));
+
+		Assert.Equal(source.GameTime, neutral.GameTime);
+		Assert.Equal(System.Numerics.Vector2.Zero, neutral.MousePos);
+		Assert.Equal(0, neutral.MouseWheel);
+		for (int key = 0; key < (int)InputKey.InputKeyCount; key++)
+			Assert.False(neutral.KeysDown[key]);
+		Assert.Equal(0UL, packet.KeysBitmask);
+		Assert.Equal(0, packet.MouseWheel);
+		Assert.True(buffer.TryGetInput(7, out BufferedInput buffered));
+		Assert.Equal(0, buffered.State.MouseWheel);
+	}
+
+	[Fact]
+	public void GameplayModePreservesRawInput()
+	{
+		InputState source = new()
+		{
+			GameTime = 3,
+			MouseWheel = -1,
+		};
+		source.KeysDown[(int)InputKey.A] = true;
+
+		InputState result = MPClientGameState.CreateSimulationInputState(
+			source,
+			GameplayInputMode.Gameplay
+		);
+
+		Assert.Equal(-1, result.MouseWheel);
+		Assert.True(result.KeysDown[(int)InputKey.A]);
 	}
 
 	private sealed class TestContext : IDisposable

@@ -7,7 +7,7 @@
 	"Borderless": false,
 	"SetFocused": true,
 	"TargetFPS": -1,
-	"LogLevel": "Trace",
+	"LogLevel": "Debug",
 	"HighDpiWindow": true,
 	"VSync": true,
 	"Msaa": true,

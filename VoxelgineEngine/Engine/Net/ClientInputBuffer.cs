@@ -18,6 +18,9 @@ namespace Voxelgine.Engine
 
 		/// <summary>The camera yaw/pitch angle at this tick.</summary>
 		public Vector2 CameraAngle;
+
+		/// <summary>Whether collision-free movement was active for this command.</summary>
+		public bool NoClip;
 	}
 
 	/// <summary>
@@ -55,8 +58,13 @@ namespace Voxelgine.Engine
 		/// <param name="tickNumber">The client's local tick number for this input.</param>
 		/// <param name="state">The polled input state (keys, mouse, wheel).</param>
 		/// <param name="cameraAngle">The camera yaw (X) and pitch (Y) in degrees.</param>
+		/// <param name="noClip">Whether collision-free movement is active for this command.</param>
 		/// <returns>An <see cref="InputStatePacket"/> ready to be sent unreliably to the server.</returns>
-		public InputStatePacket Record(int tickNumber, InputState state, Vector2 cameraAngle)
+		public InputStatePacket Record(
+			int tickNumber,
+			InputState state,
+			Vector2 cameraAngle,
+			bool noClip = false)
 		{
 			int index = tickNumber % BufferSize;
 			if (index < 0) index += BufferSize;
@@ -64,6 +72,7 @@ namespace Voxelgine.Engine
 			_buffer[index].TickNumber = tickNumber;
 			_buffer[index].State = state;
 			_buffer[index].CameraAngle = cameraAngle;
+			_buffer[index].NoClip = noClip;
 			_occupied[index] = true;
 
 			if (_count < BufferSize)
@@ -71,7 +80,7 @@ namespace Voxelgine.Engine
 
 			var commands = new List<InputCommand>(4)
 			{
-				InputCommand.FromState(tickNumber, state, cameraAngle),
+				InputCommand.FromState(tickNumber, state, cameraAngle, noClip),
 			};
 
 			for (int previousTick = tickNumber - 1; previousTick >= tickNumber - 3; previousTick--)
@@ -81,7 +90,8 @@ namespace Voxelgine.Engine
 					commands.Add(InputCommand.FromState(
 						previous.TickNumber,
 						previous.State,
-						previous.CameraAngle
+						previous.CameraAngle,
+						previous.NoClip
 					));
 				}
 			}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
 #if WINDOWS
@@ -33,7 +34,11 @@ namespace Voxelgine.Engine
 			AddOnKeyPressed(InputKey.C, (E) =>
 			{
 				NoClip = !NoClip;
-				Logging.WriteLine($"No-clip mode: {(NoClip ? "ON" : "OFF")}");
+				Logging.Log(
+					GameLogLevel.Debug,
+					"Physics",
+					$"Noclip requested playerId={PlayerId} enabled={NoClip}"
+				);
 			});
 
 			AddOnKeyPressed(InputKey.Num1, (K) => { Inventory?.SetSelectedIndex(0); });

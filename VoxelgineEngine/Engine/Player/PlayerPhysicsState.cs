@@ -14,4 +14,5 @@ public readonly record struct PlayerPhysicsState(
 	float HeadBumpCooldownRemaining,
 	Vector3 LastWallNormal,
 	bool WasGrounded,
-	bool WasInWater);
+	bool WasInWater,
+	bool NoClip = false);

@@ -13,6 +13,7 @@ public sealed class InputCommandRecoveryTests
 
 		Assert.Equal([10, 9, 8, 7], copy.Commands.Select(command => command.TickNumber));
 		Assert.Equal(original.Commands.Select(command => command.CameraAngle), copy.Commands.Select(command => command.CameraAngle));
+		Assert.Equal(original.Commands.Select(command => command.NoClip), copy.Commands.Select(command => command.NoClip));
 	}
 
 	[Fact]
@@ -23,12 +24,13 @@ public sealed class InputCommandRecoveryTests
 		for (int tick = 1; tick <= 4; tick++)
 		{
 			state.MouseWheel = tick;
-			buffer.Record(tick, state, new Vector2(tick, -tick));
+			buffer.Record(tick, state, new Vector2(tick, -tick), noClip: tick >= 3);
 		}
 
-		InputStatePacket packet = buffer.Record(5, state, new Vector2(5f, -5f));
+		InputStatePacket packet = buffer.Record(5, state, new Vector2(5f, -5f), noClip: true);
 
 		Assert.Equal([5, 4, 3, 2], packet.Commands.Select(command => command.TickNumber));
+		Assert.Equal([true, true, true, false], packet.Commands.Select(command => command.NoClip));
 	}
 
 	[Fact]
@@ -70,8 +72,10 @@ public sealed class InputCommandRecoveryTests
 		Assert.True(queue.TryDequeue(out InputCommand synthesized));
 		Assert.Equal(1, synthesized.TickNumber);
 		Assert.Equal(0f, synthesized.MouseWheel);
+		Assert.False(synthesized.NoClip);
 		Assert.True(queue.TryDequeue(out InputCommand recovered));
 		Assert.Equal(2, recovered.TickNumber);
+		Assert.True(recovered.NoClip);
 	}
 
 	[Fact]
@@ -94,6 +98,7 @@ public sealed class InputCommandRecoveryTests
 				TickNumber = tick,
 				CameraAngle = new Vector2(tick, 0f),
 				MouseWheel = tick,
+				NoClip = tick % 2 == 0,
 			}).ToArray(),
 		};
 	}
@@ -125,6 +130,7 @@ public sealed class CompletePredictionStateTests
 
 		Assert.Equal(19, Assert.Single(copy.Players).LastInputTick);
 		Assert.Equal(state, copy.Players[0].PhysicsState);
+		Assert.True(copy.Players[0].PhysicsState.NoClip);
 	}
 
 	[Fact]
@@ -148,6 +154,18 @@ public sealed class CompletePredictionStateTests
 		Assert.False(prediction.ProcessServerSnapshot(10, state));
 	}
 
+	[Fact]
+	public void NoclipDifferenceRequiresReconciliation()
+	{
+		ClientPrediction prediction = new();
+		PlayerPhysicsState predicted = State(groundGrace: 0.1f, grounded: false);
+		prediction.RecordPrediction(10, predicted);
+		PlayerPhysicsState server = predicted with { NoClip = false };
+
+		Assert.True(predicted.NoClip);
+		Assert.True(prediction.ProcessServerSnapshot(10, server));
+	}
+
 	private static PlayerPhysicsState State(float groundGrace, bool grounded) => new(
 		new Vector3(1f, 2f, 3f),
 		new Vector3(4f, 5f, 6f),
@@ -157,5 +175,6 @@ public sealed class CompletePredictionStateTests
 		0.2f,
 		-Vector3.UnitX,
 		grounded,
-		false);
+		false,
+		true);
 }

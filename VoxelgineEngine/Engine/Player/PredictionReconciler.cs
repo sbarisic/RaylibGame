@@ -71,6 +71,7 @@ namespace Voxelgine.Engine
 				// Restore camera angle for this tick's input
 				player.SetCamAngle(new Vector3(input.CameraAngle.X, input.CameraAngle.Y, 0));
 				player.UpdateDirectionVectors();
+				player.NoClip = input.NoClip;
 
 				// Feed the input state into the replay InputMgr
 				_replayInputSource.SetState(input.State);

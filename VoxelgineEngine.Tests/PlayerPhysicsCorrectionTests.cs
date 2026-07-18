@@ -157,6 +157,88 @@ public sealed class PlayerPhysicsCorrectionTests
 	}
 
 	[Fact]
+	public unsafe void NoclipMovesThroughSolidVoxelsAndIsCapturedInPhysicsState()
+	{
+		ChunkMap map = new();
+		map.SetBlock(0, 0, 1, BlockType.Stone);
+		map.SetBlock(0, 1, 1, BlockType.Stone);
+		Player player = CreatePlayer();
+		player.SetPosition(new Vector3(0.5f, 1.6f, 0.5f));
+		player.Camera.CamAngle = Vector3.Zero;
+		player.UpdateDirectionVectors();
+		player.NoClip = true;
+		NetworkInputSource source = new();
+		InputMgr input = new(source);
+		InputState inputState = new();
+		inputState.KeysDown[(int)InputKey.W] = true;
+		source.SetState(inputState);
+		input.Tick(0f);
+
+		player.UpdatePhysics(new PhysicsWorld(map), new PhysData(), 0.1f, input);
+		PlayerPhysicsState result = player.CapturePhysicsState();
+
+		Assert.Equal(new Vector3(0.5f, 1.6f, 2f), result.Position);
+		Assert.Equal(Vector3.Zero, result.Velocity);
+		Assert.True(result.NoClip);
+	}
+
+	[Theory]
+	[InlineData(75f)]
+	[InlineData(-75f)]
+	public unsafe void NoclipVerticalControlsUseWorldUp(float pitch)
+	{
+		Player player = CreatePlayer();
+		player.SetPosition(new Vector3(4f, 5f, 6f));
+		player.Camera.CamAngle = new Vector3(35f, pitch, 0f);
+		player.UpdateDirectionVectors();
+		player.NoClip = true;
+		NetworkInputSource source = new();
+		InputMgr input = new(source);
+		InputState inputState = new();
+		inputState.KeysDown[(int)InputKey.Space] = true;
+		source.SetState(inputState);
+		input.Tick(0f);
+
+		player.UpdatePhysics(new PhysicsWorld(new ChunkMap()), new PhysData(), 0.1f, input);
+
+		Assert.Equal(new Vector3(4f, 6.5f, 6f), player.Position);
+	}
+
+	[Fact]
+	public void NoclipClearsCollisionAndWaterTransients()
+	{
+		Player player = CreatePlayer();
+		player.ApplyPhysicsState(new PlayerPhysicsState(
+			new Vector3(1f, 2f, 3f),
+			new Vector3(4f, 5f, 6f),
+			0.1f,
+			0.05f,
+			0.6f,
+			0.5f,
+			Vector3.UnitX,
+			true,
+			true,
+			true));
+		NetworkInputSource source = new();
+		InputMgr input = new(source);
+		source.SetState(new InputState());
+		input.Tick(0f);
+
+		player.UpdatePhysics(new PhysicsWorld(new ChunkMap()), new PhysData(), 0.015f, input);
+		PlayerPhysicsState result = player.CapturePhysicsState();
+
+		Assert.Equal(Vector3.Zero, result.Velocity);
+		Assert.Equal(0f, result.GroundGraceRemaining);
+		Assert.Equal(0f, result.JumpCooldownRemaining);
+		Assert.Equal(0f, result.RecentJumpRemaining);
+		Assert.Equal(0f, result.HeadBumpCooldownRemaining);
+		Assert.Equal(Vector3.Zero, result.LastWallNormal);
+		Assert.False(result.WasGrounded);
+		Assert.False(result.WasInWater);
+		Assert.True(result.NoClip);
+	}
+
+	[Fact]
 	public unsafe void RepeatedCorrectionsRemainExactForTenThousandTicks()
 	{
 		ChunkMap map = new();

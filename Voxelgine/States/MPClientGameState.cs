@@ -391,7 +391,8 @@ namespace Voxelgine.States
 				var inputPacket = _inputBuffer.Record(
 					_client.LocalTick,
 					simulationInput,
-					new Vector2(_simulation.LocalPlayer.Camera.CamAngle.X, _simulation.LocalPlayer.Camera.CamAngle.Y)
+					new Vector2(_simulation.LocalPlayer.Camera.CamAngle.X, _simulation.LocalPlayer.Camera.CamAngle.Y),
+					_simulation.LocalPlayer.NoClip
 				);
 				_client.Send(inputPacket, false, currentTime);
 

@@ -132,6 +132,7 @@ namespace UnitTest {
 				KeysBitmask = 0xDEADBEEF12345678UL,
 				CameraAngle = new Vector2(123.4f, -56.7f),
 				MouseWheel = 3.0f,
+				NoClip = true,
 			};
 
 			byte[] data = original.Serialize();
@@ -141,6 +142,7 @@ namespace UnitTest {
 			Assert.Equal(original.KeysBitmask, deserialized.KeysBitmask);
 			Assert.Equal(original.CameraAngle, deserialized.CameraAngle);
 			Assert.Equal(original.MouseWheel, deserialized.MouseWheel);
+			Assert.True(deserialized.NoClip);
 		}
 
 		[Fact]

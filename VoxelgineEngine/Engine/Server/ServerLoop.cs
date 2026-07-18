@@ -352,6 +352,15 @@ namespace Voxelgine.Engine.Server
 
 					player.SetCamAngle(new Vector3(command.CameraAngle.X, command.CameraAngle.Y, 0));
 					player.UpdateDirectionVectors();
+					if (player.NoClip != command.NoClip)
+					{
+						player.NoClip = command.NoClip;
+						_logging.Log(
+							GameLogLevel.Debug,
+							"Physics",
+							$"Noclip changed playerId={playerId} enabled={player.NoClip} commandTick={command.TickNumber}"
+						);
+					}
 
 					if (!player.IsDead)
 						player.UpdatePhysics(_simulation.PhysicsWorld, physData, dt, inputMgr);

@@ -11,8 +11,13 @@ namespace Voxelgine.Engine
 		public ulong KeysBitmask;
 		public Vector2 CameraAngle;
 		public float MouseWheel;
+		public bool NoClip;
 
-		public static unsafe InputCommand FromState(int tickNumber, InputState state, Vector2 cameraAngle)
+		public static unsafe InputCommand FromState(
+			int tickNumber,
+			InputState state,
+			Vector2 cameraAngle,
+			bool noClip = false)
 		{
 			ulong mask = 0;
 			int count = Math.Min((int)InputKey.InputKeyCount, 64);
@@ -28,6 +33,7 @@ namespace Voxelgine.Engine
 				KeysBitmask = mask,
 				CameraAngle = cameraAngle,
 				MouseWheel = state.MouseWheel,
+				NoClip = noClip,
 			};
 		}
 
@@ -92,6 +98,16 @@ namespace Voxelgine.Engine
 				SetNewest(command);
 			}
 		}
+		public bool NoClip
+		{
+			get => GetNewest().NoClip;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.NoClip = value;
+				SetNewest(command);
+			}
+		}
 
 		/// <summary>
 		/// Packs an <see cref="InputState"/> struct's key states into the bitmask.
@@ -99,7 +115,12 @@ namespace Voxelgine.Engine
 		public unsafe void PackKeys(InputState state)
 		{
 			InputCommand newest = GetNewest();
-			newest = InputCommand.FromState(newest.TickNumber, state, newest.CameraAngle);
+			newest = InputCommand.FromState(
+				newest.TickNumber,
+				state,
+				newest.CameraAngle,
+				newest.NoClip
+			);
 			SetNewest(newest);
 		}
 
@@ -123,6 +144,7 @@ namespace Voxelgine.Engine
 				writer.Write(Commands[i].KeysBitmask);
 				writer.WriteVector2(Commands[i].CameraAngle);
 				writer.Write(Commands[i].MouseWheel);
+				writer.Write(Commands[i].NoClip);
 			}
 		}
 
@@ -139,6 +161,7 @@ namespace Voxelgine.Engine
 				Commands[i].KeysBitmask = reader.ReadUInt64();
 				Commands[i].CameraAngle = reader.ReadVector2();
 				Commands[i].MouseWheel = reader.ReadSingle();
+				Commands[i].NoClip = reader.ReadBoolean();
 			}
 		}
 
@@ -269,6 +292,7 @@ namespace Voxelgine.Engine
 			writer.WriteVector3(state.LastWallNormal);
 			writer.Write(state.WasGrounded);
 			writer.Write(state.WasInWater);
+			writer.Write(state.NoClip);
 		}
 
 		private static PlayerPhysicsState ReadPhysicsState(BinaryReader reader) => new(
@@ -279,6 +303,7 @@ namespace Voxelgine.Engine
 			reader.ReadSingle(),
 			reader.ReadSingle(),
 			reader.ReadVector3(),
+			reader.ReadBoolean(),
 			reader.ReadBoolean(),
 			reader.ReadBoolean()
 		);

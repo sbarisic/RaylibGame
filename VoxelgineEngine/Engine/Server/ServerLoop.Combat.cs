@@ -167,7 +167,7 @@ namespace Voxelgine.Engine.Server
 				if (player.PlayerId == excludePlayerId)
 					continue;
 
-				if (player.IsDead)
+				if (player.IsDead || player.NoClip)
 					continue;
 
 				AABB playerAABB = PhysicsUtils.CreatePlayerAABB(player.Position);
@@ -194,7 +194,8 @@ namespace Voxelgine.Engine.Server
 		}
 
 		/// <summary>
-		/// Kills players who have fallen below the world bounds.
+		/// Kills colliding players who have fallen below the world bounds.
+		/// Noclip players may intentionally fly below the terrain.
 		/// The respawn system will reset their position after <see cref="RespawnDelay"/>.
 		/// </summary>
 		private void CheckPlayerBounds()

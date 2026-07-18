@@ -214,7 +214,8 @@ namespace Voxelgine.Engine
 				MathF.Abs(predicted.HeadBumpCooldownRemaining - serverState.HeadBumpCooldownRemaining) > StateCorrectionThreshold ||
 				Vector3.DistanceSquared(predicted.LastWallNormal, serverState.LastWallNormal) > StateCorrectionThreshold * StateCorrectionThreshold ||
 				predicted.WasGrounded != serverState.WasGrounded ||
-				predicted.WasInWater != serverState.WasInWater;
+				predicted.WasInWater != serverState.WasInWater ||
+				predicted.NoClip != serverState.NoClip;
 
 			if (deterministicStateDiffers)
 			{

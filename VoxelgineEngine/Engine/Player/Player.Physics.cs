@@ -67,7 +67,8 @@ namespace Voxelgine.Engine
 				HeadBumpCooldown,
 				LastWallNormal,
 				WasLastLegsOnFloor,
-				WasInWater
+				WasInWater,
+				NoClip
 			);
 		}
 
@@ -94,6 +95,7 @@ namespace Voxelgine.Engine
 			LastWallNormal = state.LastWallNormal;
 			WasLastLegsOnFloor = state.WasGrounded;
 			WasInWater = state.WasInWater;
+			NoClip = state.NoClip;
 			return true;
 		}
 
@@ -102,7 +104,6 @@ namespace Voxelgine.Engine
 			Vector3 move = Vector3.Zero;
 			Vector3 forward = GetForward();
 			Vector3 left = GetLeft();
-			Vector3 up = GetUp();
 
 			if (inputManager.IsInputDown(InputKey.W))
 				move += forward;
@@ -113,14 +114,19 @@ namespace Voxelgine.Engine
 			if (inputManager.IsInputDown(InputKey.D))
 				move -= left;
 			if (inputManager.IsInputDown(InputKey.Space))
-				move += up;
+				move += Vector3.UnitY;
 			if (inputManager.IsInputDown(InputKey.Shift))
-				move -= up;
+				move -= Vector3.UnitY;
 
 			PlyVelocity = Vector3.Zero;
 			GroundGraceTimer = 0f;
+			JumpCooldownRemaining = 0f;
+			RecentJumpRemaining = 0f;
+			HeadBumpCooldown = 0f;
+			LastWallNormal = Vector3.Zero;
 			WasLastLegsOnFloor = false;
-			if (move != Vector3.Zero)
+			WasInWater = false;
+			if (move.LengthSquared() > 1e-6f)
 			{
 				move = Vector3.Normalize(move) * physicsData.NoClipMoveSpeed * deltaTime;
 				SetPosition(Position + move);

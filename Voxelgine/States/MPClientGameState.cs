@@ -211,6 +211,14 @@ namespace Voxelgine.States
 		public override void Tick(float GameTime)
 		{
 			RecordClientFrameTime(GameTime);
+			if (!_connectionLost
+				&& !string.IsNullOrEmpty(_errorText)
+				&& Window.InMgr.IsInputPressed(InputKey.Esc))
+			{
+				DisconnectAndReturn("Returning to menu");
+				return;
+			}
+
 			if (_client == null && !_connectionLost)
 				return;
 

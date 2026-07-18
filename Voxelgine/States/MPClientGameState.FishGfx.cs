@@ -58,9 +58,9 @@ public unsafe partial class MPClientGameState
 		_clientFrameTime = gameTime;
 	}
 
-	private float GetClientTime()
+	internal float GetClientTime()
 	{
-		return _clientFrameTime;
+		return Eng.TotalTime;
 	}
 
 	private float GetClientDeltaTime()

@@ -45,6 +45,11 @@ internal static class Program
 
 		GameConfig config = services.GetRequiredService<GameConfig>();
 		config.LoadFromJson();
+		if (args.Any(static argument =>
+			argument.StartsWith("--fishgfx-auto", StringComparison.OrdinalIgnoreCase)))
+		{
+			config.SetFocused = false;
+		}
 		IFishLogging logging = services.GetRequiredService<IFishLogging>();
 		logging.Init();
 		logging.WriteLine("Aurora Falls - Voxelgine Engine");
@@ -67,6 +72,10 @@ internal static class Program
 			);
 			window.SetState(initialState);
 			engine.Init();
+			if (initialState is MainMenuStateFishUI menuState)
+			{
+				menuState.ShowAutomaticDialog(args);
+			}
 			RunLoop(args, engine, services, window, audio, logging, initialState);
 		}
 		catch (Exception exception)

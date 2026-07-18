@@ -19,7 +19,7 @@ namespace Voxelgine.States
 			_statusText = "Connected! Loading world...";
 		}
 
-		private void OnDisconnected(string reason)
+		internal void OnDisconnected(string reason)
 		{
 			_logging.ClientWriteLine($"MPClientGameState: Disconnected: {reason}");
 

@@ -1,82 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
 
 using Newtonsoft.Json;
-using System.Reflection;
 using Voxelgine.Engine.DI;
 using Voxelgine.Engine.Input;
 
 namespace Voxelgine.Engine
 {
-	public class ConfigValueRef
-	{
-		public string FieldName;
-		public FieldInfo Field;
-
-		string LastValueString = null;
-
-		IFishEngineRunner Eng;
-
-		public ConfigValueRef(IFishEngineRunner Eng, FieldInfo field, string fieldName)
-		{
-			this.Eng = Eng;
-			Field = field;
-			FieldName = fieldName;
-			GetValueString();
-		}
-
-		public string GetValueString()
-		{
-			LastValueString = Field.GetValue(Eng.DI.GetRequiredService<GameConfig>())?.ToString() ?? "null";
-			return LastValueString;
-		}
-
-		public void SetValueString(string value)
-		{
-			LastValueString = value;
-
-			if (value == "null")
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), null);
-				return;
-			}
-
-			if (Field.FieldType == typeof(int))
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), int.Parse(value));
-			}
-			else if (Field.FieldType == typeof(float))
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), float.Parse(value));
-			}
-			else if (Field.FieldType == typeof(bool))
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), bool.Parse(value));
-			}
-			else if (Field.FieldType == typeof(string))
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), value);
-			}
-			else if (Field.FieldType.IsEnum)
-			{
-				Field.SetValue(Eng.DI.GetRequiredService<GameConfig>(), Enum.Parse(Field.FieldType, value));
-			}
-			else
-			{
-				throw new NotSupportedException($"Unsupported field type: {Field.FieldType}");
-			}
-		}
-
-		public override string ToString()
-		{
-			return string.Format("{0} = '{1}'", FieldName, LastValueString);
-		}
-	}
-
 	public class GameConfig : IFishConfig
 	{
 		const string ConfigFileName = "data/config.json";
@@ -149,31 +80,13 @@ namespace Voxelgine.Engine
 			LastOptWnd_H = 0;
 		}
 
-		[SettingsHidden]
-		IFishEngineRunner Eng;
-
-		public GameConfig(IFishEngineRunner Eng)
+		public GameConfig(IFishEngineRunner _)
 		{
-			this.Eng = Eng;
 			SetDefaults();
 
 			MouseButtonDown = Array.Empty<KeyValuePair<InputKey, PhysicalMouseButton>>();
 			KeyDown = Array.Empty<KeyValuePair<InputKey, PhysicalKey>>();
 			TwoKeysDown = Array.Empty<KeyValuePair<InputKey, KeyValuePair<PhysicalKey, PhysicalKey>>>();
-		}
-
-		public IEnumerable<ConfigValueRef> GetVariables()
-		{
-			Type T = GetType();
-
-			FieldInfo[] Fields = T.GetFields(BindingFlags.Public | BindingFlags.Instance);
-			foreach (FieldInfo F in Fields)
-			{
-				if (F.GetCustomAttribute<SettingsHiddenAttribute>() != null)
-					continue;
-
-				yield return new ConfigValueRef(Eng, F, F.Name);
-			}
 		}
 
 		public void SaveToJson()

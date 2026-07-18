@@ -122,7 +122,7 @@ namespace UnitTest {
 			byte[] data = original.Serialize();
 			var deserialized = (WorldSnapshotPacket)Packet.Deserialize(data);
 
-			Assert.Equal(0, deserialized.Players.Length);
+			Assert.Empty(deserialized.Players);
 		}
 
 		[Fact]

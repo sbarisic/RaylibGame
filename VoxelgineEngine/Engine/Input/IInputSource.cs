@@ -1,7 +1,7 @@
 namespace Voxelgine.Engine
 {
 	/// <summary>
-	/// Abstracts the source of input state. Local players use Raylib polling,
+	/// Abstracts the source of input state. Local players use a client input adapter,
 	/// remote/networked players receive input state from network packets.
 	/// </summary>
 	public interface IInputSource

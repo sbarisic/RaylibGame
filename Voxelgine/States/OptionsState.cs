@@ -11,7 +11,7 @@ namespace Voxelgine.States
 {
 	class OptionsState : GameStateImpl
 	{
-		public OptionsState(GameWindow window, IFishEngineRunner Eng) : base(window, Eng)
+		public OptionsState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 		}
 	}

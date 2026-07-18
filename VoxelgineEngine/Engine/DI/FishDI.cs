@@ -30,6 +30,13 @@ namespace Voxelgine.Engine.DI
 			builder.Services.AddSingleton<TService, TImpl>();
 		}
 
+		public void AddSingleton<TService>(Func<IServiceProvider, TService> factory)
+			where TService : class
+		{
+			ArgumentNullException.ThrowIfNull(factory);
+			builder.Services.AddSingleton(factory);
+		}
+
 		public void AddTransient<TService, TImpl>() where TService : class where TImpl : class, TService
 		{
 			builder.Services.AddTransient<TService, TImpl>();

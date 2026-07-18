@@ -1,5 +1,5 @@
 using Voxelgine.Engine;
-using Raylib_cs;
+using Voxelgine.Engine.DI;
 using System;
 using System.Numerics;
 using Voxelgine.GUI;
@@ -12,7 +12,7 @@ namespace Voxelgine.States
 	{
 		// ======================================= FishUI Setup =================================================
 
-		public override void OnResize(GameWindow window)
+		public override void OnResize(IGameWindow window)
 		{
 			base.OnResize(window);
 			_gui?.OnResize(window.Width, window.Height);
@@ -305,7 +305,7 @@ namespace Voxelgine.States
 			_debugMenuWindow.OnClosed += (window) =>
 			{
 				_debugMenuWindow.Visible = false;
-				_simulation?.LocalPlayer?.ToggleMouse(false);
+				(_simulation?.LocalPlayer as ClientPlayer)?.ToggleMouse(false);
 			};
 
 			var stack = new StackLayout
@@ -351,12 +351,12 @@ namespace Voxelgine.States
 			// Server packet logging (only when hosting)
 			var chkServerPacketLog = new CheckBox("Server Packet Logging")
 			{
-				IsChecked = Eng.MainMenuState?.HostedServer?.Server?.PacketLoggingEnabled ?? false,
+				IsChecked = Eng.AsClient().MainMenuState?.HostedServer?.Server?.PacketLoggingEnabled ?? false,
 				Size = new Vector2(24, 24)
 			};
 			chkServerPacketLog.OnCheckedChanged += (sender, isChecked) =>
 			{
-				var server = Eng.MainMenuState?.HostedServer?.Server;
+				var server = Eng.AsClient().MainMenuState?.HostedServer?.Server;
 				if (server != null) server.PacketLoggingEnabled = isChecked;
 			};
 			stack.AddChild(chkServerPacketLog);
@@ -483,7 +483,7 @@ namespace Voxelgine.States
 			btnClose.Clicked += (sender, args) =>
 			{
 				_debugMenuWindow.Visible = false;
-				_simulation?.LocalPlayer?.ToggleMouse(false);
+				(_simulation?.LocalPlayer as ClientPlayer)?.ToggleMouse(false);
 			};
 			stack.AddChild(btnClose);
 
@@ -514,7 +514,7 @@ namespace Voxelgine.States
 				Position = pos,
 				FacingDirection = facing,
 			};
-			_client.Send(packet, true, (float)Raylib.GetTime());
+			_client.Send(packet, true, GetClientTime());
 		}
 
 		private void DebugPlaceCampfire()
@@ -536,7 +536,7 @@ namespace Voxelgine.States
 				Z = z,
 				BlockType = (byte)BlockType.Campfire,
 			};
-			_client.Send(packet, true, (float)Raylib.GetTime());
+			_client.Send(packet, true, GetClientTime());
 		}
 
 		private void DebugPlaceTorch()
@@ -558,7 +558,7 @@ namespace Voxelgine.States
 				Z = z,
 				BlockType = (byte)BlockType.Torch,
 			};
-			_client.Send(packet, true, (float)Raylib.GetTime());
+			_client.Send(packet, true, GetClientTime());
 		}
 
 		/// <summary>
@@ -574,7 +574,7 @@ namespace Voxelgine.States
 				PlayerId = _client.PlayerId,
 				Message = message
 			};
-			_client.Send(packet, true, (float)Raylib.GetTime());
+			_client.Send(packet, true, GetClientTime());
 			_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
 		}
 
@@ -612,7 +612,7 @@ namespace Voxelgine.States
 			if (_connectionStatusLabel == null || _client == null)
 				return;
 
-			float currentTime = (float)Raylib.GetTime();
+			float currentTime = GetClientTime();
 			float timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
 
 			if (timeSinceReceive > 3f)
@@ -722,7 +722,6 @@ namespace Voxelgine.States
 
 			// Health bar
 			int barW = 200;
-			int barH = 20;
 			if (_healthBar != null)
 				_healthBar.Position = new Vector2(screenW / 2f - barW / 2f, screenH - 42);
 			if (_healthLabel != null)

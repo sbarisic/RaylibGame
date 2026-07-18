@@ -1,32 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Voxelgine.States;
 
-namespace Voxelgine.Engine.DI
+namespace Voxelgine.Engine.DI;
+
+public interface IClientEngineRunner : IFishEngineRunner
 {
-	public interface IFishEngineRunner
+	MainMenuStateFishUI MainMenuState { get; set; }
+
+	NPCPreviewState NPCPreviewState { get; set; }
+
+	EffectsPreviewState EffectsPreviewState { get; set; }
+
+	MPClientGameState MultiplayerGameState { get; set; }
+}
+
+public static class ClientEngineRunnerExtensions
+{
+	public static IClientEngineRunner AsClient(this IFishEngineRunner engine)
 	{
-		public FishDI DI { get; set; }
-
-		public int ChunkDrawCalls { get; set; }
-
-		public bool DebugMode { get; set; }
-
-		public float TotalTime { get; set; }
-
-		public MainMenuStateFishUI MainMenuState { get; set; }
-
-		public NPCPreviewState NPCPreviewState { get; set; }
-
-		public EffectsPreviewState EffectsPreviewState { get; set; }
-
-		public MPClientGameState MultiplayerGameState { get; set; }
-
-		//public IFishLogging Logging { get; set; }
-
-		public void Init();
+		return (IClientEngineRunner)engine;
 	}
 }

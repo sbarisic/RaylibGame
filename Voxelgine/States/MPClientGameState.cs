@@ -1,5 +1,4 @@
 using Voxelgine.Engine;
-using Raylib_cs;
 using Voxelgine.Graphics;
 using System;
 using System.Collections.Generic;
@@ -9,6 +8,7 @@ using Voxelgine.GUI;
 using Voxelgine.Engine.DI;
 using FishUI;
 using FishUI.Controls;
+using Voxelgine.Engine.Audio;
 
 namespace Voxelgine.States
 {
@@ -33,9 +33,7 @@ namespace Voxelgine.States
 		// Game simulation (created after world data is received)
 		private GameSimulation _simulation;
 		private FishUIManager _gui;
-		private SoundMgr _snd;
-		private ParticleSystem _particle;
-		private Frustum _viewFrustum;
+		private IGameAudioSink _snd;
 		private float _totalTime;
 
 		// Status
@@ -124,20 +122,6 @@ namespace Voxelgine.States
 			public byte AnimationState;
 		}
 
-		// Water overlay
-		private Texture2D? _waterOverlayTexture;
-		private bool _waterOverlayLoaded;
-
-		// Sun/Moon textures
-		private Texture2D? _sunTexture;
-		private Texture2D? _moonTexture;
-		private bool _celestialTexturesLoaded;
-		private Vector2 _sunScreenPos;
-		private bool _sunVisible;
-		private float _sunScreenSize;
-		private Vector2 _moonScreenPos;
-		private bool _moonVisible;
-		private float _moonScreenSize;
 
 		IGameWindow _gameWindow;
 		IFishLogging _logging;
@@ -150,9 +134,6 @@ namespace Voxelgine.States
 
 		/// <summary>The world chunk map (available after world data is loaded).</summary>
 		public ChunkMap Map => _simulation?.Map;
-
-		/// <summary>The particle system for visual effects.</summary>
-		public ParticleSystem Particle => _particle;
 
 		/// <summary>The entity manager (available after world data is loaded).</summary>
 		public EntityManager Entities => _simulation?.Entities;
@@ -198,7 +179,7 @@ namespace Voxelgine.States
 
 			try
 			{
-				_client.Connect(host, port, playerName, (float)Raylib.GetTime());
+				_client.Connect(host, port, playerName, GetClientTime());
 			}
 			catch (Exception ex)
 			{
@@ -211,25 +192,31 @@ namespace Voxelgine.States
 		public override void SwapTo()
 		{
 			base.SwapTo();
+			if (_gui is not null)
+			{
+				_gui.InputEnabled = true;
+			}
+			SetCursorCaptured(_initialized && !_chatOpen);
+		}
 
-			if (_initialized)
+		public override void SwapFrom()
+		{
+			if (_gui is not null)
 			{
-				Raylib.DisableCursor();
+				_gui.InputEnabled = false;
 			}
-			else
-			{
-				Raylib.EnableCursor();
-			}
+			base.SwapFrom();
 		}
 
 		public override void Tick(float GameTime)
 		{
+			RecordClientFrameTime(GameTime);
 			if (_client == null && !_connectionLost)
 				return;
 
 			try
 			{
-				float currentTime = (float)Raylib.GetTime();
+				float currentTime = GetClientTime();
 
 				// Process network (client may still be processing final packets)
 				_client?.Tick(currentTime);
@@ -237,7 +224,7 @@ namespace Voxelgine.States
 				// Handle connection lost overlay input
 				if (_connectionLost)
 				{
-					if (Raylib.IsKeyPressed(KeyboardKey.R))
+					if (Window.InMgr.IsInputPressed(InputKey.R))
 					{
 						// Reconnect to the same server
 						string host = _serverHost;
@@ -248,17 +235,16 @@ namespace Voxelgine.States
 						return;
 					}
 
-					if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+					if (Window.InMgr.IsInputPressed(InputKey.Esc))
 					{
 						// Return to main menu
 						Cleanup();
-						Window.SetState(Eng.MainMenuState);
+						Window.SetState(Eng.AsClient().MainMenuState);
 						return;
 					}
 
-					// Keep updating particles and day/night for visual continuity
-					_simulation?.DayNight.Update(Raylib.GetFrameTime());
-					_particle?.Tick(GameTime);
+					// Keep updating day/night for visual continuity.
+					_simulation?.DayNight.Update(GetClientDeltaTime());
 					return;
 				}
 
@@ -276,7 +262,7 @@ namespace Voxelgine.States
 					return;
 				}
 
-				float dt = Raylib.GetFrameTime();
+				float dt = GetClientDeltaTime();
 
 				// Update day/night cycle (client authority is false — time set by server)
 				float prevMultiplier = _simulation.DayNight.SkyLightMultiplier;
@@ -286,33 +272,29 @@ namespace Voxelgine.States
 					_simulation.Map.MarkAllChunksDirty();
 				}
 
-				_particle?.Tick(GameTime);
-				if (_particle != null)
-					_simulation.Map.EmitBlockParticles(_particle, dt);
-
 				// Toggle network statistics overlay
-				if (Raylib.IsKeyPressed(KeyboardKey.F5))
+				if (Window.InMgr.IsInputPressed(InputKey.F5))
 					_showNetStats = !_showNetStats;
 
 				// Toggle player list overlay
-				if (Raylib.IsKeyPressed(KeyboardKey.Tab))
+				if (Window.InMgr.IsInputPressed(InputKey.Tab))
 					_showPlayerList = !_showPlayerList;
 
 				// Chat input handling
 				if (_chatOpen)
 				{
-					if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+					if (Window.InMgr.IsInputPressed(InputKey.Enter))
 					{
 						SubmitChatMessage();
 					}
-					else if (Raylib.IsKeyPressed(KeyboardKey.Escape))
+					else if (Window.InMgr.IsInputPressed(InputKey.Esc))
 					{
 						CloseChatInput();
 					}
 					return; // Consume all other input while chat is open
 				}
 
-				if (Raylib.IsKeyPressed(KeyboardKey.Enter))
+				if (Window.InMgr.IsInputPressed(InputKey.Enter))
 				{
 					OpenChatInput();
 					return;
@@ -333,12 +315,15 @@ namespace Voxelgine.States
 				_simulation.Map.ClearPendingChanges();
 
 				_simulation.Map.Tick();
-				_simulation.LocalPlayer.Tick(Window.InMgr);
-				_simulation.LocalPlayer.TickGUI(Window.InMgr, _simulation.Map);
-				_simulation.LocalPlayer.UpdateGUI();
+				if (!HandleFishGfxCursorToggle(_simulation.LocalPlayer))
+				{
+					(_simulation.LocalPlayer as ClientPlayer)?.Tick(Window.InMgr);
+				}
+				(_simulation.LocalPlayer as ClientPlayer)?.TickGUI(Window.InMgr, _simulation.Map);
+				(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
 
 				// Send pending block changes to server
-				SendPendingBlockChanges((float)Raylib.GetTime());
+				SendPendingBlockChanges(GetClientTime());
 			}
 			catch (Exception ex)
 			{
@@ -353,7 +338,7 @@ namespace Voxelgine.States
 
 			try
 			{
-				float currentTime = (float)Raylib.GetTime();
+				float currentTime = TotalTime;
 
 				// Increment client tick
 				_client.LocalTick++;
@@ -390,216 +375,6 @@ namespace Voxelgine.States
 			}
 		}
 
-		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
-		{
-			if (!_initialized || _simulation?.LocalPlayer == null)
-				return;
-
-			try
-			{
-				_simulation.LocalPlayer.UpdateFPSCamera(ref FInfo);
-
-				// Sync render camera from physics camera
-				_simulation.LocalPlayer.RenderCam = _simulation.LocalPlayer.Cam;
-
-				// Decay correction smooth offset toward zero
-				float dt = Raylib.GetFrameTime();
-				if (_correctionSmoothOffset.LengthSquared() > 0.0001f)
-				{
-					_correctionSmoothOffset *= MathF.Max(0f, 1f - CorrectionSmoothRate * dt);
-				}
-				else
-				{
-					_correctionSmoothOffset = Vector3.Zero;
-				}
-
-				// Apply smooth offset to render camera (physics position is unaffected)
-				if (_correctionSmoothOffset != Vector3.Zero)
-				{
-					var cam = _simulation.LocalPlayer.RenderCam;
-					cam.Position += _correctionSmoothOffset;
-					cam.Target += _correctionSmoothOffset;
-					_simulation.LocalPlayer.RenderCam = cam;
-				}
-
-				// Populate frame info for GameWindow interpolation
-				FInfo.Empty = false;
-				FInfo.Pos = _simulation.LocalPlayer.RenderCam.Position;
-				FInfo.Cam = _simulation.LocalPlayer.RenderCam;
-				FInfo.CamAngle = _simulation.LocalPlayer.GetCamAngle();
-				FInfo.FeetPosition = _simulation.LocalPlayer.FeetPosition + _correctionSmoothOffset;
-				FInfo.ViewModelOffset = _simulation.LocalPlayer.ViewMdl.ViewModelOffset;
-				FInfo.ViewModelRot = _simulation.LocalPlayer.ViewMdl.VMRot;
-
-				// Apply interpolation if we have a previous frame
-				if (!LastFrame.Empty)
-				{
-					GameFrameInfo interp = FInfo.Interpolate(LastFrame, TimeAlpha);
-					_simulation.LocalPlayer.RenderCam = interp.Cam;
-					_simulation.LocalPlayer.ViewMdl.ViewModelOffset = interp.ViewModelOffset;
-					_simulation.LocalPlayer.ViewMdl.VMRot = interp.ViewModelRot;
-				}
-
-				// Update remote player interpolation
-				float frameTime = Raylib.GetFrameTime();
-				float currentTime = (float)Raylib.GetTime();
-				foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
-				{
-					remotePlayer.Update(currentTime, frameTime);
-
-					// Play footstep sounds for remote players based on velocity detection
-					if (_snd != null && remotePlayer.TryPlayFootstep())
-					{
-						_snd.PlayCombo("walk", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), remotePlayer.Position);
-					}
-				}
-
-				// Update entity interpolation from server snapshots
-				UpdateEntityInterpolation(currentTime);
-
-				Raylib.ClearBackground(_simulation.DayNight.SkyColor);
-
-				CalculateCelestialPositions();
-				DrawCelestialBodies();
-
-				Raylib.BeginMode3D(_simulation.LocalPlayer.RenderCam);
-
-				Shader defaultShader = ResMgr.GetShader("default");
-				Raylib.BeginShaderMode(defaultShader);
-
-				Draw3D(TimeAlpha, ref LastFrame, ref FInfo);
-
-				Raylib.EndShaderMode();
-
-				Raylib.EndMode3D();
-
-				// Draw viewmodel overlay AFTER EndMode3D so the 2D texture is not
-				// projected through the 3D camera (which would misplace it on screen).
-				_simulation.LocalPlayer.DrawViewModelOverlay();
-			}
-			catch (Exception ex)
-			{
-				_logging.ClientWriteLine($"MPClientGameState: Draw exception: {ex}");
-			}
-		}
-
-		private void Draw3D(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo CurrentFrame)
-		{
-			if (!_simulation.LocalPlayer.FreezeFrustum)
-				_viewFrustum = new Frustum(Eng, ref _simulation.LocalPlayer.Cam);
-
-			_simulation.Map.Draw(ref _viewFrustum);
-			_simulation.Entities.Draw3D(TimeAlpha, ref LastFrame);
-
-			// Draw remote players
-			foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
-			{
-				remotePlayer.Draw3D();
-			}
-
-			DrawBlockPlacementPreview();
-			DrawTransparent();
-
-			_particle?.Draw(_simulation.LocalPlayer, ref _viewFrustum);
-			_simulation.LocalPlayer.Draw(TimeAlpha, ref LastFrame, ref CurrentFrame);
-		}
-
-		public override void Draw2D()
-		{
-			try
-			{
-				float deltaTime = Raylib.GetFrameTime();
-				_totalTime += deltaTime;
-
-				if (!_initialized)
-				{
-					// Loading screen
-					Raylib.ClearBackground(new Color(30, 30, 40, 255));
-
-					// Update loading UI state
-					if (_loadingStatusLabel != null)
-						_loadingStatusLabel.Text = _statusText ?? "";
-
-					bool hasError = !string.IsNullOrEmpty(_errorText);
-					if (_loadingErrorLabel != null)
-					{
-						_loadingErrorLabel.Text = _errorText ?? "";
-						_loadingErrorLabel.Visible = hasError;
-					}
-					if (_loadingHintLabel != null)
-						_loadingHintLabel.Visible = hasError;
-
-					if (_client?.State == ClientState.Loading && _loadingProgressBar != null)
-					{
-						_loadingProgressBar.Visible = true;
-						_loadingProgressBar.Value = _client.WorldReceiver.Progress;
-					}
-					else if (_loadingProgressBar != null)
-					{
-						_loadingProgressBar.Visible = false;
-					}
-
-					if (hasError && Raylib.IsKeyPressed(KeyboardKey.Escape))
-					{
-						DisconnectAndReturn("Cancelled");
-						return;
-					}
-
-					_gui?.Tick(deltaTime, _totalTime);
-					return;
-				}
-
-				// In-game HUD
-				DrawUnderwaterOverlay();
-
-				// Crosshair and FPS (Raylib primitives)
-				Raylib.DrawCircleLines(_gameWindow.Width / 2, _gameWindow.Height / 2, 5, Color.White);
-				Raylib.DrawFPS(10, 10);
-
-				// Remote player name tags (3D projection, stays as Raylib)
-				DrawRemotePlayerNameTags();
-
-				// Entity 2D overlays (speech bubbles)
-				_simulation.Entities.Draw2D(_simulation.LocalPlayer.RenderCam);
-
-				// Update FishUI HUD state
-				UpdateHUDInfo();
-				UpdateHealthBar();
-				UpdateConnectionStatus();
-
-				// Network stats panel visibility
-				if (_netStatsPanel != null)
-					_netStatsPanel.Visible = _showNetStats;
-				if (_showNetStats)
-					UpdateNetStats();
-
-				// Player list panel visibility
-				if (_playerListPanel != null)
-					_playerListPanel.Visible = _showPlayerList;
-				if (_showPlayerList)
-					UpdatePlayerList();
-
-				// Death overlay visibility
-				if (_deathOverlayPanel != null)
-					_deathOverlayPanel.Visible = _simulation?.LocalPlayer != null && _simulation.LocalPlayer.IsDead;
-
-				// Connection lost overlay
-				if (_connectionLostPanel != null)
-				{
-					_connectionLostPanel.Visible = _connectionLost;
-					if (_connectionLost && _connectionLostReasonLabel != null)
-						_connectionLostReasonLabel.Text = _disconnectReason ?? "";
-				}
-
-				// FishUI draws all HUD controls (inventory, health, kill feed, overlays)
-				_gui.Tick(deltaTime, _totalTime);
-			}
-			catch (Exception ex)
-			{
-				_logging.ClientWriteLine($"MPClientGameState: Draw2D exception: {ex}");
-			}
-		}
-
 		// ======================================= Helper Methods =================================================
 
 		private void OpenChatInput()
@@ -609,7 +384,7 @@ namespace Voxelgine.States
 				_chatInputPanel.Visible = true;
 			if (_chatInputBox != null)
 				_chatInputBox.Text = "";
-			Raylib.EnableCursor();
+			SetCursorCaptured(false);
 		}
 
 		private void CloseChatInput()
@@ -619,7 +394,7 @@ namespace Voxelgine.States
 				_chatInputPanel.Visible = false;
 			if (_chatInputBox != null)
 				_chatInputBox.Text = "";
-			Raylib.DisableCursor();
+			SetCursorCaptured(true);
 		}
 
 		private void SubmitChatMessage()
@@ -639,7 +414,7 @@ namespace Voxelgine.States
 					PlayerId = _client.PlayerId,
 					Message = message
 				};
-				_client.Send(packet, true, (float)Raylib.GetTime());
+				_client.Send(packet, true, GetClientTime());
 
 				if (message.StartsWith('/'))
 					_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
@@ -650,10 +425,10 @@ namespace Voxelgine.States
 		{
 			if (_client != null && _client.IsConnected)
 			{
-				try { _client.Disconnect(reason, (float)Raylib.GetTime()); } catch { }
+				try { _client.Disconnect(reason, GetClientTime()); } catch { }
 			}
 			Cleanup();
-			Window.SetState(Eng.MainMenuState);
+			Window.SetState(Eng.AsClient().MainMenuState);
 		}
 
 		private void Cleanup()
@@ -677,12 +452,14 @@ namespace Voxelgine.States
 				_client = null;
 			}
 
+			_simulation?.LocalPlayer?.Dispose();
+			DisposeFishGfxVoxelScene();
 			_inputBuffer = null;
 			_prediction = null;
 			_simulation = null;
+			_gui?.Dispose();
 			_gui = null;
 			_snd = null;
-			_particle = null;
 			_pendingPlayerJoins.Clear();
 			_pendingEntityPackets.Clear();
 			_entitySnapshots.Clear();
@@ -715,6 +492,11 @@ namespace Voxelgine.States
 			_playerListPanel = null;
 			_playerListInfoLabel = null;
 			_showPlayerList = false;
+		}
+
+		public override void Dispose()
+		{
+			Cleanup();
 		}
 	}
 }

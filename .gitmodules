@@ -1,0 +1,6 @@
+[submodule "thirdparty/FishGfx"]
+	path = thirdparty/FishGfx
+	url = https://github.com/sbarisic/FishGfx.git
+[submodule "thirdparty/miniaudio"]
+	path = thirdparty/miniaudio
+	url = https://github.com/mackron/miniaudio.git

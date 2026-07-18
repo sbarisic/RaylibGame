@@ -1,14 +1,15 @@
 using FishUI;
 using FishUI.Controls;
-using Raylib_cs;
 using System;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
-using Voxelgine.Graphics;
+using Voxelgine.FishGfxClient;
+using Voxelgine.FishGfxClient.Effects;
+using Voxelgine.FishGfxClient.Rendering;
 using Voxelgine.GUI;
 
-using ParticleBlendMode = Voxelgine.Engine.ParticleBlendMode;
+using FishGfx.Graphics;
 
 namespace Voxelgine.States
 {
@@ -18,13 +19,12 @@ namespace Voxelgine.States
 	/// </summary>
 	public class EffectsPreviewState : GameStateImpl
 	{
-		private FishUIManager _gui;
-		private ParticleSystem _particles;
-		private Camera3D _camera;
+		private static readonly string[] TextureCollections = ["smoke", "fire", "blood", "spark"];
+		private readonly FishUIManager _gui;
+		private readonly FishGfxParticlePreview _fishParticles;
 		private float _cameraAngle = 0f;
 		private float _cameraDistance = 6f;
 		private float _cameraHeight = 2f;
-		private float _totalTime;
 
 		// UI elements
 		private Label _statsLabel;
@@ -47,36 +47,23 @@ namespace Voxelgine.States
 		private Button _btnTexBrowse;
 		private Window _browserWindow;
 		private int _texIndex = 0;
-		private ParticleType _customType = ParticleType.Smoke;
-		private ParticleBlendMode _blendMode = ParticleBlendMode.Alpha;
+		private ParticleEffectKind _customType = ParticleEffectKind.Smoke;
+		private BillboardBlendMode _blendMode = BillboardBlendMode.Alpha;
 		private bool _emissive = false;
 		private bool _physics = true;
 		private bool _noCollisions = false;
 		private float _spread = 0.3f;
 		private Slider _sliderTexIdx;
 		private float _clipboardTimer;
+		private Vector2 _lastMousePosition;
 
 		public EffectsPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 			_gui = new FishUIManager(window, Eng.DI.GetRequiredService<IFishLogging>());
-
-			_camera = new Camera3D(
-				new Vector3(0, 2, 6),
-				new Vector3(0, 1, 0),
-				Vector3.UnitY,
-				45,
-				CameraProjection.Perspective
-			);
-
-			_particles = new ParticleSystem();
-			_particles.Init(
-				point => false,
-				point => BlockType.None,
-				point => Color.White
-			);
-
-			var collectionNames = ResMgr.GetCollectionNames();
-			_selectedCollection = collectionNames.Length > 0 ? collectionNames[0] : "smoke";
+			IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
+				?? throw new ArgumentException("Effects preview requires FishGfx.", nameof(window));
+			_fishParticles = new FishGfxParticlePreview(fishWindow);
+			_selectedCollection = TextureCollections[0];
 
 			CreateUI();
 		}
@@ -132,19 +119,19 @@ namespace Voxelgine.States
 			stack.AddChild(new Label { Text = "Spawn Effects:", Size = new Vector2(cw, 24) });
 
 			var btnSmoke = new Button { Text = "Smoke", Size = new Vector2(cw, 32) };
-			btnSmoke.Clicked += (s, e) => SpawnEffect(ParticleType.Smoke);
+			btnSmoke.Clicked += (s, e) => SpawnEffect(ParticleEffectKind.Smoke);
 			stack.AddChild(btnSmoke);
 
 			var btnFire = new Button { Text = "Fire", Size = new Vector2(cw, 32) };
-			btnFire.Clicked += (s, e) => SpawnEffect(ParticleType.Fire);
+			btnFire.Clicked += (s, e) => SpawnEffect(ParticleEffectKind.Fire);
 			stack.AddChild(btnFire);
 
 			var btnBlood = new Button { Text = "Blood", Size = new Vector2(cw, 32) };
-			btnBlood.Clicked += (s, e) => SpawnEffect(ParticleType.Blood);
+			btnBlood.Clicked += (s, e) => SpawnEffect(ParticleEffectKind.Blood);
 			stack.AddChild(btnBlood);
 
 			var btnSpark = new Button { Text = "Sparks", Size = new Vector2(cw, 32) };
-			btnSpark.Clicked += (s, e) => SpawnEffect(ParticleType.Spark);
+			btnSpark.Clicked += (s, e) => SpawnEffect(ParticleEffectKind.Spark);
 			stack.AddChild(btnSpark);
 
 			// === Parameters ===
@@ -263,7 +250,7 @@ namespace Voxelgine.States
 			var btnCustomType = new Button { Text = $"Type: {typeNames[(int)_customType]}", Size = new Vector2(cw, 32) };
 			btnCustomType.Clicked += (s, e) =>
 			{
-				_customType = (ParticleType)(((int)_customType + 1) % typeNames.Length);
+				_customType = (ParticleEffectKind)(((int)_customType + 1) % typeNames.Length);
 				btnCustomType.Text = $"Type: {typeNames[(int)_customType]}";
 			};
 			stack.AddChild(btnCustomType);
@@ -275,7 +262,7 @@ namespace Voxelgine.States
 
 			// Texture index slider
 			stack.AddChild(new Label { Text = "Texture Index:", Size = new Vector2(cw, 18) });
-			int initialMaxIdx = ResMgr.GetCollectionSize(_selectedCollection) - 1;
+			int initialMaxIdx = GetTextureCount(_selectedCollection) - 1;
 			_sliderTexIdx = new Slider
 			{
 				Size = new Vector2(cw, 24),
@@ -290,11 +277,11 @@ namespace Voxelgine.States
 			stack.AddChild(_sliderTexIdx);
 
 			// Blend mode selector (cycling button)
-			string[] blendNames = ["Additive", "FireType", "AlphaPremul", "Multiply", "Alpha"];
+			string[] blendNames = Enum.GetNames<BillboardBlendMode>();
 			var btnBlend = new Button { Text = $"Blend: {blendNames[(int)_blendMode]}", Size = new Vector2(cw, 32) };
 			btnBlend.Clicked += (s, e) =>
 			{
-				_blendMode = (ParticleBlendMode)(((int)_blendMode + 1) % blendNames.Length);
+				_blendMode = (BillboardBlendMode)(((int)_blendMode + 1) % blendNames.Length);
 				btnBlend.Text = $"Blend: {blendNames[(int)_blendMode]}";
 			};
 			stack.AddChild(btnBlend);
@@ -351,7 +338,7 @@ namespace Voxelgine.States
 			btnExportCode.Clicked += (s, e) =>
 			{
 				string code = GenerateCustomParticleCode();
-				Raylib.SetClipboardText(code);
+				((IFishGfxGameWindow)Window).RenderWindow.ClipboardText = code;
 				_clipboardTimer = 3.0f;
 			};
 			stack.AddChild(btnExportCode);
@@ -372,7 +359,7 @@ namespace Voxelgine.States
 			stack.AddChild(btnClear);
 
 			var btnBack = new Button { Text = "Back to Main Menu", Size = new Vector2(cw, 40) };
-			btnBack.Clicked += (s, e) => Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.MainMenuState);
+			btnBack.Clicked += (s, e) => Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
 			stack.AddChild(btnBack);
 
 			scroll.AddChild(stack);
@@ -380,155 +367,48 @@ namespace Voxelgine.States
 			_gui.AddControl(controlsWindow);
 		}
 
-		private void SpawnEffect(ParticleType type)
+		private void SpawnEffect(ParticleEffectKind type)
 		{
-			Color clr = new Color(_colorR, _colorG, _colorB, (byte)255);
-			Vector3 spawnPos = new Vector3(0, 1, 0);
-
-			for (int i = 0; i < _count; i++)
-			{
-				// Slight random offset per particle so bursts spread out
-				Vector3 offset = new Vector3(
-					(Random.Shared.NextSingle() - 0.5f) * 0.3f,
-					(Random.Shared.NextSingle() - 0.5f) * 0.3f,
-					(Random.Shared.NextSingle() - 0.5f) * 0.3f
-				);
-
-				switch (type)
-				{
-					case ParticleType.Smoke:
-					{
-						Vector3 vel = new Vector3(
-							(Random.Shared.NextSingle() - 0.5f) * _speed,
-							0.5f * _speed + Random.Shared.NextSingle() * _speed,
-							(Random.Shared.NextSingle() - 0.5f) * _speed
-						);
-						_particles.SpawnSmoke(spawnPos + offset, vel, clr);
-						break;
-					}
-					case ParticleType.Fire:
-					{
-						Vector3 force = new Vector3(
-							(Random.Shared.NextSingle() - 0.5f) * _speed,
-							_speed,
-							(Random.Shared.NextSingle() - 0.5f) * _speed
-						);
-						_particles.SpawnFire(spawnPos + offset, force, clr, _scale, true, _lifetime);
-						break;
-					}
-					case ParticleType.Blood:
-					{
-						Vector3 normal = Vector3.Normalize(new Vector3(
-							(Random.Shared.NextSingle() - 0.5f),
-							0.5f + Random.Shared.NextSingle() * 0.5f,
-							(Random.Shared.NextSingle() - 0.5f)
-						));
-						_particles.SpawnBlood(spawnPos + offset, normal * _speed, _scale);
-						break;
-					}
-					case ParticleType.Spark:
-					{
-						Vector3 dir = Vector3.Normalize(new Vector3(
-							(Random.Shared.NextSingle() - 0.5f),
-							0.5f + Random.Shared.NextSingle() * 0.5f,
-							(Random.Shared.NextSingle() - 0.5f)
-						));
-						_particles.SpawnSpark(spawnPos + offset, dir * _speed, clr, _scale);
-						break;
-					}
-				}
-			}
+			_fishParticles.Spawn(
+				type,
+				_count,
+				_speed,
+				_scale,
+				_lifetime,
+				new FishGfx.Color(_colorR, _colorG, _colorB)
+			);
 		}
 
 		private void SpawnCustomEffect()
 		{
-			string collName = _selectedCollection;
-			Texture2D tex = ResMgr.GetFromCollectionByIndex(collName, _texIndex);
-			Color clr = new Color(_colorR, _colorG, _colorB, (byte)255);
-			Vector3 spawnPos = new Vector3(0, 1, 0);
-
-			for (int i = 0; i < _count; i++)
-			{
-				Vector3 offset = new Vector3(
-					(Random.Shared.NextSingle() - 0.5f) * _spread,
-					(Random.Shared.NextSingle() - 0.5f) * _spread,
-					(Random.Shared.NextSingle() - 0.5f) * _spread
-				);
-
-				Vector3 vel = new Vector3(
-					(Random.Shared.NextSingle() - 0.5f) * _speed * _spread,
-					_speed * (0.5f + Random.Shared.NextSingle()),
-					(Random.Shared.NextSingle() - 0.5f) * _speed * _spread
-				);
-
-				_particles.SpawnCustom(
-					spawnPos + offset,
-					vel,
-					clr,
-					tex,
-					_scale,
-					_lifetime,
-					_customType,
-					_blendMode,
-					_emissive,
-					_physics,
-					_noCollisions
-				);
-			}
+			_fishParticles.Spawn(
+				_customType,
+				_count,
+				_speed,
+				_scale,
+				_lifetime,
+				new FishGfx.Color(_colorR, _colorG, _colorB),
+				_spread
+			);
 		}
 
 		private string GenerateCustomParticleCode()
 		{
-			var ic = System.Globalization.CultureInfo.InvariantCulture;
-			string typeName = _customType.ToString();
-			string blendName = _blendMode.ToString();
-			string collName = _selectedCollection;
-			string scaler = _customType == ParticleType.Smoke ? "0.4f" : "0";
-
-			string F(float v) => v.ToString("F2", ic) + "f";
-			string B(bool v) => v ? "true" : "false";
-
-			var sb = new System.Text.StringBuilder();
-			sb.AppendLine("\t\t/// <summary>");
-			sb.AppendLine($"\t\t/// Custom particle \u2014 exported from Effects Preview.");
-			sb.AppendLine($"\t\t/// Type: {typeName}, Texture: {collName}[{_texIndex}], Blend: {blendName}");
-			sb.AppendLine("\t\t/// </summary>");
-			sb.AppendLine("\t\tpublic void SpawnMyEffect(Vector3 Pos, Vector3 Direction, Color Clr, float ScaleFactor = 1.0f)");
-			sb.AppendLine("\t\t{");
-			sb.AppendLine("\t\t\tfor (int i = 0; i < Particles.Length; i++)");
-			sb.AppendLine("\t\t\t{");
-			sb.AppendLine("\t\t\t\tref Particle P = ref Particles[i];");
-			sb.AppendLine();
-			sb.AppendLine("\t\t\t\tif (!P.Draw)");
-			sb.AppendLine("\t\t\t\t{");
-			sb.AppendLine("\t\t\t\t\tP.Draw = true;");
-			sb.AppendLine("\t\t\t\t\tP.Pos = Pos;");
-			sb.AppendLine("\t\t\t\t\tP.Color = Clr;");
-			sb.AppendLine();
-			sb.AppendLine($"\t\t\t\t\tfloat spreadX = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
-			sb.AppendLine($"\t\t\t\t\tfloat spreadY = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
-			sb.AppendLine($"\t\t\t\t\tfloat spreadZ = (Random.Shared.NextSingle() - 0.5f) * {F(_spread)};");
-			sb.AppendLine("\t\t\t\t\tP.Vel = Direction + new Vector3(spreadX, spreadY, spreadZ);");
-			sb.AppendLine();
-			sb.AppendLine("\t\t\t\t\tP.SpawnedAt = lastGameTime;");
-			sb.AppendLine($"\t\t\t\t\tP.LifeTime = {F(_lifetime)} + Random.Shared.NextSingle() * {F(_lifetime * 0.4f)};");
-			sb.AppendLine($"\t\t\t\t\tP.MovePhysics = {B(_physics)};");
-			sb.AppendLine($"\t\t\t\t\tP.Tex = ResMgr.GetFromCollectionByIndex(\"{collName}\", {_texIndex});");
-			sb.AppendLine($"\t\t\t\t\tP.Scaler = {scaler};");
-			sb.AppendLine($"\t\t\t\t\tP.InitialScale = ({F(_scale)} + Random.Shared.NextSingle() * {F(_scale * 0.3f)}) * ScaleFactor;");
-			sb.AppendLine("\t\t\t\t\tP.Scale = P.InitialScale;");
-			sb.AppendLine("\t\t\t\t\tP.Rnd = Random.Shared.NextSingle();");
-			sb.AppendLine($"\t\t\t\t\tP.Type = ParticleType.{typeName};");
-			sb.AppendLine($"\t\t\t\t\tP.IsEmissive = {B(_emissive)};");
-			sb.AppendLine($"\t\t\t\t\tP.BlendMode = ParticleBlendMode.{blendName};");
-			sb.AppendLine($"\t\t\t\t\tP.NoCollisions = {B(_noCollisions)};");
-			sb.AppendLine();
-			sb.AppendLine("\t\t\t\t\treturn;");
-			sb.AppendLine("\t\t\t\t}");
-			sb.AppendLine("\t\t\t}");
-			sb.AppendLine("\t\t}");
-
-			return sb.ToString();
+			var culture = System.Globalization.CultureInfo.InvariantCulture;
+			string Number(float value) => value.ToString("F2", culture) + "f";
+			return $$"""
+				// {{_selectedCollection}}/{{_texIndex + 1}}.png, blend {{_blendMode}},
+				// emissive={{_emissive}}, physics={{_physics}}, noCollisions={{_noCollisions}}
+				preview.Spawn(
+					ParticleEffectKind.{{_customType}},
+					{{_count}},
+					{{Number(_speed)}},
+					{{Number(_scale)}},
+					{{Number(_lifetime)}},
+					new FishGfx.Color({{_colorR}}, {{_colorG}}, {{_colorB}}),
+					{{Number(_spread)}}
+				);
+				""";
 		}
 
 		private void ToggleTextureBrowser()
@@ -576,42 +456,19 @@ namespace Voxelgine.States
 
 			float bw = 240;
 
-			// Texture folders
-			stack.AddChild(new Label { Text = "Texture Folders:", Size = new Vector2(bw, 20) });
+			stack.AddChild(new Label { Text = "Particle Atlases:", Size = new Vector2(bw, 20) });
 
-			string[] folders = ResMgr.GetTextureFolderNames();
-			foreach (string folder in folders)
+			foreach (string collection in TextureCollections)
 			{
-				int fileCount = ResMgr.GetTextureFolderFileCount(folder);
+				int fileCount = GetTextureCount(collection);
 				if (fileCount == 0)
+				{
 					continue;
-
-				var btn = new Button { Text = $"{folder} ({fileCount})", Size = new Vector2(bw, 26) };
-				btn.Clicked += (s, e) =>
-				{
-					if (ResMgr.EnsureCollectionFromFolder(folder))
-						SelectTextureSource(folder);
-				};
-				stack.AddChild(btn);
-			}
-
-			// Individual texture files
-			string[] files = ResMgr.GetTextureFileNames();
-			if (files.Length > 0)
-			{
-				stack.AddChild(new Label { Text = "Individual Textures:", Size = new Vector2(bw, 20) });
-
-				foreach (string file in files)
-				{
-					var btn = new Button { Text = file, Size = new Vector2(bw, 26) };
-					btn.Clicked += (s, e) =>
-					{
-						string name = ResMgr.EnsureCollectionFromFile(file);
-						if (name != null)
-							SelectTextureSource(name);
-					};
-					stack.AddChild(btn);
 				}
+
+				var btn = new Button { Text = $"{collection} ({fileCount})", Size = new Vector2(bw, 26) };
+				btn.Clicked += (s, e) => SelectTextureSource(collection);
+				stack.AddChild(btn);
 			}
 
 			scroll.AddChild(stack);
@@ -624,7 +481,7 @@ namespace Voxelgine.States
 			_selectedCollection = collectionName;
 			_btnTexBrowse.Text = $"Texture: {collectionName}";
 
-			int maxIdx = ResMgr.GetCollectionSize(collectionName) - 1;
+			int maxIdx = GetTextureCount(collectionName) - 1;
 			_sliderTexIdx.MaxValue = Math.Max(maxIdx, 1);
 			_texIndex = 0;
 			_sliderTexIdx.Value = 0;
@@ -633,131 +490,141 @@ namespace Voxelgine.States
 				_browserWindow.Visible = false;
 		}
 
+		private static int GetTextureCount(string collectionName)
+		{
+			string directory = Path.Combine(
+				AppContext.BaseDirectory,
+				"data",
+				"textures",
+				collectionName
+			);
+			return Directory.Exists(directory)
+				? Directory.EnumerateFiles(directory, "*.png").Count()
+				: 0;
+		}
+
 		private void ClearParticles()
 		{
-			// Re-initialize to clear all particles
-			_particles.Init(
-				point => false,
-				point => BlockType.None,
-				point => Color.White
-			);
+			_fishParticles.Clear();
 		}
 
 		public override void SwapTo()
 		{
-			base.SwapTo();
-			Raylib.EnableCursor();
+			_gui.InputEnabled = true;
+			IFishGfxGameWindow fishWindow = (IFishGfxGameWindow)Window;
+			fishWindow.RenderWindow.CaptureCursor = false;
+			fishWindow.RenderWindow.ShowCursor = true;
+		}
+
+		public override void SwapFrom()
+		{
+			_gui.InputEnabled = false;
 		}
 
 		public override void Tick(float GameTime)
 		{
-			float dt = Raylib.GetFrameTime();
-			_totalTime += dt;
-
-			// Camera orbit control with mouse drag
-			if (Raylib.IsMouseButtonDown(MouseButton.Left) && !IsMouseOverUI())
+			if (Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
-				Vector2 mouseDelta = Raylib.GetMouseDelta();
-				_cameraAngle += mouseDelta.X * 0.01f;
-				_cameraHeight += mouseDelta.Y * 0.03f;
-				_cameraHeight = Math.Clamp(_cameraHeight, 0.5f, 5f);
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
 			}
+		}
 
-			// Zoom with scroll wheel
-			float scroll = Raylib.GetMouseWheelMove();
-			_cameraDistance -= scroll * 0.5f;
-			_cameraDistance = Math.Clamp(_cameraDistance, 2f, 15f);
+		public override void BeginInputFrame()
+		{
+			_gui.BeginInputFrame();
+		}
 
-			// Update camera position
-			_camera.Position = new Vector3(
-				MathF.Sin(_cameraAngle) * _cameraDistance,
-				_cameraHeight,
-				MathF.Cos(_cameraAngle) * _cameraDistance
+		public override void BeginFrame(in FrameTiming timing)
+		{
+			Vector2 mouse = Window.InMgr.GetMousePos();
+			bool overUi = mouse.X < 390 && mouse.Y < 730
+				|| _browserWindow is { Visible: true }
+					&& mouse.X >= 390 && mouse.X < 670 && mouse.Y < 530;
+			if (Window.InMgr.IsInputDown(InputKey.Click_Left) && !overUi)
+			{
+				Vector2 delta = mouse - _lastMousePosition;
+				_cameraAngle += delta.X * 0.01f;
+				_cameraHeight = Math.Clamp(_cameraHeight + delta.Y * 0.03f, 0.5f, 5f);
+			}
+			_lastMousePosition = mouse;
+			_cameraDistance = Math.Clamp(
+				_cameraDistance - Window.InMgr.GetMouseWheel() * 0.5f,
+				2,
+				15
 			);
-			_camera.Target = new Vector3(0, 1, 0);
 
-			// Auto spawn
 			if (_autoSpawn)
 			{
-				_autoSpawnTimer += dt;
-				if (_autoSpawnTimer >= AutoSpawnInterval)
+				_autoSpawnTimer += timing.DeltaTime;
+				while (_autoSpawnTimer >= AutoSpawnInterval)
 				{
 					_autoSpawnTimer -= AutoSpawnInterval;
 					SpawnCustomEffect();
 				}
 			}
-
-			// ESC to go back
-			if (Window.InMgr.IsInputPressed(InputKey.Esc))
-			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.MainMenuState);
-			}
-		}
-
-		private bool IsMouseOverUI()
-		{
-			Vector2 mousePos = Raylib.GetMousePosition();
-			if (mousePos.X < 390 && mousePos.Y < 730)
-				return true;
-			if (_browserWindow != null && _browserWindow.Visible &&
-				mousePos.X >= 390 && mousePos.X < 670 && mousePos.Y < 530)
-				return true;
-			return false;
-		}
-
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
-		{
-			_particles.Tick(TotalTime);
-		}
-
-		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
-		{
-			Raylib.ClearBackground(new Color(40, 44, 52));
-			Raylib.BeginMode3D(_camera);
-
-			// Draw ground grid
-			Raylib.DrawGrid(10, 1.0f);
-
-			// Draw coordinate axes
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(2, 0, 0), Color.Red);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 2, 0), Color.Green);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 2), Color.Blue);
-
-			// Draw scale reference block (1×1×1, top face at Y=1 where particles spawn)
-			Vector3 blockCenter = new Vector3(0, 0.5f, 0);
-			Vector3 blockSize = new Vector3(1, 1, 1);
-			Raylib.DrawCubeV(blockCenter, blockSize, new Color(120, 120, 120, 180));
-			Raylib.DrawCubeWiresV(blockCenter, blockSize, new Color(200, 200, 200, 255));
-
-			// Draw spawn point marker
-			Raylib.DrawSphere(new Vector3(0, 1, 0), 0.05f, Color.Yellow);
-
-			// Draw particles
-			_particles.DrawPreview(_camera, _camera.Position);
-
-			Raylib.EndMode3D();
-		}
-
-		public override void Draw2D()
-		{
-			float dt = Raylib.GetFrameTime();
-			_gui.Tick(dt, _totalTime);
-
-			// Update stats
-			_particles.GetStats(out int onScreen, out int drawn, out int max);
-			_statsLabel.Text = $"Particles: {onScreen}/{drawn}/{max}";
+			_fishParticles.Update(timing.DeltaTime);
+			_gui.Update(timing.DeltaTime, timing.TotalTime);
+			_statsLabel.Text = $"Particles: {_fishParticles.ActiveCount}/256";
 			_paramLabel.Text = $"Color: ({_colorR},{_colorG},{_colorB})";
+			_clipboardTimer = MathF.Max(0, _clipboardTimer - timing.DeltaTime);
+		}
 
-			// Clipboard notification
-			if (_clipboardTimer > 0)
+		public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
+		{
+			Vector3 cameraPosition = new(
+				MathF.Sin(_cameraAngle) * _cameraDistance,
+				_cameraHeight,
+				MathF.Cos(_cameraAngle) * _cameraDistance
+			);
+			FishGfx.Graphics.Camera camera = new() { Position = cameraPosition };
+			camera.LookAt(new Vector3(0, 1, 0));
+			camera.SetPerspective(framebufferSize, 45 * MathF.PI / 180, 0.05f, 256);
+			GameStateRenderSettings overlay = GameStateRenderSettings.CreateOverlay(
+				new Vector2(Window.Width, Window.Height)
+			);
+			return new GameStateRenderSettings
 			{
-				_clipboardTimer -= dt;
-				Raylib.DrawText("Code copied to clipboard!", Window.Width / 2 - 130, Window.Height - 60, 20, Color.Lime);
+				WorldView = new RenderView(camera),
+				ViewmodelView = new RenderView(camera),
+				OverlayView = overlay.OverlayView,
+				ClearColor = new FishGfx.Color(40, 44, 52),
+			};
+		}
+
+		public override void RenderWorld(RenderPass pass, in FrameTiming timing)
+		{
+			for (int coordinate = -5; coordinate <= 5; coordinate++)
+			{
+				FishGfx.Color color = coordinate == 0
+					? new FishGfx.Color(95, 105, 120)
+					: new FishGfx.Color(62, 68, 78);
+				pass.DrawLine(
+					new FishGfx.Vertex3(new Vector3(coordinate, 0, -5), color),
+					new FishGfx.Vertex3(new Vector3(coordinate, 0, 5), color)
+				);
+				pass.DrawLine(
+					new FishGfx.Vertex3(new Vector3(-5, 0, coordinate), color),
+					new FishGfx.Vertex3(new Vector3(5, 0, coordinate), color)
+				);
 			}
 
-			// Draw instructions
-			Raylib.DrawText("Drag mouse to rotate | Scroll to zoom", Window.Width - 320, Window.Height - 30, 16, Color.LightGray);
-			Raylib.DrawFPS(Window.Width - 100, 10);
+			Vector3 cameraPosition = new(
+				MathF.Sin(_cameraAngle) * _cameraDistance,
+				_cameraHeight,
+				MathF.Cos(_cameraAngle) * _cameraDistance
+			);
+			_fishParticles.Render(pass, cameraPosition, new Vector3(0, 1, 0));
+		}
+
+		public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
+		{
+			_gui.Render(pass, timing.DeltaTime, timing.TotalTime);
+		}
+
+		public override void Dispose()
+		{
+			_fishParticles.Dispose();
+			_gui.Dispose();
 		}
 	}
 }

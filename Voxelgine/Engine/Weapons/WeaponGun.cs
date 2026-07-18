@@ -23,10 +23,9 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public override float AutoFireRate => 10f;
 
-		public WeaponGun(IFishEngineRunner Eng, Player ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Gun)
+		public WeaponGun(IFishEngineRunner Eng, ClientPlayer ParentPlayer, string Name) : base(Eng, ParentPlayer, Name, IconType.Gun)
 		{
 			SetViewModelInfo(ViewModelRotationMode.Gun);
-			SetupJsonModel("gun/gun.json", "gun/gun_tex.png");
 		}
 
 		public override void Tick(ViewModel ViewMdl, InputMgr InMgr)
@@ -56,7 +55,7 @@ namespace Voxelgine.Engine
 			ApplyFireEffects(intent);
 
 			// Send fire packet to server for authoritative hit resolution
-			var mpState = Eng.MultiplayerGameState;
+			var mpState = Eng.AsClient().MultiplayerGameState;
 			if (mpState != null && mpState.IsActive)
 			{
 				mpState.SendWeaponFire(E.Start, E.Dir);

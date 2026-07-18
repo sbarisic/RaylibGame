@@ -9,7 +9,7 @@
 	"TargetFPS": -1,
 	"HighDpiWindow": true,
 	"VSync": true,
-	"Msaa": false,
+	"Msaa": true,
 	"LastOptWnd_X": 0,
 	"LastOptWnd_Y": 0,
 	"LastOptWnd_W": 0,

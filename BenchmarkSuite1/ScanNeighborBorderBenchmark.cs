@@ -1,56 +1,10 @@
 using BenchmarkDotNet.Attributes;
-using System.Numerics;
 using Voxelgine.Graphics;
 using Voxelgine.Engine;
-using Voxelgine.Engine.DI;
-using Voxelgine.States;
 using Microsoft.VSDiagnostics;
 
 namespace LightingBenchmarks
 {
-    public class MockLogging : IFishLogging
-    {
-        public void Init(bool IsServer = false)
-        {
-        }
-
-        public void WriteLine(string message)
-        {
-        }
-
-        public void ServerWriteLine(string message)
-        {
-        }
-
-        public void ClientWriteLine(string message)
-        {
-        }
-
-        public void ServerNetworkWriteLine(string message)
-        {
-        }
-
-        public void ClientNetworkWriteLine(string message)
-        {
-        }
-    }
-
-    public class MockEngineRunner : IFishEngineRunner
-    {
-        public FishDI DI { get; set; }
-        public int ChunkDrawCalls { get; set; }
-        public bool DebugMode { get; set; }
-        public float TotalTime { get; set; }
-        public MainMenuStateFishUI MainMenuState { get; set; }
-        public NPCPreviewState NPCPreviewState { get; set; }
-        public EffectsPreviewState EffectsPreviewState { get; set; }
-        public MPClientGameState MultiplayerGameState { get; set; }
-
-        public void Init()
-        {
-        }
-    }
-
     [CPUUsageDiagnoser]
     public class ScanNeighborBorderBenchmark
     {
@@ -58,15 +12,7 @@ namespace LightingBenchmarks
         [GlobalSetup]
         public void Setup()
         {
-            var di = new FishDI();
-            di.AddSingleton<IFishLogging, MockLogging>();
-            di.Build();
-            di.CreateScope();
-            var eng = new MockEngineRunner
-            {
-                DI = di
-            };
-            _worldMap = new ChunkMap(eng);
+			_worldMap = new ChunkMap();
             const int CS = Chunk.ChunkSize;
             // Create chunks by placing a Water block (no lighting trigger) in each chunk position
             for (int cx = -1; cx <= 1; cx++)

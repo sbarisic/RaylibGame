@@ -1,6 +1,5 @@
 using FishUI;
 using FishUI.Controls;
-using Raylib_cs;
 using System.Numerics;
 using Voxelgine.Engine;
 
@@ -26,12 +25,6 @@ namespace Voxelgine.GUI
 		private ImageRef _backgroundPressed;
 		private float _iconScale = 2.0f;
 		private bool _hasIcon;
-
-		// Atlas region support
-		private bool _useAtlasRegion;
-		private Vector2 _uvPos;
-		private Vector2 _uvSize;
-		private Texture2D _atlasTexture;
 
 		public event Action<FishUIItemBox> OnItemClicked;
 
@@ -60,7 +53,6 @@ namespace Voxelgine.GUI
 			ui.Graphics.SetImageFilter(_icon, true);
 			_iconScale = scale;
 			_hasIcon = true;
-			_useAtlasRegion = false;
 		}
 
 		public void SetIcon(global::FishUI.FishUI ui, ImageRef icon, float scale)
@@ -69,25 +61,6 @@ namespace Voxelgine.GUI
 			ui.Graphics.SetImageFilter(_icon, true);
 			_iconScale = scale;
 			_hasIcon = true;
-			_useAtlasRegion = false;
-		}
-
-		/// <summary>
-		/// Sets an icon from an atlas texture with UV coordinates.
-		/// </summary>
-		/// <param name="atlasTexture">The atlas texture</param>
-		/// <param name="scale">Scale factor for drawing</param>
-		/// <param name="uvPos">UV position (normalized 0-1)</param>
-		/// <param name="uvSize">UV size (normalized 0-1)</param>
-		public void SetIcon(Texture2D atlasTexture, float scale, Vector2 uvPos, Vector2 uvSize)
-		{
-			_atlasTexture = atlasTexture;
-			_iconScale = scale;
-			_uvPos = uvPos;
-			_uvSize = uvSize;
-			_hasIcon = true;
-			_useAtlasRegion = true;
-			Raylib.SetTextureFilter(atlasTexture, TextureFilter.Point);
 		}
 
 		public void SetItem(FishUIInventory parent, InventoryItem item)
@@ -144,30 +117,15 @@ namespace Voxelgine.GUI
 			{
 				float tint = IsMousePressed ? 0.7f : 1.0f;
 				byte tintByte = (byte)(255 * tint);
-				var tintColor = new Color(tintByte, tintByte, tintByte, (byte)255);
+				var tintColor = new FishColor(tintByte, tintByte, tintByte, 255);
 
-				if (_useAtlasRegion && _atlasTexture.Id != 0)
+				if (_icon.Userdata != null)
 				{
-					// Draw from atlas using UV coordinates
-					float srcX = _uvPos.X * _atlasTexture.Width;
-					float srcY = _uvPos.Y * _atlasTexture.Height;
-					float srcW = _uvSize.X * _atlasTexture.Width;
-					float srcH = _uvSize.Y * _atlasTexture.Height;
-
-					float iconDrawSize = Math.Min(size.X, size.Y) * 0.75f;
+					float scaledSize = Math.Clamp(_iconScale, 0.1f, 4f);
+					float iconDrawSize = Math.Min(size.X, size.Y)
+						* Math.Clamp(0.7f * scaledSize, 0.1f, 0.9f);
 					var iconPos = pos + (size - new Vector2(iconDrawSize)) / 2;
-
-					Rectangle source = new Rectangle(srcX, srcY, srcW, srcH);
-					Rectangle dest = new Rectangle(iconPos.X, iconPos.Y, iconDrawSize, iconDrawSize);
-					Raylib.DrawTexturePro(_atlasTexture, source, dest, Vector2.Zero, 0, tintColor);
-				}
-				else if (_icon.Userdata != null)
-				{
-					// Draw regular image
-					float iconDrawSize = Math.Min(size.X, size.Y) * 0.7f;
-					var iconPos = pos + (size - new Vector2(iconDrawSize)) / 2;
-					var fishColor = new FishColor(tintColor.R, tintColor.G, tintColor.B, tintColor.A);
-					gfx.DrawImage(_icon, iconPos, new Vector2(iconDrawSize), 0, 1, fishColor);
+					gfx.DrawImage(_icon, iconPos, new Vector2(iconDrawSize), 0, 1, tintColor);
 				}
 			}
 

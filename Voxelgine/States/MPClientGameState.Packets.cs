@@ -1,11 +1,11 @@
 using Voxelgine.Engine;
-using Raylib_cs;
 using Voxelgine.Graphics;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using FishUI.Controls;
+using Voxelgine.Engine.Audio;
 
 namespace Voxelgine.States
 {
@@ -28,7 +28,7 @@ namespace Voxelgine.States
 				// Was in-game — show "Connection Lost" overlay with reconnect/return options
 				_connectionLost = true;
 				_disconnectReason = reason;
-				Raylib.EnableCursor();
+				SetCursorCaptured(false);
 			}
 			else
 			{
@@ -69,6 +69,7 @@ namespace Voxelgine.States
 				_logging.ClientWriteLine("MPClientGameState: Computing lighting...");
 				_simulation.Map.ComputeLighting();
 				_logging.ClientWriteLine("MPClientGameState: Lighting computed");
+				CreateFishGfxVoxelScene();
 
 				// Create GUI
 				_logging.ClientWriteLine("MPClientGameState: Creating gameplay UI...");
@@ -76,24 +77,13 @@ namespace Voxelgine.States
 				_logging.ClientWriteLine("MPClientGameState: Gameplay UI created");
 
 				// Create sound
-				_logging.ClientWriteLine("MPClientGameState: Creating SoundMgr...");
-				_snd = new SoundMgr();
-				_snd.Init();
-				_logging.ClientWriteLine("MPClientGameState: SoundMgr initialized");
-
-				// Create particle system
-				_logging.ClientWriteLine("MPClientGameState: Creating ParticleSystem...");
-				_particle = new ParticleSystem();
-				_particle.Init(
-					(pt) => _simulation.Map.Collide(pt, Vector3.Zero, out Vector3 _),
-					(pt) => _simulation.Map.GetBlock(pt),
-					(pt) => _simulation.Map.GetLightColor(pt)
-				);
-				_logging.ClientWriteLine("MPClientGameState: ParticleSystem initialized");
+				_logging.ClientWriteLine("MPClientGameState: Creating game audio sink...");
+				_snd = CreateAudioSink();
+				_logging.ClientWriteLine("MPClientGameState: Game audio sink initialized");
 
 				// Create local player
 				_logging.ClientWriteLine($"MPClientGameState: Creating Player (id={_client.PlayerId}, name={_playerName})...");
-				var ply = new Player(Eng, _gui, _playerName, true, _snd, _client.PlayerId);
+				var ply = new ClientPlayer(Eng, _gui, _playerName, true, _snd, _client.PlayerId);
 				_logging.ClientWriteLine("MPClientGameState: Player created, adding to PlayerManager...");
 				_simulation.Players.AddLocalPlayer(_client.PlayerId, ply);
 
@@ -145,7 +135,7 @@ namespace Voxelgine.States
 				if (_pendingEntityPackets.Count > 0)
 				{
 					_logging.ClientWriteLine($"MPClientGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
-					float replayTime = (float)Raylib.GetTime();
+					float replayTime = GetClientTime();
 					foreach (var pending in _pendingEntityPackets)
 					{
 						switch (pending)
@@ -171,12 +161,14 @@ namespace Voxelgine.States
 				_statusText = "";
 				_errorText = "";
 
-				Raylib.DisableCursor();
+				_simulation.LocalPlayer.CursorDisabled = true;
+				SetCursorCaptured(true);
 
 				_logging.ClientWriteLine("MPClientGameState: World loaded, entering gameplay");
 			}
 			catch (Exception ex)
 			{
+				DisposeFishGfxVoxelScene();
 				_logging.ClientWriteLine($"MPClientGameState: Failed to load world: {ex}");
 				_statusText = "";
 				_errorText = $"Failed to load world: {ex.Message}";
@@ -192,7 +184,7 @@ namespace Voxelgine.States
 
 		private void OnPacketReceived(Packet packet)
 		{
-			float currentTime = (float)Raylib.GetTime();
+			float currentTime = GetClientTime();
 
 			switch (packet)
 			{
@@ -395,7 +387,14 @@ namespace Voxelgine.States
 			{
 				using var ms = new MemoryStream(packet.Properties);
 				using var reader = new BinaryReader(ms);
-				entity.ReadSpawnProperties(reader);
+				if (IsUsingFishGfx)
+				{
+					ReadFishGfxSpawnProperties(entity, reader);
+				}
+				else
+				{
+					entity.ReadSpawnProperties(reader);
+				}
 			}
 
 			_simulation.Entities.SpawnWithNetworkId(_simulation, entity, packet.NetworkId);
@@ -497,7 +496,7 @@ namespace Voxelgine.States
 				}
 
 				// Update animation from latest snapshot state
-				UpdateEntityAnimation(entity, to.AnimationState, Raylib.GetFrameTime());
+				UpdateEntityAnimation(entity, to.AnimationState, GetClientDeltaTime());
 			}
 		}
 
@@ -509,21 +508,7 @@ namespace Voxelgine.States
 		{
 			if (entity is VEntNPC npc)
 			{
-				var animator = npc.GetAnimator();
-				if (animator != null)
-				{
-					string targetAnim = animationState switch
-					{
-						1 => "walk",
-						2 => "attack",
-						_ => "idle",
-					};
-
-					if (animator.CurrentAnimation != targetAnim)
-						animator.Play(targetAnim);
-
-					animator.Update(deltaTime);
-				}
+				npc.SetAnimationState(animationState);
 
 				// Derive look direction from velocity (server syncs velocity but not look direction)
 				Vector3 horizontalVel = new Vector3(entity.Velocity.X, 0, entity.Velocity.Z);
@@ -605,7 +590,7 @@ namespace Voxelgine.States
 				AimOrigin = origin,
 				AimDirection = direction,
 			};
-			_client.Send(packet, true, (float)Raylib.GetTime());
+			_client.Send(packet, true, GetClientTime());
 		}
 
 		/// <summary>
@@ -614,7 +599,7 @@ namespace Voxelgine.States
 		/// </summary>
 		public void SpawnPredictedFireEffects(Vector3 origin, Vector3 direction, float maxRange)
 		{
-			if (_simulation == null || _particle == null)
+			if (_simulation == null || _fishParticles == null)
 				return;
 
 			Vector3 muzzlePos = origin + direction * 0.5f;
@@ -660,18 +645,18 @@ namespace Voxelgine.States
 			}
 
 			// Tracer line from muzzle to hit point
-			_particle.SpawnTracer(muzzlePos, hitPos);
+			_fishParticles.EnqueueTracer(muzzlePos, hitPos);
 
 			// Hit particles based on predicted hit type
 			switch (hitType)
 			{
 				case FireHitType.Entity:
-					HitEffects.SpawnEntityHit(_particle, hitEntity is VEntNPC, hitPos, hitNormal);
+					SpawnFishGfxEntityHit(hitEntity is VEntNPC, hitPos, hitNormal);
 					break;
 
 				case FireHitType.World:
-					BlockType predictedBlock = HitEffects.GetBlockAtHit(_simulation.Map, hitPos, hitNormal);
-					HitEffects.SpawnBlockHit(_particle, predictedBlock, hitPos, hitNormal);
+					BlockType predictedBlock = GetBlockAtImpact(hitPos, hitNormal);
+					SpawnFishGfxBlockHit(predictedBlock, hitPos, hitNormal);
 					break;
 			}
 		}
@@ -682,7 +667,7 @@ namespace Voxelgine.States
 		/// </summary>
 		private void HandleWeaponFireEffect(WeaponFireEffectPacket packet)
 		{
-			if (_simulation == null || _particle == null)
+			if (_simulation == null || _fishParticles == null)
 				return;
 
 			Vector3 muzzlePos = packet.Origin + packet.Direction * 0.5f;
@@ -691,12 +676,17 @@ namespace Voxelgine.States
 			// Play fire sound for other players' shots
 			if (!isLocalPlayer && _snd != null)
 			{
-				_snd.PlayCombo("shoot1", _simulation.LocalPlayer.Position, _simulation.LocalPlayer.GetForward(), packet.Origin);
+				_snd.Emit(new GameAudioEvent(
+					"shoot1",
+					packet.Origin,
+					Vector3.Zero,
+					packet.PlayerId
+				));
 			}
 
 			// Tracer line from muzzle to hit point (skip for local player — predicted locally)
 			if (!isLocalPlayer)
-				_particle.SpawnTracer(muzzlePos, packet.HitPosition);
+				_fishParticles.EnqueueTracer(muzzlePos, packet.HitPosition);
 
 			FireHitType hitType = (FireHitType)packet.HitType;
 			switch (hitType)
@@ -717,21 +707,21 @@ namespace Voxelgine.States
 					// Particles only for remote players (local player predicted them)
 						if (!isLocalPlayer)
 						{
-							HitEffects.SpawnEntityHit(_particle, isNpcHit, packet.HitPosition, packet.HitNormal);
+							SpawnFishGfxEntityHit(isNpcHit, packet.HitPosition, packet.HitNormal);
 						}
 						break;
 
 				case FireHitType.Player:
 					// Always show blood for player hits — client cannot predict these
-					HitEffects.SpawnEntityHit(_particle, true, packet.HitPosition, packet.HitNormal);
+					SpawnFishGfxEntityHit(true, packet.HitPosition, packet.HitNormal);
 					break;
 
 				case FireHitType.World:
 					// Particles only for remote players (local player predicted them)
 					if (!isLocalPlayer)
 					{
-						BlockType hitBlock = HitEffects.GetBlockAtHit(_simulation.Map, packet.HitPosition, packet.HitNormal);
-						HitEffects.SpawnBlockHit(_particle, hitBlock, packet.HitPosition, packet.HitNormal);
+						BlockType hitBlock = GetBlockAtImpact(packet.HitPosition, packet.HitNormal);
+						SpawnFishGfxBlockHit(hitBlock, packet.HitPosition, packet.HitNormal);
 					}
 					break;
 			}
@@ -746,17 +736,24 @@ namespace Voxelgine.States
 			if (packet.SourcePlayerId == _client.PlayerId)
 				return;
 
-			Vector3 ears = _simulation.LocalPlayer.Position;
-			Vector3 dir = _simulation.LocalPlayer.GetForward();
-
 			switch ((SoundEventType)packet.EventType)
 			{
 				case SoundEventType.BlockBreak:
-					_snd.PlayCombo("block_break", ears, dir, packet.Position);
+					_snd.Emit(new GameAudioEvent(
+						"block_break",
+						packet.Position,
+						Vector3.Zero,
+						packet.SourcePlayerId
+					));
 					break;
 
 				case SoundEventType.BlockPlace:
-					_snd.PlayCombo("block_place", ears, dir, packet.Position);
+					_snd.Emit(new GameAudioEvent(
+						"block_place",
+						packet.Position,
+						Vector3.Zero,
+						packet.SourcePlayerId
+					));
 					break;
 			}
 		}
@@ -817,23 +814,11 @@ namespace Voxelgine.States
 
 			foreach (var slot in packet.Slots)
 			{
-				InventoryItem item = _simulation.LocalPlayer.GetInventoryItem(slot.SlotIndex);
+				InventoryItem item = (_simulation.LocalPlayer as ClientPlayer)?.GetInventoryItem(slot.SlotIndex);
 				if (item != null)
 					item.Count = slot.Count;
 			}
 		}
 
-		private void DrawRemotePlayerNameTags()
-		{
-			if (_simulation?.LocalPlayer == null || _simulation.Players == null)
-				return;
-
-			Camera3D camera = _simulation.LocalPlayer.RenderCam;
-
-			foreach (var remotePlayer in _simulation.Players.GetAllRemotePlayers())
-			{
-				remotePlayer.DrawNameTag(camera, _simulation.Map);
-			}
-		}
 	}
 }

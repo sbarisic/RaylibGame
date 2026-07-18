@@ -1,49 +1,77 @@
-﻿using Raylib_cs;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using FishGfx.Graphics;
+using System.Numerics;
 using Voxelgine.Engine.DI;
+using Voxelgine.FishGfxClient.Rendering;
 
-namespace Voxelgine.Engine
+namespace Voxelgine.Engine;
+
+public abstract class GameStateImpl : IDisposable
 {
-	public abstract class GameStateImpl
+	protected GameStateImpl(IGameWindow window, IFishEngineRunner engine)
 	{
-		public IGameWindow Window;
-		protected IFishEngineRunner Eng;
+		Window = window ?? throw new ArgumentNullException(nameof(window));
+		Eng = engine ?? throw new ArgumentNullException(nameof(engine));
+	}
 
-		public GameStateImpl(IGameWindow window, IFishEngineRunner Eng)
-		{
-			Window = window;
-			this.Eng = Eng;
-		}
+	public IGameWindow Window { get; }
 
-		public virtual void SwapTo()
-		{
-		}
+	protected IFishEngineRunner Eng { get; }
 
-		public virtual void OnResize(GameWindow Window)
-		{
-		}
+	public virtual void SwapTo()
+	{
+	}
 
-		public virtual void Tick(float GameTime)
-		{
-			// Once per frame
-		}
+	public virtual void SwapFrom()
+	{
+	}
 
-		public virtual void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
-		{
-			// Multiple times per frame, fixed delta
-		}
+	public virtual void OnResize(IGameWindow window)
+	{
+	}
 
-		public virtual void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
-		{
-		}
+	/// <summary>Runs once per presented client frame after events are polled.</summary>
+	public virtual void Tick(float gameTime)
+	{
+	}
 
-		public virtual void Draw2D()
-		{
-		}
+	/// <summary>Runs zero or more fixed simulation steps per presented frame.</summary>
+	public virtual void UpdateLockstep(float totalTime, float deltaTime, InputMgr input)
+	{
+	}
+
+	/// <summary>
+	/// Clears transition state before the window polls events for the next frame.
+	/// </summary>
+	public virtual void BeginInputFrame()
+	{
+	}
+
+	/// <summary>
+	/// Synchronizes frame-owned state and UI before the render graph starts.
+	/// Graphics uploads queued by file watchers have already been processed.
+	/// </summary>
+	public virtual void BeginFrame(in FrameTiming timing)
+	{
+	}
+
+	public virtual GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
+	{
+		return GameStateRenderSettings.CreateOverlay(framebufferSize);
+	}
+
+	public virtual void RenderWorld(RenderPass pass, in FrameTiming timing)
+	{
+	}
+
+	public virtual void RenderViewmodel(RenderPass pass, in FrameTiming timing)
+	{
+	}
+
+	public virtual void RenderOverlay(RenderPass pass, in FrameTiming timing)
+	{
+	}
+
+	public virtual void Dispose()
+	{
 	}
 }

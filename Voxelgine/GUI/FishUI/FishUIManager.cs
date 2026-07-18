@@ -1,118 +1,175 @@
+using FishGfx.FishUI;
+using FishGfx.Graphics;
 using FishUI;
 using FishUI.Controls;
-using Raylib_cs;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.FishGfxClient;
 
-namespace Voxelgine.GUI {
-    /// <summary>
-    /// FishUI-based GUI manager that replaces the old GUIManager.
-    /// Provides a unified interface for managing FishUI controls in the game.
-    /// </summary>
-    public class FishUIManager {
-        public FishUI.FishUI UI { get; private set; }
-        public FishUISettings Settings { get; private set; }
+namespace Voxelgine.GUI;
 
-        private readonly RaylibFishUIGfx _gfx;
-        private readonly RaylibFishUIInput _input;
-        private readonly RaylibFishUIEvents _events;
-        private readonly IFishLogging _logging;
+/// <summary>
+/// Owns the FishGfx-backed FishUI context for one game state. Input update and
+/// rendering are deliberately separate so drawing always occurs in an active
+/// FishGfx render pass.
+/// </summary>
+public sealed class FishUIManager : IDisposable
+{
+	private readonly FishUIGraphicsBackend graphics;
+	private readonly FishUIInputAdapter input;
+	private bool disposed;
 
-        public int Width => UI.Width;
-        public int Height => UI.Height;
+	public FishUIManager(IGameWindow window, IFishLogging logging)
+	{
+		ArgumentNullException.ThrowIfNull(window);
+		ArgumentNullException.ThrowIfNull(logging);
+		IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
+			?? throw new ArgumentException("FishUI requires the FishGfx client window.", nameof(window));
 
-        public FishUIManager(IGameWindow window, IFishLogging logging) {
-            _logging = logging;
-            _gfx = new RaylibFishUIGfx();
-            _input = new RaylibFishUIInput();
-            _events = new RaylibFishUIEvents(logging);
+		Settings = new FishUISettings();
+		FishUIGraphicsBackend graphicsBackend = null;
+		FishUIInputAdapter inputAdapter = null;
+		global::FishUI.FishUI context;
+		try
+		{
+			graphicsBackend = new FishUIGraphicsBackend(
+				fishWindow.RenderWindow,
+				AppContext.BaseDirectory
+			);
+			inputAdapter = new FishUIInputAdapter(fishWindow.RenderWindow);
+			context = new global::FishUI.FishUI(
+				Settings,
+				graphicsBackend,
+				inputAdapter,
+				new GameFishUIEvents(logging),
+				graphicsBackend.FileSystem
+			)
+			{
+				Width = window.Width,
+				Height = window.Height,
+			};
+			context.Init();
+		}
+		catch
+		{
+			inputAdapter?.Dispose();
+			graphicsBackend?.Dispose();
+			throw;
+		}
 
-            Settings = new FishUISettings();
-            UI = new FishUI.FishUI(Settings, _gfx, _input, _events, null);
-            UI.Width = window.Width;
-            UI.Height = window.Height;
-            UI.Init();
+		graphics = graphicsBackend;
+		input = inputAdapter;
+		UI = context;
 
-            // Try to load the GWEN theme if available
-            string themePath = "data/themes/gwen.yaml";
-            if (File.Exists(themePath)) {
-                try {
-                    Settings.LoadTheme(themePath, true);
-                } catch (Exception ex) {
-                    _logging.WriteLine($"[FishUIManager] Failed to load theme: {ex.Message}");
-                }
-            }
-        }
+		string themePath = Path.Combine(AppContext.BaseDirectory, "data", "themes", "gwen.yaml");
+		if (File.Exists(themePath))
+		{
+			try
+			{
+				Settings.LoadTheme(themePath, true);
+			}
+			catch (Exception exception)
+			{
+				logging.WriteLine($"[FishUIManager] Failed to load theme: {exception.Message}");
+			}
+		}
+	}
 
-        /// <summary>
-        /// Updates the UI and processes input. Call once per frame.
-        /// </summary>
-        public void Tick(float deltaTime, float totalTime) {
-            UI.Tick(deltaTime, totalTime);
-        }
+	public global::FishUI.FishUI UI { get; }
 
-        /// <summary>
-        /// Draws the UI. Should be called in 2D drawing phase.
-        /// </summary>
-        public void Draw() {
-            // FishUI.Tick handles both update and draw
-        }
+	public FishUISettings Settings { get; }
 
-        /// <summary>
-        /// Called when window is resized.
-        /// </summary>
-        public void OnResize(int width, int height) {
-            UI.Resized(width, height);
-        }
+	public int Width => UI.Width;
 
-        /// <summary>
-        /// Adds a control to the UI.
-        /// </summary>
-        public void AddControl(Control control) {
-            UI.AddControl(control);
-        }
+	public int Height => UI.Height;
 
-        /// <summary>
-        /// Removes a control from the UI.
-        /// </summary>
-        public bool RemoveControl(Control control) {
-            return UI.RemoveControl(control);
-        }
+	public bool InputEnabled
+	{
+		get => input.Enabled;
+		set => input.Enabled = value;
+	}
 
-        /// <summary>
-        /// Removes all controls from the UI.
-        /// </summary>
-        public void Clear() {
-            UI.RemoveAllControls();
-        }
+	public void BeginInputFrame()
+	{
+		ObjectDisposedException.ThrowIf(disposed, this);
+		input.BeginFrame();
+	}
 
-        /// <summary>
-        /// Finds a control by ID.
-        /// </summary>
-        public T FindControl<T>(string id) where T : Control {
-            return UI.FindControlByID<T>(id);
-        }
+	public void Update(float deltaTime, float totalTime)
+	{
+		ObjectDisposedException.ThrowIf(disposed, this);
+		UI.TickUpdate(deltaTime, totalTime);
+	}
 
-        /// <summary>
-        /// Gets the center position of the window.
-        /// </summary>
-        public Vector2 GetCenter() {
-            return new Vector2(Width / 2f, Height / 2f);
-        }
+	public void Render(RenderPass pass, float deltaTime, float totalTime)
+	{
+		ObjectDisposedException.ThrowIf(disposed, this);
+		ArgumentNullException.ThrowIfNull(pass);
+		RenderState state = RenderState.Default with
+		{
+			CullMode = CullMode.None,
+			DepthTestEnabled = false,
+			DepthWriteEnabled = false,
+			BlendEnabled = true,
+		};
 
-        /// <summary>
-        /// Converts a relative position (0-1) to window coordinates.
-        /// </summary>
-        public Vector2 WindowScale(Vector2 relative) {
-            return relative * new Vector2(Width, Height);
-        }
+		using (graphics.UseRenderPass(pass, pass.View, state))
+		{
+			UI.TickDraw(deltaTime, totalTime);
+		}
+	}
 
-        /// <summary>
-        /// Creates a centered position for a control of the given size.
-        /// </summary>
-        public Vector2 CenterPosition(Vector2 size) {
-            return GetCenter() - size / 2;
-        }
-    }
+	public void OnResize(int width, int height)
+	{
+		ObjectDisposedException.ThrowIf(disposed, this);
+		UI.Resized(width, height);
+	}
+
+	public void AddControl(Control control)
+	{
+		UI.AddControl(control);
+	}
+
+	public bool RemoveControl(Control control)
+	{
+		return UI.RemoveControl(control);
+	}
+
+	public void Clear()
+	{
+		UI.RemoveAllControls();
+	}
+
+	public T FindControl<T>(string id) where T : Control
+	{
+		return UI.FindControlByID<T>(id);
+	}
+
+	public Vector2 GetCenter()
+	{
+		return new Vector2(Width / 2f, Height / 2f);
+	}
+
+	public Vector2 WindowScale(Vector2 relative)
+	{
+		return relative * new Vector2(Width, Height);
+	}
+
+	public Vector2 CenterPosition(Vector2 size)
+	{
+		return GetCenter() - size / 2;
+	}
+
+	public void Dispose()
+	{
+		if (disposed)
+		{
+			return;
+		}
+
+		input.Dispose();
+		graphics.Dispose();
+		disposed = true;
+	}
 }

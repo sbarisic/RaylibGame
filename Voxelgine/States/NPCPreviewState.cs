@@ -1,12 +1,12 @@
 using FishUI.Controls;
-using Raylib_cs;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using Voxelgine;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.FishGfxClient;
+using Voxelgine.FishGfxClient.Entities;
+using Voxelgine.FishGfxClient.Rendering;
 using Voxelgine.GUI;
+using FishGfx.Graphics;
 
 namespace Voxelgine.States
 {
@@ -16,13 +16,14 @@ namespace Voxelgine.States
 	/// </summary>
 	public class NPCPreviewState : GameStateImpl
 	{
-		private FishUIManager _gui;
-		private VEntNPC _previewNPC;
-		private Camera3D _camera;
+		private readonly FishUIManager _gui;
+		private readonly FishGfxEntityRenderAssets _assets;
+		private readonly FishGfxNpcRenderAdapter _previewNpc;
 		private float _cameraAngle = 0f;
 		private float _cameraDistance = 5f;
 		private float _cameraHeight = 2f;
-		private float _totalTime;
+		private Vector2 _lastMousePosition;
+		private string _animationName = "idle";
 
 		// UI elements
 		private Window _controlsWindow;
@@ -32,21 +33,10 @@ namespace Voxelgine.States
 		public NPCPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
 			_gui = new FishUIManager(window, Eng.DI.GetRequiredService<IFishLogging>());
-
-			// Setup camera
-			_camera = new Camera3D(
-				new Vector3(0, 2, 5),    // Position
-				new Vector3(0, 1, 0),    // Target (look at)
-				Vector3.UnitY,            // Up
-				45,                       // FOV
-				CameraProjection.Perspective
-			);
-
-			// Create preview NPC
-			_previewNPC = new VEntNPC();
-			_previewNPC.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-			_previewNPC.SetPosition(Vector3.Zero);
-			_previewNPC.SetModel("npc/humanoid.json");
+			IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
+				?? throw new ArgumentException("NPC preview requires FishGfx.", nameof(window));
+			_assets = new FishGfxEntityRenderAssets(fishWindow);
+			_previewNpc = _assets.CreateNpcAdapter();
 
 			CreateUI();
 		}
@@ -77,7 +67,7 @@ namespace Voxelgine.States
 			// Animation info
 			_animationLabel = new Label
 			{
-				Text = "Base: idle | Overlay: none",
+				Text = "Animation: idle",
 				Size = new Vector2(220, 24)
 			};
 			stack.AddChild(_animationLabel);
@@ -89,50 +79,40 @@ namespace Voxelgine.States
 			};
 			stack.AddChild(_timeLabel);
 
-			var animator = _previewNPC.GetAnimator();
-
 			// Base Layer buttons section
 			var baseLabel = new Label
 			{
-				Text = "Base Layer:",
+				Text = "Looping Animations:",
 				Size = new Vector2(220, 24)
 			};
 			stack.AddChild(baseLabel);
 
-			var btnBaseIdle = new Button { Text = "Idle (Base)", Size = new Vector2(220, 32) };
-			btnBaseIdle.Clicked += (s, e) => animator?.PlayOnLayer("base", "idle");
+			var btnBaseIdle = new Button { Text = "Idle", Size = new Vector2(220, 32) };
+			btnBaseIdle.Clicked += (s, e) => _animationName = "idle";
 			stack.AddChild(btnBaseIdle);
 
-			var btnBaseWalk = new Button { Text = "Walk (Base)", Size = new Vector2(220, 32) };
-			btnBaseWalk.Clicked += (s, e) => animator?.PlayOnLayer("base", "walk");
+			var btnBaseWalk = new Button { Text = "Walk", Size = new Vector2(220, 32) };
+			btnBaseWalk.Clicked += (s, e) => _animationName = "walk";
 			stack.AddChild(btnBaseWalk);
 
-			var btnBaseCrouch = new Button { Text = "Crouch (Base)", Size = new Vector2(220, 32) };
-			btnBaseCrouch.Clicked += (s, e) => animator?.PlayOnLayer("base", "crouch");
+			var btnBaseCrouch = new Button { Text = "Crouch", Size = new Vector2(220, 32) };
+			btnBaseCrouch.Clicked += (s, e) => _animationName = "crouch";
 			stack.AddChild(btnBaseCrouch);
 
 			// Overlay Layer buttons section
 			var overlayLabel = new Label
 			{
-				Text = "Overlay Layer (plays on top):",
+				Text = "Action Animation:",
 				Size = new Vector2(220, 24)
 			};
 			stack.AddChild(overlayLabel);
 
-			var btnOverlayAttack = new Button { Text = "Attack (Overlay)", Size = new Vector2(220, 32) };
-			btnOverlayAttack.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "attack");
+			var btnOverlayAttack = new Button { Text = "Attack", Size = new Vector2(220, 32) };
+			btnOverlayAttack.Clicked += (s, e) => _animationName = "attack";
 			stack.AddChild(btnOverlayAttack);
 
-			var btnOverlayWalk = new Button { Text = "Walk (Overlay)", Size = new Vector2(220, 32) };
-			btnOverlayWalk.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "walk");
-			stack.AddChild(btnOverlayWalk);
-
-			var btnOverlayIdle = new Button { Text = "Idle (Overlay)", Size = new Vector2(220, 32) };
-			btnOverlayIdle.Clicked += (s, e) => animator?.PlayOnLayer("overlay", "idle");
-			stack.AddChild(btnOverlayIdle);
-
-			var btnStopOverlay = new Button { Text = "Stop Overlay", Size = new Vector2(220, 32) };
-			btnStopOverlay.Clicked += (s, e) => animator?.StopLayer("overlay");
+			var btnStopOverlay = new Button { Text = "Return to Idle", Size = new Vector2(220, 32) };
+			btnStopOverlay.Clicked += (s, e) => _animationName = "idle";
 			stack.AddChild(btnStopOverlay);
 
 			// Control section
@@ -144,25 +124,16 @@ namespace Voxelgine.States
 			stack.AddChild(controlLabel);
 
 			var btnStopAll = new Button { Text = "Stop All Layers", Size = new Vector2(220, 32) };
-			btnStopAll.Clicked += (s, e) =>
-			{
-				animator?.StopAllLayers();
-				animator?.Stop();
-			};
+			btnStopAll.Clicked += (s, e) => _animationName = "idle";
 			stack.AddChild(btnStopAll);
 
 			var btnReset = new Button { Text = "Reset Pose", Size = new Vector2(220, 32) };
-			btnReset.Clicked += (s, e) =>
-			{
-				animator?.StopAllLayers();
-				animator?.Stop();
-				animator?.ResetToDefaultPose();
-			};
+			btnReset.Clicked += (s, e) => _animationName = "idle";
 			stack.AddChild(btnReset);
 
 			// Back button
 			var btnBack = new Button { Text = "Back to Main Menu", Size = new Vector2(220, 40) };
-			btnBack.Clicked += (s, e) => Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.MainMenuState);
+			btnBack.Clicked += (s, e) => Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
 			stack.AddChild(btnBack);
 
 			_controlsWindow.AddChild(stack);
@@ -171,109 +142,125 @@ namespace Voxelgine.States
 
 		public override void SwapTo()
 		{
-			base.SwapTo();
-			Raylib.EnableCursor();
+			_gui.InputEnabled = true;
+			IFishGfxGameWindow fishWindow = (IFishGfxGameWindow)Window;
+			fishWindow.RenderWindow.CaptureCursor = false;
+			fishWindow.RenderWindow.ShowCursor = true;
+		}
+
+		public override void SwapFrom()
+		{
+			_gui.InputEnabled = false;
 		}
 
 		public override void Tick(float GameTime)
 		{
-			float dt = Raylib.GetFrameTime();
-			_totalTime += dt;
-
-			// Camera orbit control with mouse drag
-			if (Raylib.IsMouseButtonDown(MouseButton.Left) && !IsMouseOverUI())
+			if (Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
-				Vector2 mouseDelta = Raylib.GetMouseDelta();
-				_cameraAngle += mouseDelta.X * 0.01f;
-				_cameraHeight += mouseDelta.Y * 0.03f;
-				_cameraHeight = Math.Clamp(_cameraHeight, 0.5f, 5f);
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
 			}
+		}
+		public override void BeginInputFrame()
+		{
+			_gui.BeginInputFrame();
+		}
 
-			// Zoom with scroll wheel
-			float scroll = Raylib.GetMouseWheelMove();
-			_cameraDistance -= scroll * 0.5f;
-			_cameraDistance = Math.Clamp(_cameraDistance, 2f, 15f);
+		public override void BeginFrame(in FrameTiming timing)
+		{
+			Vector2 mouse = Window.InMgr.GetMousePos();
+			if (Window.InMgr.IsInputDown(InputKey.Click_Left) && mouse.X >= 300)
+			{
+				Vector2 delta = mouse - _lastMousePosition;
+				_cameraAngle += delta.X * 0.01f;
+				_cameraHeight = Math.Clamp(_cameraHeight + delta.Y * 0.03f, 0.5f, 5f);
+			}
+			_lastMousePosition = mouse;
+			_cameraDistance = Math.Clamp(
+				_cameraDistance - Window.InMgr.GetMouseWheel() * 0.5f,
+				2,
+				15
+			);
+			_previewNpc.Update(
+				new NpcRenderState(
+					Vector3.Zero,
+					new Vector3(0.9f, 1.8f, 0.9f),
+					Vector3.UnitZ,
+					_animationName,
+					Vector3.Zero,
+					EntityAssetIds.HumanoidTexture,
+					Rgba32.White
+				),
+				timing.DeltaTime
+			);
+			_gui.Update(timing.DeltaTime, timing.TotalTime);
+			_animationLabel.Text = $"Animation: {_animationName}";
+			_timeLabel.Text = $"Time: {timing.TotalTime:F2}s";
+		}
 
-			// Update camera position
-			_camera.Position = new Vector3(
+		public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
+		{
+			FishGfx.Graphics.Camera camera = new();
+			camera.Position = new Vector3(
 				MathF.Sin(_cameraAngle) * _cameraDistance,
 				_cameraHeight,
 				MathF.Cos(_cameraAngle) * _cameraDistance
 			);
-			_camera.Target = new Vector3(0, 1, 0);
+			camera.LookAt(new Vector3(0, 1, 0));
+			camera.SetPerspective(framebufferSize, 45 * MathF.PI / 180, 0.05f, 256);
+			GameStateRenderSettings overlay = GameStateRenderSettings.CreateOverlay(
+				new Vector2(Window.Width, Window.Height)
+			);
 
-			// ESC to go back
-			if (Window.InMgr.IsInputPressed(InputKey.Esc))
+			return new GameStateRenderSettings
 			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.MainMenuState);
-			}
+				WorldView = new RenderView(camera),
+				ViewmodelView = new RenderView(camera),
+				OverlayView = overlay.OverlayView,
+				ClearColor = new FishGfx.Color(40, 44, 52),
+			};
 		}
 
-		private bool IsMouseOverUI()
+		public override void RenderWorld(RenderPass pass, in FrameTiming timing)
 		{
-			Vector2 mousePos = Raylib.GetMousePosition();
-			return mousePos.X < 300 && mousePos.Y < 680;
-		}
-
-		public override void UpdateLockstep(float TotalTime, float Dt, InputMgr InMgr)
-		{
-			// Update NPC animation
-			var animator = _previewNPC.GetAnimator();
-			animator?.Update(Dt);
-		}
-
-		public override void Draw(float TimeAlpha, ref GameFrameInfo LastFrame, ref GameFrameInfo FInfo)
-		{
-			Raylib.ClearBackground(new Color(40, 44, 52));
-			Raylib.BeginMode3D(_camera);
-
-			// Draw ground grid
-			Raylib.DrawGrid(10, 1.0f);
-
-			// Draw coordinate axes
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(2, 0, 0), Color.Red);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 2, 0), Color.Green);
-			Raylib.DrawLine3D(Vector3.Zero, new Vector3(0, 0, 2), Color.Blue);
-
-			// Draw the NPC
-			var model = _previewNPC.GetCustomModel();
-			if (model != null)
+			for (int coordinate = -5; coordinate <= 5; coordinate++)
 			{
-				model.Position = Vector3.Zero;
-				model.LookDirection = Vector3.UnitZ;
-				model.Draw();
+				FishGfx.Color color = coordinate == 0
+					? new FishGfx.Color(95, 105, 120)
+					: new FishGfx.Color(62, 68, 78);
+				pass.DrawLine(
+					new FishGfx.Vertex3(new Vector3(coordinate, 0, -5), color),
+					new FishGfx.Vertex3(new Vector3(coordinate, 0, 5), color)
+				);
+				pass.DrawLine(
+					new FishGfx.Vertex3(new Vector3(-5, 0, coordinate), color),
+					new FishGfx.Vertex3(new Vector3(5, 0, coordinate), color)
+				);
 			}
 
-			Raylib.EndMode3D();
+			pass.DrawLine(
+				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Red),
+				new FishGfx.Vertex3(new Vector3(2, 0, 0), FishGfx.Color.Red)
+			);
+			pass.DrawLine(
+				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Green),
+				new FishGfx.Vertex3(new Vector3(0, 2, 0), FishGfx.Color.Green)
+			);
+			pass.DrawLine(
+				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Blue),
+				new FishGfx.Vertex3(new Vector3(0, 0, 2), FishGfx.Color.Blue)
+			);
+			_previewNpc.Render(pass);
 		}
 
-		public override void Draw2D()
+		public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
 		{
-			float dt = Raylib.GetFrameTime();
-			_gui.Tick(dt, _totalTime);
+			_gui.Render(pass, timing.DeltaTime, timing.TotalTime);
+		}
 
-			// Update labels with layer information
-			var animator = _previewNPC.GetAnimator();
-			if (animator != null)
-			{
-				var baseLayer = animator.GetLayer("base");
-				var overlayLayer = animator.GetLayer("overlay");
-
-				string baseAnim = baseLayer?.Clip?.Name ?? "none";
-				string overlayAnim = overlayLayer?.Clip?.Name ?? "none";
-				string baseState = baseLayer?.State.ToString() ?? "";
-				string overlayState = overlayLayer?.State.ToString() ?? "";
-
-				_animationLabel.Text = $"Base: {baseAnim} | Overlay: {overlayAnim}";
-
-				float baseTime = baseLayer?.Time ?? 0;
-				float overlayTime = overlayLayer?.Time ?? 0;
-				_timeLabel.Text = $"Base: {baseTime:F2}s | Overlay: {overlayTime:F2}s";
-			}
-
-			// Draw instructions
-			Raylib.DrawText("Drag mouse to rotate | Scroll to zoom", Window.Width - 320, Window.Height - 30, 16, Color.LightGray);
-			Raylib.DrawFPS(Window.Width - 100, 10);
+		public override void Dispose()
+		{
+			_gui.Dispose();
+			_assets.Dispose();
 		}
 	}
 }

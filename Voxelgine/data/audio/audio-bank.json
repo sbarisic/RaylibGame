@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "cues": [
+    {
+      "id": "walk",
+      "variants": [
+        { "path": "../sound/walk/walk1.wav" },
+        { "path": "../sound/walk/walk2.wav" },
+        { "path": "../sound/walk/walk3.wav" },
+        { "path": "../sound/walk/walk4.wav" },
+        { "path": "../sound/walk/walk5.wav" }
+      ],
+      "bus": "Sfx",
+      "gain": 0.1,
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 24,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "jump",
+      "variants": [{ "path": "../sound/jump/jump1.wav" }],
+      "bus": "Sfx",
+      "gain": 0.5,
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 24,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "crash1",
+      "variants": [{ "path": "../sound/crash1/crash1.wav" }],
+      "bus": "Sfx",
+      "gain": 0.4,
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 24,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "swim",
+      "variants": [{ "path": "../sound/swim/swim1.wav" }],
+      "bus": "Sfx",
+      "gain": 0.5,
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 24,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "block_place",
+      "variants": [{ "path": "../sound/block/place1.wav" }],
+      "bus": "Sfx",
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 32,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "block_break",
+      "variants": [{ "path": "../sound/block/break1.wav" }],
+      "bus": "Sfx",
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 32,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "shoot1",
+      "variants": [{ "path": "../sound/shoot1/shoot1.wav" }],
+      "bus": "Sfx",
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 2,
+      "maxDistance": 96,
+      "maxInstancesPerVariant": 6
+    },
+    {
+      "id": "ambience.wind",
+      "variants": [
+        { "path": "../sound/wind/wind_loop.flac" },
+        { "path": "../sound/wind/wind2_loop.flac" }
+      ],
+      "bus": "Ambience",
+      "gain": 0.7,
+      "spatialMode": "TwoDimensional",
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 1
+    },
+    {
+      "id": "ambience.birds",
+      "variants": [{ "path": "../sound/birds/birds_loop.flac" }],
+      "bus": "Ambience",
+      "gain": 0.6,
+      "spatialMode": "TwoDimensional",
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 1
+    },
+    {
+      "id": "ambience.underwater",
+      "variants": [{ "path": "../sound/underwater1/underwater1.wav" }],
+      "bus": "Ambience",
+      "gain": 0.65,
+      "spatialMode": "TwoDimensional",
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 1
+    },
+    {
+      "id": "ambience.campfire",
+      "variants": [{ "path": "../sound/fire/burning_loop.flac" }],
+      "bus": "Ambience",
+      "gain": 0.75,
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 2,
+      "maxDistance": 48,
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 4
+    },
+    {
+      "id": "ambience.rain.inside",
+      "variants": [
+        { "path": "../sound/rain/rain_inside1_loop.flac" },
+        { "path": "../sound/rain/rain_inside2_loop.flac" },
+        { "path": "../sound/rain/rain_inside3_loop.flac" }
+      ],
+      "bus": "Ambience",
+      "gain": 0.65,
+      "spatialMode": "TwoDimensional",
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 1
+    },
+    {
+      "id": "ambience.rain.outside",
+      "variants": [
+        { "path": "../sound/rain/rain_outside1_loop.flac" },
+        { "path": "../sound/rain/rain_outside2_loop.flac" },
+        { "path": "../sound/rain/rain_outside3_loop.flac" }
+      ],
+      "bus": "Ambience",
+      "gain": 0.8,
+      "spatialMode": "TwoDimensional",
+      "looping": true,
+      "streamed": true,
+      "maxInstancesPerVariant": 1
+    },
+    {
+      "id": "ui.coin",
+      "variants": [
+        { "path": "../sound/coin/coin1.wav" },
+        { "path": "../sound/coin/coin2.wav" },
+        { "path": "../sound/coin/coin3.wav" },
+        { "path": "../sound/coin/coin4.wav" }
+      ],
+      "bus": "Ui",
+      "spatialMode": "TwoDimensional",
+      "maxInstancesPerVariant": 6
+    }
+  ]
+}

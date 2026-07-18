@@ -1,6 +1,5 @@
 using FishUI;
 using FishUI.Controls;
-using Raylib_cs;
 using System.Numerics;
 using Voxelgine;
 using Voxelgine.Engine;
@@ -9,6 +8,10 @@ using Voxelgine.Engine.Server;
 using Voxelgine.GUI;
 
 using Thread = System.Threading.Thread;
+
+using FishGfx.Graphics;
+using Voxelgine.FishGfxClient;
+using Voxelgine.FishGfxClient.Rendering;
 
 namespace Voxelgine.States
 {
@@ -144,7 +147,7 @@ namespace Voxelgine.States
 			btnNPCPreview.TooltipText = "Preview NPC models and animations";
 			btnNPCPreview.OnButtonPressed += (sender, mbtn, pos) =>
 			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.NPCPreviewState);
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().NPCPreviewState);
 			};
 			scrollPane.AddChild(btnNPCPreview);
 
@@ -156,7 +159,7 @@ namespace Voxelgine.States
 			btnEffectsPreview.TooltipText = "Preview particle effects with adjustable parameters";
 			btnEffectsPreview.OnButtonPressed += (sender, mbtn, pos) =>
 			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.EffectsPreviewState);
+				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().EffectsPreviewState);
 			};
 			scrollPane.AddChild(btnEffectsPreview);
 
@@ -281,13 +284,13 @@ namespace Voxelgine.States
 
 			var btnSave = new Button
 			{
-				Text = "Save & Restart",
+				Text = "Apply & Save",
 				Size = new Vector2(150, 40)
 			};
 			btnSave.Clicked += (sender, args) =>
 			{
 				Eng.DI.GetRequiredService<GameConfig>().SaveToJson();
-				Voxelgine.Utils.RestartGame();
+				((IFishGfxGameWindow)Window).ApplyConfiguration();
 			};
 
 			var btnClose = new Button
@@ -451,7 +454,7 @@ namespace Voxelgine.States
 
 				_connectWindow.Visible = false;
 
-				var mpState = Eng.MultiplayerGameState;
+				var mpState = Eng.AsClient().MultiplayerGameState;
 				Eng.DI.GetRequiredService<IGameWindow>().SetState(mpState);
 				mpState.Connect(host, port, playerName);
 			};
@@ -663,7 +666,7 @@ namespace Voxelgine.States
 					_hostWindow.Visible = false;
 
 					// Connect the local client to the hosted server
-					var mpState = Eng.MultiplayerGameState;
+					var mpState = Eng.AsClient().MultiplayerGameState;
 					Eng.DI.GetRequiredService<IGameWindow>().SetState(mpState);
 					mpState.Connect("127.0.0.1", port, playerName);
 				}
@@ -721,10 +724,18 @@ namespace Voxelgine.States
 
 		public override void SwapTo()
 		{
-			Raylib.EnableCursor();
+			_gui.InputEnabled = true;
+			IFishGfxGameWindow fishWindow = (IFishGfxGameWindow)Window;
+			fishWindow.RenderWindow.CaptureCursor = false;
+			fishWindow.RenderWindow.ShowCursor = true;
 
 			// Stop any hosted server when returning to the main menu
 			StopHostedServer();
+		}
+
+		public override void SwapFrom()
+		{
+			_gui.InputEnabled = false;
 		}
 
 		public override void Tick(float GameTime)
@@ -732,16 +743,30 @@ namespace Voxelgine.States
 			// FishUI handles input in Tick
 		}
 
-		public override void Draw2D()
+		public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
 		{
-			float deltaTime = Raylib.GetFrameTime();
-			_totalTime += deltaTime;
-
-			Raylib.ClearBackground(new Color(150, 150, 150, 255));
-			_gui.Tick(deltaTime, _totalTime);
+			return GameStateRenderSettings.CreateOverlay(
+				new Vector2(Window.Width, Window.Height)
+			);
 		}
 
-		public override void OnResize(GameWindow window)
+		public override void BeginInputFrame()
+		{
+			_gui.BeginInputFrame();
+		}
+
+		public override void BeginFrame(in FrameTiming timing)
+		{
+			_totalTime = timing.TotalTime;
+			_gui.Update(timing.DeltaTime, timing.TotalTime);
+		}
+
+		public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
+		{
+			_gui.Render(pass, timing.DeltaTime, timing.TotalTime);
+		}
+
+		public override void OnResize(IGameWindow window)
 		{
 			base.OnResize(window);
 			_gui.OnResize(window.Width, window.Height);
@@ -770,6 +795,12 @@ namespace Voxelgine.States
 				(window.Width / 2f) - (hostSize.X / 2f),
 				(window.Height / 2f) - (hostSize.Y / 2f)
 			);
+		}
+
+		public override void Dispose()
+		{
+			StopHostedServer();
+			_gui.Dispose();
 		}
 	}
 }

@@ -46,7 +46,7 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 				ExclusiveVideoMode = exclusiveVideoMode,
 				VSync = config.VSync,
 				PreferredVersion = new OpenGlVersion(4, 6),
-				MinimumVersion = new OpenGlVersion(4, 0),
+				MinimumVersion = new OpenGlVersion(4, 3),
 			}
 		);
 

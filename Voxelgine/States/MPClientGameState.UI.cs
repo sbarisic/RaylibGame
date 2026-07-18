@@ -197,14 +197,14 @@ namespace Voxelgine.States
 			_netStatsInfoLabel = new FishUIInfoLabel
 			{
 				Position = new Vector2(4, 4),
-				Size = new Vector2(270, 200),
+				Size = new Vector2(310, 390),
 				TextColor = FishColor.Black,
 				DrawOutline = false,
 			};
 			_netStatsPanel = new Panel
 			{
-				Position = new Vector2(screenW - 286, 66),
-				Size = new Vector2(280, 210),
+				Position = new Vector2(screenW - 326, 66),
+				Size = new Vector2(320, 400),
 				Variant = PanelVariant.Dark,
 				Visible = false,
 			};
@@ -354,6 +354,23 @@ namespace Voxelgine.States
 			};
 			chkDebugMode.OnCheckedChanged += (sender, isChecked) => { Eng.DebugMode = isChecked; };
 			stack.AddChild(chkDebugMode);
+
+			var chkRendererProfiling = new CheckBox("Renderer Profiling")
+			{
+				IsChecked = _rendererProfilingEnabled,
+				Size = new Vector2(24, 24)
+			};
+			chkRendererProfiling.OnCheckedChanged += (sender, isChecked) =>
+			{
+				_rendererProfilingEnabled = isChecked;
+				_nextRendererProfileLogTime = 0;
+
+				if (_fishVoxelScene != null)
+				{
+					_fishVoxelScene.GpuProfilingEnabled = isChecked;
+				}
+			};
+			stack.AddChild(chkRendererProfiling);
 
 			// Network statistics overlay (F5)
 			var chkNetStats = new CheckBox("Network Stats (F5)")
@@ -713,6 +730,22 @@ namespace Voxelgine.States
 			int remoteCount = _simulation?.Players?.RemotePlayerCount ?? 0;
 			int entityBufCount = _entitySnapshots.Count;
 			_netStatsInfoLabel.WriteLine($"Interp Buffers: {remoteCount} players, {entityBufCount} entities");
+
+			if (_fishVoxelScene != null)
+			{
+				var diagnostics = _fishVoxelScene.FrameDiagnostics;
+				var statistics = _fishVoxelScene.Statistics;
+				_netStatsInfoLabel.WriteLine("--- Renderer ---");
+				_netStatsInfoLabel.WriteLine($"Chunks: {diagnostics.VisibleChunks} visible / {diagnostics.ActiveChunks} active");
+				_netStatsInfoLabel.WriteLine($"Cached inactive: {diagnostics.InactiveCachedChunks}");
+				_netStatsInfoLabel.WriteLine($"Draws: {diagnostics.DriverDrawCalls} driver / {diagnostics.LogicalDraws} logical");
+				_netStatsInfoLabel.WriteLine($"Indirect: {diagnostics.IndirectCommandCount} commands / {diagnostics.GeometryPagesTouched} pages");
+				_netStatsInfoLabel.WriteLine($"Resident pages: {statistics.GeometryPages}");
+				_netStatsInfoLabel.WriteLine($"CPU: cull {diagnostics.CullingMilliseconds:F2} ms, build {diagnostics.CommandBuildMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"Submit: {diagnostics.SubmissionMilliseconds:F2} ms, GPU {diagnostics.GpuMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"Alloc: {diagnostics.ManagedAllocatedBytes} B");
+				_netStatsInfoLabel.WriteLine($"Transparent: {(diagnostics.TransparentCacheHit ? "cached" : diagnostics.TransparentInvalidationReason.ToString())}");
+			}
 		}
 
 		private void UpdatePlayerList()
@@ -745,6 +778,11 @@ namespace Voxelgine.States
 		/// </summary>
 		private void PositionHUDControls(int screenW, int screenH)
 		{
+			if (_netStatsPanel != null)
+			{
+				_netStatsPanel.Position = new Vector2(screenW - 326, 66);
+			}
+
 			// Loading screen controls
 			if (_loadingStatusLabel != null)
 				_loadingStatusLabel.Position = new Vector2(screenW / 2f - 200, screenH / 2f - 30);

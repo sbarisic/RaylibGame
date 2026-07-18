@@ -43,6 +43,8 @@ public unsafe partial class MPClientGameState
 	private GameCameraState _fishCameraState;
 	private GameCameraState _previousFishCameraState;
 	private bool _hasPreviousFishCameraState;
+	private bool _rendererProfilingEnabled;
+	private float _nextRendererProfileLogTime;
 
 	private sealed class SpeechOcclusionCache
 	{
@@ -141,6 +143,7 @@ public unsafe partial class MPClientGameState
 			config.MaxChunkDrawDistance,
 			config.ChunkMeshUploadBudget
 		);
+		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
 		_fishCelestial = new FishGfxCelestialLayer(fishWindow);
 		_fishParticleAssets ??= FishGfxGameplayParticleAssets.Register(fishWindow.Assets);
 		_fishParticles = new FishGfxGameplayParticles(
@@ -241,6 +244,23 @@ public unsafe partial class MPClientGameState
 		ConfigureFishCamera(_fishWorldCamera, _fishCameraState, framebufferSize);
 		ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, player.Position);
 		_fishVoxelScene.Update(_fishWorldCamera);
+		VoxelRendererFrameDiagnostics rendererDiagnostics = _fishVoxelScene.FrameDiagnostics;
+		Eng.ChunkDrawCalls = rendererDiagnostics.DriverDrawCalls;
+
+		if (_rendererProfilingEnabled && timing.TotalTime >= _nextRendererProfileLogTime)
+		{
+			_nextRendererProfileLogTime = timing.TotalTime + 1;
+			VoxelRendererStatistics rendererStatistics = _fishVoxelScene.Statistics;
+			_logging?.Log(
+				GameLogLevel.Debug,
+				"Performance",
+				$"VoxelRenderer active={rendererDiagnostics.ActiveChunks} visible={rendererDiagnostics.VisibleChunks} cachedInactive={rendererDiagnostics.InactiveCachedChunks} "
+					+ $"logicalDraws={rendererDiagnostics.LogicalDraws} driverDraws={rendererDiagnostics.DriverDrawCalls} indirectCommands={rendererDiagnostics.IndirectCommandCount} "
+					+ $"pagesTouched={rendererDiagnostics.GeometryPagesTouched} pagesResident={rendererStatistics.GeometryPages} "
+					+ $"cullMs={rendererDiagnostics.CullingMilliseconds:F3} commandMs={rendererDiagnostics.CommandBuildMilliseconds:F3} "
+					+ $"submitMs={rendererDiagnostics.SubmissionMilliseconds:F3} gpuMs={rendererDiagnostics.GpuMilliseconds:F3} allocations={rendererDiagnostics.ManagedAllocatedBytes}"
+			);
+		}
 		_fishParticles?.UpdateVoxelEmitters(
 			timing.DeltaTime,
 			_fishCameraState.Position,

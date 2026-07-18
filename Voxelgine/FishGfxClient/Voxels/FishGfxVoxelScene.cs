@@ -81,6 +81,16 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	public int ChunkMeshUploadBudget => rendererOptions.MeshUploadBudget;
 
+	public bool GpuProfilingEnabled
+	{
+		get => Renderer.GpuProfilingEnabled;
+		set => Renderer.GpuProfilingEnabled = value;
+	}
+
+	public VoxelRendererFrameDiagnostics FrameDiagnostics => Renderer.FrameDiagnostics;
+
+	public VoxelRendererStatistics Statistics => Renderer.Statistics;
+
 	public void SetOptimizationSettings(int maxChunkDrawDistance, int chunkMeshUploadBudget)
 	{
 		ThrowIfDisposed();

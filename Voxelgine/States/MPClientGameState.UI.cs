@@ -197,14 +197,14 @@ namespace Voxelgine.States
 			_netStatsInfoLabel = new FishUIInfoLabel
 			{
 				Position = new Vector2(4, 4),
-				Size = new Vector2(310, 390),
+				Size = new Vector2(310, 540),
 				TextColor = FishColor.Black,
 				DrawOutline = false,
 			};
 			_netStatsPanel = new Panel
 			{
 				Position = new Vector2(screenW - 326, 66),
-				Size = new Vector2(320, 400),
+				Size = new Vector2(320, 550),
 				Variant = PanelVariant.Dark,
 				Visible = false,
 			};
@@ -745,6 +745,14 @@ namespace Voxelgine.States
 				_netStatsInfoLabel.WriteLine($"Submit: {diagnostics.SubmissionMilliseconds:F2} ms, GPU {diagnostics.GpuMilliseconds:F2} ms");
 				_netStatsInfoLabel.WriteLine($"Alloc: {diagnostics.ManagedAllocatedBytes} B");
 				_netStatsInfoLabel.WriteLine($"Transparent: {(diagnostics.TransparentCacheHit ? "cached" : diagnostics.TransparentInvalidationReason.ToString())}");
+				_netStatsInfoLabel.WriteLine($"  Faces: {diagnostics.TransparentFaceCount}, indices: {diagnostics.TransparentIndexCount}");
+				_netStatsInfoLabel.WriteLine($"  Sort: {diagnostics.TransparentWorkerSortMilliseconds:F2} ms, upload: {diagnostics.TransparentIndexUploadMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"  GPU: {diagnostics.TransparentGpuMilliseconds:F2} ms, age: {diagnostics.TransparentOrderingAgeSeconds:F2} s");
+				_netStatsInfoLabel.WriteLine($"  Alloc: {diagnostics.TransparentMainThreadAllocatedBytes} B main / {diagnostics.TransparentWorkerAllocatedBytes} B worker");
+				_netStatsInfoLabel.WriteLine($"  Queue: {(diagnostics.TransparentOrderingRunning ? "running" : diagnostics.TransparentOrderingPending ? "pending" : "idle")}, coalesced: {diagnostics.TransparentCoalescedRequests}");
+				_netStatsInfoLabel.WriteLine($"  Stale: {diagnostics.TransparentStaleResults}, dropped: {diagnostics.TransparentDroppedResults}");
+				_netStatsInfoLabel.WriteLine($"  Order: {diagnostics.TransparentOrderingReason}, revision: {diagnostics.TransparentOrderingGeometryRevision}");
+				_netStatsInfoLabel.WriteLine($"  Delta: {diagnostics.TransparentOrderingCameraDistanceDelta:F2} blocks / {diagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2} deg");
 			}
 		}
 

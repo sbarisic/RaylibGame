@@ -258,7 +258,17 @@ public unsafe partial class MPClientGameState
 					+ $"logicalDraws={rendererDiagnostics.LogicalDraws} driverDraws={rendererDiagnostics.DriverDrawCalls} indirectCommands={rendererDiagnostics.IndirectCommandCount} "
 					+ $"pagesTouched={rendererDiagnostics.GeometryPagesTouched} pagesResident={rendererStatistics.GeometryPages} "
 					+ $"cullMs={rendererDiagnostics.CullingMilliseconds:F3} commandMs={rendererDiagnostics.CommandBuildMilliseconds:F3} "
-					+ $"submitMs={rendererDiagnostics.SubmissionMilliseconds:F3} gpuMs={rendererDiagnostics.GpuMilliseconds:F3} allocations={rendererDiagnostics.ManagedAllocatedBytes}"
+					+ $"submitMs={rendererDiagnostics.SubmissionMilliseconds:F3} gpuMs={rendererDiagnostics.GpuMilliseconds:F3} allocations={rendererDiagnostics.ManagedAllocatedBytes} "
+					+ $"transparentFaces={rendererDiagnostics.TransparentFaceCount} transparentIndices={rendererDiagnostics.TransparentIndexCount} "
+					+ $"transparentSourceMs={rendererDiagnostics.TransparentSourceBuildMilliseconds:F3} transparentSortMs={rendererDiagnostics.TransparentWorkerSortMilliseconds:F3} "
+					+ $"transparentApplyMs={rendererDiagnostics.TransparentResultApplyMilliseconds:F3} transparentUploadMs={rendererDiagnostics.TransparentIndexUploadMilliseconds:F3} "
+					+ $"transparentGpuMs={rendererDiagnostics.TransparentGpuMilliseconds:F3} transparentMainAlloc={rendererDiagnostics.TransparentMainThreadAllocatedBytes} "
+					+ $"transparentWorkerAlloc={rendererDiagnostics.TransparentWorkerAllocatedBytes} transparentPending={rendererDiagnostics.TransparentOrderingPending} "
+					+ $"transparentRunning={rendererDiagnostics.TransparentOrderingRunning} transparentCoalesced={rendererDiagnostics.TransparentCoalescedRequests} "
+					+ $"transparentStale={rendererDiagnostics.TransparentStaleResults} transparentAge={rendererDiagnostics.TransparentOrderingAgeSeconds:F2}s "
+					+ $"transparentRequestReason={rendererDiagnostics.TransparentInvalidationReason} transparentOrderingReason={rendererDiagnostics.TransparentOrderingReason} "
+					+ $"transparentGeometryRevision={rendererDiagnostics.TransparentOrderingGeometryRevision} "
+					+ $"transparentCameraDelta={rendererDiagnostics.TransparentOrderingCameraDistanceDelta:F2}/{rendererDiagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2}deg"
 			);
 		}
 		_fishParticles?.UpdateVoxelEmitters(

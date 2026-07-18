@@ -30,19 +30,31 @@ namespace Voxelgine.Engine.Server
 		/// <summary>
 		/// Default world size for generated worlds.
 		/// </summary>
-		public const int DefaultWorldWidth = 256;
-		public const int DefaultWorldLength = 256;
+		public const int DefaultWorldWidth = 1024;
+		public const int DefaultWorldLength = 1024;
 
 		/// <summary>
 		/// Spawn position for connecting players. Computed from world surface after generation/load.
 		/// </summary>
-		public Vector3 PlayerSpawnPosition { get; private set; } = new Vector3(128, 66, 128);
+		public Vector3 PlayerSpawnPosition { get; private set; } = new Vector3(
+			DefaultWorldWidth / 2,
+			66,
+			DefaultWorldLength / 2
+		);
 
 		/// <summary>
 		/// Spawn positions for server-side entities. Computed from world surface after generation/load.
 		/// </summary>
-		private Vector3 _pickupSpawnPos = new Vector3(130, 66, 126);
-		private Vector3 _npcSpawnPos = new Vector3(126, 66, 128);
+		private Vector3 _pickupSpawnPos = new Vector3(
+			DefaultWorldWidth / 2 + 2,
+			66,
+			DefaultWorldLength / 2 - 2
+		);
+		private Vector3 _npcSpawnPos = new Vector3(
+			DefaultWorldWidth / 2 - 2,
+			66,
+			DefaultWorldLength / 2
+		);
 
 		/// <summary>
 		/// File path for the persisted server world.

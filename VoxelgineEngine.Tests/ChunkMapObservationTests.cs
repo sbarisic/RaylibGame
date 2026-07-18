@@ -1,11 +1,19 @@
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.Server;
 using Voxelgine.Graphics;
 
 namespace VoxelgineEngine.Tests;
 
 public sealed class ChunkMapObservationTests
 {
+	[Fact]
+	public void NewWorldDefaultsUseFourTimesThePreviousHorizontalExtent()
+	{
+		Assert.Equal(1024, ServerLoop.DefaultWorldWidth);
+		Assert.Equal(1024, ServerLoop.DefaultWorldLength);
+	}
+
 	[Fact]
 	public void SetBlock_EmitsOneChangeForPlacementReplacementAndRemoval()
 	{

@@ -48,7 +48,6 @@ Examples:
 - Transit shafts  
 - Crashed vessels  
 
-Large landmarks should be visible from far away to encourage exploration.
 
 ---
 
@@ -63,7 +62,7 @@ The tone should evolve as the player advances:
 
 **Mid Game**
 - Powered doors
-- Active defense drones
+- Active defense drones/turrets
 - Energy-based technology
 - Environmental anomalies
 
@@ -87,7 +86,7 @@ The world is fixed-size but procedurally generated with handcrafted elements.
 ### Generation Model: Hybrid
 
 - Procedural terrain ensures replayability.
-- Fixed artifacts provide meaning and identity.
+- Fixed artifacts provide meaning and identity. This means each world has some structures which always generate.
 
 Avoid fully random placement of important structures.
 
@@ -178,7 +177,7 @@ Shelter should protect the player from real threats such as:
 
 If shelter is optional, players will stop building.
 
-Encourage defensive architecture.
+Encourage defensive architecture. Ability to build turrets/traps.
 
 ### Multiplayer Base Building
 
@@ -188,7 +187,6 @@ With up to 10 players, building becomes a shared endeavor:
 - **Functional roles** — bases benefit from specialized rooms (armory, workshop, medical bay, watchtower) that encourage division of labor  
 - **Defensive pressure** — enemy attacks scale with player count, requiring larger and more sophisticated fortifications  
 - **Territory** — the group's built area defines their safe zone; expanding outward increases both resources and risk  
-- **Grief prevention** — server authority ensures block changes are validated; consider optional block ownership or trust systems for public servers
 
 ---
 
@@ -204,8 +202,7 @@ Possible consequences:
 - Gravity disturbances  
 - Environmental shifts  
 
-Players should hesitate before activating unknown systems.
-
+Players should hesitate before activating unknown systems. Unknown system consequences can be deciphered from an unknown language and from collectables.
 Mystery is more powerful than safety.
 
 ---
@@ -223,7 +220,6 @@ Recommended constraints:
 - Inaccuracy  
 
 Power growth should be earned.
-
 Early encounters should feel like survival, not farming.
 
 ### Multiplayer Combat
@@ -231,7 +227,7 @@ Early encounters should feel like survival, not farming.
 Multiplayer introduces both cooperative and competitive combat:
 
 - **Cooperative PvE** — groups can coordinate against patrols, with flanking and covering fire  
-- **Player vs Player** — friendly fire and PvP are server-configurable; competitive servers allow territorial disputes  
+- **Player vs Player** — friendly fire and PvP are server-configurable
 - **Shared risk** — a player death in a dangerous zone affects the whole group (lost carried resources, reduced defense)  
 - **Respawn cost** — death should matter but not punish too harshly; respawn at base with a brief delay  
 - **Weapon scarcity** — limited ammunition and weapon instability are amplified with multiple players competing for the same supply
@@ -249,12 +245,13 @@ Let players infer the past through:
 - Sealed bunkers  
 - Massive cables disappearing into rock  
 - Half-buried machines  
+- Collectible notes, text on old ruins
 
 Minimal direct lore is preferred.
 
 One strong implied history is enough:
 
-> The world was engineered — and something went wrong.
+> This world was engineered — and something went wrong.
 
 ---
 
@@ -265,35 +262,15 @@ The world should feel dynamic and reactive.
 Possible large-scale changes:
 
 - Structural failures  
-- Island quakes  
-- Sections breaking off  
-- Gravity fluctuations  
+- Island quakes - natural terrain erosion? Makes sure players build from harder materials which can't shift during a quake.
+- Sections breaking off - Again, reinforcements from harder materials stops that
+- Gravity fluctuations - Technology to stabilize that? Gravity field emitters?
 - New landmasses drifting nearby  
 - Increasing enemy activity  
 
 Players remember worlds that evolve.
 
 In multiplayer, persistent changes are amplified — one player's actions reshape the world for everyone. A group that disables a fabricator tower changes the threat landscape for all. Destruction is permanent and collaborative.
-
----
-
-## Long-Term Pressure
-
-Prevent the sandbox from becoming directionless.
-
-Introduce escalating tension such as:
-
-- Failing infrastructure  
-- Resource depletion  
-- Rising patrol density  
-- Environmental decay  
-- Orbital drift toward danger  
-
-Avoid strict timers — escalation is more effective than deadlines.
-
-In multiplayer, escalation scales with group activity — more players mining, building, and activating technology accelerates the island's response. A larger group progresses faster but also draws more attention.
-
----
 
 ## Primary Design Question
 
@@ -375,4 +352,4 @@ Every mechanic should feel like a natural consequence of the world — whether e
 
 ## One-Sentence World Anchor
 
-> You awaken on a floating artificial landmass guarded by forgotten machines. As you salvage lost technology, you uncover that the island is failing — and must decide whether to stabilize it or seek a way beyond. You may face this alone, or with up to nine others.
+> You awaken on a floating artificial landmass guarded by forgotten machines and creatures. As you salvage lost technology, you uncover that the island is failing — and must decide whether to stabilize it or seek a way beyond. You may face this alone, or with friends.

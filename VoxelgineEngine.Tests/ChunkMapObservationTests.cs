@@ -15,6 +15,19 @@ public sealed class ChunkMapObservationTests
 	}
 
 	[Fact]
+	public void GenerateFloatingIslandHonorsCancellationBeforeAllocatingChunks()
+	{
+		ChunkMap map = new();
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		Assert.Throws<OperationCanceledException>(
+			() => map.GenerateFloatingIsland(1024, 1024, 666, cancellation.Token)
+		);
+		Assert.Empty(map.CaptureChunks());
+	}
+
+	[Fact]
 	public void SetBlock_EmitsOneChangeForPlacementReplacementAndRemoval()
 	{
 		ChunkMap map = new();

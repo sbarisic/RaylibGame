@@ -32,6 +32,10 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	private Vector2 titleImageSize;
 	private ServerLoop hostedServer;
 	private Thread hostThread;
+	private bool hostedServerStartupPending;
+	private int pendingHostPort;
+	private string pendingHostPlayerName;
+	private long hostedServerStartupTimestamp;
 
 	/// <summary>
 	/// The hosted server instance, or null when no local server is running.
@@ -311,14 +315,29 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	/// </summary>
 	public void StopHostedServer()
 	{
-		if (hostedServer == null)
+		ServerLoop server = hostedServer;
+		Thread serverThread = hostThread;
+		hostedServerStartupPending = false;
+		SetHostControlsStarting(false);
+
+		if (server == null)
 		{
 			return;
 		}
 
-		hostedServer.Stop();
-		hostThread?.Join(3000);
-		hostedServer.Dispose();
+		server.Stop();
+		if (serverThread is { IsAlive: true }
+			&& !serverThread.Join(TimeSpan.FromSeconds(30)))
+		{
+			logging.Log(
+				GameLogLevel.Error,
+				"HostedServer",
+				"Hosted server did not stop within 30 seconds; resources were left intact to avoid disposing a live server thread."
+			);
+			return;
+		}
+
+		server.Dispose();
 		hostedServer = null;
 		hostThread = null;
 	}
@@ -340,6 +359,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 
 	public override void Tick(float gameTime)
 	{
+		UpdateHostedServerStartup();
 	}
 
 	public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)

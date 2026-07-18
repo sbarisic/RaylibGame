@@ -1,4 +1,5 @@
 using FishUI.Controls;
+using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.Engine.Server;
@@ -18,6 +19,7 @@ public partial class MainMenuStateFishUI
 	private Textbox hostSeedInput;
 	private CheckBox forceNewWorldCheckBox;
 	private Label hostStatusLabel;
+	private Button hostButton;
 
 	private void CreateConnectWindow()
 	{
@@ -112,7 +114,7 @@ public partial class MainMenuStateFishUI
 		};
 		hostWindow.AddChild(hostStatusLabel);
 
-		var hostButton = new Button
+		hostButton = new Button
 		{
 			ID = "host_submit",
 			Text = "Host",
@@ -129,7 +131,7 @@ public partial class MainMenuStateFishUI
 			Position = new Vector2(225, 272),
 			Size = new Vector2(125, 42),
 		};
-		cancelButton.OnButtonPressed += (_, _, _) => HideModal(hostWindow);
+		cancelButton.OnButtonPressed += (_, _, _) => CancelHostedServerStartup();
 		hostWindow.AddChild(cancelButton);
 	}
 
@@ -207,16 +209,30 @@ public partial class MainMenuStateFishUI
 		string playerName = NormalizePlayerName(hostNameInput.Text);
 		bool forceNewWorld = forceNewWorldCheckBox.IsChecked;
 		StopHostedServer();
-		hostStatusLabel.Text = "Starting server...";
+		if (hostedServer != null)
+		{
+			hostStatusLabel.Text = "The previous hosted server is still stopping";
+			return;
+		}
+
+		hostStatusLabel.Text = forceNewWorld
+			? "Generating world..."
+			: "Loading world...";
 
 		try
 		{
-			hostedServer = new ServerLoop(Eng.DI.GetRequiredService<IFishConfig>().LogLevel);
+			ServerLoop server = new(Eng.DI.GetRequiredService<IFishConfig>().LogLevel);
+			hostedServer = server;
+			pendingHostPort = port;
+			pendingHostPlayerName = playerName;
+			hostedServerStartupPending = true;
+			hostedServerStartupTimestamp = Stopwatch.GetTimestamp();
+			SetHostControlsStarting(true);
 			hostThread = new Thread(() =>
 			{
 				try
 				{
-					hostedServer.Start(port, seed, forceNewWorld);
+					server.Start(port, seed, forceNewWorld);
 				}
 				catch (Exception exception)
 				{
@@ -228,20 +244,75 @@ public partial class MainMenuStateFishUI
 				Name = "HostedServer",
 			};
 			hostThread.Start();
-
-			// Preserve the existing startup grace period before connecting locally.
-			Thread.Sleep(500);
-			HideModal(hostWindow);
-
-			var multiplayerState = Eng.AsClient().MultiplayerGameState;
-			Window.SetState(multiplayerState);
-			multiplayerState.Connect("127.0.0.1", port, playerName);
 		}
 		catch (Exception exception)
 		{
 			hostStatusLabel.Text = $"Could not start server: {exception.Message}";
 			StopHostedServer();
 		}
+	}
+
+	private void UpdateHostedServerStartup()
+	{
+		if (!hostedServerStartupPending || hostedServer == null)
+			return;
+
+		var startupTask = hostedServer.StartupTask;
+		if (!startupTask.IsCompleted)
+		{
+			TimeSpan elapsed = Stopwatch.GetElapsedTime(hostedServerStartupTimestamp);
+			hostStatusLabel.Text = $"Preparing world... {elapsed.TotalSeconds:F0}s";
+			return;
+		}
+
+		hostedServerStartupPending = false;
+		SetHostControlsStarting(false);
+		if (startupTask.IsCompletedSuccessfully)
+		{
+			int port = pendingHostPort;
+			string playerName = pendingHostPlayerName;
+			logging.Log(
+				GameLogLevel.Info,
+				"HostedServer",
+				$"Hosted server ready port={port} startupMs={Stopwatch.GetElapsedTime(hostedServerStartupTimestamp).TotalMilliseconds:F0}"
+			);
+			HideModal(hostWindow);
+
+			var multiplayerState = Eng.AsClient().MultiplayerGameState;
+			Window.SetState(multiplayerState);
+			multiplayerState.Connect("127.0.0.1", port, playerName);
+			return;
+		}
+
+		Exception startupError = startupTask.Exception?.GetBaseException();
+		hostStatusLabel.Text = startupTask.IsCanceled
+			? "Server startup cancelled"
+			: $"Could not start server: {startupError?.Message ?? "Unknown error"}";
+		StopHostedServer();
+	}
+
+	private void CancelHostedServerStartup()
+	{
+		if (hostedServerStartupPending)
+		{
+			StopHostedServer();
+			hostStatusLabel.Text = "Server startup cancelled";
+		}
+
+		HideModal(hostWindow);
+	}
+
+	private void SetHostControlsStarting(bool starting)
+	{
+		if (hostWindow == null)
+			return;
+
+		hostPortInput.Disabled = starting;
+		hostNameInput.Disabled = starting;
+		hostSeedInput.Disabled = starting;
+		forceNewWorldCheckBox.Disabled = starting;
+		hostButton.Disabled = starting;
+		hostWindow.CloseButtonEnabled = !starting;
 	}
 
 	private static string NormalizePlayerName(string value)

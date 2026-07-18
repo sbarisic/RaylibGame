@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
+using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
@@ -114,6 +115,11 @@ namespace Voxelgine.Engine.Server
 		private readonly Dictionary<int, float> _playerAttackEndTimes = new();
 
 		private volatile bool _running;
+		private readonly CancellationTokenSource _stopSource = new();
+		private readonly TaskCompletionSource<bool> _startupCompletion = new(
+			TaskCreationOptions.RunContinuationsAsynchronously
+		);
+		private int _startInvoked;
 		private bool _disposed;
 		private float _lastAutoSaveTime;
 
@@ -131,6 +137,13 @@ namespace Voxelgine.Engine.Server
 		/// The network server instance.
 		/// </summary>
 		public NetServer Server => _server;
+
+		/// <summary>
+		/// Completes after the UDP socket is listening and the generated or loaded world
+		/// is ready for clients. Faults when startup fails and is cancelled when stopped
+		/// before readiness.
+		/// </summary>
+		public Task StartupTask => _startupCompletion.Task;
 
 		public ServerLoop(GameLogLevel minimumLogLevel = GameLogLevel.Trace)
 		{
@@ -180,51 +193,85 @@ namespace Voxelgine.Engine.Server
 		/// <param name="worldSeed">Seed for world generation.</param>
 		public void Start(int port, int worldSeed = 666, bool forceRegenerate = false)
 		{
-			_worldSeed = worldSeed;
-			_logging.ServerWriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
+			if (Interlocked.Exchange(ref _startInvoked, 1) != 0)
+				throw new InvalidOperationException("A server loop can only be started once.");
 
-			string mapDirectory = Path.GetDirectoryName(MapFile);
-			if (!string.IsNullOrEmpty(mapDirectory))
-				Directory.CreateDirectory(mapDirectory);
-
-			if (File.Exists(MapFile) && !forceRegenerate)
+			CancellationToken cancellationToken = _stopSource.Token;
+			try
 			{
-				_logging.ServerWriteLine($"Loading world from '{MapFile}'...");
-				using var fileStream = File.OpenRead(MapFile);
-				_simulation.Map.Read(fileStream);
-				_logging.ServerWriteLine("World loaded from file.");
+				cancellationToken.ThrowIfCancellationRequested();
+				_worldSeed = worldSeed;
+				_logging.ServerWriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
+
+				string mapDirectory = Path.GetDirectoryName(MapFile);
+				if (!string.IsNullOrEmpty(mapDirectory))
+					Directory.CreateDirectory(mapDirectory);
+
+				if (File.Exists(MapFile) && !forceRegenerate)
+				{
+					_logging.ServerWriteLine($"Loading world from '{MapFile}'...");
+					using var fileStream = File.OpenRead(MapFile);
+					_simulation.Map.Read(fileStream);
+					cancellationToken.ThrowIfCancellationRequested();
+					_logging.ServerWriteLine("World loaded from file.");
+				}
+				else
+				{
+					if (forceRegenerate && File.Exists(MapFile))
+						_logging.ServerWriteLine("Force regeneration requested, ignoring existing world file.");
+
+					_logging.ServerWriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
+					_simulation.Map.GenerateFloatingIsland(
+						DefaultWorldWidth,
+						DefaultWorldLength,
+						worldSeed,
+						cancellationToken
+					);
+					_simulation.Map.ClearPendingChanges();
+					_logging.ServerWriteLine("World generation complete.");
+
+					cancellationToken.ThrowIfCancellationRequested();
+					_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
+					using var fileStream = File.Create(MapFile);
+					_simulation.Map.Write(fileStream);
+					cancellationToken.ThrowIfCancellationRequested();
+					_logging.ServerWriteLine("World saved.");
+				}
+
+				// Find valid spawn points on the world surface
+				FindAndSetSpawnPoints(cancellationToken);
+
+				_logging.ServerWriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
+
+				// Spawn server-side entities
+				SpawnEntities();
+
+				cancellationToken.ThrowIfCancellationRequested();
+				_server.WorldSeed = worldSeed;
+				_server.Start(port);
+				_running = true;
+				if (cancellationToken.IsCancellationRequested)
+				{
+					_running = false;
+					_server.Stop(CurrentTime);
+					cancellationToken.ThrowIfCancellationRequested();
+				}
+
+				_startupCompletion.TrySetResult(true);
+				_logging.ServerWriteLine("Server is running. Press Ctrl+C to stop.");
+
+				RunLoop();
 			}
-			else
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 			{
-				if (forceRegenerate && File.Exists(MapFile))
-					_logging.ServerWriteLine("Force regeneration requested, ignoring existing world file.");
-
-				_logging.ServerWriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
-				_simulation.Map.GenerateFloatingIsland(DefaultWorldWidth, DefaultWorldLength, worldSeed);
-				_simulation.Map.ClearPendingChanges();
-				_logging.ServerWriteLine("World generation complete.");
-
-				_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
-				using var fileStream = File.Create(MapFile);
-				_simulation.Map.Write(fileStream);
-				_logging.ServerWriteLine("World saved.");
+				_startupCompletion.TrySetCanceled(cancellationToken);
+				_logging.Log(GameLogLevel.Info, "Server", "Server startup cancelled.");
 			}
-
-			// Find valid spawn points on the world surface
-			FindAndSetSpawnPoints();
-
-			_logging.ServerWriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
-
-			// Spawn server-side entities
-			SpawnEntities();
-
-			_server.WorldSeed = worldSeed;
-			_server.Start(port);
-			_running = true;
-
-			_logging.ServerWriteLine("Server is running. Press Ctrl+C to stop.");
-
-			RunLoop();
+			catch (Exception exception)
+			{
+				_startupCompletion.TrySetException(exception);
+				throw;
+			}
 		}
 
 		/// <summary>
@@ -232,6 +279,8 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		public void Stop()
 		{
+			if (!_stopSource.IsCancellationRequested)
+				_stopSource.Cancel();
 			_running = false;
 		}
 
@@ -426,9 +475,9 @@ namespace Voxelgine.Engine.Server
 		/// Scans the world surface for valid spawn points and assigns them to the spawn position fields.
 		/// Falls back to hardcoded defaults if not enough valid positions are found.
 		/// </summary>
-		private void FindAndSetSpawnPoints()
+		private void FindAndSetSpawnPoints(CancellationToken cancellationToken)
 		{
-			var spawnPoints = _simulation.Map.FindSpawnPoints(3, 5);
+			var spawnPoints = _simulation.Map.FindSpawnPoints(3, 5, cancellationToken);
 
 			if (spawnPoints.Count >= 1)
 				PlayerSpawnPosition = spawnPoints[0];
@@ -449,6 +498,7 @@ namespace Voxelgine.Engine.Server
 			Stop();
 			_server.Dispose();
 			(_logging as IDisposable)?.Dispose();
+			_stopSource.Dispose();
 		}
 
 		/// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Voxelgine.Engine;
 
@@ -8,40 +9,108 @@ namespace Voxelgine.Graphics
 {
 	public unsafe partial class ChunkMap
 	{
-		public void GenerateFloatingIsland(int Width, int Length, int Seed = 666)
+		public void GenerateFloatingIsland(
+			int Width,
+			int Length,
+			int Seed = 666,
+			CancellationToken cancellationToken = default)
 		{
-			ExecuteWorldReset(() => GenerateFloatingIslandCore(Width, Length, Seed));
+			ExecuteWorldReset(
+				() => GenerateFloatingIslandCore(Width, Length, Seed, cancellationToken)
+			);
 		}
 
-		private void GenerateFloatingIslandCore(int Width, int Length, int Seed)
+		private void GenerateFloatingIslandCore(
+			int Width,
+			int Length,
+			int Seed,
+			CancellationToken cancellationToken)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			Noise.Seed = Seed;
 			const int CS = Chunk.ChunkSize;
 			int WorldHeight = 64;
 
 			// Step 1 — Create chunk grid
-			Chunk[,,] chunkGrid = CreateChunkGrid(Width, Length, WorldHeight, CS);
+			Chunk[,,] chunkGrid = CreateChunkGrid(
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				cancellationToken
+			);
 
 			// Step 2 — Island shape (stone with caves)
-			GenerateIslandShape(chunkGrid, Width, Length, WorldHeight, CS);
+			GenerateIslandShape(
+				chunkGrid,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				cancellationToken
+			);
 
 			// Step 3 — Surface layer (grass/dirt) and record surface heights
-			int[] surfaceHeight = ApplySurfaceLayer(chunkGrid, Width, Length, WorldHeight, CS);
+			int[] surfaceHeight = ApplySurfaceLayer(
+				chunkGrid,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				cancellationToken
+			);
 
 			// Step 4 — Water bodies (ponds with sand shoreline)
-			PlaceWaterBodies(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			PlaceWaterBodies(
+				chunkGrid,
+				surfaceHeight,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				Seed,
+				cancellationToken
+			);
 
 			// Step 5 — Roads (plank paths between points of interest)
-			GenerateRoads(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			GenerateRoads(
+				chunkGrid,
+				surfaceHeight,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				Seed,
+				cancellationToken
+			);
 
 			// Step 6 — Trees (on remaining grass)
-			PlaceTrees(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			PlaceTrees(
+				chunkGrid,
+				surfaceHeight,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				Seed,
+				cancellationToken
+			);
 
 			// Step 7 — Foliage (grass plants on remaining grass blocks)
-			PlaceFoliage(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed);
+			PlaceFoliage(
+				chunkGrid,
+				surfaceHeight,
+				Width,
+				Length,
+				WorldHeight,
+				CS,
+				Seed,
+				cancellationToken
+			);
 
 			// Step 8 — Lighting
 			//ComputeLighting();
+			cancellationToken.ThrowIfCancellationRequested();
 			ResetLighting();
 		}
 
@@ -50,7 +119,12 @@ namespace Voxelgine.Graphics
 		/// bypassing SetPlacedBlock overhead (neighbor tracking, change logging,
 		/// and lighting updates per block).
 		/// </summary>
-		Chunk[,,] CreateChunkGrid(int width, int length, int worldHeight, int cs)
+		Chunk[,,] CreateChunkGrid(
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			CancellationToken cancellationToken)
 		{
 			int chunksX = (width + cs - 1) / cs;
 			int chunksY = (worldHeight + cs - 1) / cs + 1; // +1 for an empty air chunk above the terrain
@@ -58,6 +132,8 @@ namespace Voxelgine.Graphics
 
 			Chunk[,,] chunkGrid = new Chunk[chunksX, chunksY, chunksZ];
 			for (int cx = 0; cx < chunksX; cx++)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int cy = 0; cy < chunksY; cy++)
 					for (int cz = 0; cz < chunksZ; cz++)
 					{
@@ -66,6 +142,7 @@ namespace Voxelgine.Graphics
 						chunkGrid[cx, cy, cz] = chunk;
 						Chunks.Add(chunkIndex, chunk);
 					}
+			}
 
 			return chunkGrid;
 		}
@@ -76,7 +153,13 @@ namespace Voxelgine.Graphics
 		/// Fills solid areas with stone and carves cave pockets using a secondary noise layer.
 		/// Parallelized across the X axis — each XZ column is independent.
 		/// </summary>
-		void GenerateIslandShape(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
+		void GenerateIslandShape(
+			Chunk[,,] chunkGrid,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			CancellationToken cancellationToken)
 		{
 			float scale = 0.02f;
 			Vector3 center = new Vector3(width, 0, length) / 2;
@@ -85,7 +168,10 @@ namespace Voxelgine.Graphics
 			const float HillScale = 0.012f;
 			const float HillAmplitude = 6.0f;
 
-			Parallel.For(0, width, x =>
+			Parallel.For(0, width, new ParallelOptions
+			{
+				CancellationToken = cancellationToken,
+			}, x =>
 			{
 				for (int z = 0; z < length; z++)
 				{
@@ -123,12 +209,21 @@ namespace Voxelgine.Graphics
 		/// Builds and returns a surface height map used by subsequent generation steps.
 		/// Parallelized across the X axis.
 		/// </summary>
-		int[] ApplySurfaceLayer(Chunk[,,] chunkGrid, int width, int length, int worldHeight, int cs)
+		int[] ApplySurfaceLayer(
+			Chunk[,,] chunkGrid,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			CancellationToken cancellationToken)
 		{
 			int[] surfaceHeight = new int[width * length];
 			Array.Fill(surfaceHeight, -1);
 
-			Parallel.For(0, width, x =>
+			Parallel.For(0, width, new ParallelOptions
+			{
+				CancellationToken = cancellationToken,
+			}, x =>
 			{
 				for (int z = 0; z < length; z++)
 				{
@@ -162,7 +257,15 @@ namespace Voxelgine.Graphics
 		/// Uses noise-seeded waypoints on the surface and connects them with
 		/// Bresenham-style paths, placing Plank blocks on the ground.
 		/// </summary>
-		void GenerateRoads(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		void GenerateRoads(
+			Chunk[,,] chunkGrid,
+			int[] surfaceHeight,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			int seed,
+			CancellationToken cancellationToken)
 		{
 			Random rng = new Random(seed + 3);
 			const float WaypointNoiseScale = 0.025f;
@@ -176,6 +279,7 @@ namespace Voxelgine.Graphics
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x += 4)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z += 4)
 				{
 					int surfY = surfaceHeight[x * length + z];
@@ -216,6 +320,7 @@ namespace Voxelgine.Graphics
 
 			foreach (var (ax, az) in waypoints)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				// Find nearest unconnected waypoint
 				int bestIdx = -1;
 				int bestDistSq = int.MaxValue;
@@ -302,7 +407,10 @@ namespace Voxelgine.Graphics
 		/// <param name="count">Number of spawn points to find.</param>
 		/// <param name="minSpacing">Minimum distance in blocks between spawn points.</param>
 		/// <returns>List of world positions suitable for spawning (above ground surface).</returns>
-		public List<Vector3> FindSpawnPoints(int count, int minSpacing = 5)
+		public List<Vector3> FindSpawnPoints(
+			int count,
+			int minSpacing = 5,
+			CancellationToken cancellationToken = default)
 		{
 			// Compute world bounds from loaded chunks
 			int minX = int.MaxValue, maxX = int.MinValue;
@@ -334,6 +442,8 @@ namespace Voxelgine.Graphics
 
 			// Scan each XZ column top-down for the topmost grass block on a flat 3x3 surface
 			for (int x = minX + 1; x < maxX - 1; x++)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = minZ + 1; z < maxZ - 1; z++)
 				{
 					for (int y = maxY - 1; y >= minY; y--)
@@ -380,6 +490,7 @@ namespace Voxelgine.Graphics
 						candidates.Add(new Vector3(x, y + 3, z));
 						break;
 					}
+			}
 				}
 
 			if (candidates.Count == 0)
@@ -465,7 +576,15 @@ namespace Voxelgine.Graphics
 		/// Places trees on grass blocks using noise-based distribution.
 		/// Uses a 2D noise layer to select tree positions, enforcing minimum spacing.
 		/// </summary>
-		void PlaceTrees(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		void PlaceTrees(
+			Chunk[,,] chunkGrid,
+			int[] surfaceHeight,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			int seed,
+			CancellationToken cancellationToken)
 		{
 			Random rng = new Random(seed + 1);
 			const float TreeNoiseScale = 0.08f;
@@ -481,6 +600,7 @@ namespace Voxelgine.Graphics
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x++)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
 				{
 					int surfY = surfaceHeight[x * length + z];
@@ -518,6 +638,7 @@ namespace Voxelgine.Graphics
 			// Place each tree
 			foreach (var (tx, tz, surfY) in treePositions)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				int trunkHeight = 6 + rng.Next(5); // 6-10
 				int canopyRadius = 2 + rng.Next(2); // 2-3
 				int canopyHeight = 3 + rng.Next(3); // 3-5
@@ -564,7 +685,15 @@ namespace Voxelgine.Graphics
 		/// Places foliage (grass plant) blocks on grass surface blocks using noise-based distribution.
 		/// Skips positions already occupied by trees, roads, water, or other blocks.
 		/// </summary>
-		void PlaceFoliage(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		void PlaceFoliage(
+			Chunk[,,] chunkGrid,
+			int[] surfaceHeight,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			int seed,
+			CancellationToken cancellationToken)
 		{
 			int gridHeight = chunkGrid.GetLength(1) * cs;
 			const float FoliageNoiseScale = 0.12f;
@@ -573,6 +702,7 @@ namespace Voxelgine.Graphics
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x++)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
 				{
 					int surfY = surfaceHeight[x * length + z];
@@ -605,7 +735,15 @@ namespace Voxelgine.Graphics
 		/// Places water bodies in terrain depressions with irregular, noise-based shapes.
 		/// Carves shallow basins, lines them with stone/sand for containment, and fills with water.
 		/// </summary>
-		void PlaceWaterBodies(Chunk[,,] chunkGrid, int[] surfaceHeight, int width, int length, int worldHeight, int cs, int seed)
+		void PlaceWaterBodies(
+			Chunk[,,] chunkGrid,
+			int[] surfaceHeight,
+			int width,
+			int length,
+			int worldHeight,
+			int cs,
+			int seed,
+			CancellationToken cancellationToken)
 		{
 			Random rng = new Random(seed + 2);
 			const float PondNoiseScale = 0.015f;
@@ -619,6 +757,7 @@ namespace Voxelgine.Graphics
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x += 3)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z += 3)
 				{
 					int surfY = surfaceHeight[x * length + z];
@@ -651,6 +790,7 @@ namespace Voxelgine.Graphics
 			// Carve and fill each pond
 			foreach (var (cx, cz) in pondCenters)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				int surfY = surfaceHeight[cx * length + cz];
 				int pondRadius = 5 + rng.Next(6); // 5-10 blocks radius
 				int pondDepth = 2 + rng.Next(3);  // 2-4 blocks deep

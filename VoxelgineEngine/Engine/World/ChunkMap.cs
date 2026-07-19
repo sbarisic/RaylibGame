@@ -11,6 +11,7 @@ namespace Voxelgine.Graphics
 	{
 		private readonly SpatialHashGrid<Chunk> Chunks;
 		private readonly List<BlockChange> _blockChangeLog = new();
+		private readonly List<WorldMutation> _worldMutationLog = new();
 		private readonly Dictionary<ChunkColumnCoordinate, long> _columnRevisions = new();
 		private readonly Dictionary<ChunkColumnCoordinate, List<Vector3>> _columnChunks = new();
 		private int _bulkWorldMutationDepth;
@@ -23,6 +24,7 @@ namespace Voxelgine.Graphics
 		private readonly Random Rnd = new();
 
 		public event Action<BlockChange> BlockChanged;
+		public event Action<FogChange> FogChanged;
 		public event Action<ChunkColumnSnapshot> ColumnLoaded;
 		public event Action WorldReset;
 		public event Action<ChunkMap, int, int, int, BlockType> OnBlockPlaced;
@@ -35,7 +37,14 @@ namespace Voxelgine.Graphics
 
 		public IReadOnlyList<BlockChange> GetPendingChanges() => _blockChangeLog;
 
-		public void ClearPendingChanges() => _blockChangeLog.Clear();
+		public IReadOnlyList<WorldMutation> GetPendingWorldMutations() =>
+			_worldMutationLog;
+
+		public void ClearPendingChanges()
+		{
+			_blockChangeLog.Clear();
+			_worldMutationLog.Clear();
+		}
 
 		public Chunk[] GetAllChunks() => Chunks.Values.ToArray();
 
@@ -95,9 +104,18 @@ namespace Voxelgine.Graphics
 					continue;
 
 				BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+				FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
 				for (int index = 0; index < blocks.Length; index++)
 					blocks[index] = chunk.Blocks[index].Type;
-				snapshots.Add(new ChunkSnapshot(chunkX, (int)coordinate.Y, chunkZ, blocks));
+				chunk.CopyFogTo(fog);
+				snapshots.Add(new ChunkSnapshot(
+					chunkX,
+					(int)coordinate.Y,
+					chunkZ,
+					blocks,
+					fog: fog,
+					nonEmptyFogCount: chunk.NonEmptyFogCount
+				));
 			}
 
 			snapshots.Sort(static (left, right) => left.ChunkY.CompareTo(right.ChunkY));
@@ -152,6 +170,7 @@ namespace Voxelgine.Graphics
 					chunk.Blocks[index] = new PlacedBlock(type);
 				}
 				chunk.SetNonAirBlockCount(snapshot.NonAirBlockCount);
+				chunk.ReplaceFog(snapshot.FogMemory.Span, snapshot.NonEmptyFogCount);
 				Chunks.Add(coordinate, chunk);
 				inserted.Add(coordinate);
 			}
@@ -207,14 +226,18 @@ namespace Voxelgine.Graphics
 			{
 				KeyValuePair<Vector3, Chunk> entry = chunks[chunkIndex];
 				BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+				FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
 				for (int blockIndex = 0; blockIndex < blocks.Length; blockIndex++)
 					blocks[blockIndex] = entry.Value.Blocks[blockIndex].Type;
+				entry.Value.CopyFogTo(fog);
 
 				snapshots[chunkIndex] = new ChunkSnapshot(
 					(int)entry.Key.X,
 					(int)entry.Key.Y,
 					(int)entry.Key.Z,
-					blocks);
+					blocks,
+					fog: fog,
+					nonEmptyFogCount: entry.Value.NonEmptyFogCount);
 			}
 
 			return snapshots;
@@ -243,6 +266,134 @@ namespace Voxelgine.Graphics
 
 		public void Tick()
 		{
+		}
+
+		public FogVoxel GetFog(int x, int y, int z)
+		{
+			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
+
+			if (!Chunks.TryGetValue(chunkIndex, out Chunk chunk))
+			{
+				return FogVoxel.Empty;
+			}
+
+			return chunk.GetFog(
+				(int)blockPosition.X,
+				(int)blockPosition.Y,
+				(int)blockPosition.Z
+			);
+		}
+
+		public void SetFog(int x, int y, int z, FogVoxel value)
+		{
+			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
+
+			if (!Chunks.TryGetValue(chunkIndex, out Chunk chunk))
+			{
+				if (value.IsEmpty)
+				{
+					return;
+				}
+
+				chunk = new Chunk(chunkIndex, this);
+				Chunks.Add(chunkIndex, chunk);
+				ChunkColumnCoordinate newColumn = new(
+					(int)chunkIndex.X,
+					(int)chunkIndex.Z
+				);
+
+				if (!_columnChunks.TryGetValue(newColumn, out List<Vector3> coordinates))
+				{
+					coordinates = new List<Vector3>();
+					_columnChunks.Add(newColumn, coordinates);
+				}
+
+				coordinates.Add(chunkIndex);
+			}
+
+			int localX = (int)blockPosition.X;
+			int localY = (int)blockPosition.Y;
+			int localZ = (int)blockPosition.Z;
+			FogVoxel oldValue = chunk.GetFog(localX, localY, localZ);
+
+			if (oldValue == value)
+			{
+				return;
+			}
+
+			long revision = IncrementColumnRevision(
+				(int)chunkIndex.X,
+				(int)chunkIndex.Z
+			);
+			chunk.SetFog(localX, localY, localZ, value);
+			FogChange change = new(x, y, z, oldValue, value, revision);
+
+			if (_bulkWorldMutationDepth == 0)
+			{
+				_worldMutationLog.Add(WorldMutation.FromFog(change));
+				FogChanged?.Invoke(change);
+			}
+		}
+
+		public int FillFog(
+			int x,
+			int y,
+			int z,
+			int sizeX,
+			int sizeY,
+			int sizeZ,
+			FogVoxel value
+		)
+		{
+			if (sizeX < 0 || sizeY < 0 || sizeZ < 0)
+			{
+				throw new ArgumentOutOfRangeException(nameof(sizeX));
+			}
+
+			int changed = 0;
+
+			for (int offsetZ = 0; offsetZ < sizeZ; offsetZ++)
+			{
+				for (int offsetY = 0; offsetY < sizeY; offsetY++)
+				{
+					for (int offsetX = 0; offsetX < sizeX; offsetX++)
+					{
+						int worldX = checked(x + offsetX);
+						int worldY = checked(y + offsetY);
+						int worldZ = checked(z + offsetZ);
+
+						if (GetFog(worldX, worldY, worldZ) == value)
+						{
+							continue;
+						}
+
+						SetFog(worldX, worldY, worldZ, value);
+						changed++;
+					}
+				}
+			}
+
+			return changed;
+		}
+
+		public int ClearFog(
+			int x,
+			int y,
+			int z,
+			int sizeX,
+			int sizeY,
+			int sizeZ
+		)
+		{
+			return FillFog(
+				x,
+				y,
+				z,
+				sizeX,
+				sizeY,
+				sizeZ,
+				FogVoxel.Empty
+			);
 		}
 
 		public void SetPlacedBlock(int x, int y, int z, PlacedBlock block)
@@ -314,7 +465,10 @@ namespace Voxelgine.Graphics
 				long columnRevision = IncrementColumnRevision((int)chunkIndex.X, (int)chunkIndex.Z);
 				change = new BlockChange(x, y, z, oldType, block.Type, columnRevision);
 				if (_bulkWorldMutationDepth == 0)
+				{
 					_blockChangeLog.Add(change);
+					_worldMutationLog.Add(WorldMutation.FromBlock(change));
+				}
 			}
 
 			targetChunk.SetBlock(localX, localY, localZ, block);
@@ -424,6 +578,74 @@ namespace Voxelgine.Graphics
 				OnBlockRemoved?.Invoke(this, x, y, z, oldType);
 			if (type != BlockType.None)
 				OnBlockPlaced?.Invoke(this, x, y, z, type);
+			return true;
+		}
+
+		public bool TryApplyReplicatedFogChange(
+			int x,
+			int y,
+			int z,
+			FogVoxel value,
+			long expectedColumnRevision
+		)
+		{
+			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
+			ChunkColumnCoordinate column = new((int)chunkIndex.X, (int)chunkIndex.Z);
+
+			if (!_columnRevisions.TryGetValue(column, out long currentRevision))
+			{
+				return false;
+			}
+
+			Chunks.TryGetValue(chunkIndex, out Chunk targetChunk);
+			FogVoxel oldValue = targetChunk?.GetFog(
+				(int)blockPosition.X,
+				(int)blockPosition.Y,
+				(int)blockPosition.Z
+			) ?? FogVoxel.Empty;
+
+			if (expectedColumnRevision == currentRevision && oldValue == value)
+			{
+				return true;
+			}
+
+			if (expectedColumnRevision != currentRevision + 1 || oldValue == value)
+			{
+				return false;
+			}
+
+			if (targetChunk == null)
+			{
+				if (value.IsEmpty)
+				{
+					return false;
+				}
+
+				targetChunk = new Chunk(chunkIndex, this);
+				Chunks.Add(chunkIndex, targetChunk);
+				if (!_columnChunks.TryGetValue(column, out List<Vector3> coordinates))
+				{
+					coordinates = new List<Vector3>();
+					_columnChunks.Add(column, coordinates);
+				}
+				coordinates.Add(chunkIndex);
+			}
+
+			targetChunk.SetFog(
+				(int)blockPosition.X,
+				(int)blockPosition.Y,
+				(int)blockPosition.Z,
+				value
+			);
+			_columnRevisions[column] = expectedColumnRevision;
+			FogChanged?.Invoke(new FogChange(
+				x,
+				y,
+				z,
+				oldValue,
+				value,
+				expectedColumnRevision
+			));
 			return true;
 		}
 

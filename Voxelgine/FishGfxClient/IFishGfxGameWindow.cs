@@ -15,5 +15,7 @@ public interface IFishGfxGameWindow : IGameWindow
 
 	DirectionalShadowDiagnostics ShadowDiagnostics { get; }
 
+	double FogGpuMilliseconds { get; }
+
 	void ApplyConfiguration();
 }

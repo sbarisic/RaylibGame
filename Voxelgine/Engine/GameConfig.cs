@@ -58,6 +58,9 @@ namespace Voxelgine.Engine
 
 		public SunShadowQuality SunShadowQuality = SunShadowQuality.Medium;
 
+		public VolumetricFogQuality VolumetricFogQuality =
+			VolumetricFogQuality.Medium;
+
 		[SettingsHidden]
 		public int LastOptWnd_X = 0;
 

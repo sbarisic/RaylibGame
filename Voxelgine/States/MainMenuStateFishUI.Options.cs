@@ -66,6 +66,7 @@ public partial class MainMenuStateFishUI
 	private DropDown chunkDrawDistanceDropDown;
 	private DropDown chunkMeshUploadBudgetDropDown;
 	private DropDown sunShadowQualityDropDown;
+	private DropDown volumetricFogQualityDropDown;
 	private ToggleSwitch vsyncToggle;
 	private ToggleSwitch msaaToggle;
 	private Slider sensitivitySlider;
@@ -338,10 +339,39 @@ public partial class MainMenuStateFishUI
 			UpdateOptionsDirtyState();
 		};
 
+		volumetricFogQualityDropDown = CreateDropDown(
+			"options_volumetric_fog_quality"
+		);
+		foreach (VolumetricFogQuality quality in Enum.GetValues<VolumetricFogQuality>())
+		{
+			volumetricFogQualityDropDown.AddItem(new DropDownItem(
+				quality.ToString(),
+				quality
+			));
+		}
+		AddOptionRow(
+			content,
+			252,
+			"Local Volumetric Fog",
+			"Depth-aware authored fog quality and raymarch step size.",
+			volumetricFogQualityDropDown
+		);
+		volumetricFogQualityDropDown.OnItemSelected += (_, item) =>
+		{
+			if (synchronizingOptions
+				|| item.UserData is not VolumetricFogQuality quality)
+			{
+				return;
+			}
+
+			optionsDraft.VolumetricFogQuality = quality;
+			UpdateOptionsDirtyState();
+		};
+
 		content.AddChild(new Label
 		{
 			Text = "Higher values load distant scenery faster, but increase CPU, GPU, and upload work.",
-			Position = new Vector2(18, 256),
+			Position = new Vector2(18, 328),
 			Size = new Vector2(580, 44),
 		});
 	}
@@ -432,6 +462,11 @@ public partial class MainMenuStateFishUI
 				sunShadowQualityDropDown,
 				item => item.UserData is SunShadowQuality quality
 					&& quality == optionsDraft.SunShadowQuality
+			);
+			SelectItem(
+				volumetricFogQualityDropDown,
+				item => item.UserData is VolumetricFogQuality quality
+					&& quality == optionsDraft.VolumetricFogQuality
 			);
 			sensitivitySlider.Value = optionsDraft.MouseSensitivity;
 			RefreshSensitivityLabel();

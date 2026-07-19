@@ -9,8 +9,10 @@ There is one active schema and no legacy reader, converter, or old-client path.
 and version, world seed, and authoritative player, pickup, and NPC spawn
 positions. The directory maps each X/Z column to an offset, compressed length,
 and checksum. Each payload contains the complete vertical column as chunk-Y
-records and `(ushort run length, ushort block ID)` runs, compressed independently
-with fast Deflate.
+records, `(ushort run length, ushort block ID)` solid runs, and
+`(ushort run length, uint packed fog)` runs, compressed independently with fast
+Deflate. The current archive schema is version 2; version 1 is deliberately
+incompatible and follows the same backup/regeneration path.
 
 Server startup validates the magic/version before reading. An incompatible file
 is moved to `map.bin.incompatible-<timestamp>.bak`, then the requested seed is
@@ -62,3 +64,11 @@ Search `data/console.log` for `[WorldStream]`, `[Persistence]`, or `[Network]` t
 diagnose checksums, revision resynchronization, backpressure, retries, archive
 replacement, and readiness transitions. F5 exposes stream, queue, reliability,
 lighting, and meshing progress.
+
+## Local fog mutations
+
+Fog is an independent four-byte voxel layer (`premultiplied RGB + density`) and
+may coexist with solids. Block and fog edits increment the same column revision
+and share one ordered mutation stream. Debug builds expose `/fog fill` and
+`/fog clear`; use `/help` for their bounded volume syntax. A missed mixed
+revision causes the same full-column resynchronization as a missed block edit.

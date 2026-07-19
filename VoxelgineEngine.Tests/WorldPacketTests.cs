@@ -71,6 +71,28 @@ public sealed class WorldPacketTests
 	}
 
 	[Fact]
+	public void FogChangePacketPreservesPackedFogAndRevision()
+	{
+		FogChangePacket source = new()
+		{
+			X = -17,
+			Y = 42,
+			Z = 31,
+			Fog = 0x80604020,
+			ColumnRevision = 991,
+		};
+
+		FogChangePacket decoded = Assert.IsType<FogChangePacket>(
+			Packet.Deserialize(source.Serialize())
+		);
+		Assert.Equal(source.X, decoded.X);
+		Assert.Equal(source.Y, decoded.Y);
+		Assert.Equal(source.Z, decoded.Z);
+		Assert.Equal(source.Fog, decoded.Fog);
+		Assert.Equal(source.ColumnRevision, decoded.ColumnRevision);
+	}
+
+	[Fact]
 	public void BlockPlacementPackets_PreserveUshortBlockIds()
 	{
 		BlockPlaceRequestPacket placement = new() { BlockType = ushort.MaxValue };

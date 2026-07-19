@@ -65,7 +65,7 @@ public sealed class IncompatibleWorldArchiveException : IOException
 public static class WorldArchive
 {
 	public const uint Magic = 0x57584F56; // VOXW
-	public const ushort FormatVersion = 1;
+	public const ushort FormatVersion = 2;
 	private const int DirectoryEntrySize = 24;
 
 	public static bool IsCompatible(Stream input)

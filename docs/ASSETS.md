@@ -30,6 +30,12 @@ FishGfx's `data/textures/voxels/raylibgame` mapping is reference and test data.
 It is not a runtime dependency. RaylibGame owns the atlas, model, and palette
 assets used by the client.
 
+Cube world voxels use four matching 512x512 atlases: `atlas.png`,
+`atlas_normal.png`, `atlas_specular.png`, and `atlas_roughness.png`. The material
+maps are linear data, replace atomically on hot reload, and use OpenGL +Y tangent
+space. Custom voxel models, items, entities, characters, and the viewmodel keep
+their existing shaders until they receive authored tangent/material data.
+
 ## Shader contract
 
 Game shaders are GLSL 400 and use FishGfx conventions such as `uModel`,

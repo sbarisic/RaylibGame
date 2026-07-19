@@ -133,27 +133,56 @@ namespace Voxelgine.Engine.Server
 		}
 
 		/// <summary>
-		/// Collects pending block changes from the ChunkMap and broadcasts them to all clients.
+		/// Collects ordered world mutations and broadcasts them to all clients.
 		/// Called once per tick after physics and entity updates.
 		/// </summary>
 		private void BroadcastBlockChanges(float currentTime)
 		{
-			var changes = _simulation.Map.GetPendingChanges();
-			if (changes.Count == 0)
+			IReadOnlyList<WorldMutation> mutations =
+				_simulation.Map.GetPendingWorldMutations();
+			if (mutations.Count == 0)
 				return;
 
-			foreach (BlockChange change in changes)
+			foreach (WorldMutation mutation in mutations)
 			{
-				BlockChangePacket packet = new()
+				Packet packet;
+				int worldX;
+				int worldZ;
+				long revision;
+
+				if (mutation.Kind == WorldMutationKind.Block)
 				{
-					X = change.X,
-					Y = change.Y,
-					Z = change.Z,
-					BlockType = (ushort)change.NewType,
-					ColumnRevision = change.ColumnRevision,
-				};
-				int columnX = (int)Math.Floor((double)change.X / Chunk.ChunkSize);
-				int columnZ = (int)Math.Floor((double)change.Z / Chunk.ChunkSize);
+					BlockChange change = mutation.Block;
+					worldX = change.X;
+					worldZ = change.Z;
+					revision = change.ColumnRevision;
+					packet = new BlockChangePacket
+					{
+						X = change.X,
+						Y = change.Y,
+						Z = change.Z,
+						BlockType = (ushort)change.NewType,
+						ColumnRevision = revision,
+					};
+				}
+				else
+				{
+					FogChange change = mutation.Fog;
+					worldX = change.X;
+					worldZ = change.Z;
+					revision = change.ColumnRevision;
+					packet = new FogChangePacket
+					{
+						X = change.X,
+						Y = change.Y,
+						Z = change.Z,
+						Fog = change.NewValue.Packed,
+						ColumnRevision = revision,
+					};
+				}
+
+				int columnX = (int)Math.Floor((double)worldX / Chunk.ChunkSize);
+				int columnZ = (int)Math.Floor((double)worldZ / Chunk.ChunkSize);
 				foreach (NetConnection connection in _server.GetConnections())
 				{
 					if (!connection.IsGameplayActive ||
@@ -173,18 +202,18 @@ namespace Voxelgine.Engine.Server
 							connection.PlayerId,
 							columnX,
 							columnZ,
-							change.ColumnRevision);
+							revision);
 					}
 					else
 					{
 						_worldStream.RequestFreshSnapshot(
 							connection.PlayerId,
-							change.X,
-							change.Z);
+							worldX,
+							worldZ);
 						_logging.Log(
 							GameLogLevel.Warning,
 							"WorldStream",
-							$"block-change-queue-saturated playerId={connection.PlayerId} column={columnX},{columnZ} revision={change.ColumnRevision}; queued snapshot resync");
+							$"world-mutation-queue-saturated playerId={connection.PlayerId} column={columnX},{columnZ} revision={revision}; queued snapshot resync");
 					}
 				}
 			}

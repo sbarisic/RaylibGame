@@ -29,6 +29,22 @@ public static class WorldColumnCodec
 					writer.Write((ushort)type);
 					index = end;
 				}
+
+				ReadOnlySpan<FogVoxel> fog = chunk.FogMemory.Span;
+				for (int index = 0; index < fog.Length;)
+				{
+					FogVoxel value = fog[index];
+					int end = index + 1;
+					while (end < fog.Length
+						&& fog[end] == value
+						&& end - index < ushort.MaxValue)
+					{
+						end++;
+					}
+					writer.Write((ushort)(end - index));
+					writer.Write(value.Packed);
+					index = end;
+				}
 			}
 		}
 
@@ -70,7 +86,49 @@ public static class WorldColumnCodec
 				index += runLength;
 			}
 
-			chunks[chunkIndex] = new ChunkSnapshot(x, chunkY, z, blocks, nonAirBlockCount);
+			FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
+			int nonEmptyFogCount = 0;
+			for (int index = 0; index < fog.Length;)
+			{
+				ushort runLength = reader.ReadUInt16();
+				FogVoxel value;
+
+				try
+				{
+					value = FogVoxel.FromPacked(reader.ReadUInt32());
+				}
+				catch (ArgumentException exception)
+				{
+					throw new InvalidDataException(
+						$"Invalid premultiplied fog value in column ({x}, {z}) chunk Y={chunkY}.",
+						exception
+					);
+				}
+
+				if (runLength == 0 || index + runLength > fog.Length)
+				{
+					throw new InvalidDataException(
+						$"Invalid fog RLE run in column ({x}, {z}) chunk Y={chunkY}."
+					);
+				}
+
+				Array.Fill(fog, value, index, runLength);
+				if (!value.IsEmpty)
+				{
+					nonEmptyFogCount += runLength;
+				}
+				index += runLength;
+			}
+
+			chunks[chunkIndex] = new ChunkSnapshot(
+				x,
+				chunkY,
+				z,
+				blocks,
+				nonAirBlockCount,
+				fog,
+				nonEmptyFogCount
+			);
 		}
 
 		return new ChunkColumnSnapshot(x, z, revision, chunks);

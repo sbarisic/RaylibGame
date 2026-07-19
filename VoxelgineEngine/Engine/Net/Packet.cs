@@ -27,6 +27,7 @@ namespace Voxelgine.Engine
 		BlockChange = 0x20,
 		BlockPlaceRequest = 0x21,
 		BlockRemoveRequest = 0x22,
+		FogChange = 0x23,
 		WorldStreamBegin = 0x40,
 		WorldColumn = 0x41,
 		WorldBootstrapComplete = 0x42,
@@ -223,6 +224,7 @@ namespace Voxelgine.Engine
 			Register<BlockChangePacket>(PacketType.BlockChange);
 			Register<BlockPlaceRequestPacket>(PacketType.BlockPlaceRequest);
 			Register<BlockRemoveRequestPacket>(PacketType.BlockRemoveRequest);
+			Register<FogChangePacket>(PacketType.FogChange);
 			Register<WorldStreamBeginPacket>(PacketType.WorldStreamBegin);
 			Register<WorldColumnPacket>(PacketType.WorldColumn);
 			Register<WorldBootstrapCompletePacket>(PacketType.WorldBootstrapComplete);

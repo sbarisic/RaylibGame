@@ -305,6 +305,14 @@ internal static class Program
 		IFishGfxGameWindow window,
 		GameStateImpl state)
 	{
+		if (state is FishGfxGameplaySmokeState gameplay
+			&& !gameplay.IsFogVolumeReady)
+		{
+			throw new InvalidOperationException(
+				"The automatic gameplay fog volume was not uploaded in time."
+			);
+		}
+
 		const int channelTolerance = 16;
 		const int minimumForegroundPixels = 64;
 		FishGfx.Color clear = state.GetRenderSettings(

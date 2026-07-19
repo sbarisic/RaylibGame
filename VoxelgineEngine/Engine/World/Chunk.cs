@@ -17,6 +17,8 @@ namespace Voxelgine.Graphics
 		public PlacedBlock[] Blocks;
 		internal bool Dirty;
 		private int NonAirBlockCount;
+		private FogVoxel[] fog;
+		private int nonEmptyFogCount;
 		private readonly ChunkMap WorldMap;
 
 		public bool NeedsRelighting;
@@ -85,6 +87,101 @@ namespace Voxelgine.Graphics
 		}
 
 		public void Fill(BlockType type) => Fill(new PlacedBlock(type));
+
+		public int NonEmptyFogCount => nonEmptyFogCount;
+
+		public FogVoxel GetFog(int x, int y, int z)
+		{
+			if (x < 0 || x >= ChunkSize
+				|| y < 0 || y >= ChunkSize
+				|| z < 0 || z >= ChunkSize)
+			{
+				WorldMap.GetWorldPos(0, 0, 0, GlobalChunkIndex, out Vector3 origin);
+				return WorldMap.GetFog(
+					(int)origin.X + x,
+					(int)origin.Y + y,
+					(int)origin.Z + z
+				);
+			}
+
+			return fog?[x + ChunkSize * (y + ChunkSize * z)] ?? FogVoxel.Empty;
+		}
+
+		internal FogVoxel SetFog(int x, int y, int z, FogVoxel value)
+		{
+			int index = x + ChunkSize * (y + ChunkSize * z);
+			FogVoxel oldValue = fog?[index] ?? FogVoxel.Empty;
+
+			if (oldValue == value)
+			{
+				return oldValue;
+			}
+
+			if (!value.IsEmpty)
+			{
+				fog ??= new FogVoxel[ChunkSize * ChunkSize * ChunkSize];
+				fog[index] = value;
+			}
+			else if (fog != null)
+			{
+				fog[index] = FogVoxel.Empty;
+			}
+
+			if (oldValue.IsEmpty && !value.IsEmpty)
+			{
+				nonEmptyFogCount++;
+			}
+			else if (!oldValue.IsEmpty && value.IsEmpty)
+			{
+				nonEmptyFogCount--;
+
+				if (nonEmptyFogCount == 0)
+				{
+					fog = null;
+				}
+			}
+
+			return oldValue;
+		}
+
+		internal void CopyFogTo(Span<FogVoxel> destination)
+		{
+			if (destination.Length != ChunkSize * ChunkSize * ChunkSize)
+			{
+				throw new ArgumentException(
+					"Fog copies require one complete chunk.",
+					nameof(destination)
+				);
+			}
+
+			if (fog == null)
+			{
+				destination.Clear();
+			}
+			else
+			{
+				fog.CopyTo(destination);
+			}
+		}
+
+		internal void ReplaceFog(ReadOnlySpan<FogVoxel> values, int nonEmptyCount)
+		{
+			if (values.Length != ChunkSize * ChunkSize * ChunkSize)
+			{
+				throw new ArgumentException(
+					"Fog replacement requires one complete chunk.",
+					nameof(values)
+				);
+			}
+
+			if (nonEmptyCount < 0 || nonEmptyCount > values.Length)
+			{
+				throw new ArgumentOutOfRangeException(nameof(nonEmptyCount));
+			}
+
+			nonEmptyFogCount = nonEmptyCount;
+			fog = nonEmptyCount == 0 ? null : values.ToArray();
+		}
 
 		public void MarkDirty() => Dirty = true;
 

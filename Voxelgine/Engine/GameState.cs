@@ -3,6 +3,7 @@ using FishGfx.Graphics.Shadows;
 using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.FishGfxClient.Rendering;
+using Voxelgine.FishGfxClient.Voxels;
 
 namespace Voxelgine.Engine;
 
@@ -85,6 +86,19 @@ public abstract class GameStateImpl : IDisposable
 	}
 
 	public virtual void RenderViewmodel(RenderPass pass, in FrameTiming timing)
+	{
+	}
+
+	public virtual FishGfxFogFrame? GetLocalFogFrame()
+	{
+		return null;
+	}
+
+	public virtual bool RendererProfilingEnabled => false;
+
+	public virtual void RenderFogDepthOccluders(
+		RenderPass pass,
+		in FrameTiming timing)
 	{
 	}
 

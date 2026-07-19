@@ -77,6 +77,7 @@ public sealed class MainMenuOptionsTests
 		config.MaxChunkDrawDistance = 173;
 		config.ChunkMeshUploadBudget = 37;
 		config.SunShadowQuality = SunShadowQuality.High;
+		config.VolumetricFogQuality = VolumetricFogQuality.Low;
 
 		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
 		GameConfig destination = CreateConfig();
@@ -85,6 +86,7 @@ public sealed class MainMenuOptionsTests
 		Assert.Equal(173, destination.MaxChunkDrawDistance);
 		Assert.Equal(37, destination.ChunkMeshUploadBudget);
 		Assert.Equal(SunShadowQuality.High, destination.SunShadowQuality);
+		Assert.Equal(VolumetricFogQuality.Low, destination.VolumetricFogQuality);
 	}
 
 	[Fact]
@@ -102,6 +104,21 @@ public sealed class MainMenuOptionsTests
 		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
 
 		Assert.Equal(SunShadowQuality.Medium, draft.SunShadowQuality);
+	}
+
+	[Fact]
+	public void VolumetricFogQualityDefaultsAndInvalidValuesUseMedium()
+	{
+		GameConfig config = CreateConfig();
+		Assert.Equal(VolumetricFogQuality.Medium, config.VolumetricFogQuality);
+		Assert.Equal(
+			VolumetricFogQuality.Medium,
+			GameOptionsDraft.CreateDefaults(0).VolumetricFogQuality
+		);
+
+		config.VolumetricFogQuality = (VolumetricFogQuality)999;
+		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
+		Assert.Equal(VolumetricFogQuality.Medium, draft.VolumetricFogQuality);
 	}
 
 	[Theory]
@@ -256,8 +273,14 @@ public sealed class MainMenuOptionsTests
 		Assert.Equal(GameConfig.DefaultMaxChunkDrawDistance, config.MaxChunkDrawDistance);
 		Assert.Equal(GameConfig.DefaultChunkMeshUploadBudget, config.ChunkMeshUploadBudget);
 		Assert.Equal(SunShadowQuality.Medium, config.SunShadowQuality);
+		Assert.Equal(VolumetricFogQuality.Medium, config.VolumetricFogQuality);
 		Assert.Contains(
 			"\"SunShadowQuality\":\"Medium\"",
+			roundTrip.Replace(" ", string.Empty),
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"\"VolumetricFogQuality\":\"Medium\"",
 			roundTrip.Replace(" ", string.Empty),
 			StringComparison.Ordinal
 		);

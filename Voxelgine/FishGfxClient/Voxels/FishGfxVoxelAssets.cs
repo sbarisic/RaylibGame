@@ -24,7 +24,7 @@ internal sealed class FishGfxVoxelAssets
 		new(200, 72, 16, 16, AtlasSize, AtlasSize);
 
 	private readonly ReadOnlyDictionary<BlockType, ushort> materialIds;
-	private readonly AssetHandle<Texture> atlas;
+	private readonly AssetHandle<VoxelSurfaceAssetsResource> surfaceTextures;
 
 	internal FishGfxVoxelAssets(GraphicsContext graphics, GameAssetStore assetStore)
 	{
@@ -32,14 +32,13 @@ internal sealed class FishGfxVoxelAssets
 		ArgumentNullException.ThrowIfNull(assetStore);
 		ModelAssets models = LoadModels();
 		(Palette, materialIds) = CreatePalette(models);
-		atlas = assetStore.GetOrRegister(
-			"voxel.atlas",
-			() =>
-			{
-				using Bitmap bitmap = CreateAtlasBitmap();
-				return graphics.CreateTextureFromImage(bitmap);
-			},
+		surfaceTextures = assetStore.GetOrRegister(
+			"voxel.surface-textures",
+			() => LoadSurfaceTextures(graphics),
 			TexturePath("atlas.png"),
+			TexturePath("atlas_normal.png"),
+			TexturePath("atlas_specular.png"),
+			TexturePath("atlas_roughness.png"),
 			ModelPath("barrel", "barrel_tex.png"),
 			ModelPath("campfire", "campfire_tex.png"),
 			ModelPath("torch", "torch_tex.png"),
@@ -47,7 +46,9 @@ internal sealed class FishGfxVoxelAssets
 		);
 	}
 
-	internal Texture Atlas => atlas.Value;
+	internal Texture Atlas => surfaceTextures.Value.Textures.BaseColor;
+
+	internal VoxelSurfaceTextureSet SurfaceTextures => surfaceTextures.Value.Textures;
 
 	internal VoxelPalette Palette { get; }
 
@@ -283,6 +284,63 @@ internal sealed class FishGfxVoxelAssets
 		return atlas;
 	}
 
+	private static VoxelSurfaceAssetsResource LoadSurfaceTextures(
+		GraphicsContext graphics
+	)
+	{
+		using Bitmap baseColorBitmap = CreateAtlasBitmap();
+		using Bitmap normalBitmap = LoadAndValidateAtlas("atlas_normal.png");
+		using Bitmap specularBitmap = LoadAndValidateAtlas("atlas_specular.png");
+		using Bitmap roughnessBitmap = LoadAndValidateAtlas("atlas_roughness.png");
+		Texture baseColor = null;
+		Texture normal = null;
+		Texture specular = null;
+		Texture roughness = null;
+
+		try
+		{
+			baseColor = graphics.CreateTextureFromImage(baseColorBitmap);
+			TextureLoadOptions linearOptions = new()
+			{
+				Format = TextureFormat.RGBA8Unorm,
+			};
+			normal = graphics.CreateTextureFromImage(normalBitmap, linearOptions);
+			specular = graphics.CreateTextureFromImage(specularBitmap, linearOptions);
+			roughness = graphics.CreateTextureFromImage(roughnessBitmap, linearOptions);
+			return new VoxelSurfaceAssetsResource(
+				new VoxelSurfaceTextureSet(
+					baseColor,
+					normal,
+					specular,
+					roughness
+				)
+			);
+		}
+		catch
+		{
+			roughness?.Dispose();
+			specular?.Dispose();
+			normal?.Dispose();
+			baseColor?.Dispose();
+			throw;
+		}
+	}
+
+	private static Bitmap LoadAndValidateAtlas(string fileName)
+	{
+		Bitmap bitmap = new(TexturePath(fileName));
+
+		if (bitmap.Width == AtlasSize && bitmap.Height == AtlasSize)
+		{
+			return bitmap;
+		}
+
+		bitmap.Dispose();
+		throw new InvalidDataException(
+			$"Voxel surface atlas '{fileName}' must be {AtlasSize}x{AtlasSize}."
+		);
+	}
+
 	private static void DrawAsset(
 		Bitmap destination,
 		string path,
@@ -343,5 +401,23 @@ internal sealed class FishGfxVoxelAssets
 		VoxelModel Campfire,
 		VoxelModel Torch,
 		VoxelModelSet Foliage);
+
+	private sealed class VoxelSurfaceAssetsResource : IDisposable
+	{
+		internal VoxelSurfaceAssetsResource(VoxelSurfaceTextureSet textures)
+		{
+			Textures = textures ?? throw new ArgumentNullException(nameof(textures));
+		}
+
+		internal VoxelSurfaceTextureSet Textures { get; }
+
+		public void Dispose()
+		{
+			Textures.Roughness.Dispose();
+			Textures.Specular.Dispose();
+			Textures.Normal.Dispose();
+			Textures.BaseColor.Dispose();
+		}
+	}
 }
 #endif

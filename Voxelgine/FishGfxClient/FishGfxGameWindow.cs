@@ -98,6 +98,8 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 
 	public DirectionalShadowDiagnostics ShadowDiagnostics => renderGraph.ShadowDiagnostics;
 
+	public double FogGpuMilliseconds => renderGraph.FogGpuMilliseconds;
+
 	public InputMgr InMgr { get; }
 
 	public int Width => RenderWindow.Width;

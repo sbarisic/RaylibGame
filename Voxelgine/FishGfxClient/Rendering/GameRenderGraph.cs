@@ -5,6 +5,7 @@ using FishGfx.Graphics.Shadows;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
+using Voxelgine.FishGfxClient.Voxels;
 
 namespace Voxelgine.FishGfxClient.Rendering;
 
@@ -12,9 +13,12 @@ public sealed class GameRenderGraph : IDisposable
 {
 	private readonly GraphicsContext graphics;
 	private readonly AssetHandle<ShaderProgram> postShader;
+	private readonly AssetHandle<ShaderProgram> localFogShader;
+	private readonly LocalFogGpuTimer localFogGpuTimer;
 	private bool useMsaa;
 	private RenderTarget worldTarget;
 	private RenderTarget resolvedTarget;
+	private RenderTarget compositeTarget;
 	private Vector2 targetSize;
 	private bool disposed;
 	private DirectionalShadowRenderer shadowRenderer;
@@ -33,12 +37,20 @@ public sealed class GameRenderGraph : IDisposable
 			"data/shaders/fishgfx/scene_post.vert",
 			"data/shaders/fishgfx/scene_post.frag"
 		);
+		localFogShader = assets.LoadShader(
+			"local-volumetric-fog",
+			"data/shaders/fishgfx/local_fog.vert",
+			"data/shaders/fishgfx/local_fog.frag"
+		);
+		localFogGpuTimer = new LocalFogGpuTimer(graphics);
 	}
 
 	public int SampleCount => useMsaa ? 4 : 1;
 
 	public DirectionalShadowDiagnostics ShadowDiagnostics =>
 		shadowRenderer?.Diagnostics ?? default;
+
+	public double FogGpuMilliseconds => localFogGpuTimer.LastMilliseconds;
 
 	public void SetMultisampling(bool enabled)
 	{
@@ -52,6 +64,7 @@ public sealed class GameRenderGraph : IDisposable
 		DisposeTargets();
 		worldTarget = null;
 		resolvedTarget = null;
+		compositeTarget = null;
 		targetSize = default;
 	}
 
@@ -66,7 +79,10 @@ public sealed class GameRenderGraph : IDisposable
 
 		using RenderFrame frame = graphics.BeginFrame();
 		frameIndex++;
+		localFogGpuTimer.Enabled = state.RendererProfilingEnabled;
+		localFogGpuTimer.Poll();
 		DirectionalShadowFrame? shadows = PrepareShadows(frame, state, timing);
+		FishGfxFogFrame? fog = state.GetLocalFogFrame();
 		using (RenderPass world = frame.BeginPass(
 			worldTarget,
 			CreateDescriptor(
@@ -80,27 +96,15 @@ public sealed class GameRenderGraph : IDisposable
 		))
 		{
 			state.RenderWorld(world, timing, shadows);
+			if (fog.HasValue)
+			{
+				state.RenderFogDepthOccluders(world, timing);
+			}
 		}
 
-		using (RenderPass viewmodel = frame.BeginPass(
-			worldTarget,
-			CreateDescriptor(
-				settings.ViewmodelView,
-				settings.ViewmodelState,
-				settings.ClearColor,
-				timing.TotalTime,
-				RenderLoadAction.Load,
-				RenderLoadAction.Clear
-			)
-		))
-		{
-			state.RenderViewmodel(viewmodel, timing);
-		}
-
-		if (useMsaa)
-		{
-			frame.ResolveColor(worldTarget, 0, resolvedTarget, 0);
-		}
+		RenderTarget sceneTarget = fog.HasValue
+			? RenderFogAndViewmodel(frame, state, settings, timing, fog.Value, width, height)
+			: RenderViewmodel(frame, state, settings, timing);
 
 		ShaderProgram shader = postShader.Value;
 		shader.SetUniform("uTexture", 0);
@@ -122,7 +126,7 @@ public sealed class GameRenderGraph : IDisposable
 				0,
 				width,
 				height,
-				texture: resolvedTarget.ColorAttachments[0],
+				texture: sceneTarget.ColorAttachments[0],
 				shader: shader
 			);
 		}
@@ -145,6 +149,102 @@ public sealed class GameRenderGraph : IDisposable
 		frame.Present();
 	}
 
+	private RenderTarget RenderViewmodel(
+		RenderFrame frame,
+		GameStateImpl state,
+		GameStateRenderSettings settings,
+		in FrameTiming timing)
+	{
+		using (RenderPass viewmodel = frame.BeginPass(
+			worldTarget,
+			CreateDescriptor(
+				settings.ViewmodelView,
+				settings.ViewmodelState,
+				settings.ClearColor,
+				timing.TotalTime,
+				RenderLoadAction.Load,
+				RenderLoadAction.Clear
+			)
+		))
+		{
+			state.RenderViewmodel(viewmodel, timing);
+		}
+
+		if (!useMsaa)
+		{
+			return worldTarget;
+		}
+
+		frame.ResolveColor(worldTarget, 0, resolvedTarget, 0);
+		return resolvedTarget;
+	}
+
+	private RenderTarget RenderFogAndViewmodel(
+		RenderFrame frame,
+		GameStateImpl state,
+		GameStateRenderSettings settings,
+		in FrameTiming timing,
+		in FishGfxFogFrame fog,
+		int width,
+		int height)
+	{
+		RenderTarget fogSource = worldTarget;
+		if (useMsaa)
+		{
+			frame.ResolveColor(worldTarget, 0, resolvedTarget, 0);
+			frame.ResolveDepth(worldTarget, resolvedTarget);
+			fogSource = resolvedTarget;
+		}
+
+		using (RenderPass fogPass = frame.BeginPass(
+			compositeTarget,
+			CreateDescriptor(
+				CreateScreenView(width, height),
+				settings.OverlayState,
+				settings.ClearColor,
+				timing.TotalTime,
+				RenderLoadAction.Clear,
+				RenderLoadAction.Clear
+			)
+		))
+		{
+			using IDisposable fogTiming = localFogGpuTimer.Begin(fogPass);
+			new LocalFogCompositeCommand(
+				fogSource.ColorAttachments[0],
+				fogSource.DepthStencilAttachment,
+				fog,
+				localFogShader.Value,
+				settings.WorldView,
+				width,
+				height,
+				frameIndex * 0.61803398875f
+			).Execute(fogPass);
+		}
+
+		using (RenderPass viewmodel = frame.BeginPass(
+			compositeTarget,
+			CreateDescriptor(
+				settings.ViewmodelView,
+				settings.ViewmodelState,
+				settings.ClearColor,
+				timing.TotalTime,
+				RenderLoadAction.Load,
+				RenderLoadAction.Clear
+			)
+		))
+		{
+			state.RenderViewmodel(viewmodel, timing);
+		}
+
+		if (!useMsaa)
+		{
+			return compositeTarget;
+		}
+
+		frame.ResolveColor(compositeTarget, 0, resolvedTarget, 0);
+		return resolvedTarget;
+	}
+
 	public void Dispose()
 	{
 		if (disposed)
@@ -153,11 +253,13 @@ public sealed class GameRenderGraph : IDisposable
 		}
 
 		DisposeTargets();
+		localFogGpuTimer.Dispose();
 		shadowRenderer?.Dispose();
 		shadowRenderer = null;
 		shadowOwner = null;
 		worldTarget = null;
 		resolvedTarget = null;
+		compositeTarget = null;
 		disposed = true;
 	}
 
@@ -290,6 +392,9 @@ public sealed class GameRenderGraph : IDisposable
 		resolvedTarget = useMsaa
 			? graphics.CreateRenderTarget(new RenderTargetDescriptor(width, height))
 			: worldTarget;
+		compositeTarget = graphics.CreateRenderTarget(
+			new RenderTargetDescriptor(width, height, sampleCount: SampleCount)
+		);
 		targetSize = size;
 	}
 
@@ -301,6 +406,7 @@ public sealed class GameRenderGraph : IDisposable
 		}
 
 		worldTarget?.Dispose();
+		compositeTarget?.Dispose();
 	}
 
 	private static RenderPassDescriptor CreateDescriptor(

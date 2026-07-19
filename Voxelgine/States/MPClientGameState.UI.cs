@@ -6,6 +6,7 @@ using Voxelgine.GUI;
 using FishUI;
 using FishUI.Controls;
 using Voxelgine.FishGfxClient;
+using Voxelgine.FishGfxClient.Voxels;
 
 namespace Voxelgine.States
 {
@@ -766,6 +767,15 @@ namespace Voxelgine.States
 				_netStatsInfoLabel.WriteLine($"  Stale: {diagnostics.TransparentStaleResults}, dropped: {diagnostics.TransparentDroppedResults}");
 				_netStatsInfoLabel.WriteLine($"  Order: {diagnostics.TransparentOrderingReason}, revision: {diagnostics.TransparentOrderingGeometryRevision}");
 				_netStatsInfoLabel.WriteLine($"  Delta: {diagnostics.TransparentOrderingCameraDistanceDelta:F2} blocks / {diagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2} deg");
+				FishGfxFogDiagnostics fog = _fishVoxelScene.FogVolume.Diagnostics;
+				FishGfxFogFrame? fogFrame = _fishVoxelScene.FogVolume.CurrentFrame;
+				_netStatsInfoLabel.WriteLine("--- Local Fog ---");
+				_netStatsInfoLabel.WriteLine($"Active: {fog.ActiveCells} cells, origin: {fog.Origin.X:F0}/{fog.Origin.Y:F0}/{fog.Origin.Z:F0}");
+				_netStatsInfoLabel.WriteLine($"Queues: {fog.PendingBuilds} build / {fog.PendingUploads} upload; bytes: {fog.UploadedBytes}");
+				_netStatsInfoLabel.WriteLine($"CPU: rebuild {fog.RebuildMilliseconds:F2} ms / upload {fog.UploadMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"Alloc: {fog.MainThreadAllocatedBytes} B main / {fog.WorkerAllocatedBytes} B worker");
+				_netStatsInfoLabel.WriteLine($"Ray: {(fogFrame?.StepLength ?? 0):F1} blocks / {fogFrame?.MaximumSteps ?? 0} max steps");
+				_netStatsInfoLabel.WriteLine($"GPU: {((IFishGfxGameWindow)_gameWindow).FogGpuMilliseconds:F2} ms");
 				if (_gameWindow is IFishGfxGameWindow fishWindow)
 				{
 					var shadows = fishWindow.ShadowDiagnostics;

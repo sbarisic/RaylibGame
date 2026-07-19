@@ -143,6 +143,7 @@ public unsafe partial class MPClientGameState
 			_simulation.Map,
 			config.MaxChunkDrawDistance,
 			config.ChunkMeshUploadBudget,
+			config.VolumetricFogQuality,
 			synchronizeExisting
 		);
 		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
@@ -214,6 +215,9 @@ public unsafe partial class MPClientGameState
 		{
 			return;
 		}
+		_fishVoxelScene.FogVolume.Quality = Eng.DI
+			.GetRequiredService<GameConfig>()
+			.VolumetricFogQuality;
 		if (!_initialized || _simulation?.LocalPlayer is null)
 		{
 			Vector2 loadingFramebuffer = ((IFishGfxGameWindow)_gameWindow).RenderWindow.FramebufferSize;
@@ -273,6 +277,8 @@ public unsafe partial class MPClientGameState
 				((IFishGfxGameWindow)_gameWindow).ShadowDiagnostics;
 			VoxelShadowSubmissionDiagnostics shadowCasterDiagnostics =
 				_fishVoxelScene.Renderer.LastShadowSubmission;
+			FishGfxFogDiagnostics fogDiagnostics = _fishVoxelScene.FogVolume.Diagnostics;
+			FishGfxFogFrame? fogFrame = _fishVoxelScene.FogVolume.CurrentFrame;
 			_logging?.Log(
 				GameLogLevel.Debug,
 				"Performance",
@@ -305,7 +311,13 @@ public unsafe partial class MPClientGameState
 					+ $"shadowLeafVertices={shadowCasterDiagnostics.AlphaShadowVertexCount} "
 					+ $"shadowCullMs={shadowCasterDiagnostics.CullingMilliseconds:F3} shadowBuildMs={shadowCasterDiagnostics.CommandBuildMilliseconds:F3} "
 					+ $"shadowSubmitMs={shadowCasterDiagnostics.SubmissionMilliseconds:F3} shadowAlloc={shadowCasterDiagnostics.ManagedAllocationBytes} "
-					+ $"shadowGpuMs={SumShadowGpuMilliseconds(shadowDiagnostics):F3}"
+					+ $"shadowGpuMs={SumShadowGpuMilliseconds(shadowDiagnostics):F3} "
+					+ $"fogCells={fogDiagnostics.ActiveCells} fogOrigin={fogDiagnostics.Origin.X:F0}/{fogDiagnostics.Origin.Y:F0}/{fogDiagnostics.Origin.Z:F0} "
+					+ $"fogQueues={fogDiagnostics.PendingBuilds}/{fogDiagnostics.PendingUploads} fogUploadedBytes={fogDiagnostics.UploadedBytes} "
+					+ $"fogRebuildMs={fogDiagnostics.RebuildMilliseconds:F3} fogUploadMs={fogDiagnostics.UploadMilliseconds:F3} "
+					+ $"fogMainAlloc={fogDiagnostics.MainThreadAllocatedBytes} fogWorkerAlloc={fogDiagnostics.WorkerAllocatedBytes} "
+					+ $"fogStep={fogFrame?.StepLength ?? 0:F2} fogMaxSteps={fogFrame?.MaximumSteps ?? 0} "
+					+ $"fogGpuMs={((IFishGfxGameWindow)_gameWindow).FogGpuMilliseconds:F3}"
 			);
 		}
 		_fishParticles?.UpdateVoxelEmitters(
@@ -461,6 +473,24 @@ public unsafe partial class MPClientGameState
 	public override void RenderViewmodel(RenderPass pass, in FrameTiming timing)
 	{
 		(_simulation?.LocalPlayer as ClientPlayer)?.RenderFishGfxViewModel(pass);
+	}
+
+	public override FishGfxFogFrame? GetLocalFogFrame()
+	{
+		return _fishVoxelScene?.FogVolume.CurrentFrame;
+	}
+
+	public override bool RendererProfilingEnabled => _rendererProfilingEnabled;
+
+	public override void RenderFogDepthOccluders(
+		RenderPass pass,
+		in FrameTiming timing)
+	{
+		_fishVoxelScene?.Renderer.RenderFogDepthOccluders(
+			pass,
+			_fishWorldCamera,
+			_fishVoxelScene.MaxChunkDrawDistance
+		);
 	}
 
 	public override void RenderOverlay(RenderPass pass, in FrameTiming timing)

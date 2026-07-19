@@ -29,6 +29,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 	public FishGfxVoxelScene(GraphicsContext graphics, GameAssetStore assetStore, ChunkMap source,
 		int maxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
 		int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
+		VolumetricFogQuality fogQuality = VolumetricFogQuality.Medium,
 		bool synchronizeExisting = true)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
@@ -62,6 +63,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 			assets.AtlasLayout,
 			Lighting,
 			rendererOptions);
+		Renderer.SetSurfaceTextures(assets.SurfaceTextures);
+		FogVolume = new FishGfxFogVolume(graphics, source, fogQuality);
 
 		source.BlockChanged += QueueChange;
 		source.ColumnLoaded += QueueColumn;
@@ -75,6 +78,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 	public VoxelLighting Lighting { get; }
 
 	public VoxelRenderer Renderer { get; }
+
+	public FishGfxFogVolume FogVolume { get; }
 
 	public IReadOnlyDictionary<BlockType, ushort> MaterialIds => assets.MaterialIds;
 
@@ -168,6 +173,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 		ProcessPendingChanges();
 		Lighting.Update();
 		Renderer.UpdateMeshes(camera);
+		FogVolume.Update(camera.Position);
 	}
 
 	public void Enqueue(RenderQueue queue, Camera camera)
@@ -287,16 +293,17 @@ public sealed class FishGfxVoxelScene : IDisposable
 		source.BlockChanged -= QueueChange;
 		source.ColumnLoaded -= QueueColumn;
 		source.WorldReset -= QueueReset;
+		FogVolume.Dispose();
 		Renderer.Dispose();
 		Lighting.Dispose();
 	}
 
 	private void SynchronizeAtlas()
 	{
-		Texture current = assets.Atlas;
-		if (!ReferenceEquals(Renderer.AtlasTexture, current))
+		VoxelSurfaceTextureSet current = assets.SurfaceTextures;
+		if (!ReferenceEquals(Renderer.SurfaceTextures, current))
 		{
-			Renderer.SetAtlasTexture(current);
+			Renderer.SetSurfaceTextures(current);
 		}
 	}
 

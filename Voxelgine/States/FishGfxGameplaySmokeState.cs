@@ -46,6 +46,8 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 	);
 	private bool disposed;
 
+	internal bool IsFogVolumeReady => voxelScene.FogVolume.CurrentFrame.HasValue;
+
 	public FishGfxGameplaySmokeState(
 		IFishGfxGameWindow window,
 		IFishEngineRunner engine
@@ -239,6 +241,18 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		);
 	}
 
+	public override FishGfxFogFrame? GetLocalFogFrame()
+	{
+		return voxelScene.FogVolume.CurrentFrame;
+	}
+
+	public override void RenderFogDepthOccluders(
+		RenderPass pass,
+		in FrameTiming timing)
+	{
+		voxelScene.Renderer.RenderFogDepthOccluders(pass, camera, 128);
+	}
+
 	private SlidingDoorRenderState CreateDoorState()
 	{
 		return new SlidingDoorRenderState(
@@ -321,5 +335,23 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		map.SetBlock(13, 2, 7, BlockType.Torch);
 		map.SetBlock(7, 2, 11, BlockType.Leaf);
 		map.SetBlock(8, 2, 11, BlockType.Foliage);
+		map.FillFog(
+			3,
+			2,
+			4,
+			9,
+			3,
+			10,
+			FogVoxel.FromStraight(new Rgba32(110, 175, 255), 96)
+		);
+		map.FillFog(
+			9,
+			2,
+			6,
+			13,
+			2,
+			11,
+			FogVoxel.FromStraight(new Rgba32(255, 110, 85), 144)
+		);
 	}
 }

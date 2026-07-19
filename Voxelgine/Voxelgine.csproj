@@ -329,10 +329,10 @@
     <None Update="data\shaders\fishgfx\**\*.vert;data\shaders\fishgfx\**\*.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="data\textures\atlas_metallic.png">
+    <None Update="data\textures\atlas_normal.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="data\textures\atlas_normal.png">
+    <None Update="data\textures\atlas_roughness.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="data\textures\atlas_specular.png">

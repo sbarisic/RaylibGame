@@ -97,6 +97,10 @@ namespace Voxelgine.States
 					HandleBlockChange(blockChange);
 					break;
 
+				case FogChangePacket fogChange:
+					HandleFogChange(fogChange);
+					break;
+
 				case EntitySpawnPacket entitySpawn:
 					HandleEntitySpawn(entitySpawn);
 					break;
@@ -257,6 +261,67 @@ namespace Voxelgine.States
 					Revision = _simulation.Map.GetColumnRevision(columnX, columnZ),
 				}, true, GetClientTime());
 			}
+		}
+
+		private void HandleFogChange(FogChangePacket fogChange)
+		{
+			if (_simulation == null)
+				return;
+
+			FogVoxel value;
+
+			try
+			{
+				value = FogVoxel.FromPacked(fogChange.Fog);
+			}
+			catch (ArgumentException exception)
+			{
+				_logging.Log(
+					GameLogLevel.Warning,
+					"WorldStream",
+					$"invalid-fog-value position={fogChange.X},{fogChange.Y},{fogChange.Z}",
+					exception
+				);
+				RequestColumnResync(fogChange.X, fogChange.Z, fogChange.ColumnRevision);
+				return;
+			}
+
+			if (!_simulation.Map.TryApplyReplicatedFogChange(
+				fogChange.X,
+				fogChange.Y,
+				fogChange.Z,
+				value,
+				fogChange.ColumnRevision))
+			{
+				RequestColumnResync(
+					fogChange.X,
+					fogChange.Z,
+					fogChange.ColumnRevision
+				);
+			}
+		}
+
+		private void RequestColumnResync(
+			int worldX,
+			int worldZ,
+			long expectedRevision
+		)
+		{
+			int columnX = (int)Math.Floor((double)worldX / Chunk.ChunkSize);
+			int columnZ = (int)Math.Floor((double)worldZ / Chunk.ChunkSize);
+			long localRevision = _simulation.Map.GetColumnRevision(columnX, columnZ);
+			_logging.Log(
+				GameLogLevel.Warning,
+				"WorldStream",
+				$"revision-gap column={columnX},{columnZ} expected={expectedRevision} local={localRevision}"
+			);
+			_client.Send(new WorldColumnResyncRequestPacket
+			{
+				StreamId = _worldStreamId,
+				X = columnX,
+				Z = columnZ,
+				Revision = localRevision,
+			}, true, GetClientTime());
 		}
 
 		/// <summary>

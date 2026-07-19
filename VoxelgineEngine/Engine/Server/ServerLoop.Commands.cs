@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Voxelgine.Engine.DI;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server
 {
@@ -226,6 +227,10 @@ namespace Voxelgine.Engine.Server
 			_logging.ServerWriteLine("  /day           - Set time to noon");
 			_logging.ServerWriteLine("  /night         - Set time to midnight");
 			_logging.ServerWriteLine("  /speak <text>  - All NPCs display a speech bubble");
+#if DEBUG
+			_logging.ServerWriteLine("  /fog fill ...  - Fill a player-centered fog volume");
+			_logging.ServerWriteLine("  /fog clear ... - Clear a player-centered fog volume");
+#endif
 		}
 
 		/// <summary>
@@ -258,8 +263,14 @@ namespace Voxelgine.Engine.Server
 					CmdSpeak(connection, args);
 					break;
 
+#if DEBUG
+				case "fog":
+					CmdFog(connection, args);
+					break;
+#endif
+
 				default:
-					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>");
+					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>.");
 					break;
 			}
 		}
@@ -322,6 +333,106 @@ namespace Voxelgine.Engine.Server
 
 				SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) speaking.");
 			}
+
+#if DEBUG
+			private void CmdFog(NetConnection connection, string arguments)
+			{
+				Player player = _simulation.Players.GetPlayer(connection.PlayerId);
+
+				if (player == null)
+				{
+					SendServerMessageTo(connection.PlayerId, "Could not find your player.");
+					return;
+				}
+
+				string[] values = arguments.Split(
+					' ',
+					StringSplitOptions.RemoveEmptyEntries |
+					StringSplitOptions.TrimEntries
+				);
+
+				if (values.Length == 0)
+				{
+					SendFogUsage(connection.PlayerId);
+					return;
+				}
+
+				bool fill = string.Equals(values[0], "fill", StringComparison.OrdinalIgnoreCase);
+				bool clear = string.Equals(values[0], "clear", StringComparison.OrdinalIgnoreCase);
+				int expectedCount = fill ? 8 : clear ? 4 : -1;
+
+				if (expectedCount < 0 || values.Length != expectedCount
+					|| !int.TryParse(values[1], out int radiusX)
+					|| !int.TryParse(values[2], out int height)
+					|| !int.TryParse(values[3], out int radiusZ)
+					|| radiusX < 0 || radiusX > 64
+					|| radiusZ < 0 || radiusZ > 64
+					|| height <= 0 || height > 96)
+				{
+					SendFogUsage(connection.PlayerId);
+					return;
+				}
+
+				int centerX = (int)MathF.Floor(player.Position.X);
+				int minimumY = (int)MathF.Floor(player.Position.Y);
+				int centerZ = (int)MathF.Floor(player.Position.Z);
+				int minimumX = centerX - radiusX;
+				int minimumZ = centerZ - radiusZ;
+				int sizeX = checked(radiusX * 2 + 1);
+				int sizeZ = checked(radiusZ * 2 + 1);
+				int changed;
+
+				if (clear)
+				{
+					changed = _simulation.Map.ClearFog(
+						minimumX,
+						minimumY,
+						minimumZ,
+						sizeX,
+						height,
+						sizeZ
+					);
+				}
+				else
+				{
+					if (!byte.TryParse(values[4], out byte red)
+						|| !byte.TryParse(values[5], out byte green)
+						|| !byte.TryParse(values[6], out byte blue)
+						|| !byte.TryParse(values[7], out byte density))
+					{
+						SendFogUsage(connection.PlayerId);
+						return;
+					}
+
+					FogVoxel fog = FogVoxel.FromStraight(
+						new Rgba32(red, green, blue),
+						density
+					);
+					changed = _simulation.Map.FillFog(
+						minimumX,
+						minimumY,
+						minimumZ,
+						sizeX,
+						height,
+						sizeZ,
+						fog
+					);
+				}
+
+				SendServerMessageTo(
+					connection.PlayerId,
+					$"Fog {values[0].ToLowerInvariant()} changed {changed} cell(s)."
+				);
+			}
+
+			private void SendFogUsage(int playerId)
+			{
+				SendServerMessageTo(
+					playerId,
+					"Usage: /fog fill <radiusX> <height> <radiusZ> <r> <g> <b> <density> or /fog clear <radiusX> <height> <radiusZ>"
+				);
+			}
+#endif
 
 			/// <summary>
 			/// Sends a server message to a specific player via chat.

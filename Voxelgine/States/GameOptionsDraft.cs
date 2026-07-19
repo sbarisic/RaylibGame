@@ -47,6 +47,8 @@ internal sealed record GameOptionsDraft
 
 	public SunShadowQuality SunShadowQuality { get; set; }
 
+	public VolumetricFogQuality VolumetricFogQuality { get; set; }
+
 	public bool SetFocused { get; set; }
 
 	public bool Resizable { get; set; }
@@ -91,6 +93,9 @@ internal sealed record GameOptionsDraft
 			SunShadowQuality = Enum.IsDefined(config.SunShadowQuality)
 				? config.SunShadowQuality
 				: SunShadowQuality.Medium,
+			VolumetricFogQuality = Enum.IsDefined(config.VolumetricFogQuality)
+				? config.VolumetricFogQuality
+				: VolumetricFogQuality.Medium,
 			SetFocused = config.SetFocused,
 			Resizable = config.Resizable,
 		};
@@ -110,6 +115,7 @@ internal sealed record GameOptionsDraft
 			MaxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
 			ChunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
 			SunShadowQuality = SunShadowQuality.Medium,
+			VolumetricFogQuality = VolumetricFogQuality.Medium,
 			SetFocused = true,
 			Resizable = true,
 		};
@@ -141,6 +147,9 @@ internal sealed record GameOptionsDraft
 		config.SunShadowQuality = Enum.IsDefined(SunShadowQuality)
 			? SunShadowQuality
 			: SunShadowQuality.Medium;
+		config.VolumetricFogQuality = Enum.IsDefined(VolumetricFogQuality)
+			? VolumetricFogQuality
+			: VolumetricFogQuality.Medium;
 		config.SetFocused = SetFocused;
 		config.Resizable = Resizable;
 

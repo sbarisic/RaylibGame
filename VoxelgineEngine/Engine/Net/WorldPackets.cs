@@ -64,6 +64,34 @@ public sealed class BlockPlaceRequestPacket : Packet
 	}
 }
 
+public sealed class FogChangePacket : Packet
+{
+	public override PacketType Type => PacketType.FogChange;
+	public int X { get; set; }
+	public int Y { get; set; }
+	public int Z { get; set; }
+	public uint Fog { get; set; }
+	public long ColumnRevision { get; set; }
+
+	public override void Write(BinaryWriter writer)
+	{
+		writer.Write(X);
+		writer.Write(Y);
+		writer.Write(Z);
+		writer.Write(Fog);
+		writer.Write(ColumnRevision);
+	}
+
+	public override void Read(BinaryReader reader)
+	{
+		X = reader.ReadInt32();
+		Y = reader.ReadInt32();
+		Z = reader.ReadInt32();
+		Fog = reader.ReadUInt32();
+		ColumnRevision = reader.ReadInt64();
+	}
+}
+
 public sealed class BlockRemoveRequestPacket : Packet
 {
 	public override PacketType Type => PacketType.BlockRemoveRequest;

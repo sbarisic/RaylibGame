@@ -23,13 +23,16 @@ namespace Voxelgine.Graphics
 		public AABB ModelAABB;
 		public Vector3 GlobalChunkIndex;
 
-		public Chunk(Vector3 globalChunkIndex, ChunkMap worldMap)
+		public Chunk(Vector3 globalChunkIndex, ChunkMap worldMap, bool initializeBlocks = true)
 		{
 			GlobalChunkIndex = globalChunkIndex;
 			WorldMap = worldMap;
 			Blocks = new PlacedBlock[ChunkSize * ChunkSize * ChunkSize];
-			for (int index = 0; index < Blocks.Length; index++)
-				Blocks[index] = new PlacedBlock(BlockType.None);
+			if (initializeBlocks)
+			{
+				for (int index = 0; index < Blocks.Length; index++)
+					Blocks[index] = new PlacedBlock(BlockType.None);
+			}
 
 			Vector3 worldPosition = globalChunkIndex * ChunkSize;
 			ModelAABB = new AABB(worldPosition, new Vector3(ChunkSize));
@@ -95,6 +98,11 @@ namespace Voxelgine.Graphics
 			}
 
 			NonAirBlockCount = count;
+		}
+
+		internal void SetNonAirBlockCount(int count)
+		{
+			NonAirBlockCount = Math.Clamp(count, 0, Blocks.Length);
 		}
 
 		public void To3D(int index, out int x, out int y, out int z)

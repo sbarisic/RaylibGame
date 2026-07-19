@@ -22,15 +22,20 @@ Shared code communicates presentation data with `System.Numerics`, `AABB`,
 Domain entities retain asset identifiers, transforms, tint, and animation
 state; GPU resources are owned by client render components.
 
-## Compatibility invariants
+## Data-format invariants
 
-The renderer migration must not change:
+The current development build intentionally has no compatibility path for old
+world archives or network schemas. `map.bin` and packet layouts may be replaced
+directly while the game remains pre-release. The invariants that remain are:
 
-- save bytes or world serialization semantics;
-- packet bytes, prediction rules, or local-echo suppression;
 - numeric `BlockType` values;
 - authoritative collision, fixed-step timing, or simulation behavior; or
 - existing input bindings when legacy configuration names are loaded.
+
+An incompatible `map.bin` is moved to a timestamped backup before a fresh
+column archive is generated. The protocol-number field is diagnostic schema
+metadata rather than a compatibility layer. See [World archive and spatial
+streaming](WORLD_STREAMING.md).
 
 The client may establish new screenshot baselines after visual review. Exact
 Raylib pixel parity is not an invariant.
@@ -44,7 +49,8 @@ deliberately backend-neutral:
 ```text
 ChunkMap mutation
   |- BlockChanged: one event for one authoritative edit
-  `- WorldReset: one event after bulk generation or deserialization
+  |- ColumnLoaded: one atomic streamed-column insertion
+  `- WorldReset: one event after authoritative generation/archive load
           |
           v
 FishGfxVoxelScene (client only)
@@ -55,7 +61,9 @@ FishGfxVoxelScene (client only)
   `- VoxelRenderer
 ```
 
-The mirror is rebuilt with `SetChunk` and incrementally updated with `SetVoxel`.
+The mirror is populated incrementally with `SetChunk` as complete columns are
+applied and updated with `SetVoxel` for subsequent edits. Startup does not
+capture every chunk or request a global renderer rebuild.
 It cannot write saves or packets. Renderer state never enters `Chunk`,
 `ChunkSnapshot`, or a domain entity.
 

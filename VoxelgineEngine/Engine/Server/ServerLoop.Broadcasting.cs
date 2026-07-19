@@ -1,5 +1,6 @@
 using System.Numerics;
 using Voxelgine.Engine.DI;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server
 {
@@ -141,16 +142,51 @@ namespace Voxelgine.Engine.Server
 			if (changes.Count == 0)
 				return;
 
-			foreach (var change in changes)
+			foreach (BlockChange change in changes)
 			{
-				var packet = new BlockChangePacket
+				BlockChangePacket packet = new()
 				{
 					X = change.X,
 					Y = change.Y,
 					Z = change.Z,
-					BlockType = (byte)change.NewType,
+					BlockType = (ushort)change.NewType,
+					ColumnRevision = change.ColumnRevision,
 				};
-				_server.Broadcast(packet, true, currentTime);
+				int columnX = (int)Math.Floor((double)change.X / Chunk.ChunkSize);
+				int columnZ = (int)Math.Floor((double)change.Z / Chunk.ChunkSize);
+				foreach (NetConnection connection in _server.GetConnections())
+				{
+					if (!connection.IsGameplayActive ||
+						!_worldStream.IsApplied(connection.PlayerId, columnX, columnZ))
+					{
+						continue;
+					}
+
+					if (_server.TrySendTo(
+						connection.PlayerId,
+						packet,
+						true,
+						currentTime,
+						ReliableSendClass.Gameplay))
+					{
+						_worldStream.RecordBlockChange(
+							connection.PlayerId,
+							columnX,
+							columnZ,
+							change.ColumnRevision);
+					}
+					else
+					{
+						_worldStream.RequestFreshSnapshot(
+							connection.PlayerId,
+							change.X,
+							change.Z);
+						_logging.Log(
+							GameLogLevel.Warning,
+							"WorldStream",
+							$"block-change-queue-saturated playerId={connection.PlayerId} column={columnX},{columnZ} revision={change.ColumnRevision}; queued snapshot resync");
+					}
+				}
 			}
 
 			_simulation.Map.ClearPendingChanges();

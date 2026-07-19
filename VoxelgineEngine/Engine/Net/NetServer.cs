@@ -9,7 +9,7 @@ namespace Voxelgine.Engine
 {
 	/// <summary>
 	/// Server-side network manager. Binds a UDP port, accepts client connections
-	/// (validates protocol version, assigns player IDs, rejects if full), manages
+	/// (records schema metadata, assigns player IDs, rejects if full), manages
 	/// connected players, processes incoming packets, and provides methods to send
 	/// packets to individual clients or broadcast to all.
 	/// </summary>
@@ -29,8 +29,8 @@ namespace Voxelgine.Engine
 	public class NetServer : IDisposable
 	{
 		/// <summary>
-		/// Protocol version for client-server compatibility validation.
-		/// Increment when packet formats change in an incompatible way.
+		/// Diagnostic packet-schema metadata. Development builds use one current
+		/// schema and do not carry compatibility behavior for older executables.
 		/// </summary>
 		public const int ProtocolVersion = 1;
 
@@ -181,10 +181,16 @@ namespace Voxelgine.Engine
 					continue;
 				}
 
-				var retransmissions = connection.Channel.GetRetransmissions(currentTime);
-				foreach (var rawData in retransmissions)
+				if (!connection.CollectRetransmissions(currentTime, out uint failedSequence))
 				{
-					connection.QueueSend(rawData, true);
+					string reason = $"Reliable delivery failed for sequence {failedSequence}.";
+					_logging?.Log(
+						GameLogLevel.Error,
+						"Network",
+						$"playerId={connection.PlayerId} endpoint={connection.RemoteEndPoint} {reason}"
+					);
+					DisconnectClient(connection, reason, currentTime);
+					continue;
 				}
 
 				connection.CleanupStaleFragments(currentTime);
@@ -216,6 +222,21 @@ namespace Voxelgine.Engine
 		}
 
 		/// <summary>
+		/// Attempts to enqueue a packet using an explicit priority class. Bulk producers
+		/// use the return value as backpressure and resume on a later server tick.
+		/// </summary>
+		public bool TrySendTo(
+			int playerId,
+			Packet packet,
+			bool reliable,
+			float currentTime,
+			ReliableSendClass sendClass)
+		{
+			return _playerConnections.TryGetValue(playerId, out NetConnection connection) &&
+				QueuePacket(connection, packet, reliable, currentTime, sendClass);
+		}
+
+		/// <summary>
 		/// Sends a packet to all connected clients.
 		/// </summary>
 		/// <param name="packet">The packet to send.</param>
@@ -225,7 +246,7 @@ namespace Voxelgine.Engine
 		{
 			foreach (var connection in _connections.Values)
 			{
-				if (connection.State == ConnectionState.Connected)
+				if (connection.State == ConnectionState.Connected && connection.IsGameplayActive)
 				{
 					QueuePacket(connection, packet, reliable, currentTime);
 				}
@@ -243,7 +264,9 @@ namespace Voxelgine.Engine
 		{
 			foreach (var connection in _connections.Values)
 			{
-				if (connection.State == ConnectionState.Connected && connection.PlayerId != excludePlayerId)
+				if (connection.State == ConnectionState.Connected &&
+					connection.IsGameplayActive &&
+					connection.PlayerId != excludePlayerId)
 				{
 					QueuePacket(connection, packet, reliable, currentTime);
 				}
@@ -333,14 +356,10 @@ namespace Voxelgine.Engine
 
 			if (connect.ProtocolVersion != ProtocolVersion)
 			{
-				_logging?.ServerNetworkWriteLine($"Rejected connection from {sender}: protocol version mismatch (server: {ProtocolVersion}, client: {connect.ProtocolVersion})");
-				var reject = new ConnectRejectPacket
-				{
-					Reason = $"Protocol version mismatch (server: {ProtocolVersion}, client: {connect.ProtocolVersion})"
-				};
-				byte[] raw = tempConnection.WrapPacket(reject, true, currentTime);
-				_transport.SendTo(raw, sender);
-				return;
+				_logging?.Log(
+					GameLogLevel.Warning,
+					"Network",
+					$"schema-metadata-mismatch endpoint={sender} server={ProtocolVersion} client={connect.ProtocolVersion}; continuing development connection");
 			}
 
 			if (_connections.Count >= MaxPlayers)
@@ -350,8 +369,12 @@ namespace Voxelgine.Engine
 				{
 					Reason = "Server is full"
 				};
-				byte[] raw = tempConnection.WrapPacket(reject, true, currentTime);
-				_transport.SendTo(raw, sender);
+				tempConnection.SendImmediate(
+					reject,
+					true,
+					currentTime,
+					_transport,
+					ReliableSendClass.Control);
 				return;
 			}
 
@@ -362,8 +385,12 @@ namespace Voxelgine.Engine
 				{
 					Reason = "No available player slots"
 				};
-				byte[] raw = tempConnection.WrapPacket(reject, true, currentTime);
-				_transport.SendTo(raw, sender);
+				tempConnection.SendImmediate(
+					reject,
+					true,
+					currentTime,
+					_transport,
+					ReliableSendClass.Control);
 				return;
 			}
 
@@ -460,16 +487,49 @@ namespace Voxelgine.Engine
 		private void SendDirect(NetConnection connection, Packet packet, bool reliable, float currentTime)
 		{
 			LogPacket("SEND", packet, connection);
-			connection.SendImmediate(packet, reliable, currentTime, _transport);
+			if (!connection.SendImmediate(
+				packet,
+				reliable,
+				currentTime,
+				_transport,
+				ReliableSendClass.Control))
+			{
+				_logging?.Log(
+					GameLogLevel.Error,
+					"Network",
+					$"Immediate control send queue is full playerId={connection.PlayerId} type={packet.Type}."
+				);
+			}
 		}
 
 		/// <summary>
 		/// Queues a packet for batched sending at the next <see cref="FlushAllConnections"/> call.
 		/// </summary>
-		private void QueuePacket(NetConnection connection, Packet packet, bool reliable, float currentTime)
+		private bool QueuePacket(
+			NetConnection connection,
+			Packet packet,
+			bool reliable,
+			float currentTime,
+			ReliableSendClass? requestedClass = null)
 		{
 			LogPacket("SEND", packet, connection);
-			connection.QueuePacket(packet, reliable, currentTime);
+			ReliableSendClass sendClass = requestedClass ?? (packet is ConnectAcceptPacket
+				or ConnectRejectPacket
+				or DisconnectPacket
+				or PingPacket
+				or PongPacket
+				? ReliableSendClass.Control
+				: ReliableSendClass.Gameplay);
+			bool queued = connection.QueuePacket(packet, reliable, currentTime, sendClass);
+			if (!queued && sendClass != ReliableSendClass.Bulk)
+			{
+				_logging?.Log(
+					GameLogLevel.Error,
+					"Network",
+					$"Reliable send queue is full playerId={connection.PlayerId} type={packet.Type} class={sendClass}."
+				);
+			}
+			return queued;
 		}
 
 		/// <summary>

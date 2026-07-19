@@ -15,9 +15,11 @@ namespace Voxelgine.Graphics
 			int Seed = 666,
 			CancellationToken cancellationToken = default)
 		{
-			ExecuteWorldReset(
-				() => GenerateFloatingIslandCore(Width, Length, Seed, cancellationToken)
-			);
+			ExecuteWorldReset(() =>
+			{
+				GenerateFloatingIslandCore(Width, Length, Seed, cancellationToken);
+				InitializeColumnRevisions();
+			});
 		}
 
 		private void GenerateFloatingIslandCore(
@@ -412,7 +414,6 @@ namespace Voxelgine.Graphics
 			int minSpacing = 5,
 			CancellationToken cancellationToken = default)
 		{
-			// Compute world bounds from loaded chunks
 			int minX = int.MaxValue, maxX = int.MinValue;
 			int minY = int.MaxValue, maxY = int.MinValue;
 			int minZ = int.MaxValue, maxZ = int.MinValue;
@@ -435,98 +436,81 @@ namespace Voxelgine.Graphics
 			if (minX == int.MaxValue)
 				return new List<Vector3>();
 
-			float centerX = (minX + maxX) / 2f;
-			float centerZ = (minZ + maxZ) / 2f;
+			int centerX = (minX + maxX) / 2;
+			int centerZ = (minZ + maxZ) / 2;
+			List<Vector3> result = new(count);
+			float minSpacingSq = minSpacing * minSpacing;
+			int maxRadius = Math.Max(maxX - minX, maxZ - minZ);
 
-			var candidates = new List<Vector3>();
+			bool TryAdd(int x, int z)
+			{
+				if (x <= minX || x >= maxX - 1 || z <= minZ || z >= maxZ - 1)
+					return false;
+				for (int y = maxY - 1; y >= minY; y--)
+				{
+					if (GetBlock(x, y, z) != BlockType.Grass ||
+						GetBlock(x, y + 1, z) != BlockType.None ||
+						GetBlock(x, y + 2, z) != BlockType.None ||
+						GetBlock(x, y + 3, z) != BlockType.None)
+					{
+						continue;
+					}
 
-			// Scan each XZ column top-down for the topmost grass block on a flat 3x3 surface
-			for (int x = minX + 1; x < maxX - 1; x++)
+					bool flat = true;
+					for (int offsetX = -1; offsetX <= 1 && flat; offsetX++)
+					{
+						for (int offsetZ = -1; offsetZ <= 1 && flat; offsetZ++)
+						{
+							bool neighbour = false;
+							for (int neighbourY = y + 1; neighbourY >= y - 1; neighbourY--)
+							{
+								if (BlockInfo.IsSolid(GetBlock(x + offsetX, neighbourY, z + offsetZ)) &&
+									GetBlock(x + offsetX, neighbourY + 1, z + offsetZ) == BlockType.None)
+								{
+									neighbour = true;
+									break;
+								}
+							}
+							flat = neighbour;
+						}
+					}
+
+					if (!flat)
+						continue;
+					Vector3 candidate = new(x, y + 3, z);
+					if (result.Any(selected =>
+						Vector2.DistanceSquared(
+							new Vector2(candidate.X, candidate.Z),
+							new Vector2(selected.X, selected.Z)) < minSpacingSq))
+					{
+						return false;
+					}
+					result.Add(candidate);
+					return true;
+				}
+				return false;
+			}
+
+			for (int radius = 0; radius <= maxRadius && result.Count < count; radius++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				for (int z = minZ + 1; z < maxZ - 1; z++)
+				if (radius == 0)
 				{
-					for (int y = maxY - 1; y >= minY; y--)
-					{
-						// Must be a grass block
-						if (GetBlock(x, y, z) != BlockType.Grass)
-							continue;
-
-						// Need 3 air blocks above for player clearance
-						if (GetBlock(x, y + 1, z) != BlockType.None ||
-							GetBlock(x, y + 2, z) != BlockType.None ||
-							GetBlock(x, y + 3, z) != BlockType.None)
-							continue;
-
-						// Check 3x3 flatness: all surrounding surface blocks must be solid
-						// and within ±1 of the center height
-						bool flat = true;
-						for (int ddx = -1; ddx <= 1 && flat; ddx++)
-						{
-							for (int dz = -1; dz <= 1 && flat; dz++)
-							{
-								if (ddx == 0 && dz == 0)
-									continue;
-
-								// Find topmost solid block in this neighbor column (within ±1 of y)
-								bool neighborOk = false;
-								for (int ny = y + 1; ny >= y - 1; ny--)
-								{
-									if (BlockInfo.IsSolid(GetBlock(x + ddx, ny, z + dz)) &&
-										GetBlock(x + ddx, ny + 1, z + dz) == BlockType.None)
-									{
-										neighborOk = true;
-										break;
-									}
-								}
-								if (!neighborOk)
-									flat = false;
-							}
-						}
-
-						if (!flat)
-							continue;
-
-						candidates.Add(new Vector3(x, y + 3, z));
-						break;
-					}
-			}
+					TryAdd(centerX, centerZ);
+					continue;
 				}
 
-			if (candidates.Count == 0)
-				return new List<Vector3>();
-
-			// Sort by distance to world center (XZ plane)
-			candidates.Sort((a, b) =>
-			{
-				float distA = (a.X - centerX) * (a.X - centerX) + (a.Z - centerZ) * (a.Z - centerZ);
-				float distB = (b.X - centerX) * (b.X - centerX) + (b.Z - centerZ) * (b.Z - centerZ);
-				return distA.CompareTo(distB);
-			});
-
-			// Select points with minimum spacing
-			var result = new List<Vector3>();
-			float minSpacingSq = minSpacing * minSpacing;
-
-			foreach (var candidate in candidates)
-			{
-				bool tooClose = false;
-				foreach (var selected in result)
+				for (int x = centerX - radius; x <= centerX + radius && result.Count < count; x++)
 				{
-					float ddx = candidate.X - selected.X;
-					float dz = candidate.Z - selected.Z;
-					if (ddx * ddx + dz * dz < minSpacingSq)
-					{
-						tooClose = true;
-						break;
-					}
+					TryAdd(x, centerZ - radius);
+					if (result.Count < count)
+						TryAdd(x, centerZ + radius);
 				}
-
-				if (!tooClose)
+				for (int z = centerZ - radius + 1; z < centerZ + radius && result.Count < count; z++)
 				{
-					result.Add(candidate);
-					if (result.Count >= count)
-						break;
+					TryAdd(centerX - radius, z);
+					if (result.Count < count)
+						TryAdd(centerX + radius, z);
 				}
 			}
 

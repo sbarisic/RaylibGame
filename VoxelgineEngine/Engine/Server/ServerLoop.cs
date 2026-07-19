@@ -63,12 +63,13 @@ namespace Voxelgine.Engine.Server
 		private const string MapFile = "data/map.bin";
 
 		private readonly NetServer _server;
-		private readonly WorldTransferManager _worldTransfer;
+		private readonly WorldStreamManager _worldStream;
 		private readonly IFishLogging _logging;
 		private readonly IFishEngineRunner _eng;
 		private readonly FishDI _di;
 		private GameSimulation _simulation;
 		private int _worldSeed;
+		private WorldArchivePayloadCache _archivePayloadCache;
 
 		/// <summary>
 		/// Interval in seconds between <see cref="DayTimeSyncPacket"/> broadcasts.
@@ -94,6 +95,7 @@ namespace Voxelgine.Engine.Server
 		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
 		private readonly Dictionary<int, ServerCommandQueue> _playerCommandQueues = new();
 		private readonly Dictionary<int, ServerInventory> _playerInventories = new();
+		private readonly Dictionary<int, PendingPlayer> _pendingPlayers = new();
 		private readonly PlayerDataStore _playerData;
 
 		private float _lastTimeSyncTime;
@@ -174,15 +176,14 @@ namespace Voxelgine.Engine.Server
 #if DEBUG
 			//_server.PacketLoggingEnabled = true;
 #endif
-			_worldTransfer = new WorldTransferManager(_server);
+			_simulation = new GameSimulation(eng);
+			_simulation.Entities.PlayerTouchedEntity += OnPlayerTouchedEntity;
+			_worldStream = new WorldStreamManager(_server, _simulation.Map, _logging);
 
 			_server.OnClientConnected += OnClientConnected;
 			_server.OnClientDisconnected += OnClientDisconnected;
 			_server.OnPacketReceived += OnPacketReceived;
-			_worldTransfer.OnTransferComplete += OnWorldTransferComplete;
-
-			_simulation = new GameSimulation(eng);
-			_simulation.Entities.PlayerTouchedEntity += OnPlayerTouchedEntity;
+			_worldStream.ClientReady += ActivatePendingPlayer;
 		}
 
 		/// <summary>
@@ -207,39 +208,58 @@ namespace Voxelgine.Engine.Server
 				if (!string.IsNullOrEmpty(mapDirectory))
 					Directory.CreateDirectory(mapDirectory);
 
+				bool generated = true;
 				if (File.Exists(MapFile) && !forceRegenerate)
 				{
-					_logging.ServerWriteLine($"Loading world from '{MapFile}'...");
-					using var fileStream = File.OpenRead(MapFile);
-					_simulation.Map.Read(fileStream);
-					cancellationToken.ThrowIfCancellationRequested();
-					_logging.ServerWriteLine("World loaded from file.");
+					string backup = WorldArchive.MoveIncompatibleFileToBackup(MapFile);
+					if (backup != null)
+					{
+						_logging.Log(
+							GameLogLevel.Warning,
+							"Persistence",
+							$"incompatible-map backup={Path.GetFullPath(backup)}; regenerating formatVersion={WorldArchive.FormatVersion}");
+					}
+					else
+					{
+						Stopwatch loadTimer = Stopwatch.StartNew();
+						WorldArchiveReadResult archive;
+						using (FileStream archiveStream = File.OpenRead(MapFile))
+							archive = WorldArchive.Read(archiveStream, cancellationToken);
+						_simulation.Map.ReplaceAllColumns(archive.Columns);
+						_archivePayloadCache = archive.PayloadCache;
+						_worldStream.SetArchivePayloadCache(_archivePayloadCache);
+						_worldSeed = archive.Metadata.WorldSeed;
+						PlayerSpawnPosition = archive.Metadata.PlayerSpawn;
+						_pickupSpawnPos = archive.Metadata.PickupSpawn;
+						_npcSpawnPos = archive.Metadata.NpcSpawn;
+						generated = false;
+						_logging.Log(
+							GameLogLevel.Info,
+							"Persistence",
+							$"world-load path={Path.GetFullPath(MapFile)} columns={archive.Columns.Count} seed={_worldSeed} durationMs={loadTimer.Elapsed.TotalMilliseconds:F1}");
+					}
 				}
-				else
-				{
-					if (forceRegenerate && File.Exists(MapFile))
-						_logging.ServerWriteLine("Force regeneration requested, ignoring existing world file.");
 
-					_logging.ServerWriteLine($"Generating world (seed: {worldSeed}, size: {DefaultWorldWidth}x{DefaultWorldLength})...");
+				if (generated)
+				{
+					_logging.Log(GameLogLevel.Info, "Generation", $"begin seed={worldSeed} size={DefaultWorldWidth}x{DefaultWorldLength}");
 					_simulation.Map.GenerateFloatingIsland(
 						DefaultWorldWidth,
 						DefaultWorldLength,
 						worldSeed,
-						cancellationToken
-					);
+						cancellationToken);
 					_simulation.Map.ClearPendingChanges();
-					_logging.ServerWriteLine("World generation complete.");
-
-					cancellationToken.ThrowIfCancellationRequested();
-					_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
-					using var fileStream = File.Create(MapFile);
-					_simulation.Map.Write(fileStream);
-					cancellationToken.ThrowIfCancellationRequested();
-					_logging.ServerWriteLine("World saved.");
+					FindAndSetSpawnPoints(cancellationToken);
+					SaveWorld();
 				}
-
-				// Find valid spawn points on the world surface
-				FindAndSetSpawnPoints(cancellationToken);
+				else if (!IsSpawnPositionValid(PlayerSpawnPosition) ||
+					!IsSpawnPositionValid(_pickupSpawnPos) ||
+					!IsSpawnPositionValid(_npcSpawnPos))
+				{
+					_logging.Log(GameLogLevel.Warning, "Persistence", "archive spawn positions are invalid; searching deterministically");
+					FindAndSetSpawnPoints(cancellationToken);
+					SaveWorld();
+				}
 
 				_logging.ServerWriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
 
@@ -247,7 +267,7 @@ namespace Voxelgine.Engine.Server
 				SpawnEntities();
 
 				cancellationToken.ThrowIfCancellationRequested();
-				_server.WorldSeed = worldSeed;
+				_server.WorldSeed = _worldSeed;
 				_server.Start(port);
 				_running = true;
 				if (cancellationToken.IsCancellationRequested)
@@ -333,7 +353,7 @@ namespace Voxelgine.Engine.Server
 			_server.Tick(totalTime);
 
 			// 2. Send pending world data fragments to connecting clients
-			_worldTransfer.Tick(totalTime);
+			_worldStream.Tick(totalTime);
 
 			// 3. Process player respawns
 			ProcessRespawns();
@@ -437,28 +457,28 @@ namespace Voxelgine.Engine.Server
 		{
 			try
 			{
-				_logging.ServerWriteLine($"Saving world to '{MapFile}'...");
-				using var fileStream = File.Create(MapFile);
-				_simulation.Map.Write(fileStream);
-				_logging.ServerWriteLine("World saved.");
+				Stopwatch timer = Stopwatch.StartNew();
+				string temporaryPath = MapFile + ".tmp";
+				using (FileStream fileStream = File.Create(temporaryPath))
+				{
+					_archivePayloadCache = WorldArchive.Write(
+						fileStream,
+						_simulation.Map,
+						new WorldArchiveMetadata(_worldSeed, PlayerSpawnPosition, _pickupSpawnPos, _npcSpawnPos),
+						_archivePayloadCache);
+					fileStream.Flush(flushToDisk: true);
+				}
+				File.Move(temporaryPath, MapFile, overwrite: true);
+				_worldStream.SetArchivePayloadCache(_archivePayloadCache);
+				_logging.Log(
+					GameLogLevel.Info,
+					"Persistence",
+					$"world-save path={Path.GetFullPath(MapFile)} columns={_simulation.Map.ColumnCount} bytes={new FileInfo(MapFile).Length} durationMs={timer.Elapsed.TotalMilliseconds:F1}");
 			}
 			catch (Exception ex)
 			{
 				_logging.Log(GameLogLevel.Error, "Persistence", $"Failed to save world path={Path.GetFullPath(MapFile)}", ex);
 			}
-		}
-
-		/// <summary>
-		/// Serializes the current world state (ChunkMap) into a GZip-compressed byte array.
-		/// </summary>
-		private byte[] SerializeWorld()
-		{
-			_logging.ServerWriteLine("SerializeWorld: Serializing world...");
-			using var ms = new MemoryStream();
-			_simulation.Map.Write(ms);
-			byte[] data = ms.ToArray();
-			_logging.ServerWriteLine($"SerializeWorld: Produced {data.Length:N0} bytes");
-			return data;
 		}
 
 		/// <summary>

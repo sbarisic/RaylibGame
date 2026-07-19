@@ -126,7 +126,7 @@ public unsafe partial class MPClientGameState
 		}
 	}
 
-	private void CreateFishGfxVoxelScene()
+	private void CreateFishGfxVoxelScene(bool synchronizeExisting = true)
 	{
 #if WINDOWS
 		DisposeFishGfxVoxelScene();
@@ -141,7 +141,8 @@ public unsafe partial class MPClientGameState
 			fishWindow.Assets,
 			_simulation.Map,
 			config.MaxChunkDrawDistance,
-			config.ChunkMeshUploadBudget
+			config.ChunkMeshUploadBudget,
+			synchronizeExisting
 		);
 		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
 		_fishCelestial = new FishGfxCelestialLayer(fishWindow);
@@ -208,8 +209,23 @@ public unsafe partial class MPClientGameState
 		}
 
 		UpdateFishGfxUi(timing);
-		if (!_initialized || _simulation?.LocalPlayer is null || _fishVoxelScene is null)
+		if (_fishVoxelScene is null)
 		{
+			return;
+		}
+		if (!_initialized || _simulation?.LocalPlayer is null)
+		{
+			Vector2 loadingFramebuffer = ((IFishGfxGameWindow)_gameWindow).RenderWindow.FramebufferSize;
+			_fishCameraState = new GameCameraState(
+				_worldStreamFocus + new Vector3(0, 12, -20),
+				_worldStreamFocus,
+				Vector3.UnitY,
+				60,
+				CameraProjectionKind.Perspective);
+			ConfigureFishCamera(_fishWorldCamera, _fishCameraState, loadingFramebuffer);
+			if (_simulation != null)
+				ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, _worldStreamFocus);
+			_fishVoxelScene.Update(_fishWorldCamera);
 			return;
 		}
 
@@ -251,6 +267,7 @@ public unsafe partial class MPClientGameState
 		{
 			_nextRendererProfileLogTime = timing.TotalTime + 1;
 			VoxelRendererStatistics rendererStatistics = _fishVoxelScene.Statistics;
+			NetConnectionDiagnostics networkDiagnostics = _client?.Diagnostics ?? default;
 			_logging?.Log(
 				GameLogLevel.Debug,
 				"Performance",
@@ -269,6 +286,13 @@ public unsafe partial class MPClientGameState
 					+ $"transparentRequestReason={rendererDiagnostics.TransparentInvalidationReason} transparentOrderingReason={rendererDiagnostics.TransparentOrderingReason} "
 					+ $"transparentGeometryRevision={rendererDiagnostics.TransparentOrderingGeometryRevision} "
 					+ $"transparentCameraDelta={rendererDiagnostics.TransparentOrderingCameraDistanceDelta:F2}/{rendererDiagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2}deg"
+					+ $" streamCore={WorldCoreReceived}/{WorldCoreApplied}/{WorldCoreLit}/{WorldCoreMeshed} streamHalo={WorldHaloReceived}/{WorldHaloApplied}/{WorldHaloLit}/{WorldHaloMeshed} "
+					+ $"streamOrdinary={WorldOrdinaryReceived}/{WorldOrdinaryApplied} decodeQueue={WorldDecodeQueueDepth} applyQueue={WorldApplyQueueDepth} "
+					+ $"streamedColumns={WorldCoreReceived + WorldHaloReceived + WorldOrdinaryReceived} cachedColumns={WorldCachedColumns} "
+					+ $"columnDecodeMs={AverageColumnDecodeMilliseconds:F3} columnApplyMs={AverageColumnApplyMilliseconds:F3} "
+					+ $"reliableFlight={networkDiagnostics.ReliableInFlight} queues={networkDiagnostics.ControlQueued}/{networkDiagnostics.GameplayQueued}/{networkDiagnostics.BulkQueued} "
+					+ $"ackOnly={networkDiagnostics.AcknowledgementsSent} ackOnlyPerSecond={networkDiagnostics.AcknowledgementsPerSecond:F1} "
+					+ $"retransmissions={networkDiagnostics.RetransmissionsSent} retransmissionsPerSecond={networkDiagnostics.RetransmissionsPerSecond:F1} retryFailures={networkDiagnostics.RetryFailures}"
 			);
 		}
 		_fishParticles?.UpdateVoxelEmitters(
@@ -302,11 +326,14 @@ public unsafe partial class MPClientGameState
 		GameStateRenderSettings overlay = GameStateRenderSettings.CreateOverlay(logicalSize);
 		FishColor clearColor = new(30, 30, 40);
 
-		if (_initialized && _simulation?.LocalPlayer is not null)
+		if ((_initialized && _simulation?.LocalPlayer is not null) || _fishVoxelScene is not null)
 		{
 			ConfigureFishCamera(_fishWorldCamera, _fishCameraState, framebufferSize);
-			var sky = _simulation.DayNight.SkyColor;
-			clearColor = new FishColor(sky.R, sky.G, sky.B, sky.A);
+			if (_simulation != null)
+			{
+				var sky = _simulation.DayNight.SkyColor;
+				clearColor = new FishColor(sky.R, sky.G, sky.B, sky.A);
+			}
 		}
 		else
 		{
@@ -327,23 +354,27 @@ public unsafe partial class MPClientGameState
 
 	public override void RenderWorld(RenderPass pass, in FrameTiming timing)
 	{
-		if (!_initialized || _simulation?.LocalPlayer is null || _fishVoxelScene is null)
+		if (_fishVoxelScene is null)
 		{
 			return;
 		}
 
 		_fishRenderQueue.BeginFrame();
-		_fishCelestial?.Render(pass, _fishCameraState, _simulation.DayNight);
+		if (_initialized && _simulation?.LocalPlayer is not null)
+			_fishCelestial?.Render(pass, _fishCameraState, _simulation.DayNight);
 		_fishVoxelScene.Enqueue(_fishRenderQueue, _fishWorldCamera);
 		pass.Execute(_fishRenderQueue, RenderQueueBucket.Opaque);
-		DrawFishGfxGameplayGeometry(pass);
+		if (_initialized)
+			DrawFishGfxGameplayGeometry(pass);
 		pass.Execute(_fishRenderQueue, RenderQueueBucket.Transparent);
-		_fishParticles?.Render(
-			pass,
-			_fishCameraState.Position,
-			_fishCameraState.Target,
-			_fishCameraState.Up
-		);
+		if (_initialized)
+		{
+			_fishParticles?.Render(
+				pass,
+				_fishCameraState.Position,
+				_fishCameraState.Target,
+				_fishCameraState.Up);
+		}
 	}
 
 	public override void RenderViewmodel(RenderPass pass, in FrameTiming timing)
@@ -828,7 +859,7 @@ public unsafe partial class MPClientGameState
 				_loadingProgressBar.Visible = loading;
 				if (loading)
 				{
-					_loadingProgressBar.Value = _client.WorldReceiver.Progress;
+					_loadingProgressBar.Value = WorldLoadingProgress;
 				}
 			}
 		}

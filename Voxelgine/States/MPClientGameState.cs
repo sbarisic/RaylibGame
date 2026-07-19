@@ -102,13 +102,7 @@ namespace Voxelgine.States
 		private readonly NetworkInputSource _neutralInputSource = new();
 		private readonly InputMgr _neutralInputManager;
 
-		// World loading is CPU-heavy for large maps. It runs away from the graphics thread
-		// while Tick continues pumping the connection and buffering gameplay packets.
 		private readonly List<Packet> _pendingWorldPackets = new();
-		private Task<GameSimulation> _worldLoadTask;
-		private CancellationTokenSource _worldLoadCancellation;
-		private int _worldLoadGeneration;
-		private int _worldLoadStage;
 		private bool _replayingPendingWorldPackets;
 
 		// Visual correction smoothing — accumulated position offset from reconciliation
@@ -175,8 +169,6 @@ namespace Voxelgine.States
 			_client.OnConnected += OnConnected;
 			_client.OnDisconnected += OnDisconnected;
 			_client.OnConnectionRejected += OnConnectionRejected;
-			_client.OnWorldDataReady += OnWorldDataReady;
-			_client.OnWorldTransferFailed += OnWorldTransferFailed;
 			_client.OnPacketReceived += OnPacketReceived;
 
 			_statusText = $"Connecting to {host}:{port}...";
@@ -243,7 +235,7 @@ namespace Voxelgine.States
 
 				// Process network (client may still be processing final packets)
 				_client?.Tick(currentTime);
-				UpdateWorldLoad();
+				UpdateWorldStream();
 
 				// Handle connection lost overlay input
 				if (_connectionLost)
@@ -275,18 +267,7 @@ namespace Voxelgine.States
 				if (!_initialized)
 				{
 					// Update loading progress
-					if (_worldLoadTask != null)
-					{
-						_statusText = GetWorldLoadStatus();
-					}
-					else if (_client.State == ClientState.Loading)
-					{
-						var wr = _client.WorldReceiver;
-						if (wr.TotalFragments > 0)
-							_statusText = $"Loading world... {wr.FragmentsReceived}/{wr.TotalFragments}";
-						else
-							_statusText = "Loading world...";
-					}
+					_statusText = GetWorldLoadStatus();
 					return;
 				}
 
@@ -596,8 +577,6 @@ namespace Voxelgine.States
 				_client.OnConnected -= OnConnected;
 				_client.OnDisconnected -= OnDisconnected;
 				_client.OnConnectionRejected -= OnConnectionRejected;
-				_client.OnWorldDataReady -= OnWorldDataReady;
-				_client.OnWorldTransferFailed -= OnWorldTransferFailed;
 				_client.OnPacketReceived -= OnPacketReceived;
 				_client.Dispose();
 				_client = null;

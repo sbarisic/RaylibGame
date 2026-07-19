@@ -16,6 +16,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly FishGfxVoxelAssets assets;
 	private readonly CampfireEmitterIndex campfires = new();
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
+	private readonly ConcurrentQueue<ChunkColumnSnapshot> pendingColumns = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
 	private readonly VoxelRendererOptions rendererOptions;
 	private float skyLightMultiplier = 1;
@@ -24,7 +25,9 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private bool disposed;
 
 	public FishGfxVoxelScene(GraphicsContext graphics, GameAssetStore assetStore, ChunkMap source,
-		int maxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance, int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget)
+		int maxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
+		int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
+		bool synchronizeExisting = true)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		this.source = source ?? throw new ArgumentNullException(nameof(source));
@@ -59,8 +62,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 			rendererOptions);
 
 		source.BlockChanged += QueueChange;
+		source.ColumnLoaded += QueueColumn;
 		source.WorldReset += QueueReset;
-		SynchronizeAll();
+		if (synchronizeExisting)
+			SynchronizeAll();
 	}
 
 	public VoxelWorld World { get; }
@@ -90,6 +95,13 @@ public sealed class FishGfxVoxelScene : IDisposable
 	public VoxelRendererFrameDiagnostics FrameDiagnostics => Renderer.FrameDiagnostics;
 
 	public VoxelRendererStatistics Statistics => Renderer.Statistics;
+
+	public bool IsLightingIdle => Lighting.IsIdle;
+
+	public bool HasValidTransparentOrdering => Renderer.HasValidTransparentOrdering;
+
+	public VoxelPresentationState GetPresentationState(ChunkCoordinate coordinate) =>
+		Renderer.GetPresentationState(coordinate);
 
 	public void SetOptimizationSettings(int maxChunkDrawDistance, int chunkMeshUploadBudget)
 	{
@@ -130,10 +142,16 @@ public sealed class FishGfxVoxelScene : IDisposable
 			while (pendingChanges.TryDequeue(out _))
 			{
 			}
+			while (pendingColumns.TryDequeue(out _))
+			{
+			}
 
 			SynchronizeAll();
 			return;
 		}
+
+		while (pendingColumns.TryDequeue(out ChunkColumnSnapshot column))
+			ApplyColumn(column);
 
 		while (pendingChanges.TryDequeue(out BlockChange change))
 			Apply(change);
@@ -238,6 +256,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 		disposed = true;
 		source.BlockChanged -= QueueChange;
+		source.ColumnLoaded -= QueueColumn;
 		source.WorldReset -= QueueReset;
 		Renderer.Dispose();
 		Lighting.Dispose();
@@ -286,6 +305,36 @@ public sealed class FishGfxVoxelScene : IDisposable
 		}
 
 		Lighting.RequestFullRebuild();
+	}
+
+	private void ApplyColumn(ChunkColumnSnapshot column)
+	{
+		campfires.ReplaceColumn(column);
+		ChunkCoordinate[] previous = residents
+			.Where(coordinate => coordinate.X == column.X && coordinate.Z == column.Z)
+			.ToArray();
+		foreach (ChunkCoordinate coordinate in previous)
+		{
+			residents.Remove(coordinate);
+			Lighting.UnloadChunk(coordinate);
+			World.RemoveChunk(coordinate);
+		}
+
+		int highestY = column.Chunks.Count == 0
+			? int.MinValue
+			: column.Chunks.Max(static snapshot => snapshot.ChunkY);
+		foreach (ChunkSnapshot snapshot in column.Chunks)
+		{
+			ChunkCoordinate coordinate = new(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ);
+			VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
+			for (int index = 0; index < cells.Length; index++)
+				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Blocks[index]));
+
+			World.SetChunk(coordinate, cells);
+			residents.Add(coordinate);
+			Lighting.LoadChunk(coordinate, skyExposedAbove: snapshot.ChunkY == highestY);
+		}
+		RefreshSkyExposure(column.X, column.Z);
 	}
 
 	private void Apply(BlockChange change)
@@ -338,6 +387,12 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private void QueueReset()
 	{
 		Interlocked.Exchange(ref resetPending, 1);
+	}
+
+	private void QueueColumn(ChunkColumnSnapshot column)
+	{
+		if (Volatile.Read(ref resetPending) == 0)
+			pendingColumns.Enqueue(column);
 	}
 
 	private static byte ScaleLight(int light)

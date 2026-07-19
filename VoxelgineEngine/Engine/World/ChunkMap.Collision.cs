@@ -28,6 +28,8 @@ namespace Voxelgine.Graphics
 			int x = (int)MathF.Floor(origin.X);
 			int y = (int)MathF.Floor(origin.Y);
 			int z = (int)MathF.Floor(origin.Z);
+			if (UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z))
+				return false;
 			if (IsSolid(x, y, z))
 			{
 				hit = new VoxelRaycastHit(x, y, z, origin, Vector3.Zero, 0f);
@@ -76,6 +78,8 @@ namespace Voxelgine.Graphics
 					normal = new Vector3(0f, 0f, -stepZ);
 				}
 
+				if (UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z))
+					return false;
 				if (IsSolid(x, y, z))
 				{
 					hit = new VoxelRaycastHit(x, y, z, origin + direction * distance, normal, distance);
@@ -97,7 +101,13 @@ namespace Voxelgine.Graphics
 			return (boundary - origin) / direction;
 		}
 
-		public bool IsSolid(int x, int y, int z) => BlockInfo.IsSolid(GetBlock(x, y, z));
+		public bool IsSolid(int x, int y, int z) =>
+			(UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z)) ||
+			BlockInfo.IsSolid(GetBlock(x, y, z));
+
+		private bool IsWorldColumnResident(int worldX, int worldZ) => IsColumnResident(
+			(int)Math.Floor((double)worldX / Chunk.ChunkSize),
+			(int)Math.Floor((double)worldZ / Chunk.ChunkSize));
 
 		public bool IsSolid(Vector3 position) => IsSolid(
 			(int)MathF.Floor(position.X),

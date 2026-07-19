@@ -4,160 +4,107 @@ using System.Net;
 
 namespace Voxelgine.Engine
 {
-	/// <summary>
-	/// Connection lifecycle states.
-	/// </summary>
 	public enum ConnectionState
 	{
-		/// <summary>
-		/// Connection handshake in progress (Connect sent, awaiting ConnectAccept/ConnectReject).
-		/// </summary>
 		Connecting,
-
-		/// <summary>
-		/// Fully connected and exchanging game data.
-		/// </summary>
 		Connected,
-
-		/// <summary>
-		/// Connection terminated (explicit disconnect or timeout).
-		/// </summary>
 		Disconnected,
 	}
 
-	/// <summary>
-	/// Represents a network connection to a remote endpoint.
-	/// Wraps a <see cref="ReliableChannel"/> for packet delivery and tracks connection
-	/// metadata: round-trip time (via Ping/Pong), timeout detection, player identity,
-	/// and connection state.
-	/// </summary>
-	/// <remarks>
-	/// Server holds one <see cref="NetConnection"/> per connected client in a
-	/// <c>Dictionary&lt;IPEndPoint, NetConnection&gt;</c>.
-	/// Client holds a single <see cref="NetConnection"/> to the server.
-	/// </remarks>
-	public class NetConnection
+	public enum ReliableSendClass
 	{
-		/// <summary>
-		/// Default timeout in seconds. If no data is received for this duration
-		/// the connection is considered dead.
-		/// </summary>
+		Control,
+		Gameplay,
+		Bulk,
+	}
+
+	public readonly record struct NetConnectionDiagnostics(
+		int ReliableInFlight,
+		int ControlQueued,
+		int GameplayQueued,
+		int BulkQueued,
+		long AcknowledgementsSent,
+		long RetransmissionsSent,
+		long RetryFailures,
+		float AcknowledgementsPerSecond,
+		float RetransmissionsPerSecond);
+
+	/// <summary>
+	/// One UDP peer with bounded, priority-aware reliable delivery and fragment reassembly.
+	/// </summary>
+	public sealed class NetConnection
+	{
 		public const float DefaultTimeout = 10f;
-
-		/// <summary>
-		/// Interval in seconds between automatic Ping packets.
-		/// </summary>
 		public const float PingInterval = 1f;
+		public const int ControlAndGameplayQueueCapacity = 256;
+		public const int BulkQueueCapacity = 128;
+		public const int BulkInFlightLimit = 48;
 
-		/// <summary>
-		/// Smoothing factor for RTT exponential moving average.
-		/// Higher values weight the existing average more heavily.
-		/// </summary>
 		private const float RttSmoothFactor = 0.8f;
+		private readonly ReliableChannel channel = new();
+		private readonly PacketFragmenter fragmenter = new();
+		private readonly BandwidthTracker bandwidth = new();
+		private readonly Queue<byte[]> controlQueue = new();
+		private readonly Queue<byte[]> gameplayQueue = new();
+		private readonly Queue<byte[]> bulkQueue = new();
+		private readonly Queue<byte[]> unreliableQueue = new();
+		private readonly List<byte[]> rawPriorityQueue = new();
 
-		private readonly ReliableChannel _channel;
-		private readonly PacketFragmenter _fragmenter = new();
+		private float lastReceiveTime;
+		private float lastPingSentTime;
+		private long lastPingTimestamp;
+		private float roundTripTime;
+		private bool roundTripTimeInitialized;
+		private float diagnosticsRateSampleTime;
+		private long diagnosticsRateAcknowledgements;
+		private long diagnosticsRateRetransmissions;
+		private float acknowledgementsPerSecond;
+		private float retransmissionsPerSecond;
 
-		private float _lastReceiveTime;
-		private float _lastPingSentTime;
-		private long _lastPingTimestamp;
-		private float _rtt;
-		private bool _rttInitialized;
-
-		private readonly BandwidthTracker _bandwidth = new();
-		private readonly List<QueuedPacket> _outgoing = new();
-
-		/// <summary>
-		/// The remote endpoint this connection communicates with.
-		/// </summary>
-		public IPEndPoint RemoteEndPoint { get; }
-
-		/// <summary>
-		/// Current connection state.
-		/// </summary>
-		public ConnectionState State { get; set; }
-
-		/// <summary>
-		/// The player ID assigned to this connection. -1 if not yet assigned.
-		/// </summary>
-		public int PlayerId { get; set; } = -1;
-
-		/// <summary>
-		/// The player display name associated with this connection.
-		/// </summary>
-		public string PlayerName { get; set; } = string.Empty;
-
-		/// <summary>
-		/// Smoothed round-trip time in seconds, measured via Ping/Pong.
-		/// Returns 0 until the first Pong is received.
-		/// </summary>
-		public float RoundTripTime => _rtt;
-
-		/// <summary>
-		/// Round-trip time in milliseconds for display purposes.
-		/// </summary>
-		public int RoundTripTimeMs => (int)(_rtt * 1000f);
-
-		/// <summary>
-		/// The underlying reliability channel for this connection.
-		/// </summary>
-		public ReliableChannel Channel => _channel;
-
-		/// <summary>
-		/// The packet fragmenter for splitting large packets and reassembling received fragments.
-		/// </summary>
-		public PacketFragmenter Fragmenter => _fragmenter;
-
-		/// <summary>
-		/// Per-connection bandwidth diagnostics tracker.
-		/// </summary>
-		public BandwidthTracker Bandwidth => _bandwidth;
-
-		/// <summary>
-		/// Creates a new connection to the specified remote endpoint.
-		/// </summary>
-		/// <param name="remoteEndPoint">The remote IP endpoint.</param>
-		/// <param name="currentTime">Current time in seconds for timeout tracking.</param>
 		public NetConnection(IPEndPoint remoteEndPoint, float currentTime)
 		{
 			RemoteEndPoint = remoteEndPoint ?? throw new ArgumentNullException(nameof(remoteEndPoint));
-			_channel = new ReliableChannel();
-			_lastReceiveTime = currentTime;
-			_lastPingSentTime = currentTime;
+			lastReceiveTime = currentTime;
+			lastPingSentTime = currentTime;
+			diagnosticsRateSampleTime = currentTime;
 			State = ConnectionState.Connecting;
 		}
 
-		/// <summary>
-		/// Wraps a packet for transmission through the reliable channel.
-		/// </summary>
-		/// <param name="packet">The packet to send.</param>
-		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
-		/// <param name="currentTime">Current time in seconds.</param>
-		/// <returns>Raw bytes ready for UDP transmission.</returns>
-		public byte[] WrapPacket(Packet packet, bool reliable, float currentTime)
-		{
-			byte[] serialized = packet.Serialize();
-			return _channel.Wrap(serialized, reliable, currentTime);
-		}
+		public IPEndPoint RemoteEndPoint { get; }
+		public ConnectionState State { get; set; }
+		public int PlayerId { get; set; } = -1;
+		public string PlayerName { get; set; } = string.Empty;
+		public bool IsGameplayActive { get; set; }
+		public float RoundTripTime => roundTripTime;
+		public int RoundTripTimeMs => (int)(roundTripTime * 1000f);
+		public ReliableChannel Channel => channel;
+		public PacketFragmenter Fragmenter => fragmenter;
+		public BandwidthTracker Bandwidth => bandwidth;
+		public int BulkQueueSlots => BulkQueueCapacity - bulkQueue.Count;
+		public int ReliableQueueCount => controlQueue.Count + gameplayQueue.Count + bulkQueue.Count;
 
-		/// <summary>
-		/// Unwraps a received raw datagram through the reliable channel and
-		/// deserializes the contained packet. Handles fragment reassembly — if the
-		/// unwrapped data is a fragment, it is buffered and null is returned until
-		/// all fragments for the group arrive.
-		/// </summary>
-		/// <param name="rawData">Raw bytes received from UDP.</param>
-		/// <param name="currentTime">Current time in seconds for receive tracking.</param>
-		/// <returns>The deserialized packet, or null if the data was a duplicate, malformed, empty, or a partial fragment.</returns>
+		public NetConnectionDiagnostics Diagnostics => new(
+			channel.PendingCount,
+			controlQueue.Count,
+			gameplayQueue.Count,
+			bulkQueue.Count,
+			channel.AckOnlyPacketsSent,
+			channel.RetransmissionsSent,
+			channel.RetryFailures,
+			acknowledgementsPerSecond,
+			retransmissionsPerSecond);
+
 		public Packet UnwrapPacket(byte[] rawData, float currentTime)
 		{
-			byte[] packetData = _channel.Unwrap(rawData);
-			if (packetData == null)
+			ReliableReceiveResult result = channel.Unwrap(rawData);
+			if (!result.IsValid)
 				return null;
 
-			_lastReceiveTime = currentTime;
+			lastReceiveTime = currentTime;
+			if (result.IsAckOnly || result.IsDuplicate || result.Payload == null)
+				return null;
 
-			byte[] reassembled = _fragmenter.HandleReceived(packetData, currentTime);
+			byte[] reassembled = fragmenter.HandleReceived(result.Payload, currentTime);
 			if (reassembled == null)
 				return null;
 
@@ -171,238 +118,201 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		/// <summary>
-		/// Returns whether the connection has timed out (no data received for <see cref="DefaultTimeout"/> seconds).
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		public bool HasTimedOut(float currentTime)
-		{
-			return currentTime - _lastReceiveTime >= DefaultTimeout;
-		}
+		public bool HasTimedOut(float currentTime) => currentTime - lastReceiveTime >= DefaultTimeout;
 
-		/// <summary>
-		/// Returns the number of seconds since the last data was received on this connection.
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		public float TimeSinceLastReceive(float currentTime)
-		{
-			return currentTime - _lastReceiveTime;
-		}
+		public float TimeSinceLastReceive(float currentTime) => currentTime - lastReceiveTime;
 
-		/// <summary>
-		/// Returns whether it is time to send a Ping packet based on <see cref="PingInterval"/>.
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		public bool ShouldSendPing(float currentTime)
-		{
-			return currentTime - _lastPingSentTime >= PingInterval;
-		}
+		public bool ShouldSendPing(float currentTime) => currentTime - lastPingSentTime >= PingInterval;
 
-		/// <summary>
-		/// Creates a <see cref="PingPacket"/> and records the send time for RTT calculation.
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		/// <returns>A Ping packet ready to be sent.</returns>
 		public PingPacket CreatePing(float currentTime)
 		{
-			_lastPingSentTime = currentTime;
-			_lastPingTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-			return new PingPacket { Timestamp = _lastPingTimestamp };
+			lastPingSentTime = currentTime;
+			lastPingTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+			return new PingPacket { Timestamp = lastPingTimestamp };
 		}
 
-		/// <summary>
-		/// Creates a <see cref="PongPacket"/> that echoes the timestamp from a received Ping.
-		/// </summary>
-		/// <param name="pingTimestamp">The timestamp from the received <see cref="PingPacket"/>.</param>
-		/// <returns>A Pong packet ready to be sent.</returns>
-		public PongPacket CreatePong(long pingTimestamp)
-		{
-			return new PongPacket { Timestamp = pingTimestamp };
-		}
+		public PongPacket CreatePong(long pingTimestamp) => new() { Timestamp = pingTimestamp };
 
-		/// <summary>
-		/// Processes a received <see cref="PongPacket"/> and updates the smoothed RTT.
-		/// </summary>
-		/// <param name="pong">The received Pong packet.</param>
 		public void ProcessPong(PongPacket pong)
 		{
-			long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-			long elapsedMs = now - pong.Timestamp;
-
-			if (elapsedMs < 0)
+			long elapsedMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - pong.Timestamp;
+			if (elapsedMilliseconds < 0)
 				return;
 
-			float sample = elapsedMs / 1000f;
-
-			if (!_rttInitialized)
+			float sample = elapsedMilliseconds / 1000f;
+			if (!roundTripTimeInitialized)
 			{
-				_rtt = sample;
-				_rttInitialized = true;
+				roundTripTime = sample;
+				roundTripTimeInitialized = true;
 			}
 			else
 			{
-				_rtt = _rtt * RttSmoothFactor + sample * (1f - RttSmoothFactor);
+				roundTripTime = roundTripTime * RttSmoothFactor + sample * (1f - RttSmoothFactor);
 			}
 		}
 
-		/// <summary>
-		/// Disconnects this connection by setting the state to <see cref="ConnectionState.Disconnected"/>.
-		/// </summary>
 		public void Disconnect()
 		{
 			State = ConnectionState.Disconnected;
+			IsGameplayActive = false;
 		}
 
-		/// <summary>
-		/// Queues a wrapped packet for batched sending at tick end.
-		/// </summary>
-		/// <param name="rawData">Raw bytes from <see cref="WrapPacket"/>.</param>
-		/// <param name="isReliable">Whether this packet requires reliable delivery.</param>
-		public void QueueSend(byte[] rawData, bool isReliable)
+		public bool QueuePacket(
+			Packet packet,
+			bool reliable,
+			float currentTime,
+			ReliableSendClass sendClass = ReliableSendClass.Gameplay)
 		{
-			_outgoing.Add(new QueuedPacket(rawData, isReliable));
-		}
-
-		/// <summary>
-		/// Serializes, fragments if necessary, wraps through the reliable channel, and
-		/// queues a packet for batched sending at tick end. Large reliable packets are
-		/// automatically split into fragments that each fit within the MTU.
-		/// </summary>
-		/// <param name="packet">The packet to send.</param>
-		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
-		/// <param name="currentTime">Current time in seconds.</param>
-		public void QueuePacket(Packet packet, bool reliable, float currentTime)
-		{
+			ArgumentNullException.ThrowIfNull(packet);
 			byte[] serialized = packet.Serialize();
+			if (!reliable)
+			{
+				unreliableQueue.Enqueue(serialized);
+				return true;
+			}
 
-			if (reliable && _fragmenter.NeedsFragmentation(serialized))
-			{
-				var fragments = _fragmenter.Split(serialized);
-				foreach (var fragment in fragments)
-				{
-					byte[] raw = _channel.Wrap(fragment, true, currentTime);
-					QueueSend(raw, true);
-				}
-			}
-			else
-			{
-				byte[] raw = _channel.Wrap(serialized, reliable, currentTime);
-				QueueSend(raw, reliable);
-			}
+			List<byte[]> payloads = fragmenter.NeedsFragmentation(serialized)
+				? fragmenter.Split(serialized)
+				: new List<byte[]> { serialized };
+			Queue<byte[]> target = GetQueue(sendClass);
+			bool queueFull = sendClass == ReliableSendClass.Bulk
+				? bulkQueue.Count + payloads.Count > BulkQueueCapacity
+				: controlQueue.Count + gameplayQueue.Count + payloads.Count > ControlAndGameplayQueueCapacity;
+			if (queueFull)
+				return false;
+
+			foreach (byte[] payload in payloads)
+				target.Enqueue(payload);
+			return true;
 		}
 
-		/// <summary>
-		/// Serializes, fragments if necessary, wraps through the reliable channel, and
-		/// sends a packet immediately through the transport without batching. Used by the
-		/// client for direct sends and the server for disconnect packets.
-		/// </summary>
-		/// <param name="packet">The packet to send.</param>
-		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
-		/// <param name="currentTime">Current time in seconds.</param>
-		/// <param name="transport">The UDP transport to send through.</param>
-		public void SendImmediate(Packet packet, bool reliable, float currentTime, UdpTransport transport)
+		public bool SendImmediate(
+			Packet packet,
+			bool reliable,
+			float currentTime,
+			UdpTransport transport,
+			ReliableSendClass sendClass = ReliableSendClass.Control)
 		{
-			byte[] serialized = packet.Serialize();
-
-			if (reliable && _fragmenter.NeedsFragmentation(serialized))
-			{
-				var fragments = _fragmenter.Split(serialized);
-				foreach (var fragment in fragments)
-				{
-					byte[] raw = _channel.Wrap(fragment, true, currentTime);
-					transport.SendTo(raw, RemoteEndPoint);
-					_bandwidth.RecordSent(raw.Length);
-				}
-			}
-			else
-			{
-				byte[] raw = _channel.Wrap(serialized, reliable, currentTime);
-				transport.SendTo(raw, RemoteEndPoint);
-				_bandwidth.RecordSent(raw.Length);
-			}
+			if (!QueuePacket(packet, reliable, currentTime, sendClass))
+				return false;
+			FlushOutgoing(transport, currentTime);
+			return true;
 		}
 
-		/// <summary>
-		/// Cleans up incomplete fragment groups that have exceeded the stale timeout.
-		/// Should be called periodically (e.g., once per tick).
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		public void CleanupStaleFragments(float currentTime)
+		public bool CollectRetransmissions(float currentTime, out uint failedSequence)
 		{
-			_fragmenter.CleanupStaleGroups(currentTime);
+			ReliableRetransmissionBatch batch = channel.CollectRetransmissions(currentTime, roundTripTime);
+			foreach (byte[] packet in batch.Packets)
+				rawPriorityQueue.Add(packet);
+			failedSequence = batch.FailedSequence;
+			return !batch.RetryLimitExceeded;
 		}
 
-		/// <summary>
-		/// Flushes all queued packets as batched datagrams via the transport.
-		/// Unreliable packets are added first; if a byte budget is set, excess
-		/// unreliable packets are dropped. Reliable packets are always sent.
-		/// </summary>
-		/// <param name="transport">The UDP transport to send through.</param>
-		/// <param name="currentTime">Current time for bandwidth tracking.</param>
-		/// <param name="maxBytesPerTick">Maximum bytes to send this tick (0 = unlimited).</param>
+		public void CleanupStaleFragments(float currentTime) => fragmenter.CleanupStaleGroups(currentTime);
+
 		public void FlushOutgoing(UdpTransport transport, float currentTime, int maxBytesPerTick = 0)
 		{
-			if (_outgoing.Count == 0)
+			ArgumentNullException.ThrowIfNull(transport);
+			bandwidth.Update(currentTime);
+			List<byte[]> packets = new(rawPriorityQueue.Count + ReliableChannel.WindowSize + unreliableQueue.Count + 1);
+			packets.AddRange(rawPriorityQueue);
+			rawPriorityQueue.Clear();
+
+			DrainReliable(controlQueue, packets, currentTime);
+			DrainReliable(gameplayQueue, packets, currentTime);
+			DrainReliable(bulkQueue, packets, currentTime, BulkInFlightLimit);
+
+			int reliableBytes = 0;
+			foreach (byte[] packet in packets)
+				reliableBytes += packet.Length;
+			int byteBudget = maxBytesPerTick > 0 ? maxBytesPerTick : int.MaxValue;
+			while (unreliableQueue.Count != 0)
+			{
+				byte[] rawData = channel.WrapUnreliable(unreliableQueue.Dequeue());
+				if (reliableBytes + rawData.Length <= byteBudget)
+				{
+					packets.Add(rawData);
+					reliableBytes += rawData.Length;
+				}
+			}
+
+			if (channel.HasPendingAcknowledgement)
+				packets.Add(channel.CreateAcknowledgement());
+			if (packets.Count == 0)
+			{
+				UpdateDiagnosticRates(currentTime);
 				return;
-
-			_bandwidth.Update(currentTime);
-
-			var toSend = new List<byte[]>();
-			int bytesBudget = maxBytesPerTick > 0 ? maxBytesPerTick : int.MaxValue;
-			int bytesQueued = 0;
-
-			// Reliable packets always sent
-			foreach (var q in _outgoing)
-			{
-				if (q.IsReliable)
-				{
-					toSend.Add(q.RawData);
-					bytesQueued += q.RawData.Length;
-				}
 			}
 
-			// Unreliable packets with budget check
-			foreach (var q in _outgoing)
+			foreach (byte[] datagram in PacketBatcher.CreateBatchedDatagrams(packets))
 			{
-				if (!q.IsReliable)
-				{
-					if (bytesQueued + q.RawData.Length <= bytesBudget)
-					{
-						toSend.Add(q.RawData);
-						bytesQueued += q.RawData.Length;
-					}
-					// else: drop this unreliable packet (bandwidth limit)
-				}
+				transport.SendTo(datagram, RemoteEndPoint);
+				bandwidth.RecordSent(datagram.Length);
 			}
-
-			_outgoing.Clear();
-
-			var datagrams = PacketBatcher.CreateBatchedDatagrams(toSend);
-			foreach (var dg in datagrams)
-			{
-				transport.SendTo(dg, RemoteEndPoint);
-				_bandwidth.RecordSent(dg.Length);
-			}
+			UpdateDiagnosticRates(currentTime);
 		}
 
-		/// <summary>
-		/// A queued outgoing packet awaiting batch flush.
-		/// </summary>
-		private readonly struct QueuedPacket
+		public void Reset()
 		{
-			public readonly byte[] RawData;
-			public readonly bool IsReliable;
+			controlQueue.Clear();
+			gameplayQueue.Clear();
+			bulkQueue.Clear();
+			unreliableQueue.Clear();
+			rawPriorityQueue.Clear();
+			fragmenter.Reset();
+			IsGameplayActive = false;
+			diagnosticsRateSampleTime = 0;
+			diagnosticsRateAcknowledgements = 0;
+			diagnosticsRateRetransmissions = 0;
+			acknowledgementsPerSecond = 0;
+			retransmissionsPerSecond = 0;
+		}
 
-			public QueuedPacket(byte[] rawData, bool isReliable)
+		private void UpdateDiagnosticRates(float currentTime)
+		{
+			float elapsed = currentTime - diagnosticsRateSampleTime;
+			if (elapsed < 1)
+				return;
+
+			long acknowledgements = channel.AckOnlyPacketsSent;
+			long retransmissions = channel.RetransmissionsSent;
+			acknowledgementsPerSecond = (acknowledgements - diagnosticsRateAcknowledgements) / elapsed;
+			retransmissionsPerSecond = (retransmissions - diagnosticsRateRetransmissions) / elapsed;
+			diagnosticsRateAcknowledgements = acknowledgements;
+			diagnosticsRateRetransmissions = retransmissions;
+			diagnosticsRateSampleTime = currentTime;
+		}
+
+		private Queue<byte[]> GetQueue(ReliableSendClass sendClass) => sendClass switch
+		{
+			ReliableSendClass.Control => controlQueue,
+			ReliableSendClass.Gameplay => gameplayQueue,
+			ReliableSendClass.Bulk => bulkQueue,
+			_ => throw new ArgumentOutOfRangeException(nameof(sendClass)),
+		};
+
+		private void DrainReliable(
+			Queue<byte[]> source,
+			List<byte[]> destination,
+			float currentTime,
+			int inFlightLimit = ReliableChannel.WindowSize)
+		{
+			while (source.Count != 0 &&
+				channel.AvailableSendSlots != 0 &&
+				channel.PendingCount < inFlightLimit)
 			{
-				RawData = rawData;
-				IsReliable = isReliable;
+				byte[] payload = source.Peek();
+				if (!channel.TryWrapReliable(payload, currentTime, out byte[] rawData))
+					break;
+				source.Dequeue();
+				destination.Add(rawData);
 			}
 		}
 
 		public override string ToString()
 		{
-			return $"[NetConnection {RemoteEndPoint} PlayerId={PlayerId} State={State} RTT={RoundTripTimeMs}ms Pending={_channel.PendingCount} Out={_bandwidth.BytesSentPerSec}B/s In={_bandwidth.BytesReceivedPerSec}B/s]";
+			NetConnectionDiagnostics diagnostics = Diagnostics;
+			return $"[NetConnection {RemoteEndPoint} PlayerId={PlayerId} State={State} RTT={RoundTripTimeMs}ms InFlight={diagnostics.ReliableInFlight} Queued={ReliableQueueCount} Out={bandwidth.BytesSentPerSec}B/s In={bandwidth.BytesReceivedPerSec}B/s]";
 		}
 	}
 }

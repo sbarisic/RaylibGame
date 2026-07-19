@@ -28,15 +28,15 @@ public sealed class ChunkMapObservationTests
 	}
 
 	[Fact]
-	public void ReadHonorsCancellationBeforeDecompression()
+	public void WorldArchiveReadHonorsCancellationBeforeDecompression()
 	{
 		ChunkMap map = new();
 		using CancellationTokenSource cancellation = new();
 		cancellation.Cancel();
-		using MemoryStream input = new();
+		using MemoryStream input = new(Write(map));
 
 		Assert.Throws<OperationCanceledException>(
-			() => map.Read(input, cancellation.Token)
+			() => WorldArchive.Read(input, cancellation.Token)
 		);
 		Assert.Empty(map.CaptureChunks());
 	}
@@ -102,7 +102,7 @@ public sealed class ChunkMapObservationTests
 	}
 
 	[Fact]
-	public void Read_RaisesOneResetNoChangesAndPreservesSaveBytesAndCells()
+	public void ArchiveRead_RaisesOneResetNoChangesAndPreservesSaveBytesAndCells()
 	{
 		ChunkMap source = new();
 		source.SetBlock(-17, 2, 31, BlockType.Water);
@@ -117,7 +117,7 @@ public sealed class ChunkMapObservationTests
 		loaded.BlockChanged += _ => changeCount++;
 
 		using (MemoryStream input = new(originalBytes, writable: false))
-			loaded.Read(input);
+			loaded.ReplaceAllColumns(WorldArchive.Read(input).Columns);
 
 		Assert.Equal(1, resetCount);
 		Assert.Equal(0, changeCount);
@@ -201,7 +201,7 @@ public sealed class ChunkMapObservationTests
 	private static byte[] Write(ChunkMap map)
 	{
 		using MemoryStream output = new();
-		map.Write(output);
+		WorldArchive.Write(output, map, default);
 		return output.ToArray();
 	}
 }

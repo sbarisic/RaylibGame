@@ -191,9 +191,9 @@ public sealed class MainMenuOptionsTests
 		Assert.Equal(1, config.Monitor);
 		Assert.Equal(1280, config.WindowWidth);
 		Assert.Equal(720, config.WindowHeight);
-		Assert.Equal(GameLogLevel.Trace, config.LogLevel);
+		Assert.Equal(GameLogLevel.Debug, config.LogLevel);
 		Assert.Contains("\"UseFSDesktopRes\"", roundTrip, StringComparison.Ordinal);
-		Assert.Contains("\"LogLevel\":\"Trace\"", roundTrip.Replace(" ", string.Empty), StringComparison.Ordinal);
+		Assert.Contains("\"LogLevel\":\"Debug\"", roundTrip.Replace(" ", string.Empty), StringComparison.Ordinal);
 		Assert.Contains("\"MouseSensitivity\"", roundTrip, StringComparison.Ordinal);
 		Assert.Equal(GameConfig.DefaultMaxChunkDrawDistance, config.MaxChunkDrawDistance);
 		Assert.Equal(GameConfig.DefaultChunkMeshUploadBudget, config.ChunkMeshUploadBudget);

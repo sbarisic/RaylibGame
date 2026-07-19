@@ -44,6 +44,7 @@ namespace Voxelgine.Engine
 		/// <param name="port">The UDP port to bind to.</param>
 		public void Bind(int port)
 		{
+			ObjectDisposedException.ThrowIf(_disposed, this);
 			if (_udpClient != null)
 				throw new InvalidOperationException("Transport is already active.");
 
@@ -57,6 +58,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void Open()
 		{
+			ObjectDisposedException.ThrowIf(_disposed, this);
 			if (_udpClient != null)
 				throw new InvalidOperationException("Transport is already active.");
 
@@ -99,10 +101,8 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void Close()
 		{
-			if (_disposed)
+			if (_udpClient == null)
 				return;
-
-			_disposed = true;
 
 			_cts?.Cancel();
 			_udpClient?.Close();
@@ -128,7 +128,10 @@ namespace Voxelgine.Engine
 		/// </summary>
 		public void Dispose()
 		{
+			if (_disposed)
+				return;
 			Close();
+			_disposed = true;
 		}
 
 		private void StartReceiveLoop()

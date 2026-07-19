@@ -7,6 +7,33 @@ namespace Voxelgine.Engine.Server
 	{
 		private void OnPacketReceived(NetConnection connection, Packet packet)
 		{
+			if (packet is WorldColumnResyncRequestPacket resync)
+			{
+				_worldStream.HandleResyncRequest(connection.PlayerId, resync);
+				return;
+			}
+
+			if (packet is WorldColumnAppliedPacket applied)
+			{
+				_worldStream.HandleApplied(connection.PlayerId, applied);
+				return;
+			}
+
+			if (packet is ChunkInterestPacket interest)
+			{
+				_worldStream.HandleInterest(connection.PlayerId, interest);
+				return;
+			}
+
+			if (packet is ClientWorldReadyPacket ready)
+			{
+				_worldStream.HandleReady(connection.PlayerId, ready);
+				return;
+			}
+
+			if (!connection.IsGameplayActive)
+				return;
+
 			switch (packet)
 			{
 				case InputStatePacket inputPacket:
@@ -65,6 +92,7 @@ namespace Voxelgine.Engine.Server
 			if (player == null)
 			{
 				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: player not found in simulation");
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
 			}
 
@@ -73,6 +101,7 @@ namespace Voxelgine.Engine.Server
 			if (distance > MaxBlockReach)
 			{
 				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: distance {distance:F1} > {MaxBlockReach} (player={player.Position}, block={blockCenter})");
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
 			}
 
@@ -82,18 +111,21 @@ namespace Voxelgine.Engine.Server
 			if (slot < 0)
 			{
 				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory slot for BlockType {blockType} (raw byte: 0x{packet.BlockType:X2})");
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
 			}
 
 			if (!_playerInventories.TryGetValue(playerId, out var inventory))
 			{
 				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory entry for player");
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
 			}
 
 			if (!inventory.TryDecrement(slot))
 			{
 				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: slot {slot} ({blockType}) has no items left (count={inventory.GetCount(slot)})");
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
 			}
 
@@ -124,12 +156,18 @@ namespace Voxelgine.Engine.Server
 			int playerId = connection.PlayerId;
 			Player player = _simulation.Players.GetPlayer(playerId);
 			if (player == null)
+			{
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
+			}
 
 			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
 			float distance = Vector3.Distance(player.Position, blockCenter);
 			if (distance > MaxBlockReach)
+			{
+				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
 				return;
+			}
 
 			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
 

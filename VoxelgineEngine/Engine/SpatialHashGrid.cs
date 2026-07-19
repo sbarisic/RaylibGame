@@ -33,6 +33,8 @@ namespace Voxelgine.Engine {
 
 		public bool ContainsKey(Vector3 pos) => _entries.ContainsKey(Pack(pos));
 
+		public bool Remove(Vector3 pos) => _entries.Remove(Pack(pos));
+
 		public void Clear() => _entries.Clear();
 
 		public ValuesEnumerable Values => new(_entries);

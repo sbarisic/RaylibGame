@@ -56,7 +56,6 @@ namespace Voxelgine.Engine
 	{
 		private readonly UdpTransport _transport;
 		private readonly ConcurrentQueue<byte[]> _receiveQueue = new();
-		private readonly WorldReceiver _worldReceiver = new();
 		private readonly IFishLogging _logging;
 		private readonly NetworkSimulation _netSim = new();
 		private readonly List<byte[]> _simReady = new();
@@ -86,26 +85,10 @@ namespace Voxelgine.Engine
 		/// <summary>
 		/// Fired for each non-system packet received from the server.
 		/// System packets (ConnectAccept, ConnectReject, Disconnect, Ping, Pong) and
-		/// world data packets (WorldData, WorldDataComplete) are handled internally.
+		/// World streaming packets are forwarded to the game-side streaming controller.
 		/// Called on the game thread during <see cref="Tick"/>.
 		/// </summary>
 		public event Action<Packet> OnPacketReceived;
-
-		/// <summary>
-		/// Fired when all world data fragments have been received and checksum-verified.
-		/// The parameter is the GZip-compressed world data byte array, ready to be loaded
-		/// via <c>ChunkMap.Read(new MemoryStream(data))</c>. The game loop should load the
-		/// world and then call <see cref="FinishLoading"/> to transition to Playing state.
-		/// Called on the game thread during <see cref="Tick"/>.
-		/// </summary>
-		public event Action<byte[]> OnWorldDataReady;
-
-		/// <summary>
-		/// Fired when the world data transfer fails (checksum mismatch, missing fragments, etc.).
-		/// The parameter is a human-readable error message.
-		/// Called on the game thread during <see cref="Tick"/>.
-		/// </summary>
-		public event Action<string> OnWorldTransferFailed;
 
 		/// <summary>
 		/// The current client connection state.
@@ -146,17 +129,11 @@ namespace Voxelgine.Engine
 		public int LocalTick { get; set; }
 
 		/// <summary>
-		/// The world data receiver for tracking loading progress.
-		/// Use <see cref="WorldReceiver.Progress"/> (0.0–1.0) and
-		/// <see cref="WorldReceiver.FragmentsReceived"/> / <see cref="WorldReceiver.TotalFragments"/>
-		/// to display loading status.
-		/// </summary>
-		public WorldReceiver WorldReceiver => _worldReceiver;
-
-		/// <summary>
 		/// The bandwidth tracker for the server connection. Null if not connected.
 		/// </summary>
 		public BandwidthTracker Bandwidth => _connection?.Bandwidth;
+
+		public NetConnectionDiagnostics Diagnostics => _connection?.Diagnostics ?? default;
 
 		/// <summary>
 		/// Returns the number of seconds since the last data was received from the server.
@@ -182,8 +159,6 @@ namespace Voxelgine.Engine
 			_transport = new UdpTransport();
 			_logging = logging;
 			PacketLoggingEnabled = logging?.MinimumLevel <= GameLogLevel.Trace;
-			_worldReceiver.OnWorldDataReady += HandleWorldDataReady;
-			_worldReceiver.OnTransferFailed += HandleWorldTransferFailed;
 		}
 
 		/// <summary>
@@ -316,11 +291,14 @@ namespace Voxelgine.Engine
 				return;
 			}
 
-			var retransmissions = _connection.Channel.GetRetransmissions(currentTime);
-			foreach (var rawData in retransmissions)
+			if (!_connection.CollectRetransmissions(currentTime, out uint failedSequence))
 			{
-				_transport.SendTo(rawData, _serverEndPoint);
-				_connection.Bandwidth.RecordSent(rawData.Length);
+				string reason = $"Reliable delivery failed for sequence {failedSequence}.";
+				_logging?.Log(GameLogLevel.Error, "Network", reason);
+				_connection.Disconnect();
+				Cleanup();
+				OnDisconnected?.Invoke(reason);
+				return;
 			}
 
 			_connection.CleanupStaleFragments(currentTime);
@@ -330,6 +308,8 @@ namespace Voxelgine.Engine
 				var ping = _connection.CreatePing(currentTime);
 				SendInternal(ping, false, currentTime);
 			}
+
+			_connection.FlushOutgoing(_transport, currentTime);
 		}
 
 		/// <summary>
@@ -398,16 +378,6 @@ namespace Voxelgine.Engine
 					_connection.ProcessPong(pong);
 					break;
 
-				case WorldDataPacket worldData:
-					_worldReceiver.HandleWorldData(worldData);
-					// Try assembly after each fragment in case complete packet arrived first
-					_worldReceiver.TryAssemble();
-					break;
-
-				case WorldDataCompletePacket worldComplete:
-					_worldReceiver.HandleWorldDataComplete(worldComplete);
-					break;
-
 				default:
 					OnPacketReceived?.Invoke(packet);
 					break;
@@ -439,16 +409,6 @@ namespace Voxelgine.Engine
 			OnDisconnected?.Invoke(reject.Reason);
 		}
 
-		private void HandleWorldDataReady(byte[] worldData)
-		{
-			OnWorldDataReady?.Invoke(worldData);
-		}
-
-		private void HandleWorldTransferFailed(string error)
-		{
-			OnWorldTransferFailed?.Invoke(error);
-		}
-
 		private void LogPacket(string direction, Packet packet)
 		{
 			if (!PacketLoggingEnabled || _logging == null)
@@ -460,7 +420,20 @@ namespace Voxelgine.Engine
 		private void SendInternal(Packet packet, bool reliable, float currentTime)
 		{
 			LogPacket("SEND", packet);
-			_connection.SendImmediate(packet, reliable, currentTime, _transport);
+			ReliableSendClass sendClass = packet is ConnectPacket
+				or DisconnectPacket
+				or PingPacket
+				or PongPacket
+				? ReliableSendClass.Control
+				: ReliableSendClass.Gameplay;
+			if (!_connection.SendImmediate(packet, reliable, currentTime, _transport, sendClass))
+			{
+				_logging?.Log(
+					GameLogLevel.Error,
+					"Network",
+					$"Reliable send queue is full type={packet.Type} class={sendClass}."
+				);
+			}
 		}
 
 		private void Cleanup()
@@ -471,8 +444,8 @@ namespace Voxelgine.Engine
 			_transport.OnDataReceived -= QueueReceivedData;
 			_transport.Close();
 
-			_worldReceiver.Reset();
 			_netSim.Clear();
+			_connection?.Reset();
 
 			_connection = null;
 			_serverEndPoint = null;

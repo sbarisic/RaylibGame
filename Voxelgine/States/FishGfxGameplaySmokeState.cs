@@ -51,15 +51,22 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 	) : base(window, engine)
 	{
 		this.window = window ?? throw new ArgumentNullException(nameof(window));
-		BuildWorld(map);
+		ChunkMap generatedWorld = new();
+		BuildWorld(generatedWorld);
+		ChunkColumnSnapshot[] startupColumns = generatedWorld.GetColumnCoordinates()
+			.Select(coordinate => generatedWorld.CaptureColumn(coordinate.X, coordinate.Z))
+			.ToArray();
 		dayNight.SetTime(13);
 		ConfigureCamera(new Vector2(1280, 720));
 
 		voxelScene = new FishGfxVoxelScene(
 			window.RenderWindow.Graphics,
 			window.Assets,
-			map
+			map,
+			synchronizeExisting: false
 		);
+		foreach (ChunkColumnSnapshot column in startupColumns)
+			map.ApplyColumn(column);
 		celestial = new FishGfxCelestialLayer(window);
 		FishGfxGameplayParticleAssets particleAssets =
 			FishGfxGameplayParticleAssets.Register(

@@ -18,14 +18,23 @@ namespace Voxelgine.Graphics
 		public readonly BlockType OldType;
 		/// <summary>The block type after the change.</summary>
 		public readonly BlockType NewType;
+		/// <summary>Authoritative revision of the containing horizontal column.</summary>
+		public readonly long ColumnRevision;
 
-		public BlockChange(int x, int y, int z, BlockType oldType, BlockType newType)
+		public BlockChange(
+			int x,
+			int y,
+			int z,
+			BlockType oldType,
+			BlockType newType,
+			long columnRevision = 0)
 		{
 			X = x;
 			Y = y;
 			Z = z;
 			OldType = oldType;
 			NewType = newType;
+			ColumnRevision = columnRevision;
 		}
 	}
 }

@@ -47,21 +47,26 @@ namespace Voxelgine.States
 			_errorText = $"Connection rejected: {reason}";
 		}
 
-		private void OnWorldDataReady(byte[] compressedData)
-		{
-			BeginWorldLoad(compressedData);
-		}
-
-		private void OnWorldTransferFailed(string error)
-		{
-			_logging.Log(GameLogLevel.Error, "Network", $"World transfer failed error={error}");
-			_statusText = "";
-			_errorText = $"World transfer failed: {error}";
-		}
-
 		private void OnPacketReceived(Packet packet)
 		{
-			if (_simulation == null && !_replayingPendingWorldPackets)
+			switch (packet)
+			{
+				case WorldStreamBeginPacket begin:
+					BeginWorldStream(begin);
+					return;
+				case WorldColumnPacket column:
+					ReceiveWorldColumn(column);
+					return;
+				case WorldBootstrapCompletePacket complete when complete.StreamId == _worldStreamId:
+					_bootstrapComplete = true;
+					_logging.Log(GameLogLevel.Debug, "WorldStream", $"bootstrap-complete streamId={complete.StreamId}");
+					return;
+				case ClientWorldStartPacket start:
+					FinishWorldStart(start);
+					return;
+			}
+
+			if (!_initialized && !_replayingPendingWorldPackets)
 			{
 				_pendingWorldPackets.Add(packet);
 				return;
@@ -231,7 +236,27 @@ namespace Voxelgine.States
 			if (_simulation == null)
 				return;
 
-			_simulation.Map.SetBlock(blockChange.X, blockChange.Y, blockChange.Z, (BlockType)blockChange.BlockType);
+			if (!_simulation.Map.TryApplyReplicatedBlockChange(
+				blockChange.X,
+				blockChange.Y,
+				blockChange.Z,
+				(BlockType)blockChange.BlockType,
+				blockChange.ColumnRevision))
+			{
+				int columnX = (int)Math.Floor((double)blockChange.X / Chunk.ChunkSize);
+				int columnZ = (int)Math.Floor((double)blockChange.Z / Chunk.ChunkSize);
+				_logging.Log(
+					GameLogLevel.Warning,
+					"WorldStream",
+					$"revision-gap column={columnX},{columnZ} expected={blockChange.ColumnRevision} local={_simulation.Map.GetColumnRevision(columnX, columnZ)}");
+				_client.Send(new WorldColumnResyncRequestPacket
+				{
+					StreamId = _worldStreamId,
+					X = columnX,
+					Z = columnZ,
+					Revision = _simulation.Map.GetColumnRevision(columnX, columnZ),
+				}, true, GetClientTime());
+			}
 		}
 
 		/// <summary>
@@ -460,7 +485,7 @@ namespace Voxelgine.States
 						X = change.X,
 						Y = change.Y,
 						Z = change.Z,
-						BlockType = (byte)change.NewType,
+						BlockType = (ushort)change.NewType,
 					};
 					_client.Send(packet, true, currentTime);
 				}

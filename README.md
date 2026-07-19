@@ -21,7 +21,7 @@ shared engine and dedicated server remain portable `net10.0` projects.
 - FishGfx voxel rendering, real MSAA, post-processing, and FishUI integration
 - A custom high-level audio API over a narrow native miniaudio shim
 - Streamed ambience and basic positional 3D audio, with a future Steam Audio seam
-- GZip-compressed saves with stable block, save, and packet representations
+- Indexed, independently compressed world columns with spatial client streaming
 - A graphics-free dedicated server that can publish and run on Windows or Linux
 
 ## Repository layout
@@ -94,6 +94,7 @@ The complete toolchain, publish, test, and package-audit commands are in
 - [Audio architecture and cue bank](docs/AUDIO.md)
 - [Models, shaders, and asset conversion](docs/ASSETS.md)
 - [Building, testing, publishing, and package audits](docs/BUILDING.md)
+- [World archive and spatial streaming](docs/WORLD_STREAMING.md)
 
 ## Controls
 
@@ -109,7 +110,7 @@ The complete toolchain, publish, test, and package-audit commands are in
 | Right mouse | Place block |
 | F1 | Toggle debug menu |
 | F3 | Toggle debug mode |
-| F5 | Quick save |
+| F5 | Toggle network/renderer statistics |
 | Escape | Return to the main menu |
 
 ## License

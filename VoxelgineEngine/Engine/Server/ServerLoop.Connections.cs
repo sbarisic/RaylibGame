@@ -1,153 +1,152 @@
 using System.Numerics;
+using Voxelgine.Engine.DI;
+using Voxelgine.Graphics;
 
-namespace Voxelgine.Engine.Server
+namespace Voxelgine.Engine.Server;
+
+public partial class ServerLoop
 {
-	public partial class ServerLoop
+	private sealed record PendingPlayer(Player Player, ServerInventory Inventory, string Name);
+
+	private void OnClientConnected(NetConnection connection)
 	{
-		private void OnClientConnected(NetConnection connection)
+		int playerId = connection.PlayerId;
+		string playerName = connection.PlayerName;
+		_logging.Log(
+			GameLogLevel.Info,
+			"Connection",
+			$"reserved playerId={playerId} name={playerName} endpoint={connection.RemoteEndPoint}");
+
+		Player player = new(_eng, playerId);
+		ServerInventory inventory = new();
+		if (_playerData.TryLoad(playerName, out Vector3 savedPos, out float savedHealth, out Vector3 savedVel, inventory))
 		{
-			int playerId = connection.PlayerId;
-			string playerName = connection.PlayerName;
-
-			_logging.ServerWriteLine($"Player connected: [{playerId}] \"{playerName}\" from {connection.RemoteEndPoint}");
-
-			// Create server-side player instance (no GUI, sound, or rendering)
-			Player player = new Player(_eng, playerId);
-
-			// Create server-side inventory for this player
-			var inventory = new ServerInventory();
-
-			// Restore saved player state (position, health, velocity, inventory) if available
-			if (_playerData.TryLoad(playerName, out Vector3 savedPos, out float savedHealth, out Vector3 savedVel, inventory))
+			if (savedHealth <= 0 || !IsSpawnPositionValid(savedPos))
 			{
-				if (savedHealth <= 0)
-				{
-					// Player was dead when saved — respawn at spawn point with full health
-					player.SetPosition(PlayerSpawnPosition);
-					player.ResetHealth();
-					_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data but was dead, respawning at {PlayerSpawnPosition}.");
-				}
-				else
-				{
-					player.SetPosition(savedPos);
-					player.Health = savedHealth;
-					player.SetVelocity(savedVel);
-					_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" restored from saved data (pos={savedPos}, health={savedHealth}).");
-				}
+				player.SetPosition(PlayerSpawnPosition);
+				player.ResetHealth();
+				_logging.Log(GameLogLevel.Warning, "Persistence", $"invalid saved player state playerId={playerId}; using spawn={PlayerSpawnPosition}");
 			}
 			else
 			{
-				player.SetPosition(PlayerSpawnPosition);
+				player.SetPosition(savedPos);
+				player.Health = savedHealth;
+				player.SetVelocity(savedVel);
 			}
-
-			_playerInventories[playerId] = inventory;
-
-			// Create per-player input pipeline: NetworkInputSource → InputMgr
-			var inputSource = new NetworkInputSource();
-			var inputMgr = new InputMgr(inputSource);
-			_playerInputSources[playerId] = inputSource;
-			_playerInputMgrs[playerId] = inputMgr;
-			_playerCommandQueues[playerId] = new ServerCommandQueue();
-
-			// Send PlayerJoined for all existing players to the new client
-			foreach (Player existing in _simulation.Players.GetAllPlayers())
-			{
-				var existingJoined = new PlayerJoinedPacket
-				{
-					PlayerId = existing.PlayerId,
-					PlayerName = GetPlayerName(existing.PlayerId),
-					Position = existing.Position,
-				};
-				_server.SendTo(playerId, existingJoined, true, CurrentTime);
-			}
-
-			// Send EntitySpawn for all existing entities to the new client
-			foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
-			{
-				var spawnPacket = BuildEntitySpawnPacket(entity);
-				_server.SendTo(playerId, spawnPacket, true, CurrentTime);
-				_server.SendTo(playerId, BuildEntitySnapshotPacket(entity), true, CurrentTime);
-			}
-
-			// Add the new player to the simulation
-			_simulation.Players.AddPlayer(playerId, player);
-
-			// Broadcast PlayerJoined for the new player to all other clients
-			var joinedPacket = new PlayerJoinedPacket
-			{
-				PlayerId = playerId,
-				PlayerName = playerName,
-				Position = player.Position,
-			};
-			_server.BroadcastExcept(playerId, joinedPacket, true, CurrentTime);
-
-			// Send current time of day to the new client
-			_server.SendTo(playerId, new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
-
-			// Send the player's inventory state
-			_server.SendTo(playerId, inventory.CreateFullUpdatePacket(), true, CurrentTime);
-
-			// Serialize the world and begin streaming to the new client
-			byte[] worldData = SerializeWorld();
-			_worldTransfer.BeginTransfer(playerId, worldData);
-			int totalFragments = (worldData.Length + WorldTransferManager.FragmentSize - 1) / WorldTransferManager.FragmentSize;
-			_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" spawned at {player.Position}. Streaming world ({worldData.Length:N0} bytes, {totalFragments} fragments). Players online: {_simulation.Players.Count}");
 		}
-
-		private void OnClientDisconnected(NetConnection connection, string reason)
+		else
 		{
-			int playerId = connection.PlayerId;
-			string playerName = connection.PlayerName;
-
-			_logging.ServerWriteLine($"Player disconnected: [{playerId}] \"{playerName}\" - {reason}");
-
-			// Cancel any in-progress world transfer
-			_worldTransfer.CancelTransfer(playerId);
-
-			// Save player state before removal
-			var player = _simulation.Players.GetPlayer(playerId);
-			if (player != null)
-			{
-				_playerInventories.TryGetValue(playerId, out var inventory);
-				_playerData.Save(playerName, player.Position, player.Health, player.GetVelocity(), inventory);
-				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" state saved.");
-			}
-
-			// Clean up per-player input pipeline
-			_playerInputMgrs.Remove(playerId);
-			_playerInputSources.Remove(playerId);
-			_playerCommandQueues.Remove(playerId);
-
-			// Clean up respawn timer, attack timer, inventory, and input tick tracking
-			_respawnTimers.Remove(playerId);
-			_playerAttackEndTimes.Remove(playerId);
-			_playerInventories.Remove(playerId);
-
-			// Remove from simulation
-			_simulation.Players.RemovePlayer(playerId);
-
-			// Broadcast PlayerLeft to remaining clients
-			var leftPacket = new PlayerLeftPacket
-			{
-				PlayerId = playerId,
-			};
-			_server.Broadcast(leftPacket, true, CurrentTime);
-
-			_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" removed. Players online: {_simulation.Players.Count}");
+			player.SetPosition(PlayerSpawnPosition);
 		}
 
-		private void OnWorldTransferComplete(int playerId)
+		_pendingPlayers[playerId] = new PendingPlayer(player, inventory, playerName);
+		_worldStream.Begin(playerId, player.Position, _worldSeed, CurrentTime);
+	}
+
+	private void ActivatePendingPlayer(int playerId)
+	{
+		if (!_pendingPlayers.Remove(playerId, out PendingPlayer pending))
+			return;
+
+		NetConnection connection = _server.GetConnection(playerId);
+		if (connection == null || connection.State != ConnectionState.Connected)
+			return;
+
+		Player player = pending.Player;
+		_playerInventories[playerId] = pending.Inventory;
+		NetworkInputSource inputSource = new();
+		_playerInputSources[playerId] = inputSource;
+		_playerInputMgrs[playerId] = new InputMgr(inputSource);
+		_playerCommandQueues[playerId] = new ServerCommandQueue();
+
+		foreach (Player existing in _simulation.Players.GetAllPlayers())
 		{
-			string playerName = GetPlayerName(playerId);
-			_logging.ServerWriteLine($"World transfer complete for player [{playerId}] \"{playerName}\".");
-
-			// Re-send inventory after world transfer — the initial InventoryUpdate sent during
-			// connect may have arrived before the client created its simulation and been dropped.
-			if (_playerInventories.TryGetValue(playerId, out var inventory))
+			_server.SendTo(playerId, new PlayerJoinedPacket
 			{
-				_server.SendTo(playerId, inventory.CreateFullUpdatePacket(), true, CurrentTime);
-				_logging.ServerWriteLine($"Player [{playerId}] \"{playerName}\" inventory re-sent after world transfer.");
-			}
+				PlayerId = existing.PlayerId,
+				PlayerName = GetPlayerName(existing.PlayerId),
+				Position = existing.Position,
+			}, true, CurrentTime);
 		}
+
+		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
+		{
+			_server.SendTo(playerId, BuildEntitySpawnPacket(entity), true, CurrentTime);
+			_server.SendTo(playerId, BuildEntitySnapshotPacket(entity), true, CurrentTime);
+		}
+
+		_simulation.Players.AddPlayer(playerId, player);
+		connection.IsGameplayActive = true;
+		_server.BroadcastExcept(playerId, new PlayerJoinedPacket
+		{
+			PlayerId = playerId,
+			PlayerName = pending.Name,
+			Position = player.Position,
+		}, true, CurrentTime);
+
+		_server.SendTo(playerId, new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
+		_server.SendTo(playerId, pending.Inventory.CreateFullUpdatePacket(), true, CurrentTime);
+		_server.SendTo(playerId, new ClientWorldStartPacket
+		{
+			StreamId = _worldStream.GetStreamId(playerId),
+			ServerTick = _server.ServerTick,
+			Health = player.Health,
+			PhysicsState = player.CapturePhysicsState(),
+		}, true, CurrentTime);
+
+		_logging.Log(
+			GameLogLevel.Info,
+			"Connection",
+			$"activated playerId={playerId} name={pending.Name} position={player.Position} players={_simulation.Players.Count}");
+	}
+
+	private void OnClientDisconnected(NetConnection connection, string reason)
+	{
+		int playerId = connection.PlayerId;
+		string playerName = connection.PlayerName;
+		_worldStream.Cancel(playerId);
+
+		if (_pendingPlayers.Remove(playerId))
+		{
+			_logging.Log(
+				GameLogLevel.Info,
+				"Connection",
+				$"loading-disconnect playerId={playerId} name={playerName} reason={reason}");
+			return;
+		}
+
+		Player player = _simulation.Players.GetPlayer(playerId);
+		if (player != null)
+		{
+			_playerInventories.TryGetValue(playerId, out ServerInventory inventory);
+			_playerData.Save(playerName, player.Position, player.Health, player.GetVelocity(), inventory);
+		}
+
+		_playerInputMgrs.Remove(playerId);
+		_playerInputSources.Remove(playerId);
+		_playerCommandQueues.Remove(playerId);
+		_respawnTimers.Remove(playerId);
+		_playerAttackEndTimes.Remove(playerId);
+		_playerInventories.Remove(playerId);
+		_simulation.Players.RemovePlayer(playerId);
+		_server.Broadcast(new PlayerLeftPacket { PlayerId = playerId }, true, CurrentTime);
+		_logging.Log(
+			GameLogLevel.Info,
+			"Connection",
+			$"disconnected playerId={playerId} name={playerName} reason={reason} players={_simulation.Players.Count}");
+	}
+
+	private bool IsSpawnPositionValid(Vector3 position)
+	{
+		if (!float.IsFinite(position.X) || !float.IsFinite(position.Y) || !float.IsFinite(position.Z))
+			return false;
+		int x = (int)MathF.Floor(position.X);
+		int y = (int)MathF.Floor(position.Y);
+		int z = (int)MathF.Floor(position.Z);
+		return _simulation.Map.IsColumnResident(
+			(int)Math.Floor((double)x / Chunk.ChunkSize),
+			(int)Math.Floor((double)z / Chunk.ChunkSize)) &&
+			_simulation.Map.GetBlock(x, y - 1, z) != BlockType.None &&
+			_simulation.Map.GetBlock(x, y, z) == BlockType.None;
 	}
 }

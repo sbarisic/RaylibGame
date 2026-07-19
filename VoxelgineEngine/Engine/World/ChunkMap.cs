@@ -11,6 +11,8 @@ namespace Voxelgine.Graphics
 	{
 		private readonly SpatialHashGrid<Chunk> Chunks;
 		private readonly List<BlockChange> _blockChangeLog = new();
+		private readonly Dictionary<ChunkColumnCoordinate, long> _columnRevisions = new();
+		private readonly Dictionary<ChunkColumnCoordinate, List<Vector3>> _columnChunks = new();
 		private int _bulkWorldMutationDepth;
 
 		// Preserve the legacy server's lighting-work horizon. The headless process
@@ -21,6 +23,7 @@ namespace Voxelgine.Graphics
 		private readonly Random Rnd = new();
 
 		public event Action<BlockChange> BlockChanged;
+		public event Action<ChunkColumnSnapshot> ColumnLoaded;
 		public event Action WorldReset;
 		public event Action<ChunkMap, int, int, int, BlockType> OnBlockPlaced;
 		public event Action<ChunkMap, int, int, int, BlockType> OnBlockRemoved;
@@ -35,6 +38,154 @@ namespace Voxelgine.Graphics
 		public void ClearPendingChanges() => _blockChangeLog.Clear();
 
 		public Chunk[] GetAllChunks() => Chunks.Values.ToArray();
+
+		public int ColumnCount => _columnRevisions.Count;
+
+		/// <summary>
+		/// Client prediction treats columns not yet streamed as collision boundaries.
+		/// Authoritative server maps leave this disabled and treat absent columns as air.
+		/// </summary>
+		public bool UnknownColumnsAreBoundaries { get; set; }
+
+		public bool IsColumnResident(int chunkX, int chunkZ) =>
+			_columnRevisions.ContainsKey(new ChunkColumnCoordinate(chunkX, chunkZ));
+
+		public bool TryGetBlock(int x, int y, int z, out BlockType type)
+		{
+			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
+			if (!Chunks.TryGetValue(chunkIndex, out Chunk chunk))
+			{
+				type = BlockType.None;
+				return false;
+			}
+
+			type = chunk.GetBlock((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z).Type;
+			return true;
+		}
+
+		public long GetColumnRevision(int chunkX, int chunkZ)
+		{
+			return _columnRevisions.TryGetValue(
+				new ChunkColumnCoordinate(chunkX, chunkZ),
+				out long revision)
+				? revision
+				: 0;
+		}
+
+		public ChunkColumnCoordinate[] GetColumnCoordinates()
+		{
+			ChunkColumnCoordinate[] coordinates = _columnRevisions.Keys.ToArray();
+			Array.Sort(coordinates, static (left, right) =>
+			{
+				int comparison = left.X.CompareTo(right.X);
+				return comparison != 0 ? comparison : left.Z.CompareTo(right.Z);
+			});
+			return coordinates;
+		}
+
+		public ChunkColumnSnapshot CaptureColumn(int chunkX, int chunkZ)
+		{
+			List<ChunkSnapshot> snapshots = new();
+			ChunkColumnCoordinate column = new(chunkX, chunkZ);
+			if (!_columnChunks.TryGetValue(column, out List<Vector3> coordinates))
+				return new ChunkColumnSnapshot(chunkX, chunkZ, GetColumnRevision(chunkX, chunkZ), Array.Empty<ChunkSnapshot>());
+			foreach (Vector3 coordinate in coordinates)
+			{
+				if (!Chunks.TryGetValue(coordinate, out Chunk chunk))
+					continue;
+
+				BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+				for (int index = 0; index < blocks.Length; index++)
+					blocks[index] = chunk.Blocks[index].Type;
+				snapshots.Add(new ChunkSnapshot(chunkX, (int)coordinate.Y, chunkZ, blocks));
+			}
+
+			snapshots.Sort(static (left, right) => left.ChunkY.CompareTo(right.ChunkY));
+			return new ChunkColumnSnapshot(
+				chunkX,
+				chunkZ,
+				GetColumnRevision(chunkX, chunkZ),
+				snapshots.ToArray());
+		}
+
+		public void ApplyColumn(ChunkColumnSnapshot column)
+		{
+			ArgumentNullException.ThrowIfNull(column);
+			ApplyColumnCore(column);
+			ColumnLoaded?.Invoke(column);
+		}
+
+		public void ReplaceAllColumns(IReadOnlyList<ChunkColumnSnapshot> columns)
+		{
+			ArgumentNullException.ThrowIfNull(columns);
+			ExecuteWorldReset(() =>
+			{
+				Chunks.Clear();
+				_columnRevisions.Clear();
+				_columnChunks.Clear();
+				foreach (ChunkColumnSnapshot column in columns)
+					ApplyColumnCore(column);
+			});
+		}
+
+		private void ApplyColumnCore(ChunkColumnSnapshot column)
+		{
+			ChunkColumnCoordinate columnCoordinate = new(column.X, column.Z);
+			if (_columnChunks.Remove(columnCoordinate, out List<Vector3> existing))
+			{
+				foreach (Vector3 coordinate in existing)
+					Chunks.Remove(coordinate);
+			}
+
+			List<Vector3> inserted = new(column.Chunks.Count);
+			foreach (ChunkSnapshot snapshot in column.Chunks)
+			{
+				if (snapshot.ChunkX != column.X || snapshot.ChunkZ != column.Z)
+					throw new InvalidDataException("A column snapshot contains a chunk from another column.");
+
+				Vector3 coordinate = new(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ);
+				Chunk chunk = new(coordinate, this, initializeBlocks: false);
+				ReadOnlySpan<BlockType> blocks = snapshot.BlockMemory.Span;
+				for (int index = 0; index < blocks.Length; index++)
+				{
+					BlockType type = blocks[index];
+					chunk.Blocks[index] = new PlacedBlock(type);
+				}
+				chunk.SetNonAirBlockCount(snapshot.NonAirBlockCount);
+				Chunks.Add(coordinate, chunk);
+				inserted.Add(coordinate);
+			}
+
+			_columnChunks[columnCoordinate] = inserted;
+			_columnRevisions[columnCoordinate] = Math.Max(1, column.Revision);
+		}
+
+		internal void InitializeColumnRevisions()
+		{
+			_columnRevisions.Clear();
+			_columnChunks.Clear();
+			foreach (KeyValuePair<Vector3, Chunk> item in Chunks.Items)
+			{
+				ChunkColumnCoordinate column = new((int)item.Key.X, (int)item.Key.Z);
+				_columnRevisions.TryAdd(column, 1);
+				if (!_columnChunks.TryGetValue(column, out List<Vector3> coordinates))
+				{
+					coordinates = new List<Vector3>();
+					_columnChunks.Add(column, coordinates);
+				}
+				coordinates.Add(item.Key);
+			}
+		}
+
+		private long IncrementColumnRevision(int chunkX, int chunkZ)
+		{
+			ChunkColumnCoordinate coordinate = new(chunkX, chunkZ);
+			long revision = _columnRevisions.TryGetValue(coordinate, out long current)
+				? checked(current + 1)
+				: 1;
+			_columnRevisions[coordinate] = revision;
+			return revision;
+		}
 
 		public IReadOnlyList<ChunkSnapshot> CaptureChunks()
 		{
@@ -143,7 +294,16 @@ namespace Voxelgine.Graphics
 			}
 
 			if (!Chunks.ContainsKey(chunkIndex))
+			{
 				Chunks.Add(chunkIndex, new Chunk(chunkIndex, this));
+				ChunkColumnCoordinate newColumn = new((int)chunkIndex.X, (int)chunkIndex.Z);
+				if (!_columnChunks.TryGetValue(newColumn, out List<Vector3> coordinates))
+				{
+					coordinates = new List<Vector3>();
+					_columnChunks.Add(newColumn, coordinates);
+				}
+				coordinates.Add(chunkIndex);
+			}
 
 			Chunks.TryGetValue(chunkIndex, out Chunk targetChunk);
 			BlockType oldType = targetChunk.GetBlock(localX, localY, localZ).Type;
@@ -151,7 +311,8 @@ namespace Voxelgine.Graphics
 			BlockChange change = default;
 			if (typeChanged)
 			{
-				change = new BlockChange(x, y, z, oldType, block.Type);
+				long columnRevision = IncrementColumnRevision((int)chunkIndex.X, (int)chunkIndex.Z);
+				change = new BlockChange(x, y, z, oldType, block.Type, columnRevision);
 				if (_bulkWorldMutationDepth == 0)
 					_blockChangeLog.Add(change);
 			}
@@ -229,6 +390,42 @@ namespace Voxelgine.Graphics
 
 		public void SetBlock(int x, int y, int z, BlockType type) =>
 			SetPlacedBlock(x, y, z, new PlacedBlock(type));
+
+		public bool TryApplyReplicatedBlockChange(
+			int x,
+			int y,
+			int z,
+			BlockType type,
+			long expectedColumnRevision)
+		{
+			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
+			ChunkColumnCoordinate column = new((int)chunkIndex.X, (int)chunkIndex.Z);
+			if (!_columnRevisions.TryGetValue(column, out long currentRevision) ||
+				!Chunks.TryGetValue(chunkIndex, out Chunk targetChunk))
+			{
+				return false;
+			}
+
+			int localX = (int)blockPosition.X;
+			int localY = (int)blockPosition.Y;
+			int localZ = (int)blockPosition.Z;
+			BlockType oldType = targetChunk.GetBlock(localX, localY, localZ).Type;
+			if (expectedColumnRevision == currentRevision && oldType == type)
+				return true;
+			if (expectedColumnRevision != currentRevision + 1 || oldType == type)
+				return false;
+
+			targetChunk.SetBlock(localX, localY, localZ, new PlacedBlock(type));
+			targetChunk.MarkDirty();
+			_columnRevisions[column] = expectedColumnRevision;
+			BlockChange change = new(x, y, z, oldType, type, expectedColumnRevision);
+			BlockChanged?.Invoke(change);
+			if (oldType != BlockType.None)
+				OnBlockRemoved?.Invoke(this, x, y, z, oldType);
+			if (type != BlockType.None)
+				OnBlockPlaced?.Invoke(this, x, y, z, type);
+			return true;
+		}
 
 		public PlacedBlock GetPlacedBlock(int x, int y, int z, out Chunk chunk)
 		{

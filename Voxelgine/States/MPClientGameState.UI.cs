@@ -78,7 +78,7 @@ namespace Voxelgine.States
 
 		/// <summary>
 		/// Removes loading screen FishUI controls and creates gameplay HUD controls.
-		/// Called from <see cref="OnWorldDataReady"/> after world loading completes.
+		/// Called after the server accepts the streamed world bootstrap.
 		/// </summary>
 		private void CreateGameplayUI()
 		{
@@ -578,7 +578,7 @@ namespace Voxelgine.States
 				X = x,
 				Y = y,
 				Z = z,
-				BlockType = (byte)BlockType.Campfire,
+				BlockType = (ushort)BlockType.Campfire,
 			};
 			_client.Send(packet, true, GetClientTime());
 		}
@@ -600,7 +600,7 @@ namespace Voxelgine.States
 				X = x,
 				Y = y,
 				Z = z,
-				BlockType = (byte)BlockType.Torch,
+				BlockType = (ushort)BlockType.Torch,
 			};
 			_client.Send(packet, true, GetClientTime());
 		}
@@ -730,6 +730,18 @@ namespace Voxelgine.States
 			int remoteCount = _simulation?.Players?.RemotePlayerCount ?? 0;
 			int entityBufCount = _entitySnapshots.Count;
 			_netStatsInfoLabel.WriteLine($"Interp Buffers: {remoteCount} players, {entityBufCount} entities");
+
+			NetConnectionDiagnostics network = _client?.Diagnostics ?? default;
+			_netStatsInfoLabel.WriteLine("--- Streaming ---");
+			_netStatsInfoLabel.WriteLine($"Core: {WorldCoreReceived} recv / {WorldCoreApplied} applied / {WorldCoreLit} lit / {WorldCoreMeshed} meshed");
+			_netStatsInfoLabel.WriteLine($"Halo: {WorldHaloReceived} recv / {WorldHaloApplied} applied / {WorldHaloLit} lit / {WorldHaloMeshed} meshed");
+			_netStatsInfoLabel.WriteLine($"Ordinary: {WorldOrdinaryReceived} recv / {WorldOrdinaryApplied} applied");
+			_netStatsInfoLabel.WriteLine($"Columns: {WorldCoreReceived + WorldHaloReceived + WorldOrdinaryReceived} streamed / {WorldCachedColumns} cached");
+			_netStatsInfoLabel.WriteLine($"Queues: {WorldDecodeQueueDepth} decode / {WorldApplyQueueDepth} apply");
+			_netStatsInfoLabel.WriteLine($"Column avg: {AverageColumnDecodeMilliseconds:F2} ms decode / {AverageColumnApplyMilliseconds:F2} ms apply");
+			_netStatsInfoLabel.WriteLine($"Reliable: {network.ReliableInFlight} flight; {network.ControlQueued}/{network.GameplayQueued}/{network.BulkQueued} C/G/B");
+			_netStatsInfoLabel.WriteLine($"ACK-only: {network.AcknowledgementsPerSecond:F1}/s ({network.AcknowledgementsSent}), retransmits: {network.RetransmissionsPerSecond:F1}/s ({network.RetransmissionsSent})");
+			_netStatsInfoLabel.WriteLine($"Retry failures: {network.RetryFailures}");
 
 			if (_fishVoxelScene != null)
 			{

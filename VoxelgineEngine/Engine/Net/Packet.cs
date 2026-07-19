@@ -23,12 +23,18 @@ namespace Voxelgine.Engine
 		PlayerSnapshot = 0x11,
 		WorldSnapshot = 0x12,
 
-		// World (0x20–0x22, 0x40–0x41)
+		// World
 		BlockChange = 0x20,
 		BlockPlaceRequest = 0x21,
 		BlockRemoveRequest = 0x22,
-		WorldData = 0x40,
-		WorldDataComplete = 0x41,
+		WorldStreamBegin = 0x40,
+		WorldColumn = 0x41,
+		WorldBootstrapComplete = 0x42,
+		WorldColumnApplied = 0x43,
+		WorldColumnResyncRequest = 0x44,
+		ChunkInterest = 0x45,
+		ClientWorldReady = 0x46,
+		ClientWorldStart = 0x47,
 
 		// Entity (0x30–0x33)
 		EntitySpawn = 0x30,
@@ -94,6 +100,32 @@ namespace Voxelgine.Engine
 			float y = reader.ReadSingle();
 			return new Vector2(x, y);
 		}
+
+		public static void WritePlayerPhysicsState(this BinaryWriter writer, in PlayerPhysicsState state)
+		{
+			writer.WriteVector3(state.Position);
+			writer.WriteVector3(state.Velocity);
+			writer.Write(state.GroundGraceRemaining);
+			writer.Write(state.JumpCooldownRemaining);
+			writer.Write(state.RecentJumpRemaining);
+			writer.Write(state.HeadBumpCooldownRemaining);
+			writer.WriteVector3(state.LastWallNormal);
+			writer.Write(state.WasGrounded);
+			writer.Write(state.WasInWater);
+			writer.Write(state.NoClip);
+		}
+
+		public static PlayerPhysicsState ReadPlayerPhysicsState(this BinaryReader reader) => new(
+			reader.ReadVector3(),
+			reader.ReadVector3(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadSingle(),
+			reader.ReadVector3(),
+			reader.ReadBoolean(),
+			reader.ReadBoolean(),
+			reader.ReadBoolean());
 	}
 
 	/// <summary>
@@ -191,8 +223,14 @@ namespace Voxelgine.Engine
 			Register<BlockChangePacket>(PacketType.BlockChange);
 			Register<BlockPlaceRequestPacket>(PacketType.BlockPlaceRequest);
 			Register<BlockRemoveRequestPacket>(PacketType.BlockRemoveRequest);
-			Register<WorldDataPacket>(PacketType.WorldData);
-			Register<WorldDataCompletePacket>(PacketType.WorldDataComplete);
+			Register<WorldStreamBeginPacket>(PacketType.WorldStreamBegin);
+			Register<WorldColumnPacket>(PacketType.WorldColumn);
+			Register<WorldBootstrapCompletePacket>(PacketType.WorldBootstrapComplete);
+			Register<WorldColumnAppliedPacket>(PacketType.WorldColumnApplied);
+			Register<WorldColumnResyncRequestPacket>(PacketType.WorldColumnResyncRequest);
+			Register<ChunkInterestPacket>(PacketType.ChunkInterest);
+			Register<ClientWorldReadyPacket>(PacketType.ClientWorldReady);
+			Register<ClientWorldStartPacket>(PacketType.ClientWorldStart);
 
 			// Entity
 			Register<EntitySpawnPacket>(PacketType.EntitySpawn);

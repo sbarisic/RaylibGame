@@ -118,6 +118,36 @@ public sealed class CampfireEmitterIndex
 		particleEmitters = new ReadOnlyCollection<VoxelFireEmitter>(emitters);
 	}
 
+	public void ReplaceColumn(ChunkColumnSnapshot column)
+	{
+		ArgumentNullException.ThrowIfNull(column);
+		campfireBlocks.RemoveWhere(position =>
+			FloorChunk(position.X) == column.X && FloorChunk(position.Z) == column.Z);
+		torchBlocks.RemoveWhere(position =>
+			FloorChunk(position.X) == column.X && FloorChunk(position.Z) == column.Z);
+
+		foreach (ChunkSnapshot snapshot in column.Chunks)
+		{
+			for (int z = 0; z < ChunkSnapshot.Size; z++)
+			{
+				for (int y = 0; y < ChunkSnapshot.Size; y++)
+				{
+					for (int x = 0; x < ChunkSnapshot.Size; x++)
+					{
+						BlockType type = snapshot.GetBlock(x, y, z);
+						if (type is not (BlockType.Campfire or BlockType.Torch))
+							continue;
+						GetBlocks(type).Add(new BlockPosition(
+							snapshot.ChunkX * ChunkSnapshot.Size + x,
+							snapshot.ChunkY * ChunkSnapshot.Size + y,
+							snapshot.ChunkZ * ChunkSnapshot.Size + z));
+					}
+				}
+			}
+		}
+		RebuildPositions();
+	}
+
 	private HashSet<BlockPosition> GetBlocks(BlockType type)
 	{
 		return type switch
@@ -132,6 +162,9 @@ public sealed class CampfireEmitterIndex
 	{
 		return new Vector3(position.X + 0.5f, position.Y + 0.5f, position.Z + 0.5f);
 	}
+
+	private static int FloorChunk(int coordinate) =>
+		(int)Math.Floor((double)coordinate / ChunkSnapshot.Size);
 
 	private readonly record struct BlockPosition(int X, int Y, int Z);
 }

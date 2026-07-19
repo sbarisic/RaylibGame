@@ -4,255 +4,288 @@ using System.IO;
 
 namespace Voxelgine.Engine
 {
+	[Flags]
+	internal enum ReliablePacketFlags : byte
+	{
+		None = 0,
+		Reliable = 1,
+		AckOnly = 2,
+	}
+
+	public readonly struct ReliableReceiveResult
+	{
+		internal ReliableReceiveResult(bool isValid, bool isAckOnly, bool isDuplicate, byte[] payload)
+		{
+			IsValid = isValid;
+			IsAckOnly = isAckOnly;
+			IsDuplicate = isDuplicate;
+			Payload = payload;
+		}
+
+		public bool IsValid { get; }
+		public bool IsAckOnly { get; }
+		public bool IsDuplicate { get; }
+		public byte[] Payload { get; }
+	}
+
+	public readonly struct ReliableRetransmissionBatch
+	{
+		internal ReliableRetransmissionBatch(List<byte[]> packets, bool retryLimitExceeded, uint failedSequence)
+		{
+			Packets = packets;
+			RetryLimitExceeded = retryLimitExceeded;
+			FailedSequence = failedSequence;
+		}
+
+		public IReadOnlyList<byte[]> Packets { get; }
+		public bool RetryLimitExceeded { get; }
+		public uint FailedSequence { get; }
+	}
+
 	/// <summary>
-	/// Manages reliable and unreliable packet delivery over UDP for a single connection.
-	/// Wraps outgoing packets with a protocol header and tracks reliable packets for
-	/// retransmission. Processes incoming ACK data and detects duplicate reliable packets.
+	/// Selective-repeat reliability for one UDP peer. The send window is exactly the
+	/// number of packets represented by the acknowledgement bitfield, so an accepted
+	/// packet can never age out of the peer's acknowledgement history while outstanding.
 	/// </summary>
 	/// <remarks>
-	/// Wire format: [reliable:1][seq:2][ack_seq:2][ack_bits:4][packet_data...]
-	/// <para/>
-	/// Packet data starts with the <see cref="PacketType"/> byte from <see cref="Packet.Serialize"/>.
-	/// All packets (reliable and unreliable) carry piggybacked ACK data.
-	/// Sequence number 0 is reserved for unreliable packets (no tracking).
+	/// Wire format: [flags:1][sequence:4][ack_sequence:4][ack_bits:8][payload...].
+	/// Sequence zero is reserved for unreliable and acknowledgement-only datagrams.
 	/// </remarks>
-	public class ReliableChannel
+	public sealed class ReliableChannel
 	{
-		/// <summary>
-		/// Protocol header size in bytes:
-		/// reliable flag (1) + sequence (2) + ack sequence (2) + ack bitfield (4).
-		/// </summary>
-		public const int HeaderSize = 9;
+		public const int HeaderSize = 17;
+		public const int WindowSize = 64;
+		public const int MaxRetries = 12;
+		public const float InitialRetransmitTimeout = 0.2f;
+		public const float MinimumRetransmitTimeout = 0.1f;
+		public const float MaximumRetransmitTimeout = 1f;
 
-		/// <summary>
-		/// Default retransmission timeout in seconds.
-		/// </summary>
-		public const float DefaultRetransmitTimeout = 0.2f;
+		private uint localSequence;
+		private readonly Dictionary<uint, PendingPacket> sendWindow = new();
+		private uint remoteSequence;
+		private ulong ackBitfield;
+		private bool hasReceivedReliable;
+		private bool ackDirty;
 
-		// --- Outgoing state ---
-		private ushort _localSequence;
-		private readonly Dictionary<ushort, PendingPacket> _sendBuffer = new();
+		public uint LocalSequence => localSequence;
+		public uint RemoteSequence => remoteSequence;
+		public int PendingCount => sendWindow.Count;
+		public int AvailableSendSlots => WindowSize - sendWindow.Count;
+		public bool HasPendingAcknowledgement => ackDirty;
+		public long AckOnlyPacketsSent { get; private set; }
+		public long RetransmissionsSent { get; private set; }
+		public long RetryFailures { get; private set; }
 
-		// --- Incoming state ---
-		private ushort _remoteSequence;
-		private uint _ackBitfield;
-		private bool _hasReceivedReliable;
-
-		/// <summary>
-		/// The last assigned local reliable sequence number.
-		/// </summary>
-		public ushort LocalSequence => _localSequence;
-
-		/// <summary>
-		/// The highest received remote reliable sequence number.
-		/// </summary>
-		public ushort RemoteSequence => _remoteSequence;
-
-		/// <summary>
-		/// Number of reliable packets awaiting acknowledgment.
-		/// </summary>
-		public int PendingCount => _sendBuffer.Count;
-
-		/// <summary>
-		/// Wraps packet data with the protocol header for transmission.
-		/// Reliable packets are assigned a sequence number and stored for retransmission.
-		/// Unreliable packets use sequence 0 and are not tracked.
-		/// All packets carry piggybacked ACK data for the remote side.
-		/// </summary>
-		/// <param name="packetData">Serialized packet bytes (from <see cref="Packet.Serialize"/>).</param>
-		/// <param name="reliable">Whether this packet requires reliable delivery.</param>
-		/// <param name="currentTime">Current time in seconds for retransmission tracking.</param>
-		/// <returns>Raw bytes ready for UDP transmission (header + packet data).</returns>
-		public byte[] Wrap(byte[] packetData, bool reliable, float currentTime)
+		public bool TryWrapReliable(byte[] packetData, float currentTime, out byte[] rawData)
 		{
-			ushort sequence = 0;
-
-			if (reliable)
+			ArgumentNullException.ThrowIfNull(packetData);
+			if (sendWindow.Count >= WindowSize)
 			{
-				_localSequence++;
-				if (_localSequence == 0)
-					_localSequence = 1;
-
-				sequence = _localSequence;
-
-				_sendBuffer[sequence] = new PendingPacket
-				{
-					Sequence = sequence,
-					PacketData = packetData,
-					SentTime = currentTime,
-				};
-			}
-
-			return BuildRawPacket(reliable ? (byte)1 : (byte)0, sequence, _remoteSequence, _ackBitfield, packetData);
-		}
-
-		/// <summary>
-		/// Processes a received raw packet: strips the protocol header, processes piggybacked
-		/// ACK data to remove acknowledged packets from the send buffer, and checks incoming
-		/// reliable packets for duplicates.
-		/// </summary>
-		/// <param name="rawData">Raw bytes received from UDP (header + packet data).</param>
-		/// <returns>
-		/// The packet data payload (suitable for <see cref="Packet.Deserialize"/>),
-		/// or null if the packet is a duplicate, malformed, or has no payload.
-		/// </returns>
-		public byte[] Unwrap(byte[] rawData)
-		{
-			if (rawData == null || rawData.Length < HeaderSize)
-				return null;
-
-			using var ms = new MemoryStream(rawData);
-			using var reader = new BinaryReader(ms);
-
-			byte reliableFlag = reader.ReadByte();
-			ushort sequence = reader.ReadUInt16();
-			ushort ackSequence = reader.ReadUInt16();
-			uint ackBitfield = reader.ReadUInt32();
-
-			ProcessAck(ackSequence, ackBitfield);
-
-			int payloadLength = rawData.Length - HeaderSize;
-			if (payloadLength == 0)
-				return null;
-
-			byte[] packetData = reader.ReadBytes(payloadLength);
-
-			if (reliableFlag != 0 && sequence != 0)
-			{
-				if (!TrackReceivedSequence(sequence))
-					return null;
-			}
-
-			return packetData;
-		}
-
-		/// <summary>
-		/// Collects reliable packets that have not been acknowledged within the retransmission
-		/// timeout and re-wraps them with current ACK data for retransmission.
-		/// </summary>
-		/// <param name="currentTime">Current time in seconds.</param>
-		/// <param name="retransmitTimeout">Seconds before retransmitting an unACKed packet.</param>
-		/// <returns>List of raw byte arrays ready for UDP retransmission.</returns>
-		public List<byte[]> GetRetransmissions(float currentTime, float retransmitTimeout = DefaultRetransmitTimeout)
-		{
-			var result = new List<byte[]>();
-
-			foreach (var kvp in _sendBuffer)
-			{
-				var pending = kvp.Value;
-				if (currentTime - pending.SentTime >= retransmitTimeout)
-				{
-					pending.SentTime = currentTime;
-
-					byte[] rewrapped = BuildRawPacket(1, pending.Sequence, _remoteSequence, _ackBitfield, pending.PacketData);
-					result.Add(rewrapped);
-				}
-			}
-
-			return result;
-		}
-
-		/// <summary>
-		/// Tracks a received reliable sequence number in the receive window.
-		/// Returns false if the sequence is a duplicate or too old to track (more than 32 behind).
-		/// </summary>
-		private bool TrackReceivedSequence(ushort sequence)
-		{
-			if (!_hasReceivedReliable)
-			{
-				_remoteSequence = sequence;
-				_ackBitfield = 0;
-				_hasReceivedReliable = true;
-				return true;
-			}
-
-			int diff = SequenceDiff(sequence, _remoteSequence);
-
-			if (diff == 0)
+				rawData = null;
 				return false;
-
-			if (diff > 0)
-			{
-				// New sequence ahead of current — shift the bitfield and mark old head as received.
-				if (diff < 32)
-					_ackBitfield <<= diff;
-				else
-					_ackBitfield = 0;
-
-				if (diff <= 32)
-					_ackBitfield |= 1U << (diff - 1);
-
-				_remoteSequence = sequence;
-				return true;
 			}
 
-			// diff < 0: older packet arrived out of order.
-			int bitIndex = -diff - 1;
-			if (bitIndex >= 32)
-				return false;
+			localSequence++;
+			if (localSequence == 0)
+				localSequence = 1;
 
-			if ((_ackBitfield & (1U << bitIndex)) != 0)
-				return false;
-
-			_ackBitfield |= 1U << bitIndex;
+			uint sequence = localSequence;
+			sendWindow.Add(sequence, new PendingPacket(sequence, packetData, currentTime));
+			rawData = BuildRawPacket(
+				ReliablePacketFlags.Reliable,
+				sequence,
+				remoteSequence,
+				ackBitfield,
+				packetData);
 			return true;
 		}
 
-		/// <summary>
-		/// Processes piggybacked ACK data from a remote packet, removing
-		/// acknowledged packets from the send buffer.
-		/// </summary>
-		private void ProcessAck(ushort ackSequence, uint ackBitfield)
+		public byte[] WrapUnreliable(byte[] packetData)
+		{
+			ArgumentNullException.ThrowIfNull(packetData);
+			byte[] rawData = BuildRawPacket(
+				ReliablePacketFlags.None,
+				0,
+				remoteSequence,
+				ackBitfield,
+				packetData);
+			return rawData;
+		}
+
+		public byte[] CreateAcknowledgement()
+		{
+			byte[] rawData = BuildRawPacket(
+				ReliablePacketFlags.AckOnly,
+				0,
+				remoteSequence,
+				ackBitfield,
+				Array.Empty<byte>());
+			ackDirty = false;
+			AckOnlyPacketsSent++;
+			return rawData;
+		}
+
+		public ReliableReceiveResult Unwrap(byte[] rawData)
+		{
+			if (rawData == null || rawData.Length < HeaderSize)
+				return default;
+
+			using MemoryStream stream = new(rawData, writable: false);
+			using BinaryReader reader = new(stream);
+			ReliablePacketFlags flags = (ReliablePacketFlags)reader.ReadByte();
+			if ((flags & ~(ReliablePacketFlags.Reliable | ReliablePacketFlags.AckOnly)) != 0)
+				return default;
+
+			uint sequence = reader.ReadUInt32();
+			uint ackSequence = reader.ReadUInt32();
+			ulong ackBits = reader.ReadUInt64();
+			ProcessAck(ackSequence, ackBits);
+
+			bool ackOnly = (flags & ReliablePacketFlags.AckOnly) != 0;
+			bool reliable = (flags & ReliablePacketFlags.Reliable) != 0;
+			if (ackOnly && (reliable || sequence != 0 || rawData.Length != HeaderSize))
+				return default;
+
+			if (!ackOnly && !reliable && sequence != 0)
+				return default;
+			if (reliable && sequence == 0)
+				return default;
+
+			if (ackOnly)
+				return new ReliableReceiveResult(true, true, false, null);
+
+			int payloadLength = rawData.Length - HeaderSize;
+			if (payloadLength <= 0)
+				return default;
+
+			byte[] payload = reader.ReadBytes(payloadLength);
+			if (!reliable)
+				return new ReliableReceiveResult(true, false, false, payload);
+
+			bool accepted = TrackReceivedSequence(sequence);
+			ackDirty = true;
+			return new ReliableReceiveResult(true, false, !accepted, accepted ? payload : null);
+		}
+
+		public ReliableRetransmissionBatch CollectRetransmissions(float currentTime, float roundTripTime)
+		{
+			List<byte[]> packets = new();
+			float baseTimeout = roundTripTime > 0
+				? Math.Clamp(roundTripTime * 2f, MinimumRetransmitTimeout, MaximumRetransmitTimeout)
+				: InitialRetransmitTimeout;
+
+			foreach (PendingPacket pending in sendWindow.Values)
+			{
+				float multiplier = MathF.Pow(2f, Math.Min(pending.RetryCount, 4));
+				float timeout = Math.Min(MaximumRetransmitTimeout, baseTimeout * multiplier);
+				if (currentTime - pending.SentTime < timeout)
+					continue;
+
+				if (pending.RetryCount >= MaxRetries)
+				{
+					RetryFailures++;
+					return new ReliableRetransmissionBatch(packets, true, pending.Sequence);
+				}
+
+				pending.SentTime = currentTime;
+				pending.RetryCount++;
+				packets.Add(BuildRawPacket(
+					ReliablePacketFlags.Reliable,
+					pending.Sequence,
+					remoteSequence,
+					ackBitfield,
+					pending.PacketData));
+				RetransmissionsSent++;
+			}
+
+			return new ReliableRetransmissionBatch(packets, false, 0);
+		}
+
+		private bool TrackReceivedSequence(uint sequence)
+		{
+			if (!hasReceivedReliable)
+			{
+				remoteSequence = sequence;
+				ackBitfield = 0;
+				hasReceivedReliable = true;
+				return true;
+			}
+
+			int difference = SequenceDifference(sequence, remoteSequence);
+			if (difference == 0)
+				return false;
+
+			if (difference > 0)
+			{
+				ackBitfield = difference < WindowSize ? ackBitfield << difference : 0;
+				if (difference <= WindowSize)
+					ackBitfield |= 1UL << (difference - 1);
+				remoteSequence = sequence;
+				return true;
+			}
+
+			int bitIndex = -difference - 1;
+			if (bitIndex >= WindowSize)
+				return false;
+
+			ulong mask = 1UL << bitIndex;
+			if ((ackBitfield & mask) != 0)
+				return false;
+
+			ackBitfield |= mask;
+			return true;
+		}
+
+		private void ProcessAck(uint ackSequence, ulong ackBits)
 		{
 			if (ackSequence == 0)
 				return;
 
-			_sendBuffer.Remove(ackSequence);
-
-			for (int i = 0; i < 32; i++)
+			sendWindow.Remove(ackSequence);
+			for (int index = 0; index < WindowSize; index++)
 			{
-				if ((ackBitfield & (1U << i)) != 0)
-				{
-					ushort ackedSeq = (ushort)(ackSequence - 1 - i);
-					if (ackedSeq != 0)
-						_sendBuffer.Remove(ackedSeq);
-				}
+				if ((ackBits & (1UL << index)) == 0)
+					continue;
+
+				uint acknowledged = ackSequence - 1u - (uint)index;
+				if (acknowledged != 0)
+					sendWindow.Remove(acknowledged);
 			}
 		}
 
-		/// <summary>
-		/// Builds a raw packet by prepending the protocol header to the packet data.
-		/// </summary>
-		private static byte[] BuildRawPacket(byte reliableFlag, ushort sequence, ushort ackSequence, uint ackBitfield, byte[] packetData)
+		private static byte[] BuildRawPacket(
+			ReliablePacketFlags flags,
+			uint sequence,
+			uint ackSequence,
+			ulong ackBits,
+			byte[] packetData)
 		{
-			byte[] raw = new byte[HeaderSize + packetData.Length];
-
-			using var ms = new MemoryStream(raw);
-			using var writer = new BinaryWriter(ms);
-
-			writer.Write(reliableFlag);
+			byte[] rawData = new byte[HeaderSize + packetData.Length];
+			using MemoryStream stream = new(rawData);
+			using BinaryWriter writer = new(stream);
+			writer.Write((byte)flags);
 			writer.Write(sequence);
 			writer.Write(ackSequence);
-			writer.Write(ackBitfield);
+			writer.Write(ackBits);
 			writer.Write(packetData);
-
-			return raw;
+			return rawData;
 		}
 
-		/// <summary>
-		/// Computes the signed difference between two sequence numbers with ushort wraparound.
-		/// Positive means <paramref name="a"/> is ahead of <paramref name="b"/>.
-		/// </summary>
-		private static int SequenceDiff(ushort a, ushort b)
-		{
-			return (short)(a - b);
-		}
+		private static int SequenceDifference(uint left, uint right) => unchecked((int)(left - right));
 
-		private class PendingPacket
+		private sealed class PendingPacket
 		{
-			public ushort Sequence;
-			public byte[] PacketData;
-			public float SentTime;
+			internal PendingPacket(uint sequence, byte[] packetData, float sentTime)
+			{
+				Sequence = sequence;
+				PacketData = packetData;
+				SentTime = sentTime;
+			}
+
+			internal uint Sequence { get; }
+			internal byte[] PacketData { get; }
+			internal float SentTime { get; set; }
+			internal int RetryCount { get; set; }
 		}
 	}
 }

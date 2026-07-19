@@ -485,174 +485,302 @@ namespace VoxelgineEngine.Tests {
 	// ──────────────────────────────────────────────
 	public class ReliableChannelTests {
 		[Fact]
-		public void Wrap_Unreliable_DoesNotTrack() {
+		public void WrapUnreliable_DoesNotTrack() {
 			var channel = new ReliableChannel();
-			byte[] packetData = new byte[] { 0x80, 0x01, 0x02 }; // Fake Ping packet data
+			byte[] packetData = new byte[] { 0x80, 0x01, 0x02 };
 
-			byte[] raw = channel.Wrap(packetData, reliable: false, currentTime: 0f);
+			byte[] raw = channel.WrapUnreliable(packetData);
 
 			Assert.Equal(0, channel.PendingCount);
 			Assert.Equal(ReliableChannel.HeaderSize + packetData.Length, raw.Length);
 		}
 
 		[Fact]
-		public void Wrap_Reliable_TracksInSendBuffer() {
+		public void TryWrapReliable_TracksInSendWindow() {
 			var channel = new ReliableChannel();
 			byte[] packetData = new byte[] { 0x01, 0x00 };
 
-			channel.Wrap(packetData, reliable: true, currentTime: 0f);
+			Assert.True(channel.TryWrapReliable(packetData, 0f, out byte[] raw));
 
 			Assert.Equal(1, channel.PendingCount);
-			Assert.Equal(1, channel.LocalSequence);
+			Assert.Equal(1u, channel.LocalSequence);
+			Assert.Equal(ReliableChannel.HeaderSize + packetData.Length, raw.Length);
 		}
 
 		[Fact]
-		public void Wrap_Reliable_SequenceIncrements() {
+		public void ReliableWindow_BoundsAt64Packets() {
 			var channel = new ReliableChannel();
-			byte[] data = new byte[] { 0x01 };
-
-			channel.Wrap(data, reliable: true, currentTime: 0f);
-			channel.Wrap(data, reliable: true, currentTime: 0f);
-			channel.Wrap(data, reliable: true, currentTime: 0f);
-
-			Assert.Equal(3, channel.LocalSequence);
-			Assert.Equal(3, channel.PendingCount);
+			for (int index = 0; index < ReliableChannel.WindowSize; index++)
+				Assert.True(channel.TryWrapReliable(new byte[] { (byte)index }, 0, out _));
+			Assert.False(channel.TryWrapReliable(new byte[] { 65 }, 0, out _));
+			Assert.Equal(64, channel.PendingCount);
 		}
 
 		[Fact]
-		public void Unwrap_Unreliable_ReturnsPayload() {
+		public void UnwrapUnreliable_ReturnsPayload() {
 			var sender = new ReliableChannel();
 			var receiver = new ReliableChannel();
 
 			byte[] packetData = new byte[] { 0x80, 0xAA, 0xBB };
-			byte[] raw = sender.Wrap(packetData, reliable: false, currentTime: 0f);
+			byte[] raw = sender.WrapUnreliable(packetData);
 
-			byte[] payload = receiver.Unwrap(raw);
+			ReliableReceiveResult result = receiver.Unwrap(raw);
 
-			Assert.NotNull(payload);
-			Assert.Equal(packetData, payload);
+			Assert.True(result.IsValid);
+			Assert.Equal(packetData, result.Payload);
 		}
 
 		[Fact]
-		public void Unwrap_Reliable_ReturnsPayload_TracksSequence() {
+		public void UnwrapReliable_ReturnsPayloadAndTracksSequence() {
 			var sender = new ReliableChannel();
 			var receiver = new ReliableChannel();
 
 			byte[] packetData = new byte[] { 0x01, 0x05 };
-			byte[] raw = sender.Wrap(packetData, reliable: true, currentTime: 0f);
+			Assert.True(sender.TryWrapReliable(packetData, 0, out byte[] raw));
 
-			byte[] payload = receiver.Unwrap(raw);
+			ReliableReceiveResult result = receiver.Unwrap(raw);
 
-			Assert.NotNull(payload);
-			Assert.Equal(packetData, payload);
-			Assert.Equal(1, receiver.RemoteSequence);
+			Assert.True(result.IsValid);
+			Assert.False(result.IsDuplicate);
+			Assert.Equal(packetData, result.Payload);
+			Assert.Equal(1u, receiver.RemoteSequence);
 		}
 
 		[Fact]
-		public void Unwrap_DuplicateReliable_ReturnsNull() {
+		public void DuplicateReliable_IsSuppressedButAcknowledged() {
 			var sender = new ReliableChannel();
 			var receiver = new ReliableChannel();
 
 			byte[] packetData = new byte[] { 0x01, 0x10 };
-			byte[] raw = sender.Wrap(packetData, reliable: true, currentTime: 0f);
+			Assert.True(sender.TryWrapReliable(packetData, 0, out byte[] raw));
 
 			receiver.Unwrap(raw);
-			byte[] duplicate = receiver.Unwrap(raw);
+			ReliableReceiveResult duplicate = receiver.Unwrap(raw);
 
-			Assert.Null(duplicate);
+			Assert.True(duplicate.IsValid);
+			Assert.True(duplicate.IsDuplicate);
+			Assert.Null(duplicate.Payload);
+			Assert.True(receiver.HasPendingAcknowledgement);
 		}
 
 		[Fact]
-		public void ACK_PiggybackedInResponse_RemovesPending() {
+		public void AcknowledgementOnly_RemovesPending() {
 			var server = new ReliableChannel();
 			var client = new ReliableChannel();
-
-			// Server sends reliable packet
 			byte[] serverPacketData = new byte[] { 0x05, 0x01, 0x02 };
-			byte[] rawFromServer = server.Wrap(serverPacketData, reliable: true, currentTime: 0f);
+			Assert.True(server.TryWrapReliable(serverPacketData, 0, out byte[] rawFromServer));
 			Assert.Equal(1, server.PendingCount);
 
-			// Client receives it (this updates client's internal ACK state)
 			client.Unwrap(rawFromServer);
-
-			// Client sends any packet back (carries piggybacked ACK)
-			byte[] clientPacketData = new byte[] { 0x10, 0x00 };
-			byte[] rawFromClient = client.Wrap(clientPacketData, reliable: false, currentTime: 0f);
-
-			// Server receives client's response (processes piggybacked ACK)
-			server.Unwrap(rawFromClient);
-
-			// Server's pending reliable packet should now be acknowledged
+			ReliableReceiveResult acknowledgement = server.Unwrap(client.CreateAcknowledgement());
+			Assert.True(acknowledgement.IsAckOnly);
 			Assert.Equal(0, server.PendingCount);
 		}
 
 		[Fact]
-		public void GetRetransmissions_BeforeTimeout_ReturnsEmpty() {
+		public void Retransmissions_BeforeTimeout_AreEmpty() {
 			var channel = new ReliableChannel();
 			byte[] data = new byte[] { 0x01 };
-			channel.Wrap(data, reliable: true, currentTime: 0f);
+			channel.TryWrapReliable(data, 0, out _);
 
-			var retransmissions = channel.GetRetransmissions(0.1f, 0.2f);
+			ReliableRetransmissionBatch retransmissions = channel.CollectRetransmissions(0.1f, 0.2f);
 
-			Assert.Empty(retransmissions);
+			Assert.Empty(retransmissions.Packets);
+			Assert.False(retransmissions.RetryLimitExceeded);
 		}
 
 		[Fact]
-		public void GetRetransmissions_AfterTimeout_ReturnsPackets() {
+		public void Retransmissions_AfterAdaptiveTimeout_AreReturned() {
 			var channel = new ReliableChannel();
 			byte[] data = new byte[] { 0x01 };
-			channel.Wrap(data, reliable: true, currentTime: 0f);
+			channel.TryWrapReliable(data, 0, out _);
 
-			var retransmissions = channel.GetRetransmissions(0.5f, 0.2f);
+			ReliableRetransmissionBatch retransmissions = channel.CollectRetransmissions(0.5f, 0.2f);
 
-			Assert.Single(retransmissions);
-			Assert.Equal(1, channel.PendingCount); // Still pending (not ACKed yet)
+			Assert.Single(retransmissions.Packets);
+			Assert.Equal(1, channel.PendingCount);
 		}
 
 		[Fact]
-		public void Unwrap_TooShort_ReturnsNull() {
+		public void UnwrapTooShort_IsInvalid() {
 			var channel = new ReliableChannel();
-			byte[] tooShort = new byte[] { 0x00, 0x01 };
-
-			byte[] result = channel.Unwrap(tooShort);
-
-			Assert.Null(result);
+			Assert.False(channel.Unwrap(new byte[] { 0x00, 0x01 }).IsValid);
 		}
 
 		[Fact]
-		public void Unwrap_Null_ReturnsNull() {
+		public void UnwrapNull_IsInvalid() {
 			var channel = new ReliableChannel();
-
-			byte[] result = channel.Unwrap(null);
-
-			Assert.Null(result);
+			Assert.False(channel.Unwrap(null).IsValid);
 		}
 
 		[Fact]
-		public void MultipleReliablePackets_ACKedByBitfield() {
+		public void BurstLargerThanWindow_CompletesInBatches() {
 			var server = new ReliableChannel();
 			var client = new ReliableChannel();
-
-			// Server sends 3 reliable packets
-			byte[] d1 = new byte[] { 0x01 };
-			byte[] d2 = new byte[] { 0x02 };
-			byte[] d3 = new byte[] { 0x03 };
-			byte[] raw1 = server.Wrap(d1, reliable: true, currentTime: 0f);
-			byte[] raw2 = server.Wrap(d2, reliable: true, currentTime: 0f);
-			byte[] raw3 = server.Wrap(d3, reliable: true, currentTime: 0f);
-			Assert.Equal(3, server.PendingCount);
-
-			// Client receives all three (each updates the ACK bitfield)
-			client.Unwrap(raw1);
-			client.Unwrap(raw2);
-			client.Unwrap(raw3);
-
-			// Client sends a response (piggybacked ACK covers seq 1, 2, 3)
-			byte[] response = client.Wrap(new byte[] { 0x10 }, reliable: false, currentTime: 0f);
-			server.Unwrap(response);
-
-			// All 3 should be acknowledged
+			int delivered = 0;
+			while (delivered < 130)
+			{
+				int batch = Math.Min(ReliableChannel.WindowSize, 130 - delivered);
+				for (int index = 0; index < batch; index++)
+				{
+					Assert.True(server.TryWrapReliable(BitConverter.GetBytes(delivered + index), 0, out byte[] raw));
+					Assert.True(client.Unwrap(raw).IsValid);
+				}
+				server.Unwrap(client.CreateAcknowledgement());
+				delivered += batch;
+			}
 			Assert.Equal(0, server.PendingCount);
+			Assert.Equal(130u, server.LocalSequence);
+		}
+
+		[Fact]
+		public void SequenceWraparound_SkipsReservedZero() {
+			var sender = new ReliableChannel();
+			var receiver = new ReliableChannel();
+			var field = typeof(ReliableChannel).GetField(
+				"localSequence",
+				System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+			Assert.NotNull(field);
+			field.SetValue(sender, uint.MaxValue - 1);
+
+			Assert.True(sender.TryWrapReliable(new byte[] { 1 }, 0, out byte[] maximum));
+			Assert.True(sender.TryWrapReliable(new byte[] { 2 }, 0, out byte[] wrapped));
+			Assert.Equal(uint.MaxValue, BitConverter.ToUInt32(maximum, 1));
+			Assert.Equal(1u, BitConverter.ToUInt32(wrapped, 1));
+			Assert.False(receiver.Unwrap(maximum).IsDuplicate);
+			Assert.False(receiver.Unwrap(wrapped).IsDuplicate);
+		}
+
+		[Fact]
+		public void OutOfOrderPackets_AreAcceptedAndSelectivelyAcknowledged() {
+			var sender = new ReliableChannel();
+			var receiver = new ReliableChannel();
+			Assert.True(sender.TryWrapReliable(new byte[] { 1 }, 0, out byte[] first));
+			Assert.True(sender.TryWrapReliable(new byte[] { 2 }, 0, out byte[] second));
+			Assert.True(sender.TryWrapReliable(new byte[] { 3 }, 0, out byte[] third));
+
+			Assert.Equal(new byte[] { 3 }, receiver.Unwrap(third).Payload);
+			Assert.Equal(new byte[] { 1 }, receiver.Unwrap(first).Payload);
+			Assert.Equal(new byte[] { 2 }, receiver.Unwrap(second).Payload);
+			sender.Unwrap(receiver.CreateAcknowledgement());
+
+			Assert.Equal(0, sender.PendingCount);
+		}
+
+		[Fact]
+		public void LostPacket_IsRecoveredWithExponentialRetransmissionBackoff() {
+			var sender = new ReliableChannel();
+			var receiver = new ReliableChannel();
+			Assert.True(sender.TryWrapReliable(new byte[] { 42 }, 0, out _));
+
+			Assert.Empty(sender.CollectRetransmissions(0.19f, 0).Packets);
+			ReliableRetransmissionBatch firstRetry = sender.CollectRetransmissions(0.2f, 0);
+			Assert.Single(firstRetry.Packets);
+			Assert.Empty(sender.CollectRetransmissions(0.59f, 0).Packets);
+			Assert.Single(sender.CollectRetransmissions(0.6f, 0).Packets);
+
+			ReliableReceiveResult recovered = receiver.Unwrap(firstRetry.Packets[0]);
+			Assert.Equal(new byte[] { 42 }, recovered.Payload);
+			sender.Unwrap(receiver.CreateAcknowledgement());
+			Assert.Equal(0, sender.PendingCount);
+		}
+
+		[Fact]
+		public void RetryExhaustion_IsReportedAfterTwelveRetries() {
+			var channel = new ReliableChannel();
+			channel.TryWrapReliable(new byte[] { 1 }, 0, out _);
+			for (int retry = 1; retry <= ReliableChannel.MaxRetries; retry++)
+			{
+				ReliableRetransmissionBatch batch = channel.CollectRetransmissions(retry, 0);
+				Assert.False(batch.RetryLimitExceeded);
+			}
+
+			ReliableRetransmissionBatch failed = channel.CollectRetransmissions(
+				ReliableChannel.MaxRetries + 1,
+				0);
+			Assert.True(failed.RetryLimitExceeded);
+			Assert.Equal(1u, failed.FailedSequence);
+		}
+
+		[Fact]
+		public void ControlQueue_AcceptsTrafficWhenBulkQueueIsSaturated() {
+			var connection = new NetConnection(
+				new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 7777),
+				0);
+			for (int index = 0; index < NetConnection.BulkQueueCapacity; index++)
+			{
+				Assert.True(connection.QueuePacket(
+					new PingPacket { Timestamp = index },
+					true,
+					0,
+					ReliableSendClass.Bulk));
+			}
+			Assert.False(connection.QueuePacket(
+				new PingPacket(),
+				true,
+				0,
+				ReliableSendClass.Bulk));
+			Assert.True(connection.QueuePacket(
+				new DisconnectPacket { Reason = "test" },
+				true,
+				0,
+				ReliableSendClass.Control));
+			Assert.Equal(128, connection.Diagnostics.BulkQueued);
+			Assert.Equal(1, connection.Diagnostics.ControlQueued);
+		}
+
+		[Fact]
+		public void BulkTraffic_LeavesReliableSlotsForControlTraffic() {
+			using var transport = new UdpTransport();
+			transport.Open();
+			var connection = new NetConnection(
+				new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 9),
+				0);
+			for (int index = 0; index < NetConnection.BulkQueueCapacity; index++)
+			{
+				Assert.True(connection.QueuePacket(
+					new PingPacket { Timestamp = index },
+					true,
+					0,
+					ReliableSendClass.Bulk));
+			}
+
+			connection.FlushOutgoing(transport, 0);
+			Assert.Equal(NetConnection.BulkInFlightLimit, connection.Diagnostics.ReliableInFlight);
+			Assert.True(connection.QueuePacket(
+				new DisconnectPacket { Reason = "urgent" },
+				true,
+				0,
+				ReliableSendClass.Control));
+			connection.FlushOutgoing(transport, 0);
+
+			Assert.Equal(0, connection.Diagnostics.ControlQueued);
+			Assert.Equal(NetConnection.BulkInFlightLimit + 1, connection.Diagnostics.ReliableInFlight);
+		}
+
+		[Fact]
+		public void OutgoingPayload_DoesNotReplaceRequiredAcknowledgementOnlyDatagram() {
+			var sender = new ReliableChannel();
+			var receiver = new ReliableChannel();
+			Assert.True(sender.TryWrapReliable(new byte[] { 1 }, 0, out byte[] incoming));
+			receiver.Unwrap(incoming);
+
+			receiver.WrapUnreliable(new byte[] { 2 });
+
+			Assert.True(receiver.HasPendingAcknowledgement);
+			Assert.True(sender.Unwrap(receiver.CreateAcknowledgement()).IsAckOnly);
+			Assert.Equal(0, sender.PendingCount);
+		}
+
+		[Fact]
+		public void UdpTransport_CanCloseAndReopenBeforeDisposal() {
+			using var transport = new UdpTransport();
+			transport.Open();
+			Assert.True(transport.IsActive);
+			transport.Close();
+			Assert.False(transport.IsActive);
+			transport.Open();
+			Assert.True(transport.IsActive);
 		}
 	}
 

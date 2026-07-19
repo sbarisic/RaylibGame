@@ -107,7 +107,11 @@ internal sealed class FishGfxEntityModel : IDisposable
 		shader.SetUniform("uTexture", 0);
 		shader.SetUniform("uAlphaCutoff", 0.1f);
 		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
-		using IDisposable stateScope = pass.PushState(pass.State with { Winding = winding });
+		using IDisposable stateScope = pass.PushState(pass.State with
+		{
+			Winding = winding,
+			CullMode = CullMode.Back,
+		});
 
 		foreach (ModelPart part in parts)
 		{

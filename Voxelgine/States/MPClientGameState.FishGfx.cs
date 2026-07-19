@@ -1118,22 +1118,22 @@ public unsafe partial class MPClientGameState
 		return quality switch
 		{
 			SunShadowQuality.Off => new DirectionalShadowOptions(
-				0, 1, 0, 0.65f, 0.1f, DirectionalShadowFilter.Pcf3x3, 1.5f, 2f),
+				0, 1, 0, 0.65f, 0.1f, DirectionalShadowFilter.Pcf3x3, 0.75f, 1f),
 			SunShadowQuality.Low => new DirectionalShadowOptions(
 				2, 1024, Math.Min(64, drawDistance), 0.65f, 0.1f,
-				DirectionalShadowFilter.Pcf3x3, 1.5f, 2f)
+				DirectionalShadowFilter.Pcf3x3, 0.75f, 1f)
 			{
 				UpdateIntervals = new[] { 1, 4 },
 			},
 			SunShadowQuality.High => new DirectionalShadowOptions(
 				4, 2048, Math.Min(256, drawDistance), 0.65f, 0.1f,
-				DirectionalShadowFilter.Pcf5x5, 1.5f, 2f)
+				DirectionalShadowFilter.Pcf5x5, 0.75f, 1f)
 			{
 				UpdateIntervals = new[] { 1, 1, 2, 4 },
 			},
 			_ => new DirectionalShadowOptions(
 				3, 2048, Math.Min(128, drawDistance), 0.65f, 0.1f,
-				DirectionalShadowFilter.Pcf3x3, 1.5f, 2f)
+				DirectionalShadowFilter.Pcf3x3, 0.75f, 1f)
 			{
 				UpdateIntervals = new[] { 1, 2, 4 },
 			},

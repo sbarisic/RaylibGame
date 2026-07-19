@@ -127,6 +127,8 @@ public sealed class MainMenuOptionsTests
 		Assert.Equal(maximumDistance, options.MaximumDistance);
 		Assert.Equal(filter, options.Filter);
 		Assert.Equal(updateIntervals, options.UpdateIntervals);
+		Assert.Equal(0.75f, options.RasterSlopeBias);
+		Assert.Equal(1f, options.RasterConstantBias);
 	}
 
 	[Fact]

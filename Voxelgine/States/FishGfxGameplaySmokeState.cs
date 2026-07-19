@@ -187,8 +187,8 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 				0.65f,
 				0.1f,
 				DirectionalShadowFilter.Pcf3x3,
-				1.5f,
-				2f
+				0.75f,
+				1f
 			)
 			{
 				UpdateIntervals = new[] { 1, 2, 4 },

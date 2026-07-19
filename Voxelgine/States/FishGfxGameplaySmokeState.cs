@@ -335,6 +335,9 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		map.SetBlock(13, 2, 7, BlockType.Torch);
 		map.SetBlock(7, 2, 11, BlockType.Leaf);
 		map.SetBlock(8, 2, 11, BlockType.Foliage);
+		// Keep a second resident chunk with no alpha-shadow geometry. The fog-depth
+		// pass must skip its absent foliage allocation instead of submitting null.
+		map.SetBlock(18, 1, 8, BlockType.Stone);
 		map.FillFog(
 			3,
 			2,

@@ -12,7 +12,14 @@ uniform vec3 uFogOrigin;
 uniform vec3 uFogSize;
 uniform float uStepLength;
 uniform int uMaximumSteps;
-uniform float uJitter;
+
+float stablePixelJitter(vec2 pixel)
+{
+	// Interleaved gradient noise is deterministic for a stationary view. It
+	// decorrelates neighboring ray starts without the frame-to-frame shimmer
+	// caused by temporal jitter when no history accumulation is available.
+	return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
 
 bool intersectBox(vec3 origin, vec3 direction, vec3 minimum, vec3 maximum,
 	out float entry, out float exitDistance)
@@ -67,7 +74,7 @@ void main()
 		return;
 	}
 
-	float distanceAlongRay = entry + fract(uJitter) * uStepLength;
+	float distanceAlongRay = entry + stablePixelJitter(gl_FragCoord.xy) * uStepLength;
 	vec3 accumulated = vec3(0.0);
 	float transmittance = 1.0;
 	for (int step = 0; step < uMaximumSteps && distanceAlongRay < exitDistance; step++)

@@ -16,7 +16,6 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 	private readonly Vector3 cameraPosition;
 	private readonly int width;
 	private readonly int height;
-	private readonly float jitter;
 
 	public LocalFogCompositeCommand(
 		Texture sceneColor,
@@ -25,8 +24,7 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 		ShaderProgram shader,
 		in RenderView view,
 		int width,
-		int height,
-		float jitter)
+		int height)
 	{
 		this.sceneColor = sceneColor ?? throw new ArgumentNullException(nameof(sceneColor));
 		this.sceneDepth = sceneDepth ?? throw new ArgumentNullException(nameof(sceneDepth));
@@ -34,7 +32,6 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 		this.shader = shader ?? throw new ArgumentNullException(nameof(shader));
 		this.width = width;
 		this.height = height;
-		this.jitter = jitter;
 		cameraPosition = view.Position;
 		if (!Matrix4x4.Invert(view.View * view.Projection, out inverseViewProjection))
 		{
@@ -53,7 +50,6 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 		shader.SetUniform("uFogSize", fog.Size);
 		shader.SetUniform("uStepLength", fog.StepLength);
 		shader.SetUniform("uMaximumSteps", fog.MaximumSteps);
-		shader.SetUniform("uJitter", jitter);
 		using IDisposable depthBinding = sceneDepth.Bind(1);
 		using IDisposable volumeBinding = fog.Texture.Bind(2);
 		pass.DrawTexturedRectangle(

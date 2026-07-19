@@ -216,8 +216,7 @@ public sealed class GameRenderGraph : IDisposable
 				localFogShader.Value,
 				settings.WorldView,
 				width,
-				height,
-				frameIndex * 0.61803398875f
+				height
 			).Execute(fogPass);
 		}
 

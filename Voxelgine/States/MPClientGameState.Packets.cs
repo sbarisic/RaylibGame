@@ -23,6 +23,7 @@ namespace Voxelgine.States
 		internal void OnDisconnected(string reason)
 		{
 			_logging.Log(GameLogLevel.Info, "Network", $"Disconnected reason={reason}");
+			CancelWorldLoad();
 
 			if (_initialized)
 			{
@@ -48,121 +49,7 @@ namespace Voxelgine.States
 
 		private void OnWorldDataReady(byte[] compressedData)
 		{
-			_logging.Log(GameLogLevel.Info, "Network", $"World transfer complete compressedBytes={compressedData.Length}");
-			_statusText = "Building world...";
-
-			try
-			{
-				// Create game simulation
-				_logging.ClientWriteLine("MPClientGameState: Creating GameSimulation...");
-				_simulation = new GameSimulation(Eng);
-				_simulation.DayNight.IsAuthority = false; // Server controls time
-				_logging.ClientWriteLine("MPClientGameState: GameSimulation created");
-
-				// Load world
-				_logging.ClientWriteLine("MPClientGameState: Reading ChunkMap from stream...");
-				using (var ms = new MemoryStream(compressedData))
-				{
-					_simulation.Map.Read(ms);
-				}
-				_logging.ClientWriteLine("MPClientGameState: ChunkMap loaded successfully");
-
-				_logging.ClientWriteLine("MPClientGameState: Computing lighting...");
-				_simulation.Map.ComputeLighting();
-				_logging.ClientWriteLine("MPClientGameState: Lighting computed");
-				CreateFishGfxVoxelScene();
-
-				// Create GUI
-				_logging.ClientWriteLine("MPClientGameState: Creating gameplay UI...");
-				CreateGameplayUI();
-				_logging.ClientWriteLine("MPClientGameState: Gameplay UI created");
-
-				// Create sound
-				_logging.ClientWriteLine("MPClientGameState: Creating game audio sink...");
-				_snd = CreateAudioSink();
-				_logging.ClientWriteLine("MPClientGameState: Game audio sink initialized");
-
-				// Create local player
-				_logging.ClientWriteLine($"MPClientGameState: Creating Player (id={_client.PlayerId}, name={_playerName})...");
-				var ply = new ClientPlayer(Eng, _gui, _playerName, true, _snd, _client.PlayerId);
-				_logging.ClientWriteLine("MPClientGameState: Player created, adding to PlayerManager...");
-				_simulation.Players.AddLocalPlayer(_client.PlayerId, ply);
-
-				_logging.ClientWriteLine("MPClientGameState: InitGUI...");
-				ply.InitGUI(_gameWindow, _gui);
-				_logging.ClientWriteLine("MPClientGameState: InitGUI complete");
-
-				_logging.ClientWriteLine("MPClientGameState: Player.Init...");
-				ply.Init(_simulation.Map);
-				_logging.ClientWriteLine("MPClientGameState: Player.Init complete");
-
-				_logging.ClientWriteLine("MPClientGameState: SetPosition...");
-				ply.SetPosition(new Vector3(32, 73, 19)); // Default spawn, server will correct
-				_logging.ClientWriteLine("MPClientGameState: SetPosition complete");
-
-				// Set entity manager to non-authoritative (server owns entity state)
-				_simulation.Entities.IsAuthority = false;
-
-				// Process any InventoryUpdate packet that arrived before the simulation was created
-				if (_pendingInventoryUpdate != null)
-				{
-					_logging.ClientWriteLine($"MPClientGameState: Replaying buffered InventoryUpdatePacket ({_pendingInventoryUpdate.Slots.Length} slots)...");
-					HandleInventoryUpdate(_pendingInventoryUpdate);
-					_pendingInventoryUpdate = null;
-				}
-
-				// Process any PlayerJoined packets that arrived before the simulation was created
-				if (_pendingPlayerJoins.Count > 0)
-				{
-					_logging.ClientWriteLine($"MPClientGameState: Processing {_pendingPlayerJoins.Count} buffered PlayerJoined packet(s)...");
-					foreach (var pending in _pendingPlayerJoins)
-					{
-						HandlePlayerJoined(pending);
-					}
-					_pendingPlayerJoins.Clear();
-				}
-
-				// Process any entity packets that arrived before the simulation was created
-				if (_pendingEntityPackets.Count > 0)
-				{
-					_logging.ClientWriteLine($"MPClientGameState: Processing {_pendingEntityPackets.Count} buffered entity packet(s)...");
-					float replayTime = GetClientTime();
-					foreach (var pending in _pendingEntityPackets)
-					{
-						switch (pending)
-						{
-							case EntitySpawnPacket spawn:
-								HandleEntitySpawn(spawn);
-								break;
-							case EntityRemovePacket remove:
-								HandleEntityRemove(remove);
-								break;
-							case EntitySnapshotPacket snapshot:
-								HandleEntitySnapshot(snapshot, replayTime);
-								break;
-						}
-					}
-					_pendingEntityPackets.Clear();
-				}
-
-				// Finish loading
-				_logging.ClientWriteLine("MPClientGameState: FinishLoading...");
-				_client.FinishLoading();
-				_initialized = true;
-				_statusText = "";
-				_errorText = "";
-
-				ApplyInputOwnership();
-
-				_logging.ClientWriteLine("MPClientGameState: World loaded, entering gameplay");
-			}
-			catch (Exception ex)
-			{
-				DisposeFishGfxVoxelScene();
-				_logging.Log(GameLogLevel.Error, "Persistence", "Failed to load transferred world.", ex);
-				_statusText = "";
-				_errorText = $"Failed to load world: {ex.Message}";
-			}
+			BeginWorldLoad(compressedData);
 		}
 
 		private void OnWorldTransferFailed(string error)
@@ -174,6 +61,12 @@ namespace Voxelgine.States
 
 		private void OnPacketReceived(Packet packet)
 		{
+			if (_simulation == null && !_replayingPendingWorldPackets)
+			{
+				_pendingWorldPackets.Add(packet);
+				return;
+			}
+
 			float currentTime = GetClientTime();
 
 			switch (packet)
@@ -315,11 +208,7 @@ namespace Voxelgine.States
 				return; // That's us
 
 			if (_simulation == null)
-			{
-				// World not loaded yet — buffer for later processing
-				_pendingPlayerJoins.Add(joined);
 				return;
-			}
 
 			_logging.ClientWriteLine($"MPClientGameState: Player joined: {joined.PlayerName} (ID {joined.PlayerId})");
 
@@ -352,10 +241,7 @@ namespace Voxelgine.States
 		private void HandleEntitySpawn(EntitySpawnPacket packet)
 		{
 			if (_simulation == null)
-			{
-				_pendingEntityPackets.Add(packet);
 				return;
-			}
 
 			// Don't duplicate if already exists
 			if (_simulation.Entities.GetEntityByNetworkId(packet.NetworkId) != null)
@@ -396,10 +282,7 @@ namespace Voxelgine.States
 		private void HandleEntityRemove(EntityRemovePacket packet)
 		{
 			if (_simulation == null)
-			{
-				_pendingEntityPackets.Add(packet);
 				return;
-			}
 
 			var removed = _simulation.Entities.Remove(packet.NetworkId);
 			_entitySnapshots.Remove(packet.NetworkId);
@@ -415,10 +298,7 @@ namespace Voxelgine.States
 		private void HandleEntitySnapshot(EntitySnapshotPacket packet, float currentTime)
 		{
 			if (_simulation == null)
-			{
-				_pendingEntityPackets.Add(packet);
 				return;
-			}
 
 			var entity = _simulation.Entities.GetEntityByNetworkId(packet.NetworkId);
 			if (entity == null)
@@ -818,11 +698,7 @@ namespace Voxelgine.States
 		private void HandleInventoryUpdate(InventoryUpdatePacket packet)
 		{
 			if (_simulation?.LocalPlayer == null)
-			{
-				_pendingInventoryUpdate = packet;
-				_logging.ClientWriteLine($"MPClientGameState: Buffered InventoryUpdatePacket ({packet.Slots.Length} slots) — simulation not ready");
 				return;
-			}
 
 			foreach (var slot in packet.Slots)
 			{

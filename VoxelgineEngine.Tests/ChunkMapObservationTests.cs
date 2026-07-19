@@ -28,6 +28,32 @@ public sealed class ChunkMapObservationTests
 	}
 
 	[Fact]
+	public void ReadHonorsCancellationBeforeDecompression()
+	{
+		ChunkMap map = new();
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+		using MemoryStream input = new();
+
+		Assert.Throws<OperationCanceledException>(
+			() => map.Read(input, cancellation.Token)
+		);
+		Assert.Empty(map.CaptureChunks());
+	}
+
+	[Fact]
+	public void ComputeLightingHonorsCancellationBeforeStartingWork()
+	{
+		ChunkMap map = new();
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		Assert.Throws<OperationCanceledException>(
+			() => map.ComputeLighting(cancellation.Token)
+		);
+	}
+
+	[Fact]
 	public void SetBlock_EmitsOneChangeForPlacementReplacementAndRemoval()
 	{
 		ChunkMap map = new();

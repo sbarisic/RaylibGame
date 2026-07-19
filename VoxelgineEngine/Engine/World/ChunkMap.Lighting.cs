@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Voxelgine.Engine;
 
@@ -6,21 +7,32 @@ namespace Voxelgine.Graphics
 {
 	public unsafe partial class ChunkMap
 	{
-		public void ResetLighting()
+		public void ResetLighting(CancellationToken cancellationToken = default)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			Chunk[] chunks = GetAllChunks();
-			Parallel.ForEach(chunks, static chunk => chunk.ResetLighting());
+			Parallel.ForEach(
+				chunks,
+				new ParallelOptions { CancellationToken = cancellationToken },
+				static chunk => chunk.ResetLighting()
+			);
 		}
 
-		public void ComputeLighting()
+		public void ComputeLighting(CancellationToken cancellationToken = default)
 		{
-			ResetLighting();
+			ResetLighting(cancellationToken);
 			Chunk[] chunks = GetAllChunks();
-			ComputeLightingParallel(chunks);
-			Parallel.ForEach(chunks, static chunk => chunk.MarkDirty());
+			ComputeLightingParallel(chunks, cancellationToken);
+			Parallel.ForEach(
+				chunks,
+				new ParallelOptions { CancellationToken = cancellationToken },
+				static chunk => chunk.MarkDirty()
+			);
 		}
 
-		private void ComputeLightingParallel(Chunk[] chunks)
+		private void ComputeLightingParallel(
+			Chunk[] chunks,
+			CancellationToken cancellationToken = default)
 		{
 			List<Chunk>[] phases = new List<Chunk>[8];
 			for (int index = 0; index < phases.Length; index++)
@@ -28,6 +40,7 @@ namespace Voxelgine.Graphics
 
 			foreach (Chunk chunk in chunks)
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				int x = ((int)chunk.GlobalChunkIndex.X % 2 + 2) % 2;
 				int y = ((int)chunk.GlobalChunkIndex.Y % 2 + 2) % 2;
 				int z = ((int)chunk.GlobalChunkIndex.Z % 2 + 2) % 2;
@@ -37,7 +50,13 @@ namespace Voxelgine.Graphics
 			foreach (List<Chunk> phase in phases)
 			{
 				if (phase.Count > 0)
-					Parallel.ForEach(phase, static chunk => chunk.ComputeLightingWithoutReset());
+				{
+					Parallel.ForEach(
+						phase,
+						new ParallelOptions { CancellationToken = cancellationToken },
+						static chunk => chunk.ComputeLightingWithoutReset()
+					);
+				}
 			}
 		}
 

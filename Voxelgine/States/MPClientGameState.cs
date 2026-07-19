@@ -2,8 +2,9 @@ using Voxelgine.Engine;
 using Voxelgine.Graphics;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using Voxelgine.GUI;
 using Voxelgine.Engine.DI;
 using FishUI;
@@ -101,14 +102,14 @@ namespace Voxelgine.States
 		private readonly NetworkInputSource _neutralInputSource = new();
 		private readonly InputMgr _neutralInputManager;
 
-		// Buffer for PlayerJoined packets received before simulation is created
-		private readonly List<PlayerJoinedPacket> _pendingPlayerJoins = new List<PlayerJoinedPacket>();
-
-		// Buffer for entity packets received before simulation is created
-		private readonly List<Packet> _pendingEntityPackets = new List<Packet>();
-
-		// Buffer for inventory update packets received before simulation is created
-		private InventoryUpdatePacket _pendingInventoryUpdate;
+		// World loading is CPU-heavy for large maps. It runs away from the graphics thread
+		// while Tick continues pumping the connection and buffering gameplay packets.
+		private readonly List<Packet> _pendingWorldPackets = new();
+		private Task<GameSimulation> _worldLoadTask;
+		private CancellationTokenSource _worldLoadCancellation;
+		private int _worldLoadGeneration;
+		private int _worldLoadStage;
+		private bool _replayingPendingWorldPackets;
 
 		// Visual correction smoothing — accumulated position offset from reconciliation
 		// corrections, blended toward zero each frame to avoid visual jitter/snapping.
@@ -225,7 +226,8 @@ namespace Voxelgine.States
 		{
 			RecordClientFrameTime(GameTime);
 			if (!_connectionLost
-				&& !string.IsNullOrEmpty(_errorText)
+				&& !_initialized
+				&& (_client != null || !string.IsNullOrEmpty(_errorText))
 				&& Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
 				DisconnectAndReturn("Returning to menu");
@@ -241,6 +243,7 @@ namespace Voxelgine.States
 
 				// Process network (client may still be processing final packets)
 				_client?.Tick(currentTime);
+				UpdateWorldLoad();
 
 				// Handle connection lost overlay input
 				if (_connectionLost)
@@ -272,7 +275,11 @@ namespace Voxelgine.States
 				if (!_initialized)
 				{
 					// Update loading progress
-					if (_client.State == ClientState.Loading)
+					if (_worldLoadTask != null)
+					{
+						_statusText = GetWorldLoadStatus();
+					}
+					else if (_client.State == ClientState.Loading)
 					{
 						var wr = _client.WorldReceiver;
 						if (wr.TotalFragments > 0)
@@ -576,6 +583,7 @@ namespace Voxelgine.States
 
 		private void Cleanup()
 		{
+			CancelWorldLoad();
 			_initialized = false;
 			_connectionLost = false;
 			_disconnectReason = "";
@@ -603,8 +611,8 @@ namespace Voxelgine.States
 			_gui?.Dispose();
 			_gui = null;
 			_snd = null;
-			_pendingPlayerJoins.Clear();
-			_pendingEntityPackets.Clear();
+			_pendingWorldPackets.Clear();
+			_replayingPendingWorldPackets = false;
 			_entitySnapshots.Clear();
 			_chatHistory.Clear();
 			_predictionReconciler.Reset();

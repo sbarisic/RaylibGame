@@ -1,6 +1,7 @@
 using System.IO;
 using System.IO.Compression;
 using System.Numerics;
+using System.Threading;
 
 namespace Voxelgine.Graphics
 {
@@ -24,13 +25,14 @@ namespace Voxelgine.Graphics
 			}
 		}
 
-		public void Read(Stream Input)
+		public void Read(Stream Input, CancellationToken cancellationToken = default)
 		{
-			ExecuteWorldReset(() => ReadCore(Input));
+			ExecuteWorldReset(() => ReadCore(Input, cancellationToken));
 		}
 
-		private void ReadCore(Stream Input)
+		private void ReadCore(Stream Input, CancellationToken cancellationToken)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			using (GZipStream ZipStream = new GZipStream(Input, CompressionMode.Decompress, true))
 			using (var Reader = new BinaryReader(ZipStream))
 			{
@@ -38,6 +40,7 @@ namespace Voxelgine.Graphics
 
 				for (int i = 0; i < Count; i++)
 				{
+					cancellationToken.ThrowIfCancellationRequested();
 					int CX = Reader.ReadInt32();
 					int CY = Reader.ReadInt32();
 					int CZ = Reader.ReadInt32();

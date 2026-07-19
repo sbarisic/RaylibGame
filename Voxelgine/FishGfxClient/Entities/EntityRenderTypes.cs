@@ -1,4 +1,6 @@
 #if WINDOWS
+using FishGfx.Graphics.Shadows;
+using FishGfx.Voxels;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.Engine.Geometry;
@@ -54,11 +56,38 @@ public readonly record struct EntityModelHit(
 	}
 }
 
+public readonly record struct EntityLightSample(Vector3 BlockLight, float SkyLight)
+{
+	public static implicit operator EntityLightSample(Rgba32 legacyTint)
+	{
+		const float inverseByte = 1f / byte.MaxValue;
+		return new EntityLightSample(
+			new Vector3(legacyTint.R, legacyTint.G, legacyTint.B) * inverseByte,
+			0
+		);
+	}
+}
+
+public readonly record struct EntityWorldLighting(
+	VoxelSunSettings Sun,
+	DirectionalShadowFrame? Shadows)
+{
+	public static EntityWorldLighting Unshadowed { get; } = new(
+		new VoxelSunSettings(
+			new Vector3(-0.45f, -1, -0.3f),
+			FishGfx.Color.White,
+			1,
+			0.35f
+		),
+		null
+	);
+}
+
 public readonly record struct RemotePlayerRenderState(
 	Vector3 EyePosition,
 	Vector2 CameraAngle,
 	byte AnimationState,
-	Rgba32 LightTint
+	EntityLightSample Light
 );
 
 public readonly record struct NpcRenderState(
@@ -68,7 +97,7 @@ public readonly record struct NpcRenderState(
 	string AnimationName,
 	Vector3 HeadRotation,
 	string TextureAssetId,
-	Rgba32 LightTint
+	EntityLightSample Light
 );
 
 public readonly record struct SlidingDoorRenderState(
@@ -77,7 +106,7 @@ public readonly record struct SlidingDoorRenderState(
 	Vector3 FacingDirection,
 	float OpenProgress,
 	float OpenAngleDegrees,
-	Rgba32 LightTint
+	EntityLightSample Light
 );
 
 public readonly record struct PickupRenderState(
@@ -85,7 +114,7 @@ public readonly record struct PickupRenderState(
 	Vector3 Size,
 	float RotationDegrees,
 	float BobOffset,
-	Rgba32 LightTint
+	EntityLightSample Light
 );
 
 internal readonly record struct EntityPartPose(Vector3 RotationDegrees, Vector3 PositionOffset);

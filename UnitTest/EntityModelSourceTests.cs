@@ -1,5 +1,7 @@
 using System.Drawing;
+using System.Numerics;
 using Voxelgine.FishGfxClient.Entities;
+using Winding = FishGfx.Graphics.Winding;
 
 namespace UnitTest;
 
@@ -52,6 +54,36 @@ public sealed class EntityModelSourceTests
 					sampled.A > 0,
 					$"{textureFileName} part {part.Name} sampled transparent pixel ({x}, {y})."
 				);
+			}
+		}
+	}
+
+	[Fact]
+	public void HumanoidFlatNormalsFollowItsFrontFaceWinding()
+	{
+		EntityModelSource source = LoadHumanoid();
+
+		foreach (EntityModelPartSource part in source.Parts)
+		{
+			Vector3[] normals = FishGfxEntityModel.CreateFlatNormals(
+				part,
+				source.FrontFaceWinding
+			);
+
+			Assert.Equal(part.Vertices.Length, normals.Length);
+
+			for (int vertex = 0; vertex < part.Vertices.Length; vertex += 3)
+			{
+				Vector3 a = part.Vertices[vertex].Position;
+				Vector3 b = part.Vertices[vertex + 1].Position;
+				Vector3 c = part.Vertices[vertex + 2].Position;
+				Vector3 expected = source.FrontFaceWinding == Winding.CounterClockwise
+					? Vector3.Normalize(Vector3.Cross(b - a, c - a))
+					: Vector3.Normalize(Vector3.Cross(c - a, b - a));
+
+				Assert.True(Vector3.Dot(expected, normals[vertex]) > 0.999f);
+				Assert.Equal(normals[vertex], normals[vertex + 1]);
+				Assert.Equal(normals[vertex], normals[vertex + 2]);
 			}
 		}
 	}

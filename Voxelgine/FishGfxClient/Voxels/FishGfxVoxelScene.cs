@@ -4,8 +4,10 @@ using System.Numerics;
 using FishGfx.Game;
 using FishGfx.Graphics;
 using FishGfx.Voxels;
+using FishGfx.Graphics.Shadows;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
+using Voxelgine.FishGfxClient.Entities;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.FishGfxClient.Voxels;
@@ -96,6 +98,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	public VoxelRendererStatistics Statistics => Renderer.Statistics;
 
+	public long GeometryRevision => Renderer.GeometryRevision;
+
 	public bool IsLightingIdle => Lighting.IsIdle;
 
 	public bool HasValidTransparentOrdering => Renderer.HasValidTransparentOrdering;
@@ -168,10 +172,35 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	public void Enqueue(RenderQueue queue, Camera camera)
 	{
+		Enqueue(queue, camera, shadows: null);
+	}
+
+	public void Enqueue(
+		RenderQueue queue,
+		Camera camera,
+		DirectionalShadowFrame? shadows)
+	{
 		ArgumentNullException.ThrowIfNull(queue);
 		ArgumentNullException.ThrowIfNull(camera);
 		SynchronizeAtlas();
-		Renderer.EnqueueVisible(queue, camera);
+		Renderer.EnqueueVisible(queue, camera, shadows);
+	}
+
+	public EntityLightSample SampleEntityLight(Vector3 worldPosition)
+	{
+		ThrowIfDisposed();
+		VoxelLight light = Lighting.GetLight(
+			(int)MathF.Floor(worldPosition.X),
+			(int)MathF.Floor(worldPosition.Y),
+			(int)MathF.Floor(worldPosition.Z)
+		);
+		VoxelBlockLight block = light.Block;
+		float inverseMaximum = 1f / VoxelEnvironmentSampling.MaximumSkyLight;
+
+		return new EntityLightSample(
+			new Vector3(block.Red, block.Green, block.Blue) * inverseMaximum,
+			Math.Max(light.Sky * inverseMaximum, minimumAmbientLight * inverseMaximum)
+		);
 	}
 
 	public Rgba32 SampleLight(Vector3 worldPosition)

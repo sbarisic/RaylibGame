@@ -153,7 +153,9 @@ internal sealed class FishGfxVoxelAssets
 				VoxelRenderMode.Transparent,
 				new VoxelFaceTiles(9),
 				occludesFaces: false,
-				light: new VoxelMaterialLightSettings(1)));
+				light: new VoxelMaterialLightSettings(1),
+				shadowCasterMode: VoxelShadowCasterMode.AlphaTest,
+				shadowAlphaCutoff: 0.35f));
 		Add(
 			BlockType.Water,
 			new VoxelMaterial(

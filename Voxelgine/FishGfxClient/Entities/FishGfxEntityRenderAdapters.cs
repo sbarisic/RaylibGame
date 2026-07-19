@@ -88,6 +88,16 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			() => FishGfxAnimationLibrary.LoadStandard(animationDirectory),
 			animationPaths
 		);
+		AssetHandle<ShaderProgram> litShader = window.Assets.LoadShader(
+			"entity.lit.shader",
+			"data/shaders/fishgfx/entity_lit.vert",
+			"data/shaders/fishgfx/entity_lit.frag"
+		);
+		AssetHandle<ShaderProgram> shadowShader = window.Assets.LoadShader(
+			"entity.shadow.shader",
+			"data/shaders/fishgfx/entity_shadow.vert",
+			"data/shaders/fishgfx/entity_shadow.frag"
+		);
 
 		return new SharedResources(
 			humanoid,
@@ -97,7 +107,9 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			alternateTexture,
 			doorTexture,
 			orbTexture,
-			animations
+			animations,
+			litShader,
+			shadowShader
 		);
 	}
 
@@ -198,6 +210,24 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 		}
 	}
 
+	internal ShaderProgram LitShader
+	{
+		get
+		{
+			ThrowIfDisposed();
+			return resources.LitShader.Value;
+		}
+	}
+
+	internal ShaderProgram ShadowShader
+	{
+		get
+		{
+			ThrowIfDisposed();
+			return resources.ShadowShader.Value;
+		}
+	}
+
 	private void ThrowIfDisposed()
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
@@ -211,7 +241,9 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 		AssetHandle<Texture> HumanoidTextureAlternate,
 		AssetHandle<Texture> SlidingDoorTexture,
 		AssetHandle<Texture> ExperienceOrbTexture,
-		AssetHandle<FishGfxAnimationLibrary> Animations
+		AssetHandle<FishGfxAnimationLibrary> Animations,
+		AssetHandle<ShaderProgram> LitShader,
+		AssetHandle<ShaderProgram> ShadowShader
 	);
 }
 
@@ -250,7 +282,7 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 		hasState = true;
 	}
 
-	public void Render(RenderPass pass)
+	public void Render(RenderPass pass, in EntityWorldLighting lighting)
 	{
 		EnsureState();
 		assets.Humanoid.Render(
@@ -258,7 +290,28 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 			rootTransform,
 			animation.Pose,
 			assets.HumanoidTexture(EntityAssetIds.HumanoidTexture),
-			ToFishColor(state.LightTint)
+			Color.White,
+			assets.LitShader,
+			state.Light,
+			lighting
+		);
+	}
+
+	public void Render(RenderPass pass)
+	{
+		EntityWorldLighting lighting = EntityWorldLighting.Unshadowed;
+		Render(pass, lighting);
+	}
+
+	public void RenderShadow(RenderPass pass)
+	{
+		EnsureState();
+		assets.Humanoid.RenderShadow(
+			pass,
+			rootTransform,
+			animation.Pose,
+			assets.HumanoidTexture(EntityAssetIds.HumanoidTexture),
+			assets.ShadowShader
 		);
 	}
 
@@ -321,7 +374,7 @@ public sealed class FishGfxNpcRenderAdapter
 		hasState = true;
 	}
 
-	public void Render(RenderPass pass)
+	public void Render(RenderPass pass, in EntityWorldLighting lighting)
 	{
 		EnsureState();
 		assets.Humanoid.Render(
@@ -329,7 +382,28 @@ public sealed class FishGfxNpcRenderAdapter
 			rootTransform,
 			animation.Pose,
 			assets.HumanoidTexture(state.TextureAssetId),
-			ToFishColor(state.LightTint)
+			Color.White,
+			assets.LitShader,
+			state.Light,
+			lighting
+		);
+	}
+
+	public void Render(RenderPass pass)
+	{
+		EntityWorldLighting lighting = EntityWorldLighting.Unshadowed;
+		Render(pass, lighting);
+	}
+
+	public void RenderShadow(RenderPass pass)
+	{
+		EnsureState();
+		assets.Humanoid.RenderShadow(
+			pass,
+			rootTransform,
+			animation.Pose,
+			assets.HumanoidTexture(state.TextureAssetId),
+			assets.ShadowShader
 		);
 	}
 
@@ -375,14 +449,37 @@ public sealed class FishGfxSlidingDoorRenderAdapter
 		this.assets = assets;
 	}
 
-	public void Render(RenderPass pass, in SlidingDoorRenderState state)
+	public void Render(
+		RenderPass pass,
+		in SlidingDoorRenderState state,
+		in EntityWorldLighting lighting)
 	{
 		assets.SlidingDoor.Render(
 			pass,
 			CreateTransform(state),
 			RestPose,
 			assets.SlidingDoorTexture,
-			ToFishColor(state.LightTint)
+			Color.White,
+			assets.LitShader,
+			state.Light,
+			lighting
+		);
+	}
+
+	public void Render(RenderPass pass, in SlidingDoorRenderState state)
+	{
+		EntityWorldLighting lighting = EntityWorldLighting.Unshadowed;
+		Render(pass, state, lighting);
+	}
+
+	public void RenderShadow(RenderPass pass, in SlidingDoorRenderState state)
+	{
+		assets.SlidingDoor.RenderShadow(
+			pass,
+			CreateTransform(state),
+			RestPose,
+			assets.SlidingDoorTexture,
+			assets.ShadowShader
 		);
 	}
 
@@ -431,14 +528,37 @@ public sealed class FishGfxPickupRenderAdapter
 		this.assets = assets;
 	}
 
-	public void Render(RenderPass pass, in PickupRenderState state)
+	public void Render(
+		RenderPass pass,
+		in PickupRenderState state,
+		in EntityWorldLighting lighting)
 	{
 		assets.ExperienceOrb.Render(
 			pass,
 			CreateTransform(state),
 			RestPose,
 			assets.ExperienceOrbTexture,
-			ToFishColor(state.LightTint)
+			Color.White,
+			assets.LitShader,
+			state.Light,
+			lighting
+		);
+	}
+
+	public void Render(RenderPass pass, in PickupRenderState state)
+	{
+		EntityWorldLighting lighting = EntityWorldLighting.Unshadowed;
+		Render(pass, state, lighting);
+	}
+
+	public void RenderShadow(RenderPass pass, in PickupRenderState state)
+	{
+		assets.ExperienceOrb.RenderShadow(
+			pass,
+			CreateTransform(state),
+			RestPose,
+			assets.ExperienceOrbTexture,
+			assets.ShadowShader
 		);
 	}
 

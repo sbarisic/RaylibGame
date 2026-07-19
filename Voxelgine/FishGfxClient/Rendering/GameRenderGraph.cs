@@ -1,6 +1,7 @@
 #if WINDOWS
 using FishGfx;
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
@@ -16,6 +17,11 @@ public sealed class GameRenderGraph : IDisposable
 	private RenderTarget resolvedTarget;
 	private Vector2 targetSize;
 	private bool disposed;
+	private DirectionalShadowRenderer shadowRenderer;
+	private DirectionalShadowOptions shadowOptions;
+	private GameStateImpl shadowOwner;
+	private long shadowGeometryRevision = long.MinValue;
+	private long frameIndex;
 
 	public GameRenderGraph(GraphicsContext graphics, GameAssetStore assets, bool enableMsaa)
 	{
@@ -30,6 +36,9 @@ public sealed class GameRenderGraph : IDisposable
 	}
 
 	public int SampleCount => useMsaa ? 4 : 1;
+
+	public DirectionalShadowDiagnostics ShadowDiagnostics =>
+		shadowRenderer?.Diagnostics ?? default;
 
 	public void SetMultisampling(bool enabled)
 	{
@@ -56,6 +65,8 @@ public sealed class GameRenderGraph : IDisposable
 		GameStateRenderSettings settings = state.GetRenderSettings(new Vector2(width, height));
 
 		using RenderFrame frame = graphics.BeginFrame();
+		frameIndex++;
+		DirectionalShadowFrame? shadows = PrepareShadows(frame, state, timing);
 		using (RenderPass world = frame.BeginPass(
 			worldTarget,
 			CreateDescriptor(
@@ -68,7 +79,7 @@ public sealed class GameRenderGraph : IDisposable
 			)
 		))
 		{
-			state.RenderWorld(world, timing);
+			state.RenderWorld(world, timing, shadows);
 		}
 
 		using (RenderPass viewmodel = frame.BeginPass(
@@ -142,9 +153,126 @@ public sealed class GameRenderGraph : IDisposable
 		}
 
 		DisposeTargets();
+		shadowRenderer?.Dispose();
+		shadowRenderer = null;
+		shadowOwner = null;
 		worldTarget = null;
 		resolvedTarget = null;
 		disposed = true;
+	}
+
+	private DirectionalShadowFrame? PrepareShadows(
+		RenderFrame frame,
+		GameStateImpl state,
+		in FrameTiming timing)
+	{
+		GameDirectionalShadowRequest? requestValue = state.GetDirectionalShadowRequest();
+
+		if (!requestValue.HasValue || requestValue.Value.Options.CascadeCount == 0)
+		{
+			if (shadowOwner != null)
+			{
+				shadowRenderer?.InvalidateAll();
+				shadowOwner = null;
+				shadowGeometryRevision = long.MinValue;
+			}
+
+			return null;
+		}
+
+		GameDirectionalShadowRequest request = requestValue.Value;
+
+		if (!ReferenceEquals(shadowOwner, state))
+		{
+			shadowRenderer?.InvalidateAll();
+			shadowOwner = state;
+			shadowGeometryRevision = long.MinValue;
+		}
+
+		if (shadowRenderer == null)
+		{
+			shadowOptions = request.Options;
+			shadowRenderer = new DirectionalShadowRenderer(graphics, shadowOptions);
+		}
+		else if (!OptionsEqual(shadowOptions, request.Options))
+		{
+			shadowOptions = request.Options;
+			shadowRenderer.SetOptions(shadowOptions);
+		}
+
+		if (shadowGeometryRevision != request.GeometryRevision)
+		{
+			shadowGeometryRevision = request.GeometryRevision;
+			shadowRenderer.InvalidateGeometry();
+		}
+
+		if (request.DynamicActorsChanged)
+		{
+			shadowRenderer.NotifyDynamicActorsChanged();
+		}
+
+		shadowRenderer.GpuProfilingEnabled = request.GpuProfilingEnabled;
+
+		shadowRenderer.Prepare(
+			request.ViewCamera,
+			request.LightDirection,
+			request.Strength,
+			frameIndex
+		);
+
+		for (int pendingIndex = 0; pendingIndex < shadowRenderer.CascadesNeedingRender.Count; pendingIndex++)
+		{
+			int cascadeIndex = shadowRenderer.CascadesNeedingRender[pendingIndex];
+			DirectionalShadowCascade cascade = shadowRenderer.GetPendingCascade(cascadeIndex);
+
+			using (RenderPass shadowPass = shadowRenderer.BeginCascadePass(frame, cascadeIndex))
+			{
+				using IDisposable timingScope = shadowRenderer.BeginCascadeTiming(
+					shadowPass,
+					cascadeIndex
+				);
+				state.RenderShadowCasters(shadowPass, cascade, timing);
+			}
+
+			shadowRenderer.CompleteCascade(cascadeIndex);
+		}
+
+		DirectionalShadowFrame shadowFrame = shadowRenderer.CurrentFrame;
+		return shadowFrame.Enabled ? shadowFrame : null;
+	}
+
+	private static bool OptionsEqual(
+		DirectionalShadowOptions left,
+		DirectionalShadowOptions right)
+	{
+		if (ReferenceEquals(left, right))
+		{
+			return true;
+		}
+
+		if (left == null || right == null
+			|| left.CascadeCount != right.CascadeCount
+			|| left.Resolution != right.Resolution
+			|| left.MaximumDistance != right.MaximumDistance
+			|| left.SplitLambda != right.SplitLambda
+			|| left.CascadeBlendFraction != right.CascadeBlendFraction
+			|| left.Filter != right.Filter
+			|| left.RasterSlopeBias != right.RasterSlopeBias
+			|| left.RasterConstantBias != right.RasterConstantBias
+			|| left.UpdateIntervals.Count != right.UpdateIntervals.Count)
+		{
+			return false;
+		}
+
+		for (int index = 0; index < left.UpdateIntervals.Count; index++)
+		{
+			if (left.UpdateIntervals[index] != right.UpdateIntervals[index])
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private void EnsureTargets(int width, int height)

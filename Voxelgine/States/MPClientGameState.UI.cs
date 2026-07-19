@@ -5,6 +5,7 @@ using System.Numerics;
 using Voxelgine.GUI;
 using FishUI;
 using FishUI.Controls;
+using Voxelgine.FishGfxClient;
 
 namespace Voxelgine.States
 {
@@ -765,6 +766,26 @@ namespace Voxelgine.States
 				_netStatsInfoLabel.WriteLine($"  Stale: {diagnostics.TransparentStaleResults}, dropped: {diagnostics.TransparentDroppedResults}");
 				_netStatsInfoLabel.WriteLine($"  Order: {diagnostics.TransparentOrderingReason}, revision: {diagnostics.TransparentOrderingGeometryRevision}");
 				_netStatsInfoLabel.WriteLine($"  Delta: {diagnostics.TransparentOrderingCameraDistanceDelta:F2} blocks / {diagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2} deg");
+				if (_gameWindow is IFishGfxGameWindow fishWindow)
+				{
+					var shadows = fishWindow.ShadowDiagnostics;
+					_netStatsInfoLabel.WriteLine("--- Sun Shadows ---");
+					_netStatsInfoLabel.WriteLine($"Enabled: {shadows.Enabled}, cascades: {shadows.CascadeCount}, distance: {shadows.EffectiveDistance:F0}");
+					_netStatsInfoLabel.WriteLine($"Refreshed: {shadows.RefreshedCascadeCount}, reason: {shadows.DirtyReasons}");
+					var caster = _fishVoxelScene.Renderer.LastShadowSubmission;
+					_netStatsInfoLabel.WriteLine($"Caster chunks: {caster.CasterChunkCount}, draws: {caster.DriverDrawCount}, commands: {caster.OpaqueCommandCount + caster.CutoutCommandCount + caster.AlphaShadowCommandCount}");
+					_netStatsInfoLabel.WriteLine($"Leaf caster vertices: {caster.AlphaShadowVertexCount}");
+					_netStatsInfoLabel.WriteLine($"CPU: cull {caster.CullingMilliseconds:F2} ms, build {caster.CommandBuildMilliseconds:F2} ms, submit {caster.SubmissionMilliseconds:F2} ms");
+					_netStatsInfoLabel.WriteLine($"Alloc: {caster.ManagedAllocationBytes} B");
+
+					int cascadeCount = shadows.Cascades?.Count ?? 0;
+
+					for (int cascadeIndex = 0; cascadeIndex < cascadeCount; cascadeIndex++)
+					{
+						var cascade = shadows.Cascades[cascadeIndex];
+						_netStatsInfoLabel.WriteLine($"C{cascade.Index}: {cascade.NearDistance:F1}-{cascade.FarDistance:F1}, age {cascade.AgeFrames}, GPU {cascade.GpuMilliseconds:F2} ms");
+					}
+				}
 			}
 		}
 

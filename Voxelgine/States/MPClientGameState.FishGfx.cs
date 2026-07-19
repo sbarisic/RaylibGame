@@ -5,6 +5,7 @@ using Voxelgine.GUI;
 
 #if WINDOWS
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using FishGfx.Voxels;
 using Voxelgine.Audio;
 using Voxelgine.FishGfxClient;
@@ -268,6 +269,10 @@ public unsafe partial class MPClientGameState
 			_nextRendererProfileLogTime = timing.TotalTime + 1;
 			VoxelRendererStatistics rendererStatistics = _fishVoxelScene.Statistics;
 			NetConnectionDiagnostics networkDiagnostics = _client?.Diagnostics ?? default;
+			DirectionalShadowDiagnostics shadowDiagnostics =
+				((IFishGfxGameWindow)_gameWindow).ShadowDiagnostics;
+			VoxelShadowSubmissionDiagnostics shadowCasterDiagnostics =
+				_fishVoxelScene.Renderer.LastShadowSubmission;
 			_logging?.Log(
 				GameLogLevel.Debug,
 				"Performance",
@@ -292,7 +297,15 @@ public unsafe partial class MPClientGameState
 					+ $"columnDecodeMs={AverageColumnDecodeMilliseconds:F3} columnApplyMs={AverageColumnApplyMilliseconds:F3} "
 					+ $"reliableFlight={networkDiagnostics.ReliableInFlight} queues={networkDiagnostics.ControlQueued}/{networkDiagnostics.GameplayQueued}/{networkDiagnostics.BulkQueued} "
 					+ $"ackOnly={networkDiagnostics.AcknowledgementsSent} ackOnlyPerSecond={networkDiagnostics.AcknowledgementsPerSecond:F1} "
-					+ $"retransmissions={networkDiagnostics.RetransmissionsSent} retransmissionsPerSecond={networkDiagnostics.RetransmissionsPerSecond:F1} retryFailures={networkDiagnostics.RetryFailures}"
+					+ $"retransmissions={networkDiagnostics.RetransmissionsSent} retransmissionsPerSecond={networkDiagnostics.RetransmissionsPerSecond:F1} retryFailures={networkDiagnostics.RetryFailures} "
+					+ $"shadowsEnabled={shadowDiagnostics.Enabled} shadowCascades={shadowDiagnostics.CascadeCount} shadowRefreshed={shadowDiagnostics.RefreshedCascadeCount} "
+					+ $"shadowDistance={shadowDiagnostics.EffectiveDistance:F0} shadowReasons={shadowDiagnostics.DirtyReasons} "
+					+ $"shadowCasterChunks={shadowCasterDiagnostics.CasterChunkCount} shadowDraws={shadowCasterDiagnostics.DriverDrawCount} "
+					+ $"shadowCommands={shadowCasterDiagnostics.OpaqueCommandCount + shadowCasterDiagnostics.CutoutCommandCount + shadowCasterDiagnostics.AlphaShadowCommandCount} "
+					+ $"shadowLeafVertices={shadowCasterDiagnostics.AlphaShadowVertexCount} "
+					+ $"shadowCullMs={shadowCasterDiagnostics.CullingMilliseconds:F3} shadowBuildMs={shadowCasterDiagnostics.CommandBuildMilliseconds:F3} "
+					+ $"shadowSubmitMs={shadowCasterDiagnostics.SubmissionMilliseconds:F3} shadowAlloc={shadowCasterDiagnostics.ManagedAllocationBytes} "
+					+ $"shadowGpuMs={SumShadowGpuMilliseconds(shadowDiagnostics):F3}"
 			);
 		}
 		_fishParticles?.UpdateVoxelEmitters(
@@ -352,7 +365,70 @@ public unsafe partial class MPClientGameState
 		};
 	}
 
-	public override void RenderWorld(RenderPass pass, in FrameTiming timing)
+	public override GameDirectionalShadowRequest? GetDirectionalShadowRequest()
+	{
+		if (_fishVoxelScene is null || _simulation?.DayNight is null)
+		{
+			return null;
+		}
+
+		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
+		DirectionalShadowOptions options = CreateShadowOptions(
+			config.SunShadowQuality,
+			config.MaxChunkDrawDistance
+		);
+
+		if (options.CascadeCount == 0)
+		{
+			return null;
+		}
+
+		float normalizedDaylight = Math.Clamp(
+			(_simulation.DayNight.SkyLightMultiplier - 0.15f) / 0.85f,
+			0,
+			1
+		);
+		float strength = _simulation.DayNight.SunColor.A == 0
+			? 0
+			: SmoothStep(0.02f, 0.12f, normalizedDaylight);
+		bool dynamicActors = _fishRemotePlayers.Count > 0
+			|| _simulation.Entities.GetAllEntities().Any(entity => entity is VEntNPC
+				or VEntSlidingDoor
+				or VEntPickup);
+
+		return new GameDirectionalShadowRequest(
+			_fishWorldCamera,
+			_fishVoxelScene.Renderer.SunSettings.Direction,
+			strength,
+			options,
+			_fishVoxelScene.GeometryRevision,
+			dynamicActors,
+			_rendererProfilingEnabled
+		);
+	}
+
+	public override void RenderShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade,
+		in FrameTiming timing)
+	{
+		if (_fishVoxelScene is null)
+		{
+			return;
+		}
+
+		_fishVoxelScene.Renderer.RenderShadowCasters(pass, cascade);
+
+		if (_initialized)
+		{
+			DrawFishGfxActorShadowCasters(pass, cascade);
+		}
+	}
+
+	public override void RenderWorld(
+		RenderPass pass,
+		in FrameTiming timing,
+		DirectionalShadowFrame? shadows)
 	{
 		if (_fishVoxelScene is null)
 		{
@@ -362,10 +438,15 @@ public unsafe partial class MPClientGameState
 		_fishRenderQueue.BeginFrame();
 		if (_initialized && _simulation?.LocalPlayer is not null)
 			_fishCelestial?.Render(pass, _fishCameraState, _simulation.DayNight);
-		_fishVoxelScene.Enqueue(_fishRenderQueue, _fishWorldCamera);
+		_fishVoxelScene.Enqueue(_fishRenderQueue, _fishWorldCamera, shadows);
 		pass.Execute(_fishRenderQueue, RenderQueueBucket.Opaque);
 		if (_initialized)
-			DrawFishGfxGameplayGeometry(pass);
+		{
+			DrawFishGfxGameplayGeometry(
+				pass,
+				new EntityWorldLighting(_fishVoxelScene.Renderer.SunSettings, shadows)
+			);
+		}
 		pass.Execute(_fishRenderQueue, RenderQueueBucket.Transparent);
 		if (_initialized)
 		{
@@ -477,21 +558,25 @@ public unsafe partial class MPClientGameState
 		_npcSpeechOverlay.SetItems(visible);
 	}
 
-	private void DrawFishGfxGameplayGeometry(RenderPass pass)
+	private void DrawFishGfxGameplayGeometry(
+		RenderPass pass,
+		in EntityWorldLighting lighting)
 	{
 		foreach (RemotePlayer remotePlayer in _simulation.Players.GetAllRemotePlayers())
 		{
 			if (_fishRemotePlayers.TryGetValue(remotePlayer.PlayerId, out FishGfxRemotePlayerRenderAdapter adapter))
-				adapter.Render(pass);
+				adapter.Render(pass, lighting);
 		}
 
 		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
 		{
-			Rgba32 light = _fishVoxelScene.SampleLight(entity.Position + Vector3.UnitY * 0.5f);
+			EntityLightSample light = _fishVoxelScene.SampleEntityLight(
+				entity.Position + Vector3.UnitY * 0.5f
+			);
 			switch (entity)
 			{
 				case VEntNPC npc when _fishNpcs.TryGetValue(npc.NetworkId, out FishGfxNpcRenderAdapter npcAdapter):
-					npcAdapter.Render(pass);
+					npcAdapter.Render(pass, lighting);
 					break;
 				case VEntSlidingDoor door when _fishDoorRenderer is not null:
 					_fishDoorRenderer.Render(pass, new SlidingDoorRenderState(
@@ -501,7 +586,7 @@ public unsafe partial class MPClientGameState
 						door.OpenAmount,
 						door.OpenAngleDeg,
 						light
-					));
+					), lighting);
 					break;
 				case VEntPickup pickup when _fishPickupRenderer is not null:
 					_fishPickupRenderer.Render(pass, new PickupRenderState(
@@ -510,7 +595,7 @@ public unsafe partial class MPClientGameState
 						pickup.RotationDegrees,
 						pickup.VerticalModelOffset,
 						light
-					));
+					), lighting);
 					break;
 				default:
 					FishGfxGameplayPrimitives.DrawWireBox(
@@ -791,7 +876,7 @@ public unsafe partial class MPClientGameState
 				_fishRemotePlayers.Add(remotePlayer.PlayerId, adapter);
 			}
 
-			Rgba32 light = _fishVoxelScene.SampleLight(remotePlayer.Position);
+			EntityLightSample light = _fishVoxelScene.SampleEntityLight(remotePlayer.Position);
 			adapter.Update(new RemotePlayerRenderState(
 				remotePlayer.Position,
 				remotePlayer.CameraAngle,
@@ -812,7 +897,7 @@ public unsafe partial class MPClientGameState
 				_fishNpcs.Add(npc.NetworkId, adapter);
 			}
 
-			Rgba32 light = _fishVoxelScene.SampleLight(npc.Position + Vector3.UnitY);
+			EntityLightSample light = _fishVoxelScene.SampleEntityLight(npc.Position + Vector3.UnitY);
 			adapter.Update(new NpcRenderState(
 				npc.Position,
 				npc.Size,
@@ -954,6 +1039,125 @@ public unsafe partial class MPClientGameState
 		float verticalFov = Math.Clamp(state.FieldOfView, 1, 179) * MathF.PI / 180;
 		float horizontalFov = 2 * MathF.Atan(MathF.Tan(verticalFov * 0.5f) * width / height);
 		camera.SetPerspective(width, height, horizontalFov, 0.05f, 512);
+	}
+
+	private void DrawFishGfxActorShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade)
+	{
+		ViewFrustum frustum = cascade.CasterFrustum;
+
+		foreach (FishGfxRemotePlayerRenderAdapter adapter in _fishRemotePlayers.Values)
+		{
+			if (Intersects(frustum, adapter.GetAnimationBounds()))
+			{
+				adapter.RenderShadow(pass);
+			}
+		}
+
+		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
+		{
+			switch (entity)
+			{
+				case VEntNPC npc when _fishNpcs.TryGetValue(
+					npc.NetworkId,
+					out FishGfxNpcRenderAdapter npcAdapter):
+					if (Intersects(frustum, npcAdapter.GetAnimationBounds()))
+					{
+						npcAdapter.RenderShadow(pass);
+					}
+					break;
+
+				case VEntSlidingDoor door when _fishDoorRenderer is not null:
+					SlidingDoorRenderState doorState = new(
+						door.Position,
+						door.Size,
+						door.FacingDirection,
+						door.OpenAmount,
+						door.OpenAngleDeg,
+						default
+					);
+					if (Intersects(frustum, _fishDoorRenderer.GetAnimationBounds(doorState)))
+					{
+						_fishDoorRenderer.RenderShadow(pass, doorState);
+					}
+					break;
+
+				case VEntPickup pickup when _fishPickupRenderer is not null:
+					PickupRenderState pickupState = new(
+						pickup.Position,
+						pickup.Size,
+						pickup.RotationDegrees,
+						pickup.VerticalModelOffset,
+						default
+					);
+					if (Intersects(frustum, _fishPickupRenderer.GetAnimationBounds(pickupState)))
+					{
+						_fishPickupRenderer.RenderShadow(pass, pickupState);
+					}
+					break;
+			}
+		}
+	}
+
+	private static bool Intersects(ViewFrustum frustum, EntityRenderBounds bounds)
+	{
+		return !bounds.IsEmpty
+			&& frustum.Intersects(new FishGfx.AxisAlignedBoundingBox(bounds.Min, bounds.Max));
+	}
+
+	internal static DirectionalShadowOptions CreateShadowOptions(
+		SunShadowQuality quality,
+		int maxChunkDrawDistance)
+	{
+		int drawDistance = Math.Clamp(
+			maxChunkDrawDistance,
+			GameConfig.MinimumMaxChunkDrawDistance,
+			GameConfig.MaximumMaxChunkDrawDistance
+		);
+		return quality switch
+		{
+			SunShadowQuality.Off => new DirectionalShadowOptions(
+				0, 1, 0, 0.65f, 0.1f, DirectionalShadowFilter.Pcf3x3, 1.5f, 2f),
+			SunShadowQuality.Low => new DirectionalShadowOptions(
+				2, 1024, Math.Min(64, drawDistance), 0.65f, 0.1f,
+				DirectionalShadowFilter.Pcf3x3, 1.5f, 2f)
+			{
+				UpdateIntervals = new[] { 1, 4 },
+			},
+			SunShadowQuality.High => new DirectionalShadowOptions(
+				4, 2048, Math.Min(256, drawDistance), 0.65f, 0.1f,
+				DirectionalShadowFilter.Pcf5x5, 1.5f, 2f)
+			{
+				UpdateIntervals = new[] { 1, 1, 2, 4 },
+			},
+			_ => new DirectionalShadowOptions(
+				3, 2048, Math.Min(128, drawDistance), 0.65f, 0.1f,
+				DirectionalShadowFilter.Pcf3x3, 1.5f, 2f)
+			{
+				UpdateIntervals = new[] { 1, 2, 4 },
+			},
+		};
+	}
+
+	private static float SmoothStep(float edge0, float edge1, float value)
+	{
+		float amount = Math.Clamp((value - edge0) / (edge1 - edge0), 0, 1);
+		return amount * amount * (3 - 2 * amount);
+	}
+
+	private static double SumShadowGpuMilliseconds(
+		in DirectionalShadowDiagnostics diagnostics)
+	{
+		double total = 0;
+		int count = diagnostics.Cascades?.Count ?? 0;
+
+		for (int index = 0; index < count; index++)
+		{
+			total += diagnostics.Cascades[index].GpuMilliseconds;
+		}
+
+		return total;
 	}
 
 	private static void ConfigureVoxelEnvironment(

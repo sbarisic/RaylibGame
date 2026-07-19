@@ -1,4 +1,5 @@
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using FishGfx.Voxels;
 using System.Numerics;
 using Voxelgine.Engine;
@@ -116,6 +117,13 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 			dayNight.SkyLightMultiplier,
 			dayNight.AmbientLight
 		);
+		Vector3 towardSun = dayNight.GetSunDirection();
+		voxelScene.Renderer.SunSettings = new VoxelSunSettings(
+			-Vector3.Normalize(towardSun),
+			FishGfx.Color.White,
+			dayNight.SkyLightMultiplier,
+			0.35f
+		);
 		voxelScene.Update(camera);
 		particles.UpdateVoxelEmitters(
 			timing.DeltaTime,
@@ -131,7 +139,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 				"walk",
 				new Vector3(8, 0, 0),
 				EntityAssetIds.HumanoidTexture,
-				voxelScene.SampleLight(new Vector3(6, 2, 8))
+				voxelScene.SampleEntityLight(new Vector3(6, 2, 8))
 			),
 			timing.DeltaTime
 		);
@@ -166,33 +174,61 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		};
 	}
 
-	public override void RenderWorld(RenderPass pass, in FrameTiming timing)
+	public override GameDirectionalShadowRequest? GetDirectionalShadowRequest()
+	{
+		return new GameDirectionalShadowRequest(
+			camera,
+			voxelScene.Renderer.SunSettings.Direction,
+			1,
+			new DirectionalShadowOptions(
+				3,
+				2048,
+				128,
+				0.65f,
+				0.1f,
+				DirectionalShadowFilter.Pcf3x3,
+				1.5f,
+				2f
+			)
+			{
+				UpdateIntervals = new[] { 1, 2, 4 },
+			},
+			voxelScene.GeometryRevision,
+			true
+		);
+	}
+
+	public override void RenderShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade,
+		in FrameTiming timing)
+	{
+		voxelScene.Renderer.RenderShadowCasters(pass, cascade);
+		npc.RenderShadow(pass);
+		door.RenderShadow(pass, CreateDoorState());
+		pickup.RenderShadow(pass, CreatePickupState(timing.TotalTime));
+	}
+
+	public override void RenderWorld(
+		RenderPass pass,
+		in FrameTiming timing,
+		DirectionalShadowFrame? shadows)
 	{
 		renderQueue.BeginFrame();
 		celestial.Render(pass, cameraState, dayNight);
-		voxelScene.Enqueue(renderQueue, camera);
+		voxelScene.Enqueue(renderQueue, camera, shadows);
 		pass.Execute(renderQueue, RenderQueueBucket.Opaque);
-		npc.Render(pass);
+		EntityWorldLighting lighting = new(voxelScene.Renderer.SunSettings, shadows);
+		npc.Render(pass, lighting);
 		door.Render(
 			pass,
-			new SlidingDoorRenderState(
-				new Vector3(10, 1, 9),
-				new Vector3(1, 2, 0.25f),
-				Vector3.UnitZ,
-				0.45f,
-				90,
-				voxelScene.SampleLight(new Vector3(10, 2, 9))
-			)
+			CreateDoorState(),
+			lighting
 		);
 		pickup.Render(
 			pass,
-			new PickupRenderState(
-				new Vector3(8, 1.25f, 6),
-				new Vector3(0.5f),
-				timing.TotalTime * 60,
-				0.25f + MathF.Sin(timing.TotalTime * 2) * 0.1f,
-				voxelScene.SampleLight(new Vector3(8, 2, 6))
-			)
+			CreatePickupState(timing.TotalTime),
+			lighting
 		);
 		pass.Execute(renderQueue, RenderQueueBucket.Transparent);
 		particles.Render(
@@ -200,6 +236,29 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 			cameraState.Position,
 			cameraState.Target,
 			cameraState.Up
+		);
+	}
+
+	private SlidingDoorRenderState CreateDoorState()
+	{
+		return new SlidingDoorRenderState(
+			new Vector3(10, 1, 9),
+			new Vector3(1, 2, 0.25f),
+			Vector3.UnitZ,
+			0.45f,
+			90,
+			voxelScene.SampleEntityLight(new Vector3(10, 2, 9))
+		);
+	}
+
+	private PickupRenderState CreatePickupState(float totalTime)
+	{
+		return new PickupRenderState(
+			new Vector3(8, 1.25f, 6),
+			new Vector3(0.5f),
+			totalTime * 60,
+			0.25f + MathF.Sin(totalTime * 2) * 0.1f,
+			voxelScene.SampleEntityLight(new Vector3(8, 2, 6))
 		);
 	}
 

@@ -1,4 +1,5 @@
 using FishUI.Controls;
+using FishGfx.Graphics.Shadows;
 using Newtonsoft.Json;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
@@ -75,6 +76,7 @@ public sealed class MainMenuOptionsTests
 		GameConfig config = CreateConfig();
 		config.MaxChunkDrawDistance = 173;
 		config.ChunkMeshUploadBudget = 37;
+		config.SunShadowQuality = SunShadowQuality.High;
 
 		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
 		GameConfig destination = CreateConfig();
@@ -82,6 +84,60 @@ public sealed class MainMenuOptionsTests
 
 		Assert.Equal(173, destination.MaxChunkDrawDistance);
 		Assert.Equal(37, destination.ChunkMeshUploadBudget);
+		Assert.Equal(SunShadowQuality.High, destination.SunShadowQuality);
+	}
+
+	[Fact]
+	public void ShadowQualityDefaultsAndInvalidValuesUseMedium()
+	{
+		GameConfig config = CreateConfig();
+
+		Assert.Equal(SunShadowQuality.Medium, config.SunShadowQuality);
+		Assert.Equal(
+			SunShadowQuality.Medium,
+			GameOptionsDraft.CreateDefaults(0).SunShadowQuality
+		);
+
+		config.SunShadowQuality = (SunShadowQuality)999;
+		GameOptionsDraft draft = GameOptionsDraft.FromConfig(config);
+
+		Assert.Equal(SunShadowQuality.Medium, draft.SunShadowQuality);
+	}
+
+	[Theory]
+	[InlineData(SunShadowQuality.Off, 0, 1, 0, DirectionalShadowFilter.Pcf3x3, new int[] { })]
+	[InlineData(SunShadowQuality.Low, 2, 1024, 64, DirectionalShadowFilter.Pcf3x3, new[] { 1, 4 })]
+	[InlineData(SunShadowQuality.Medium, 3, 2048, 128, DirectionalShadowFilter.Pcf3x3, new[] { 1, 2, 4 })]
+	[InlineData(SunShadowQuality.High, 4, 2048, 256, DirectionalShadowFilter.Pcf5x5, new[] { 1, 1, 2, 4 })]
+	public void ShadowQualityMapsToExpectedRendererPreset(
+		SunShadowQuality quality,
+		int cascades,
+		int resolution,
+		int maximumDistance,
+		DirectionalShadowFilter filter,
+		int[] updateIntervals)
+	{
+		DirectionalShadowOptions options = MPClientGameState.CreateShadowOptions(
+			quality,
+			GameConfig.MaximumMaxChunkDrawDistance
+		);
+
+		Assert.Equal(cascades, options.CascadeCount);
+		Assert.Equal(resolution, options.Resolution);
+		Assert.Equal(maximumDistance, options.MaximumDistance);
+		Assert.Equal(filter, options.Filter);
+		Assert.Equal(updateIntervals, options.UpdateIntervals);
+	}
+
+	[Fact]
+	public void ShadowDistanceIsCappedByChunkDrawDistance()
+	{
+		DirectionalShadowOptions options = MPClientGameState.CreateShadowOptions(
+			SunShadowQuality.High,
+			96
+		);
+
+		Assert.Equal(96, options.MaximumDistance);
 	}
 
 	[Theory]
@@ -197,6 +253,12 @@ public sealed class MainMenuOptionsTests
 		Assert.Contains("\"MouseSensitivity\"", roundTrip, StringComparison.Ordinal);
 		Assert.Equal(GameConfig.DefaultMaxChunkDrawDistance, config.MaxChunkDrawDistance);
 		Assert.Equal(GameConfig.DefaultChunkMeshUploadBudget, config.ChunkMeshUploadBudget);
+		Assert.Equal(SunShadowQuality.Medium, config.SunShadowQuality);
+		Assert.Contains(
+			"\"SunShadowQuality\":\"Medium\"",
+			roundTrip.Replace(" ", string.Empty),
+			StringComparison.Ordinal
+		);
 	}
 
 	[Fact]

@@ -2,6 +2,7 @@
 using FishGfx;
 using FishGfx.Graphics;
 using FishGfx.Graphics.Drawables;
+using FishGfx.Voxels;
 using System.Numerics;
 using Voxelgine.Engine.Geometry;
 
@@ -35,6 +36,7 @@ internal sealed class FishGfxEntityModel : IDisposable
 					hasUvs: true,
 					hasColors: false
 				);
+				mesh.SetNormals(CreateFlatNormals(partSource, winding));
 				ModelPart part = new(partSource, mesh);
 				parts.Add(part);
 				partsByName.Add(partSource.Name, part);
@@ -54,13 +56,28 @@ internal sealed class FishGfxEntityModel : IDisposable
 		Matrix4x4 rootTransform,
 		EntityModelPose pose,
 		Texture texture,
-		Color tint
+		Color tint,
+		ShaderProgram shader,
+		in EntityLightSample light,
+		in EntityWorldLighting worldLighting
 	)
 	{
 		ThrowIfDisposed();
 		ArgumentNullException.ThrowIfNull(pass);
 		ArgumentNullException.ThrowIfNull(pose);
 		ArgumentNullException.ThrowIfNull(texture);
+		ArgumentNullException.ThrowIfNull(shader);
+		VoxelSunSettings sun = worldLighting.Sun;
+		shader.SetUniform("uTexture", 0);
+		shader.SetUniform("uAlphaCutoff", 0.1f);
+		shader.SetUniform("uBlockLight", light.BlockLight);
+		shader.SetUniform("uSkyLight", light.SkyLight);
+		shader.SetUniform("LightDirection", sun.Direction);
+		shader.SetUniform("AmbientLight", sun.AmbientLight);
+		shader.SetUniform("SunColor", (Vector3)sun.Color);
+		shader.SetUniform("SunIntensity", sun.Intensity);
+		shader.SetUniform("uShadowEnabled", 0);
+		using IDisposable shadowScope = worldLighting.Shadows?.Bind(shader, 1);
 
 		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
 		using IDisposable stateScope = pass.PushState(pass.State with
@@ -71,7 +88,31 @@ internal sealed class FishGfxEntityModel : IDisposable
 		{
 			part.Mesh.DefaultColor = tint;
 			using IDisposable modelScope = pass.PushModel(transforms[part.Source.Name]);
-			pass.DrawMesh(part.Mesh, texture);
+			pass.DrawMesh(part.Mesh, texture, shader);
+		}
+	}
+
+	public void RenderShadow(
+		RenderPass pass,
+		Matrix4x4 rootTransform,
+		EntityModelPose pose,
+		Texture texture,
+		ShaderProgram shader)
+	{
+		ThrowIfDisposed();
+		ArgumentNullException.ThrowIfNull(pass);
+		ArgumentNullException.ThrowIfNull(pose);
+		ArgumentNullException.ThrowIfNull(texture);
+		ArgumentNullException.ThrowIfNull(shader);
+		shader.SetUniform("uTexture", 0);
+		shader.SetUniform("uAlphaCutoff", 0.1f);
+		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		using IDisposable stateScope = pass.PushState(pass.State with { Winding = winding });
+
+		foreach (ModelPart part in parts)
+		{
+			using IDisposable modelScope = pass.PushModel(transforms[part.Source.Name]);
+			pass.DrawMesh(part.Mesh, texture, shader);
 		}
 	}
 
@@ -236,6 +277,31 @@ internal sealed class FishGfxEntityModel : IDisposable
 	private void ThrowIfDisposed()
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
+	}
+
+	internal static Vector3[] CreateFlatNormals(
+		EntityModelPartSource source,
+		Winding winding)
+	{
+		Vector3[] normals = new Vector3[source.Vertices.Length];
+
+		for (int vertex = 0; vertex < source.Vertices.Length; vertex += 3)
+		{
+			Vector3 a = source.Vertices[vertex].Position;
+			Vector3 b = source.Vertices[vertex + 1].Position;
+			Vector3 c = source.Vertices[vertex + 2].Position;
+			Vector3 cross = winding == Winding.CounterClockwise
+				? Vector3.Cross(b - a, c - a)
+				: Vector3.Cross(c - a, b - a);
+			Vector3 normal = cross.LengthSquared() > 0.000001f
+				? Vector3.Normalize(cross)
+				: Vector3.UnitY;
+			normals[vertex] = normal;
+			normals[vertex + 1] = normal;
+			normals[vertex + 2] = normal;
+		}
+
+		return normals;
 	}
 
 	private sealed record ModelPart(EntityModelPartSource Source, Mesh3D Mesh);

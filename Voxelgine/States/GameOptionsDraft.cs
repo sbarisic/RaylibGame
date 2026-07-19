@@ -45,6 +45,8 @@ internal sealed record GameOptionsDraft
 
 	public int ChunkMeshUploadBudget { get; set; }
 
+	public SunShadowQuality SunShadowQuality { get; set; }
+
 	public bool SetFocused { get; set; }
 
 	public bool Resizable { get; set; }
@@ -86,6 +88,9 @@ internal sealed record GameOptionsDraft
 				GameConfig.MinimumChunkMeshUploadBudget,
 				GameConfig.MaximumChunkMeshUploadBudget
 			),
+			SunShadowQuality = Enum.IsDefined(config.SunShadowQuality)
+				? config.SunShadowQuality
+				: SunShadowQuality.Medium,
 			SetFocused = config.SetFocused,
 			Resizable = config.Resizable,
 		};
@@ -104,6 +109,7 @@ internal sealed record GameOptionsDraft
 			Msaa = true,
 			MaxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
 			ChunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
+			SunShadowQuality = SunShadowQuality.Medium,
 			SetFocused = true,
 			Resizable = true,
 		};
@@ -132,6 +138,9 @@ internal sealed record GameOptionsDraft
 			GameConfig.MinimumChunkMeshUploadBudget,
 			GameConfig.MaximumChunkMeshUploadBudget
 		);
+		config.SunShadowQuality = Enum.IsDefined(SunShadowQuality)
+			? SunShadowQuality
+			: SunShadowQuality.Medium;
 		config.SetFocused = SetFocused;
 		config.Resizable = Resizable;
 

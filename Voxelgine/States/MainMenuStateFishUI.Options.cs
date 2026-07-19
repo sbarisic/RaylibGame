@@ -65,6 +65,7 @@ public partial class MainMenuStateFishUI
 	private DropDown frameRateDropDown;
 	private DropDown chunkDrawDistanceDropDown;
 	private DropDown chunkMeshUploadBudgetDropDown;
+	private DropDown sunShadowQualityDropDown;
 	private ToggleSwitch vsyncToggle;
 	private ToggleSwitch msaaToggle;
 	private Slider sensitivitySlider;
@@ -314,10 +315,33 @@ public partial class MainMenuStateFishUI
 			UpdateOptionsDirtyState();
 		};
 
+		sunShadowQualityDropDown = CreateDropDown("options_sun_shadow_quality");
+		foreach (SunShadowQuality quality in Enum.GetValues<SunShadowQuality>())
+		{
+			sunShadowQualityDropDown.AddItem(new DropDownItem(quality.ToString(), quality));
+		}
+		AddOptionRow(
+			content,
+			176,
+			"Sun Shadows",
+			"Cascaded sunlight shadow quality and distance.",
+			sunShadowQualityDropDown
+		);
+		sunShadowQualityDropDown.OnItemSelected += (_, item) =>
+		{
+			if (synchronizingOptions || item.UserData is not SunShadowQuality quality)
+			{
+				return;
+			}
+
+			optionsDraft.SunShadowQuality = quality;
+			UpdateOptionsDirtyState();
+		};
+
 		content.AddChild(new Label
 		{
 			Text = "Higher values load distant scenery faster, but increase CPU, GPU, and upload work.",
-			Position = new Vector2(18, 184),
+			Position = new Vector2(18, 256),
 			Size = new Vector2(580, 44),
 		});
 	}
@@ -404,6 +428,11 @@ public partial class MainMenuStateFishUI
 			msaaToggle.IsOn = optionsDraft.Msaa;
 			RefreshFrameRateChoices();
 			RefreshOptimizationChoices();
+			SelectItem(
+				sunShadowQualityDropDown,
+				item => item.UserData is SunShadowQuality quality
+					&& quality == optionsDraft.SunShadowQuality
+			);
 			sensitivitySlider.Value = optionsDraft.MouseSensitivity;
 			RefreshSensitivityLabel();
 			focusToggle.IsOn = optionsDraft.SetFocused;

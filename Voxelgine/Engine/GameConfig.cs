@@ -56,6 +56,8 @@ namespace Voxelgine.Engine
 
 		public int ChunkMeshUploadBudget = DefaultChunkMeshUploadBudget;
 
+		public SunShadowQuality SunShadowQuality = SunShadowQuality.Medium;
+
 		[SettingsHidden]
 		public int LastOptWnd_X = 0;
 

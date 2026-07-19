@@ -1,4 +1,5 @@
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.FishGfxClient.Rendering;
@@ -61,6 +62,26 @@ public abstract class GameStateImpl : IDisposable
 
 	public virtual void RenderWorld(RenderPass pass, in FrameTiming timing)
 	{
+	}
+
+	public virtual GameDirectionalShadowRequest? GetDirectionalShadowRequest()
+	{
+		return null;
+	}
+
+	public virtual void RenderShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade,
+		in FrameTiming timing)
+	{
+	}
+
+	public virtual void RenderWorld(
+		RenderPass pass,
+		in FrameTiming timing,
+		DirectionalShadowFrame? shadows)
+	{
+		RenderWorld(pass, timing);
 	}
 
 	public virtual void RenderViewmodel(RenderPass pass, in FrameTiming timing)

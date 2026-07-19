@@ -1,4 +1,5 @@
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Engine;
@@ -94,6 +95,8 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 	public GameAssetStore Assets { get; }
 
 	public IReadOnlyList<MonitorInfo> Monitors => RenderWindow.GetMonitors();
+
+	public DirectionalShadowDiagnostics ShadowDiagnostics => renderGraph.ShadowDiagnostics;
 
 	public InputMgr InMgr { get; }
 

@@ -1,4 +1,5 @@
 using FishGfx.Graphics;
+using FishGfx.Graphics.Shadows;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
 
@@ -11,6 +12,8 @@ public interface IFishGfxGameWindow : IGameWindow
 	GameAssetStore Assets { get; }
 
 	IReadOnlyList<MonitorInfo> Monitors { get; }
+
+	DirectionalShadowDiagnostics ShadowDiagnostics { get; }
 
 	void ApplyConfiguration();
 }

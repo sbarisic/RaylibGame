@@ -5,6 +5,7 @@ using Voxelgine.Graphics;
 
 namespace VoxelgineEngine.Tests;
 
+[Collection(WorldGenerationCollection.Name)]
 public sealed class ChunkMapObservationTests
 {
 	[Fact]
@@ -138,7 +139,7 @@ public sealed class ChunkMapObservationTests
 		map.WorldReset += () => resetCount++;
 		map.BlockChanged += _ => changeCount++;
 
-		map.GenerateFloatingIsland(8, 8, 12345);
+		map.GenerateFloatingIsland(64, 64, 12345);
 
 		Assert.Equal(1, resetCount);
 		Assert.Equal(0, changeCount);

@@ -11,6 +11,7 @@ namespace Voxelgine.FishGfxClient.Voxels;
 internal sealed class FishGfxVoxelAssets
 {
 	internal const string SurfaceTextureAssetId = "voxel.surface-textures";
+	internal const float CutoutAlphaCutoff = VoxelRendererOptions.DefaultAlphaCutoff;
 	private const int AtlasSize = 512;
 	private const int CubeColumns = 16;
 	private const int CubeRows = 16;
@@ -154,16 +155,7 @@ internal sealed class FishGfxVoxelAssets
 				doubleSided: true,
 				light: new VoxelMaterialLightSettings(1)));
 		Add(BlockType.Test, Opaque("Test", 8));
-		Add(
-			BlockType.Leaf,
-			new VoxelMaterial(
-				"Leaf",
-				VoxelRenderMode.Transparent,
-				new VoxelFaceTiles(9),
-				occludesFaces: false,
-				light: new VoxelMaterialLightSettings(1),
-				shadowCasterMode: VoxelShadowCasterMode.AlphaTest,
-				shadowAlphaCutoff: 0.35f));
+		Add(BlockType.Leaf, CreateLeafMaterial());
 		Add(
 			BlockType.Water,
 			new VoxelMaterial(
@@ -251,6 +243,18 @@ internal sealed class FishGfxVoxelAssets
 			if (!ids.TryAdd(blockType, builder.Add(material)))
 				throw new InvalidOperationException($"Block type '{blockType}' is mapped twice.");
 		}
+	}
+
+	internal static VoxelMaterial CreateLeafMaterial()
+	{
+		return new VoxelMaterial(
+			"Leaf",
+			VoxelRenderMode.Cutout,
+			new VoxelFaceTiles(9),
+			occludesFaces: false,
+			light: new VoxelMaterialLightSettings(1),
+			shadowAlphaCutoff: CutoutAlphaCutoff
+		);
 	}
 
 	private static VoxelMaterial Opaque(

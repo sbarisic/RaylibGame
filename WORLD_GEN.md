@@ -5,7 +5,8 @@ Aurora Falls, how a generated world enters the authoritative server lifecycle,
 and where the implementation differs from the intended world design. It is an
 analysis of the current code, not a proposed replacement specification.
 
-Analysis snapshot: repository commit `ce085bc` (`2026-07-20`).
+Analysis baseline: repository commit `6af5e96` (`2026-07-20`), updated for the
+natural world-generation revision described below.
 
 ## Executive summary
 
@@ -25,8 +26,9 @@ connections between meaningful locations.
 
 The most important technical findings are:
 
-1. A seed does **not** identify one exact world. `PlaceFoliage` uses the
-   unseeded per-`ChunkMap` random generator, so foliage changes between runs.
+1. Sequential generation is deterministic for a fixed seed and runtime,
+   including tree selection, tree shapes, ponds, and foliage. The remaining
+   seed risk is the process-global mutable `Noise.Seed` state.
 2. The 1024 x 1024 default eagerly allocates 64 x 5 x 64 = 20,480 chunks and
    83,886,080 `PlacedBlock` cells before generation. With the current 28-byte
    effective `PlacedBlock` layout, the block arrays alone are approximately
@@ -38,9 +40,10 @@ The most important technical findings are:
 4. Generation cancellation is observable but not transactional. Cancellation
    after allocation can leave a partially mutated map, and `WorldReset` is
    raised from `finally` even when generation fails.
-5. Automated coverage verifies noise samples, early cancellation, reset events,
-   snapshots, archives, and streaming, but does not verify a whole-world hash,
-   feature invariants, default-size resource cost, or generation quality.
+5. Automated coverage now verifies compact-world hashes, strict tree spacing,
+   natural pond planning, falloff, flooring, early cancellation, reset events,
+   snapshots, archives, and streaming. Default-size resource cost and subjective
+   generation quality remain untested.
 
 ## Ownership and lifecycle
 
@@ -166,9 +169,8 @@ There are two details worth preserving when changing this pass:
 - The center-falloff distance includes the transformed vertical coordinate,
   not only X/Z distance. Its effect is small in the 1024-wide default but much
   stronger for small test worlds.
-- The vertical falloff expression does not actually interpolate from 1 to 0
-  between `0.8` and `1.0`; it is still about `0.6` immediately below `1.0`, then
-  becomes zero abruptly. That makes the configured `HeightFallEnd` misleading.
+- Vertical falloff is a clamped linear interpolation: density is unchanged
+  through `0.8`, reaches `0.5` at `0.9`, and reaches zero at `1.0`.
 
 ### 3. Surface material
 
@@ -191,26 +193,21 @@ Pond centers are sampled every three blocks with these settings:
 | Minimum center spacing | 40 blocks |
 | Edge margin | 12 blocks |
 | Radius | 5-10 blocks |
-| Nominal depth | 2-4 blocks |
-| Boundary-shape noise scale | `0.18` |
+| Minimum accepted water area | 24 blocks |
+| Maximum water depth | 4 blocks |
 
-Each pond uses a seeded `Random(seed + 2)` for radius and depth. A second noise
-sample scales the local radius from 55% to 100%, creating an irregular outline.
-Water replaces the local surface and cells below it; lower neighboring terrain
-is filled upward to the center's water level. A containment pass places stone
-below unsupported water and sand beside exposed water, then a sand annulus is
-applied around the nominal perimeter.
+Each candidate receives a deterministic 5-10 block search radius. The planner
+flood-fills connected surface cells below a water plane one block above the
+candidate. It accepts the region only when higher terrain completely encloses
+it before the search boundary, at least 24 cells would be wet, and no water
+column exceeds four blocks. Rejected candidates do not reserve the 40-block
+spacing, and a world may contain no ponds.
 
-Despite the method comments, this is mostly replacement and filling rather than
-true basin excavation: it does not clear upper terrain to air before filling.
-Columns higher than the center can retain water at their own higher surface,
-while lower columns are filled to the center level. Consequently the generated
-feature is not guaranteed to have one flat visible water surface.
-
-The shared surface-height array is updated for columns at or below the center
-water level. Subsequent roads and vegetation also check actual block types, so
-they avoid water and most shoreline sand even where the height map is only an
-approximation.
+Accepted ponds do not excavate terrain. Existing surface blocks become a solid
+sand bed, air above them is filled to one flat water plane, and adjacent
+grass/dirt rim blocks become sand. The shared surface-height array is updated to
+the water plane for every wet cell, so roads and vegetation consistently avoid
+the pond.
 
 ### 5. Roads
 
@@ -241,21 +238,20 @@ an unnecessary hidden size assumption.
 ### 6. Trees
 
 Tree candidates require grass, sufficient vertical space, a four-block edge
-margin, noise at scale `0.08` above `0.62`, and nominal five-block spacing. The
-shape is then chosen by `Random(seed + 1)`:
+margin, noise at scale `0.08` above `0.62`, and strict ten-block spacing. All
+candidates are deterministically shuffled before a spatial-bucket pass accepts
+them, preventing scan-direction bias while enforcing the Euclidean XZ distance
+against every nearby selected trunk. Accepted positions are sorted before a
+separate seeded stream chooses each shape:
 
 - trunk height: 6-10 blocks;
 - canopy radius: 2-3 blocks;
 - canopy height: 3-5 blocks; and
 - roughly spherical leaf layers, written only into air.
 
-The grass under the trunk becomes dirt. Position scanning and tree shape are
-deterministic for a fixed runtime and seed.
-
-The spacing check only compares a candidate with the last 50 selected trees,
-not every spatially nearby tree. Because the list is ordered by X then Z rather
-than by distance, the advertised five-block minimum is not a strict global
-invariant on a large map.
+The grass under the trunk becomes dirt. Trees exactly ten blocks apart are
+allowed; any pair closer than ten blocks is rejected. Position selection and
+tree shape are deterministic for a fixed runtime and seed.
 
 ### 7. Foliage
 
@@ -263,10 +259,9 @@ Foliage requires grass with air above, a two-block edge margin, and noise at
 scale `0.12` above `0.35`. It then accepts random values 0 through 20 from a
 0-through-99 draw, an effective 21% chance.
 
-This is the determinism break in the current pipeline. The draw comes from
-`ChunkMap.Rnd`, initialized with `new Random()` and never set from the world
-seed. The noise-selected candidate set is reproducible, but the final foliage
-subset is not.
+The final chance draw uses a dedicated world-seeded foliage stream. It no longer
+shares or consumes tree/pond randomness, so the foliage subset repeats for a
+fixed seed and runtime.
 
 ### 8. Lighting and publication
 
@@ -287,23 +282,21 @@ parallel terrain and surface passes.
 
 The current seed contract is therefore narrower than it appears:
 
-- Terrain, ponds, roads, and trees are repeatable within the current runtime
-  when generation is isolated.
-- Foliage is not repeatable because it uses an unseeded generator.
+- Terrain, ponds, roads, trees, and foliage are repeatable within the current
+  runtime when generation is isolated. Feature passes use separate named random
+  streams so one pass does not consume another pass's sequence.
 - Concurrent generation of two worlds in one process is unsafe: changing the
   global noise seed while another generator samples it mixes the worlds.
 - The seeded lookup uses `Random.NextBytes`, which produces arbitrary repeated
   byte values rather than shuffling a 0-255 permutation as simplex noise
   normally expects. It remains bounded and seed-sensitive, but has different
   statistical properties from a proper permutation table.
-- `FastFloor` subtracts one for zero and exact negative integers. It therefore
-  does not implement mathematical floor at those points and can introduce
-  lattice-boundary discontinuities.
+- `FastFloor` now delegates to mathematical floor, including at zero, negative
+  fractions, and exact negative integers.
 
-The tests in `CoreTests.NoiseTests` prove only that array dimensions are right,
-sample values fall in a broad byte-like range, the same seed repeats one sample,
-and two selected seeds differ at one sample. They do not establish noise quality
-or a durable cross-version world identity.
+Tests cover the floor boundary cases and compare complete sorted block data for
+repeated compact worlds. They establish same-runtime determinism but do not
+establish noise quality or a durable cross-version world identity.
 
 ## Spawn selection and initial entities
 
@@ -363,8 +356,8 @@ implementation covers only the procedural natural shell:
 | Intended capability | Current implementation |
 |---|---|
 | Finite floating island | Implemented |
-| Seed-varied natural terrain | Implemented, except fully deterministic foliage |
-| Surface vegetation and water | Implemented at a basic level |
+| Seed-varied natural terrain | Implemented with same-runtime deterministic output |
+| Surface vegetation and water | Strictly spaced trees and naturally enclosed ponds |
 | Roads between meaningful places | Dirt traces between random noise waypoints |
 | Fixed artifacts / handcrafted identity | Not implemented |
 | Upper, middle, lower, and deep strata | Not implemented |
@@ -386,7 +379,7 @@ query.
 Before treating 1024 x 1024 as the shipping default, add a release-mode
 generation benchmark that records elapsed time, peak managed memory, archive
 size, non-air chunks, and non-air cells. The current cancellation test avoids
-allocation entirely and the normal small generator test uses only 8 x 8, so the
+allocation entirely and the normal compact generator tests use 64 x 64, so the
 recent four-times-per-axis increase has no automated runtime acceptance test.
 
 The first optimization target should be the generation representation, not the
@@ -397,15 +390,11 @@ tens of millions of cells before lighting is computed.
 
 ### P1 - Define and enforce the seed contract
 
-Create a world-local generation context containing the seed, noise sampler, and
-named deterministic random streams. Seed foliage, remove global mutable noise
-state, build a real permutation table, and decide whether output must remain
+Move the remaining global mutable noise sampler into a world-local generation
+context, build a real permutation table, and decide whether output must remain
 stable across .NET/runtime upgrades. If durable identity is required, archive a
-generator version and use a project-owned PRNG.
-
-Add golden hashes over compact generated worlds for several seeds. Hash block
-types by sorted world coordinate, not raw archive bytes, so compression changes
-do not invalidate terrain tests.
+generator version and use a project-owned PRNG. Compact block-output comparisons
+now protect same-runtime determinism without coupling tests to compression.
 
 ### P1 - Add a deterministic feature plan
 
@@ -429,24 +418,18 @@ whether regeneration of a populated map replaces or rejects existing content.
 ### P2 - Correct current feature contracts
 
 - Either place planks or rename roads and their comments to dirt paths.
-- Replace the last-50 tree-spacing heuristic with a spatial bucket/grid if the
-  five-block rule is intended to be strict.
-- Generate ponds against an explicit water plane, clearing or rejecting higher
-  terrain so water surfaces and shorelines are coherent.
 - Replace coordinate packing in road edge keys with coordinate tuples.
 - Remove unused road randomness.
-- Correct the height-falloff interpolation and `FastFloor` behavior, guarded by
-  focused regression tests.
+- Add feature-count telemetry so seeds with unusually sparse vegetation or no
+  natural ponds can be identified during generation review.
 
 ### P2 - Improve validation and observability
 
 Add tests for:
 
-- identical block hashes for repeated generation of the same seed;
-- different hashes and useful feature-count ranges for several seeds;
+- useful feature-count ranges for a broad sample of seeds;
 - spawn validity and reserved spawn clearance;
-- pond containment and flat water surfaces;
-- strict tree spacing and road material/connectivity;
+- generated-world pond integration and road material/connectivity;
 - cancellation during, not only before, generation;
 - regeneration on a populated map;
 - non-multiple and invalid dimensions; and

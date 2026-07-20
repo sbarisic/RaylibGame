@@ -55,6 +55,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 				GameConfig.MaximumChunkMeshUploadBudget
 			),
 			MeshUploadTimeBudgetMilliseconds = 2,
+			AlphaCutoff = FishGfxVoxelAssets.CutoutAlphaCutoff,
 		};
 		Renderer = new VoxelRenderer(
 			graphics,

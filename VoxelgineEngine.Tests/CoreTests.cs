@@ -205,6 +205,7 @@ public sealed class UtilsTests
 	}
 }
 
+[Collection(WorldGenerationCollection.Name)]
 public sealed class NoiseTests
 {
 	[Fact]
@@ -252,5 +253,16 @@ public sealed class NoiseTests
 		float second = Noise.CalcPixel2D(100, 100, 0.5f);
 
 		Assert.NotEqual(first, second);
+	}
+
+	[Theory]
+	[InlineData(1.75f, 1)]
+	[InlineData(0f, 0)]
+	[InlineData(-0.25f, -1)]
+	[InlineData(-1f, -1)]
+	[InlineData(-1.75f, -2)]
+	public void FastFloorMatchesMathematicalFloor(float value, int expected)
+	{
+		Assert.Equal(expected, Noise.FastFloor(value));
 	}
 }

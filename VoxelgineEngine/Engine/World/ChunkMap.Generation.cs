@@ -9,6 +9,11 @@ namespace Voxelgine.Graphics
 {
 	public unsafe partial class ChunkMap
 	{
+		private const int TreeSelectionRandomSalt = 0x13A7D;
+		private const int TreeShapeRandomSalt = 0x2B5E1;
+		private const int PondRandomSalt = 0x36C49;
+		private const int FoliageRandomSalt = 0x4D2B3;
+
 		public void GenerateFloatingIsland(
 			int Width,
 			int Length,
@@ -188,11 +193,7 @@ namespace Voxelgine.Graphics
 						float CenterFalloff = 1.0f - Utils.Clamp(((center - Pos).Length() / centerRadius) / 1.2f, 0, 1);
 						float Height = (float)(y - hillOffset) / worldHeight;
 
-						const float HeightFallStart = 0.8f;
-						const float HeightFallEnd = 1.0f;
-						const float HeightFallRange = HeightFallEnd - HeightFallStart;
-
-						float HeightFalloff = Height <= HeightFallStart ? 1.0f : (Height > HeightFallStart && Height < HeightFallEnd ? 1.0f - (Height - HeightFallStart) * (HeightFallRange * 10) : 0);
+						float HeightFalloff = WorldGenerationPlanning.CalculateHeightFalloff(Height);
 						float Density = Simplex(2, x, y * 0.5f, z, scale) * CenterFalloff * HeightFalloff;
 
 						if (Density > 0.1f)
@@ -530,6 +531,12 @@ namespace Voxelgine.Graphics
 			return (Val / Octaves) / 255;
 		}
 
+		private static int CreateGenerationSeed(int seed, int salt) =>
+			unchecked(seed * 397 ^ salt);
+
+		private static Random CreateGenerationRandom(int seed, int salt) =>
+			new(CreateGenerationSeed(seed, salt));
+
 		/// <summary>
 		/// Inline block set using pre-created chunk grid. Bounds-checked.
 		/// </summary>
@@ -570,17 +577,16 @@ namespace Voxelgine.Graphics
 			int seed,
 			CancellationToken cancellationToken)
 		{
-			Random rng = new Random(seed + 1);
+			Random shapeRandom = CreateGenerationRandom(seed, TreeShapeRandomSalt);
 			const float TreeNoiseScale = 0.08f;
 			const float TreeThreshold = 0.62f;
-			const int MinTreeSpacing = 5;
+			const int MinTreeSpacing = 10;
 			const int EdgeMargin = 4; // Keep trees away from world edges
 
 			// Use actual grid extent — the chunk grid has an extra air chunk above worldHeight
 			int gridHeight = chunkGrid.GetLength(1) * cs;
 
-			// Collect tree positions using noise, then place sequentially
-			List<(int x, int z, int surfY)> treePositions = new();
+			List<TreeGenerationCandidate> candidates = new();
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x++)
 			{
@@ -600,32 +606,24 @@ namespace Voxelgine.Graphics
 					if (treeNoise < TreeThreshold)
 						continue;
 
-					// Check minimum spacing against already-selected trees
-					bool tooClose = false;
-					for (int i = treePositions.Count - 1; i >= 0 && i >= treePositions.Count - 50; i--)
-					{
-						int ddx = x - treePositions[i].x;
-						int dz = z - treePositions[i].z;
-						if (ddx * ddx + dz * dz < MinTreeSpacing * MinTreeSpacing)
-						{
-							tooClose = true;
-							break;
-						}
-					}
-					if (tooClose)
-						continue;
-
-					treePositions.Add((x, z, surfY));
+					candidates.Add(new TreeGenerationCandidate(x, z, surfY));
 				}
 			}
 
+			TreeGenerationCandidate[] treePositions = WorldGenerationPlanning.SelectTreePositions(
+				candidates,
+				MinTreeSpacing,
+				CreateGenerationSeed(seed, TreeSelectionRandomSalt)
+			);
+
 			// Place each tree
-			foreach (var (tx, tz, surfY) in treePositions)
+			foreach (TreeGenerationCandidate tree in treePositions)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				int trunkHeight = 6 + rng.Next(5); // 6-10
-				int canopyRadius = 2 + rng.Next(2); // 2-3
-				int canopyHeight = 3 + rng.Next(3); // 3-5
+				(int tx, int tz, int surfY) = (tree.X, tree.Z, tree.SurfaceY);
+				int trunkHeight = 6 + shapeRandom.Next(5); // 6-10
+				int canopyRadius = 2 + shapeRandom.Next(2); // 2-3
+				int canopyHeight = 3 + shapeRandom.Next(3); // 3-5
 				int canopyBase = surfY + trunkHeight - canopyHeight + 1;
 
 				// Trunk
@@ -680,6 +678,7 @@ namespace Voxelgine.Graphics
 			CancellationToken cancellationToken)
 		{
 			int gridHeight = chunkGrid.GetLength(1) * cs;
+			Random foliageRandom = CreateGenerationRandom(seed, FoliageRandomSalt);
 			const float FoliageNoiseScale = 0.12f;
 			const float FoliageThreshold = 0.35f;
 			const int EdgeMargin = 2;
@@ -706,7 +705,7 @@ namespace Voxelgine.Graphics
 					if (foliageNoise < FoliageThreshold)
 						continue;
 
-					int chance = Rnd.Next(0, 100);
+					int chance = foliageRandom.Next(0, 100);
 					if (chance > 20)
 						continue;
 
@@ -716,8 +715,8 @@ namespace Voxelgine.Graphics
 		}
 
 		/// <summary>
-		/// Places water bodies in terrain depressions with irregular, noise-based shapes.
-		/// Carves shallow basins, lines them with stone/sand for containment, and fills with water.
+		/// Places flat ponds only in naturally enclosed terrain depressions.
+		/// Existing solid terrain is preserved; submerged surfaces and shorelines become sand.
 		/// </summary>
 		void PlaceWaterBodies(
 			Chunk[,,] chunkGrid,
@@ -729,15 +728,13 @@ namespace Voxelgine.Graphics
 			int seed,
 			CancellationToken cancellationToken)
 		{
-			Random rng = new Random(seed + 2);
+			Random pondRandom = CreateGenerationRandom(seed, PondRandomSalt);
 			const float PondNoiseScale = 0.015f;
 			const float PondThreshold = 0.72f;
 			const int PondMinSpacing = 40;
 			const int EdgeMargin = 12;
-			const float ShapeNoiseScale = 0.18f;
-
-			// Find potential pond centers using noise
-			List<(int x, int z)> pondCenters = new();
+			List<(int X, int Z)> acceptedCenters = new();
+			ReadOnlySpan<(int X, int Z)> neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
 			for (int x = EdgeMargin; x < width - EdgeMargin; x += 3)
 			{
@@ -752,12 +749,11 @@ namespace Voxelgine.Graphics
 					if (pondNoise < PondThreshold)
 						continue;
 
-					// Check spacing
 					bool tooClose = false;
-					foreach (var (px, pz) in pondCenters)
+					foreach ((int pondX, int pondZ) in acceptedCenters)
 					{
-						int ddx = x - px;
-						int dz = z - pz;
+						int ddx = x - pondX;
+						int dz = z - pondZ;
 						if (ddx * ddx + dz * dz < PondMinSpacing * PondMinSpacing)
 						{
 							tooClose = true;
@@ -767,130 +763,50 @@ namespace Voxelgine.Graphics
 					if (tooClose)
 						continue;
 
-					pondCenters.Add((x, z));
-				}
-			}
-
-			// Carve and fill each pond
-			foreach (var (cx, cz) in pondCenters)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
-				int surfY = surfaceHeight[cx * length + cz];
-				int pondRadius = 5 + rng.Next(6); // 5-10 blocks radius
-				int pondDepth = 2 + rng.Next(3);  // 2-4 blocks deep
-				int waterLevel = surfY;
-				int outerRadius = pondRadius + 2;  // Extra margin for containment walls and shoreline
-
-				// Pass 1: Carve basin with noise-based irregular shape
-				for (int ddx = -pondRadius; ddx <= pondRadius; ddx++)
-				{
-					for (int dz = -pondRadius; dz <= pondRadius; dz++)
+					int pondRadius = 5 + pondRandom.Next(6);
+					if (!WorldGenerationPlanning.TryPlanNaturalPond(
+						surfaceHeight,
+						width,
+						length,
+						x,
+						z,
+						pondRadius,
+						out NaturalPondPlan plan))
 					{
-						int bx = cx + ddx;
-						int bz = cz + dz;
-						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
-							continue;
-
-						float distSq = ddx * ddx + dz * dz;
-						float radiusSq = pondRadius * pondRadius;
-
-						// Noise-modulated radius for irregular shape
-						float shapeNoise = Noise.CalcPixel2D(bx + seed * 13, bz + seed * 13, ShapeNoiseScale) / 255f;
-						float localRadiusFactor = 0.55f + shapeNoise * 0.45f; // 0.55-1.0 of radius
-						float localRadiusSq = radiusSq * localRadiusFactor * localRadiusFactor;
-						if (distSq > localRadiusSq)
-							continue;
-
-						int localSurfY = surfaceHeight[bx * length + bz];
-						if (localSurfY < 0)
-							continue;
-
-						// Depth tapers toward edges (deeper in center)
-						float edgeFactor = 1f - distSq / localRadiusSq;
-						int localDepth = Math.Max(1, (int)(pondDepth * edgeFactor + 0.5f));
-
-						// Carve terrain and fill with water
-						for (int dy = 0; dy < localDepth; dy++)
-						{
-							int carveY = localSurfY - dy;
-							if (carveY < 1)
-								break;
-
-							if (carveY <= waterLevel)
-								GridSetBlock(chunkGrid, bx, carveY, bz, BlockType.Water, width, worldHeight, length, cs);
-						}
-
-						// Fill any remaining space up to water level with water
-						for (int wy = localSurfY + 1; wy <= waterLevel; wy++)
-						{
-							if (GridGetBlock(chunkGrid, bx, wy, bz, width, worldHeight, length, cs) == BlockType.None)
-								GridSetBlock(chunkGrid, bx, wy, bz, BlockType.Water, width, worldHeight, length, cs);
-						}
-
-						// Update surface height to reflect water surface
-						if (localSurfY <= waterLevel)
-							surfaceHeight[bx * length + bz] = waterLevel;
+						continue;
 					}
-				}
 
-				// Pass 2: Seal the basin — ensure every water block has solid neighbors on sides and bottom
-				for (int ddx = -outerRadius; ddx <= outerRadius; ddx++)
-				{
-					for (int dz = -outerRadius; dz <= outerRadius; dz++)
+					HashSet<(int X, int Z)> waterCells = plan.Cells
+						.Select(static cell => (cell.X, cell.Z))
+						.ToHashSet();
+					foreach (NaturalPondCell cell in plan.Cells)
 					{
-						int bx = cx + ddx;
-						int bz = cz + dz;
-						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
-							continue;
-
-						for (int y = waterLevel; y >= Math.Max(1, waterLevel - pondDepth); y--)
+						GridSetBlock(chunkGrid, cell.X, cell.SurfaceY, cell.Z, BlockType.Sand, width, worldHeight, length, cs);
+						for (int waterY = cell.SurfaceY + 1; waterY <= plan.WaterLevel; waterY++)
 						{
-							if (GridGetBlock(chunkGrid, bx, y, bz, width, worldHeight, length, cs) != BlockType.Water)
+							if (GridGetBlock(chunkGrid, cell.X, waterY, cell.Z, width, worldHeight, length, cs) == BlockType.None)
+								GridSetBlock(chunkGrid, cell.X, waterY, cell.Z, BlockType.Water, width, worldHeight, length, cs);
+						}
+						surfaceHeight[cell.X * length + cell.Z] = plan.WaterLevel;
+					}
+
+					foreach (NaturalPondCell cell in plan.Cells)
+					{
+						foreach ((int offsetX, int offsetZ) in neighbors)
+						{
+							int shoreX = cell.X + offsetX;
+							int shoreZ = cell.Z + offsetZ;
+							if (waterCells.Contains((shoreX, shoreZ)))
 								continue;
 
-							// Check bottom — seal with stone if not solid
-							BlockType below = GridGetBlock(chunkGrid, bx, y - 1, bz, width, worldHeight, length, cs);
-							if (!BlockInfo.IsSolid(below) && below != BlockType.Water)
-								GridSetBlock(chunkGrid, bx, y - 1, bz, BlockType.Stone, width, worldHeight, length, cs);
-
-							// Check 4 horizontal neighbors — seal with sand if not solid and not water
-							ReadOnlySpan<(int nx, int nz)> neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-							foreach (var (nx, nz) in neighbors)
-							{
-								int sx = bx + nx;
-								int sz = bz + nz;
-								BlockType side = GridGetBlock(chunkGrid, sx, y, sz, width, worldHeight, length, cs);
-								if (!BlockInfo.IsSolid(side) && side != BlockType.Water)
-									GridSetBlock(chunkGrid, sx, y, sz, BlockType.Sand, width, worldHeight, length, cs);
-							}
+							int shoreY = surfaceHeight[shoreX * length + shoreZ];
+							BlockType shore = GridGetBlock(chunkGrid, shoreX, shoreY, shoreZ, width, worldHeight, length, cs);
+							if (shore is BlockType.Grass or BlockType.Dirt)
+								GridSetBlock(chunkGrid, shoreX, shoreY, shoreZ, BlockType.Sand, width, worldHeight, length, cs);
 						}
 					}
-				}
 
-				// Pass 3: Sand shoreline around the pond perimeter
-				for (int ddx = -outerRadius; ddx <= outerRadius; ddx++)
-				{
-					for (int dz = -outerRadius; dz <= outerRadius; dz++)
-					{
-						float distSq = ddx * ddx + dz * dz;
-						float outerSq = (pondRadius + 2.5f) * (pondRadius + 2.5f);
-						float innerSq = (pondRadius - 1.0f) * (pondRadius - 1.0f);
-						if (distSq > outerSq || distSq < innerSq)
-							continue;
-
-						int bx = cx + ddx;
-						int bz = cz + dz;
-						if (bx < 0 || bx >= width || bz < 0 || bz >= length)
-							continue;
-
-						int localSurfY = surfaceHeight[bx * length + bz];
-						if (localSurfY < 0)
-							continue;
-
-						BlockType surfBlock = GridGetBlock(chunkGrid, bx, localSurfY, bz, width, worldHeight, length, cs);
-						if (surfBlock == BlockType.Grass || surfBlock == BlockType.Dirt)
-							GridSetBlock(chunkGrid, bx, localSurfY, bz, BlockType.Sand, width, worldHeight, length, cs);
-					}
+					acceptedCenters.Add((x, z));
 				}
 			}
 		}

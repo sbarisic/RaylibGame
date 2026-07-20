@@ -21,8 +21,6 @@ namespace Voxelgine.Graphics
 		private const float LightingUpdateRadiusBlocks = 52f;
 		private static readonly Vector3 LightingObservationOrigin = Vector3.Zero;
 
-		private readonly Random Rnd = new();
-
 		public event Action<BlockChange> BlockChanged;
 		public event Action<FogChange> FogChanged;
 		public event Action<ChunkColumnSnapshot> ColumnLoaded;

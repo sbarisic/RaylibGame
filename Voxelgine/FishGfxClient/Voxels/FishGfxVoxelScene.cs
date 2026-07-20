@@ -60,11 +60,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 			graphics,
 			World,
 			assets.Palette,
-			assets.Atlas,
+			assets.SurfaceTextures,
 			assets.AtlasLayout,
 			Lighting,
 			rendererOptions);
-		Renderer.SetSurfaceTextures(assets.SurfaceTextures);
 		FogVolume = new FishGfxFogVolume(graphics, source, fogQuality);
 
 		source.BlockChanged += QueueChange;

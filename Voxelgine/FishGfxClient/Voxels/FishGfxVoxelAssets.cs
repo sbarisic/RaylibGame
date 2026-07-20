@@ -55,8 +55,6 @@ internal sealed class FishGfxVoxelAssets
 		);
 	}
 
-	internal Texture Atlas => surfaceTextures.Value.Textures.BaseColor;
-
 	internal VoxelSurfaceTextureSet SurfaceTextures => surfaceTextures.Value.Textures;
 
 	internal VoxelPalette Palette { get; }
@@ -313,7 +311,7 @@ internal sealed class FishGfxVoxelAssets
 		);
 	}
 
-	private static VoxelSurfaceAssetsResource LoadSurfaceTextures(
+	private VoxelSurfaceAssetsResource LoadSurfaceTextures(
 		GraphicsContext graphics
 	)
 	{
@@ -321,6 +319,7 @@ internal sealed class FishGfxVoxelAssets
 		using Bitmap normalBitmap = LoadAndValidateAtlas("atlas_normal.png");
 		using Bitmap specularBitmap = LoadAndValidateAtlas("atlas_specular.png");
 		using Bitmap roughnessBitmap = LoadAndValidateAtlas("atlas_roughness.png");
+		Texture modelAtlas = null;
 		Texture baseColor = null;
 		Texture normal = null;
 		Texture specular = null;
@@ -328,7 +327,7 @@ internal sealed class FishGfxVoxelAssets
 
 		try
 		{
-			baseColor = graphics.CreateTextureFromImage(
+			modelAtlas = graphics.CreateTextureFromImage(
 				baseColorBitmap,
 				new TextureLoadOptions
 				{
@@ -337,17 +336,43 @@ internal sealed class FishGfxVoxelAssets
 					Sampling = SurfaceSampling,
 				}
 			);
-			TextureLoadOptions linearOptions = new()
-			{
-				Format = TextureFormat.RGBA8Unorm,
-				MipLevels = 1,
-				Sampling = SurfaceSampling,
-			};
-			normal = graphics.CreateTextureFromImage(normalBitmap, linearOptions);
-			specular = graphics.CreateTextureFromImage(specularBitmap, linearOptions);
-			roughness = graphics.CreateTextureFromImage(roughnessBitmap, linearOptions);
+			IReadOnlyDictionary<int, float> alphaCutoffs = GetCubeAlphaCutoffs();
+			baseColor = VoxelAtlasArrayBuilder.Create(
+				graphics,
+				baseColorBitmap,
+				CubeColumns,
+				CubeRows,
+				TextureFormat.SRGB8Alpha8,
+				VoxelAtlasMipKind.BaseColor,
+				alphaCutoffs
+			);
+			normal = VoxelAtlasArrayBuilder.Create(
+				graphics,
+				normalBitmap,
+				CubeColumns,
+				CubeRows,
+				TextureFormat.RGBA8Unorm,
+				VoxelAtlasMipKind.Normal
+			);
+			specular = VoxelAtlasArrayBuilder.Create(
+				graphics,
+				specularBitmap,
+				CubeColumns,
+				CubeRows,
+				TextureFormat.RGBA8Unorm,
+				VoxelAtlasMipKind.Linear
+			);
+			roughness = VoxelAtlasArrayBuilder.Create(
+				graphics,
+				roughnessBitmap,
+				CubeColumns,
+				CubeRows,
+				TextureFormat.RGBA8Unorm,
+				VoxelAtlasMipKind.Linear
+			);
 			return new VoxelSurfaceAssetsResource(
 				new VoxelSurfaceTextureSet(
+					modelAtlas,
 					baseColor,
 					normal,
 					specular,
@@ -361,8 +386,37 @@ internal sealed class FishGfxVoxelAssets
 			specular?.Dispose();
 			normal?.Dispose();
 			baseColor?.Dispose();
+			modelAtlas?.Dispose();
 			throw;
 		}
+	}
+
+	private IReadOnlyDictionary<int, float> GetCubeAlphaCutoffs()
+	{
+		Dictionary<int, float> cutoffs = new();
+
+		foreach (VoxelMaterial material in Palette.Materials)
+		{
+			if (material == null
+				|| material.Models != null
+				|| material.ShadowCasterMode != VoxelShadowCasterMode.AlphaTest)
+			{
+				continue;
+			}
+
+			foreach (VoxelFace face in Enum.GetValues<VoxelFace>())
+			{
+				int tile = material.Tiles[face];
+
+				if (!cutoffs.TryGetValue(tile, out float existing)
+					|| material.ShadowAlphaCutoff < existing)
+				{
+					cutoffs[tile] = material.ShadowAlphaCutoff;
+				}
+			}
+		}
+
+		return cutoffs;
 	}
 
 	private static Bitmap LoadAndValidateAtlas(string fileName)
@@ -455,7 +509,8 @@ internal sealed class FishGfxVoxelAssets
 			Textures.Roughness.Dispose();
 			Textures.Specular.Dispose();
 			Textures.Normal.Dispose();
-			Textures.BaseColor.Dispose();
+			Textures.CubeBaseColor.Dispose();
+			Textures.ModelAtlas.Dispose();
 		}
 	}
 }

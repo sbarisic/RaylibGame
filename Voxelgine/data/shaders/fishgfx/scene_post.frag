@@ -6,9 +6,11 @@ in vec2 vUv;
 layout (location = 0) out vec4 outColor;
 
 uniform sampler2D uTexture;
+uniform sampler2D uOverlayTexture;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform int uUseFxaa;
+uniform int uUseOverlay;
 
 const float FxaaReduceMin = 1.0 / 128.0;
 const float FxaaReduceMul = 1.0 / 8.0;
@@ -67,6 +69,11 @@ void main()
 {
 	vec4 source = texture(uTexture, vUv);
 	vec3 color = uUseFxaa != 0 ? applyFxaa(vUv) : source.rgb;
+	if (uUseOverlay != 0)
+	{
+		vec4 overlay = texture(uOverlayTexture, vUv);
+		color = overlay.rgb + color * (1.0 - overlay.a);
+	}
 	float vignette = smoothstep(0.92, 0.18, length(vUv - vec2(0.5)));
 	float grain = fract(sin(dot(vUv * uResolution + uTime, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	color *= mix(0.965, 1.0, vignette);

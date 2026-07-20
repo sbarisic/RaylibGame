@@ -251,8 +251,10 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 {
 	private readonly FishGfxEntityRenderAssets assets;
 	private readonly FishGfxAnimationPlayer animation;
+	private readonly EntityModelFrameData frameData;
 	private RemotePlayerRenderState state;
 	private Matrix4x4 rootTransform;
+	private EntityRenderBounds bounds;
 	private bool hasState;
 
 	internal FishGfxRemotePlayerRenderAdapter(
@@ -262,6 +264,7 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 	{
 		this.assets = assets;
 		this.animation = animation;
+		frameData = assets.Humanoid.CreateFrameData();
 	}
 
 	public void Update(in RemotePlayerRenderState newState, float deltaSeconds)
@@ -279,6 +282,8 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 			feet,
 			new Vector3(MathF.Sin(yaw), 0, MathF.Cos(yaw))
 		);
+		assets.Humanoid.UpdateFrameData(frameData, rootTransform, animation.Pose);
+		bounds = frameData.Bounds;
 		hasState = true;
 	}
 
@@ -287,8 +292,7 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 		EnsureState();
 		assets.Humanoid.Render(
 			pass,
-			rootTransform,
-			animation.Pose,
+			frameData,
 			assets.HumanoidTexture(EntityAssetIds.HumanoidTexture),
 			Color.White,
 			assets.LitShader,
@@ -308,8 +312,7 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 		EnsureState();
 		assets.Humanoid.RenderShadow(
 			pass,
-			rootTransform,
-			animation.Pose,
+			frameData,
 			assets.HumanoidTexture(EntityAssetIds.HumanoidTexture),
 			assets.ShadowShader
 		);
@@ -318,7 +321,13 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 	public EntityRenderBounds GetAnimationBounds()
 	{
 		EnsureState();
-		return assets.Humanoid.CalculateBounds(rootTransform, animation.Pose);
+		return bounds;
+	}
+
+	public void SetLight(in EntityLightSample light)
+	{
+		EnsureState();
+		state = state with { Light = light };
 	}
 
 	public bool TryPick(in Ray3 ray, out EntityModelHit hit)
@@ -330,7 +339,7 @@ public sealed class FishGfxRemotePlayerRenderAdapter
 	public Matrix4x4 GetAttachmentTransform(string partName)
 	{
 		EnsureState();
-		return assets.Humanoid.GetPartTransform(partName, rootTransform, animation.Pose);
+		return assets.Humanoid.GetPartTransform(partName, frameData);
 	}
 
 	private void EnsureState()
@@ -351,8 +360,10 @@ public sealed class FishGfxNpcRenderAdapter
 {
 	private readonly FishGfxEntityRenderAssets assets;
 	private readonly FishGfxAnimationPlayer animation;
+	private readonly EntityModelFrameData frameData;
 	private NpcRenderState state;
 	private Matrix4x4 rootTransform;
+	private EntityRenderBounds bounds;
 	private bool hasState;
 
 	internal FishGfxNpcRenderAdapter(
@@ -362,6 +373,7 @@ public sealed class FishGfxNpcRenderAdapter
 	{
 		this.assets = assets;
 		this.animation = animation;
+		frameData = assets.Humanoid.CreateFrameData();
 	}
 
 	public void Update(in NpcRenderState newState, float deltaSeconds)
@@ -371,6 +383,8 @@ public sealed class FishGfxNpcRenderAdapter
 		animation.Update(deltaSeconds, state.HeadRotation);
 		Vector3 position = state.Position;
 		rootTransform = EntityTransformMath.CreateFacing(position, state.LookDirection);
+		assets.Humanoid.UpdateFrameData(frameData, rootTransform, animation.Pose);
+		bounds = frameData.Bounds;
 		hasState = true;
 	}
 
@@ -379,8 +393,7 @@ public sealed class FishGfxNpcRenderAdapter
 		EnsureState();
 		assets.Humanoid.Render(
 			pass,
-			rootTransform,
-			animation.Pose,
+			frameData,
 			assets.HumanoidTexture(state.TextureAssetId),
 			Color.White,
 			assets.LitShader,
@@ -400,8 +413,7 @@ public sealed class FishGfxNpcRenderAdapter
 		EnsureState();
 		assets.Humanoid.RenderShadow(
 			pass,
-			rootTransform,
-			animation.Pose,
+			frameData,
 			assets.HumanoidTexture(state.TextureAssetId),
 			assets.ShadowShader
 		);
@@ -410,7 +422,7 @@ public sealed class FishGfxNpcRenderAdapter
 	public EntityRenderBounds GetAnimationBounds()
 	{
 		EnsureState();
-		return assets.Humanoid.CalculateBounds(rootTransform, animation.Pose);
+		return bounds;
 	}
 
 	public bool TryPick(in Ray3 ray, out EntityModelHit hit)
@@ -422,7 +434,13 @@ public sealed class FishGfxNpcRenderAdapter
 	public Matrix4x4 GetAttachmentTransform(string partName)
 	{
 		EnsureState();
-		return assets.Humanoid.GetPartTransform(partName, rootTransform, animation.Pose);
+		return assets.Humanoid.GetPartTransform(partName, frameData);
+	}
+
+	public void SetLight(in EntityLightSample light)
+	{
+		EnsureState();
+		state = state with { Light = light };
 	}
 
 	private void EnsureState()

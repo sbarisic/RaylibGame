@@ -119,6 +119,28 @@ public readonly record struct PickupRenderState(
 
 internal readonly record struct EntityPartPose(Vector3 RotationDegrees, Vector3 PositionOffset);
 
+internal sealed class EntityModelFrameData
+{
+	internal EntityModelFrameData(int partCount)
+	{
+		WorldTransforms = new Matrix4x4[partCount];
+	}
+
+	internal Matrix4x4[] WorldTransforms { get; }
+
+	internal EntityRenderBounds Bounds { get; set; } = EntityRenderBounds.Empty;
+
+	internal long Revision { get; set; }
+
+	internal void ValidatePartCount(int partCount)
+	{
+		if (WorldTransforms.Length != partCount)
+		{
+			throw new InvalidOperationException("Entity frame data does not belong to this model.");
+		}
+	}
+}
+
 internal sealed class EntityModelPose
 {
 	private readonly Dictionary<string, EntityPartPose> parts = new(StringComparer.Ordinal);

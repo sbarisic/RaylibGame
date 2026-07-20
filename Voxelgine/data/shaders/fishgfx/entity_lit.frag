@@ -26,7 +26,8 @@ uniform float uShadowSplits[4];
 uniform float uShadowDepthRanges[4];
 uniform float uShadowMapDepthRanges[4];
 uniform float uShadowWorldTexelSizes[4];
-uniform sampler2D uShadowMaps[4];
+uniform sampler2DShadow uShadowMaps[4];
+uniform sampler2DShadow uDynamicShadowMaps[4];
 
 float SampleCascade(int cascade, float nDotL)
 {
@@ -54,26 +55,36 @@ float SampleCascade(int cascade, float nDotL)
 	vec2 texel = 1.0 / vec2(textureSize(uShadowMaps[cascade], 0));
 	vec2 minimumUv = texel * 0.5;
 	vec2 maximumUv = vec2(1.0) - minimumUv;
-	float visibility = 0.0;
-	float sampleCount = 0.0;
-
-	for (int y = -uShadowFilterRadius; y <= uShadowFilterRadius; y++)
+	float comparisonDepth = receiverDepth - bias;
+	float staticVisibility = 0.0;
+	if (uShadowFilterRadius <= 1)
 	{
-		for (int x = -uShadowFilterRadius; x <= uShadowFilterRadius; x++)
+		const vec2 offsets[4] = vec2[4](
+			vec2(-0.5, -0.5), vec2(0.5, -0.5),
+			vec2(-0.5, 0.5), vec2(0.5, 0.5));
+		for (int sampleIndex = 0; sampleIndex < 4; sampleIndex++)
 		{
-			vec2 sampleUv = clamp(
-				uv + vec2(x, y) * texel,
-				minimumUv,
-				maximumUv
-			);
-			float depth = texture(uShadowMaps[cascade], sampleUv).r;
-			visibility += receiverDepth - bias <= depth ? 1.0 : 0.0;
-
-			sampleCount += 1.0;
+			vec2 sampleUv = clamp(uv + offsets[sampleIndex] * texel, minimumUv, maximumUv);
+			staticVisibility += texture(uShadowMaps[cascade], vec3(sampleUv, comparisonDepth));
 		}
+		staticVisibility *= 0.25;
 	}
-
-	return visibility / sampleCount;
+	else
+	{
+		for (int y = -1; y <= 1; y++)
+		{
+			for (int x = -1; x <= 1; x++)
+			{
+				vec2 sampleUv = clamp(uv + vec2(x, y) * texel * 1.5, minimumUv, maximumUv);
+				staticVisibility += texture(uShadowMaps[cascade], vec3(sampleUv, comparisonDepth));
+			}
+		}
+		staticVisibility /= 9.0;
+	}
+	float dynamicVisibility = texture(
+		uDynamicShadowMaps[cascade],
+		vec3(clamp(uv, minimumUv, maximumUv), comparisonDepth));
+	return min(staticVisibility, dynamicVisibility);
 }
 
 float SunVisibility(float nDotL)

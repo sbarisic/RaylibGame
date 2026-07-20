@@ -14,11 +14,16 @@ public sealed class GameRenderGraph : IDisposable
 	private readonly GraphicsContext graphics;
 	private readonly AssetHandle<ShaderProgram> postShader;
 	private readonly AssetHandle<ShaderProgram> localFogShader;
+	private readonly AssetHandle<ShaderProgram> localFogCompositeShader;
 	private readonly LocalFogGpuTimer localFogGpuTimer;
 	private bool useMsaa;
 	private RenderTarget worldTarget;
 	private RenderTarget resolvedTarget;
 	private RenderTarget compositeTarget;
+	private RenderTarget fogRaymarchTarget;
+	private RenderTarget viewmodelTarget;
+	private RenderTarget viewmodelResolvedTarget;
+	private float fogTargetScale;
 	private Vector2 targetSize;
 	private bool disposed;
 	private DirectionalShadowRenderer shadowRenderer;
@@ -41,6 +46,11 @@ public sealed class GameRenderGraph : IDisposable
 			"local-volumetric-fog",
 			"data/shaders/fishgfx/local_fog.vert",
 			"data/shaders/fishgfx/local_fog.frag"
+		);
+		localFogCompositeShader = assets.LoadShader(
+			"local-volumetric-fog-composite",
+			"data/shaders/fishgfx/local_fog.vert",
+			"data/shaders/fishgfx/local_fog_composite.frag"
 		);
 		localFogGpuTimer = new LocalFogGpuTimer(graphics);
 	}
@@ -65,6 +75,9 @@ public sealed class GameRenderGraph : IDisposable
 		worldTarget = null;
 		resolvedTarget = null;
 		compositeTarget = null;
+		fogRaymarchTarget = null;
+		viewmodelTarget = null;
+		viewmodelResolvedTarget = null;
 		targetSize = default;
 	}
 
@@ -103,7 +116,7 @@ public sealed class GameRenderGraph : IDisposable
 			}
 		}
 
-		RenderTarget sceneTarget = fog.HasValue
+		SceneComposition composition = fog.HasValue
 			? RenderFogAndViewmodel(
 				frame,
 				state,
@@ -114,11 +127,12 @@ public sealed class GameRenderGraph : IDisposable
 				width,
 				height
 			)
-			: RenderViewmodel(frame, state, settings, timing, linearClearColor);
+			: new SceneComposition(
+				RenderViewmodel(frame, state, settings, timing, linearClearColor),
+				null
+			);
 
 		ShaderProgram shader = postShader.Value;
-		shader.SetUniform("uTexture", 0);
-		shader.SetUniform("uUseFxaa", useMsaa ? 0 : 1);
 		using (RenderPass post = frame.BeginPass(
 			graphics.Backbuffer,
 			CreateDescriptor(
@@ -131,14 +145,14 @@ public sealed class GameRenderGraph : IDisposable
 			)
 		))
 		{
-			post.DrawTexturedRectangle(
-				0,
-				0,
+			new ScenePostCommand(
+				composition.Scene.ColorAttachments[0],
+				composition.ViewmodelOverlay,
+				shader,
 				width,
 				height,
-				texture: sceneTarget.ColorAttachments[0],
-				shader: shader
-			);
+				useFxaa: !useMsaa
+			).Execute(post);
 		}
 
 		using (RenderPass overlay = frame.BeginPass(
@@ -171,7 +185,7 @@ public sealed class GameRenderGraph : IDisposable
 			CreateDescriptor(
 				settings.ViewmodelView,
 				settings.ViewmodelState,
-				linearClearColor,
+				Color.Transparent,
 				timing.TotalTime,
 				RenderLoadAction.Load,
 				RenderLoadAction.Clear
@@ -190,7 +204,7 @@ public sealed class GameRenderGraph : IDisposable
 		return resolvedTarget;
 	}
 
-	private RenderTarget RenderFogAndViewmodel(
+	private SceneComposition RenderFogAndViewmodel(
 		RenderFrame frame,
 		GameStateImpl state,
 		GameStateRenderSettings settings,
@@ -200,6 +214,7 @@ public sealed class GameRenderGraph : IDisposable
 		int width,
 		int height)
 	{
+		EnsureFogTargets(width, height, fog.StepLength);
 		RenderTarget fogSource = worldTarget;
 		if (useMsaa)
 		{
@@ -209,9 +224,9 @@ public sealed class GameRenderGraph : IDisposable
 		}
 
 		using (RenderPass fogPass = frame.BeginPass(
-			compositeTarget,
+			fogRaymarchTarget,
 			CreateDescriptor(
-				CreateScreenView(width, height),
+				CreateScreenView(fogRaymarchTarget.Width, fogRaymarchTarget.Height),
 				settings.OverlayState,
 				linearClearColor,
 				timing.TotalTime,
@@ -222,24 +237,44 @@ public sealed class GameRenderGraph : IDisposable
 		{
 			using IDisposable fogTiming = localFogGpuTimer.Begin(fogPass);
 			new LocalFogCompositeCommand(
-				fogSource.ColorAttachments[0],
 				fogSource.DepthStencilAttachment,
 				fog,
 				localFogShader.Value,
 				settings.WorldView,
-				width,
-				height
+				fogRaymarchTarget.Width,
+				fogRaymarchTarget.Height
 			).Execute(fogPass);
 		}
 
-		using (RenderPass viewmodel = frame.BeginPass(
+		using (RenderPass composite = frame.BeginPass(
 			compositeTarget,
+			CreateDescriptor(
+				CreateScreenView(width, height),
+				settings.OverlayState,
+				linearClearColor,
+				timing.TotalTime,
+				RenderLoadAction.Clear,
+				RenderLoadAction.DontCare
+			)))
+		{
+			new LocalFogBilateralCompositeCommand(
+				fogSource.ColorAttachments[0],
+				fogSource.DepthStencilAttachment,
+				fogRaymarchTarget.ColorAttachments[0],
+				localFogCompositeShader.Value,
+				width,
+				height
+			).Execute(composite);
+		}
+
+		using (RenderPass viewmodel = frame.BeginPass(
+			viewmodelTarget,
 			CreateDescriptor(
 				settings.ViewmodelView,
 				settings.ViewmodelState,
-				linearClearColor,
+				Color.Transparent,
 				timing.TotalTime,
-				RenderLoadAction.Load,
+				RenderLoadAction.Clear,
 				RenderLoadAction.Clear
 			)
 		))
@@ -247,13 +282,12 @@ public sealed class GameRenderGraph : IDisposable
 			state.RenderViewmodel(viewmodel, timing);
 		}
 
-		if (!useMsaa)
-		{
-			return compositeTarget;
-		}
-
-		frame.ResolveColor(compositeTarget, 0, resolvedTarget, 0);
-		return resolvedTarget;
+		if (useMsaa)
+			frame.ResolveColor(viewmodelTarget, 0, viewmodelResolvedTarget, 0);
+		return new SceneComposition(
+			compositeTarget,
+			(useMsaa ? viewmodelResolvedTarget : viewmodelTarget).ColorAttachments[0]
+		);
 	}
 
 	public void Dispose()
@@ -271,6 +305,9 @@ public sealed class GameRenderGraph : IDisposable
 		worldTarget = null;
 		resolvedTarget = null;
 		compositeTarget = null;
+		fogRaymarchTarget = null;
+		viewmodelTarget = null;
+		viewmodelResolvedTarget = null;
 		disposed = true;
 	}
 
@@ -316,7 +353,16 @@ public sealed class GameRenderGraph : IDisposable
 		if (shadowGeometryRevision != request.GeometryRevision)
 		{
 			shadowGeometryRevision = request.GeometryRevision;
-			shadowRenderer.InvalidateGeometry();
+			if (request.StaticInvalidations.Count == 0)
+			{
+				shadowRenderer.InvalidateGeometry();
+			}
+		}
+
+		for (int index = 0; index < request.StaticInvalidations.Count; index++)
+		{
+			AxisAlignedBoundingBox bounds = request.StaticInvalidations[index];
+			shadowRenderer.InvalidateStaticCaster(bounds);
 		}
 
 		if (request.DynamicActorsChanged)
@@ -348,6 +394,21 @@ public sealed class GameRenderGraph : IDisposable
 			}
 
 			shadowRenderer.CompleteCascade(cascadeIndex);
+		}
+
+		for (int pendingIndex = 0;
+			pendingIndex < shadowRenderer.DynamicCascadesNeedingRender.Count;
+			pendingIndex++)
+		{
+			int cascadeIndex = shadowRenderer.DynamicCascadesNeedingRender[pendingIndex];
+			DirectionalShadowCascade cascade = shadowRenderer.GetDynamicCascade(cascadeIndex);
+
+			using (RenderPass shadowPass = shadowRenderer.BeginDynamicCascadePass(frame, cascadeIndex))
+			{
+				state.RenderDynamicShadowCasters(shadowPass, cascade, timing);
+			}
+
+			shadowRenderer.CompleteDynamicCascade(cascadeIndex);
 		}
 
 		DirectionalShadowFrame shadowFrame = shadowRenderer.CurrentFrame;
@@ -403,10 +464,41 @@ public sealed class GameRenderGraph : IDisposable
 		resolvedTarget = useMsaa
 			? graphics.CreateRenderTarget(new RenderTargetDescriptor(width, height))
 			: worldTarget;
-		compositeTarget = graphics.CreateRenderTarget(
-			new RenderTargetDescriptor(width, height, sampleCount: SampleCount)
-		);
+		compositeTarget = graphics.CreateRenderTarget(new RenderTargetDescriptor(width, height));
 		targetSize = size;
+	}
+
+	private void EnsureFogTargets(int width, int height, float stepLength)
+	{
+		float scale = stepLength >= 2 ? 0.25f : stepLength <= 0.5f ? 1 : 0.5f;
+		int fogWidth = Math.Max(1, (int)MathF.Ceiling(width * scale));
+		int fogHeight = Math.Max(1, (int)MathF.Ceiling(height * scale));
+		if (fogRaymarchTarget != null
+			&& fogTargetScale == scale
+			&& fogRaymarchTarget.Width == fogWidth
+			&& fogRaymarchTarget.Height == fogHeight)
+			return;
+
+		fogRaymarchTarget?.Dispose();
+		viewmodelTarget?.Dispose();
+		if (viewmodelResolvedTarget != null
+			&& !ReferenceEquals(viewmodelResolvedTarget, viewmodelTarget))
+			viewmodelResolvedTarget.Dispose();
+		fogRaymarchTarget = graphics.CreateRenderTarget(new RenderTargetDescriptor(
+			fogWidth,
+			fogHeight,
+			new[] { TextureFormat.RGBA16Float },
+			depthStencilFormat: null
+		));
+		viewmodelTarget = graphics.CreateRenderTarget(new RenderTargetDescriptor(
+			width,
+			height,
+			sampleCount: SampleCount
+		));
+		viewmodelResolvedTarget = useMsaa
+			? graphics.CreateRenderTarget(new RenderTargetDescriptor(width, height))
+			: viewmodelTarget;
+		fogTargetScale = scale;
 	}
 
 	private void DisposeTargets()
@@ -418,6 +510,18 @@ public sealed class GameRenderGraph : IDisposable
 
 		worldTarget?.Dispose();
 		compositeTarget?.Dispose();
+		fogRaymarchTarget?.Dispose();
+		viewmodelTarget?.Dispose();
+		if (viewmodelResolvedTarget != null
+			&& !ReferenceEquals(viewmodelResolvedTarget, viewmodelTarget))
+			viewmodelResolvedTarget.Dispose();
+		worldTarget = null;
+		resolvedTarget = null;
+		compositeTarget = null;
+		fogRaymarchTarget = null;
+		viewmodelTarget = null;
+		viewmodelResolvedTarget = null;
+		fogTargetScale = 0;
 	}
 
 	private static RenderPassDescriptor CreateDescriptor(
@@ -447,5 +551,9 @@ public sealed class GameRenderGraph : IDisposable
 		camera.SetOrthogonal(0, 0, width, height);
 		return new RenderView(camera);
 	}
+
+	private readonly record struct SceneComposition(
+		RenderTarget Scene,
+		Texture ViewmodelOverlay);
 }
 #endif

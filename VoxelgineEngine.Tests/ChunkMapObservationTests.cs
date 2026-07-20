@@ -76,6 +76,83 @@ public sealed class ChunkMapObservationTests
 	}
 
 	[Fact]
+	public void FogSpatialCaptureCopiesOnlyIntersectingNonEmptyChunks()
+	{
+		ChunkMap map = new();
+		FogVoxel red = FogVoxel.FromStraight(new Rgba32(255, 0, 0, 255), 128);
+		FogVoxel blue = FogVoxel.FromStraight(new Rgba32(0, 0, 255, 255), 64);
+		map.SetFog(1, 2, 3, red);
+		map.SetFog(33, 2, 3, blue);
+		List<FogChunkSnapshotLease> snapshots = new();
+
+		map.CaptureFogChunks(new FogChunkBounds(0, 0, 0, 1, 1, 1), snapshots);
+
+		FogChunkSnapshotLease snapshot = Assert.Single(snapshots);
+		try
+		{
+			Assert.Equal(1, snapshot.NonEmptyFogCount);
+			Assert.Equal(red, snapshot.Fog.Span[1 + 2 * 16 + 3 * 256]);
+			map.SetFog(1, 2, 3, FogVoxel.Empty);
+			Assert.Equal(red, snapshot.Fog.Span[1 + 2 * 16 + 3 * 256]);
+		}
+		finally
+		{
+			snapshot.Dispose();
+		}
+
+		Assert.Equal(1, map.NonEmptyFogVoxelCount);
+		Assert.Throws<ObjectDisposedException>(() => _ = snapshot.Fog);
+	}
+
+	[Fact]
+	public void ClearingLastFogVoxelRemovesChunkFromSpatialIndex()
+	{
+		ChunkMap map = new();
+		FogVoxel fog = FogVoxel.FromStraight(new Rgba32(255, 255, 255, 255), 32);
+		map.SetFog(-1, -1, -1, fog);
+		map.SetFog(-1, -1, -1, FogVoxel.Empty);
+		List<FogChunkSnapshotLease> snapshots = new();
+
+		map.CaptureFogChunks(new FogChunkBounds(-2, -2, -2, 1, 1, 1), snapshots);
+
+		Assert.Equal(0, map.NonEmptyFogVoxelCount);
+		Assert.Empty(snapshots);
+	}
+
+	[Fact]
+	public void PreparedColumnCommitsConvertedStorageAndRevisionAtomically()
+	{
+		BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+		blocks[17] = BlockType.Glowstone;
+		FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
+		fog[18] = FogVoxel.FromStraight(new Rgba32(255, 64, 0, 255), 128);
+		ChunkColumnSnapshot snapshot = new(
+			-2,
+			3,
+			42,
+			new[] { new ChunkSnapshot(-2, 4, 3, blocks, 1, fog, 1) }
+		);
+		PreparedChunkColumn prepared = PreparedChunkColumn.Prepare(snapshot);
+		blocks[17] = BlockType.None;
+		fog[18] = FogVoxel.Empty;
+		ChunkMap map = new();
+		int committed = 0;
+		map.ColumnCommitted += coordinate =>
+		{
+			Assert.Equal(new ChunkColumnCoordinate(-2, 3), coordinate);
+			committed++;
+		};
+
+		map.CommitPreparedColumn(prepared);
+
+		Assert.Equal(1, committed);
+		Assert.Equal(42, map.GetColumnRevision(-2, 3));
+		Assert.Equal(BlockType.Glowstone, map.GetBlock(-31, 65, 48));
+		Assert.False(map.GetFog(-30, 65, 48).IsEmpty);
+		Assert.Throws<ObjectDisposedException>(() => map.CommitPreparedColumn(prepared));
+	}
+
+	[Fact]
 	public void CaptureChunks_CoversNegativeCoordinatesBoundariesAndNewChunksCellForCell()
 	{
 		ChunkMap map = new();

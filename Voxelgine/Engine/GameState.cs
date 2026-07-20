@@ -77,6 +77,13 @@ public abstract class GameStateImpl : IDisposable
 	{
 	}
 
+	public virtual void RenderDynamicShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade,
+		in FrameTiming timing)
+	{
+	}
+
 	public virtual void RenderWorld(
 		RenderPass pass,
 		in FrameTiming timing,

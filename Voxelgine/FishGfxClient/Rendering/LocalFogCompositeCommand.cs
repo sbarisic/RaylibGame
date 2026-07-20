@@ -8,7 +8,6 @@ namespace Voxelgine.FishGfxClient.Rendering;
 
 internal sealed class LocalFogCompositeCommand : RenderCommand
 {
-	private readonly Texture sceneColor;
 	private readonly Texture sceneDepth;
 	private readonly FishGfxFogFrame fog;
 	private readonly ShaderProgram shader;
@@ -18,7 +17,6 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 	private readonly int height;
 
 	public LocalFogCompositeCommand(
-		Texture sceneColor,
 		Texture sceneDepth,
 		in FishGfxFogFrame fog,
 		ShaderProgram shader,
@@ -26,7 +24,6 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 		int width,
 		int height)
 	{
-		this.sceneColor = sceneColor ?? throw new ArgumentNullException(nameof(sceneColor));
 		this.sceneDepth = sceneDepth ?? throw new ArgumentNullException(nameof(sceneDepth));
 		this.fog = fog;
 		this.shader = shader ?? throw new ArgumentNullException(nameof(shader));
@@ -41,9 +38,9 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 
 	public override void Execute(RenderPass pass)
 	{
-		shader.SetUniform("uTexture", 0);
 		shader.SetUniform("uSceneDepth", 1);
 		shader.SetUniform("uFogVolume", 2);
+		shader.SetUniform("uFogOccupancy", 3);
 		shader.SetUniform("uInverseViewProjection", inverseViewProjection);
 		shader.SetUniform("uCameraPosition", cameraPosition);
 		shader.SetUniform("uFogOrigin", fog.Origin);
@@ -52,12 +49,13 @@ internal sealed class LocalFogCompositeCommand : RenderCommand
 		shader.SetUniform("uMaximumSteps", fog.MaximumSteps);
 		using IDisposable depthBinding = sceneDepth.Bind(1);
 		using IDisposable volumeBinding = fog.Texture.Bind(2);
+		using IDisposable occupancyBinding = fog.OccupancyTexture.Bind(3);
 		pass.DrawTexturedRectangle(
 			0,
 			0,
 			width,
 			height,
-			texture: sceneColor,
+			texture: sceneDepth,
 			shader: shader
 		);
 	}

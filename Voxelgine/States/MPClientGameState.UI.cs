@@ -756,8 +756,12 @@ namespace Voxelgine.States
 				_netStatsInfoLabel.WriteLine($"Indirect: {diagnostics.IndirectCommandCount} commands / {diagnostics.GeometryPagesTouched} pages");
 				_netStatsInfoLabel.WriteLine($"Resident pages: {statistics.GeometryPages}");
 				_netStatsInfoLabel.WriteLine($"CPU: cull {diagnostics.CullingMilliseconds:F2} ms, build {diagnostics.CommandBuildMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"Active set: {diagnostics.ActiveSetRefreshMilliseconds:F2} ms, {diagnostics.ActiveSetVisitedColumns} cols / {diagnostics.ActiveSetTestedChunks} chunks, +{diagnostics.ActiveSetAdditions}/-{diagnostics.ActiveSetRemovals} ({diagnostics.ActiveSetRefreshReason})");
 				_netStatsInfoLabel.WriteLine($"Submit: {diagnostics.SubmissionMilliseconds:F2} ms, GPU {diagnostics.GpuMilliseconds:F2} ms");
+				_netStatsInfoLabel.WriteLine($"Uploads: {diagnostics.MeshUploadBytes} B / {diagnostics.MeshUploadSlices} slices, queued {diagnostics.QueuedMeshUploadBytes} B");
+				_netStatsInfoLabel.WriteLine($"  Jobs: {diagnostics.CompletedUploadJobs} done / {diagnostics.DiscardedUploadJobs} discarded, oldest {diagnostics.OldestMeshUploadJobAgeSeconds:F2} s");
 				_netStatsInfoLabel.WriteLine($"Alloc: {diagnostics.ManagedAllocatedBytes} B");
+				_netStatsInfoLabel.WriteLine($"Frame 10s: {_framePercentiles.MedianMilliseconds:F2} med / {_framePercentiles.P95Milliseconds:F2} p95 / {_framePercentiles.P99Milliseconds:F2} p99 / {_framePercentiles.MaximumMilliseconds:F2} max ms");
 				_netStatsInfoLabel.WriteLine($"Transparent: {(diagnostics.TransparentCacheHit ? "cached" : diagnostics.TransparentInvalidationReason.ToString())}");
 				_netStatsInfoLabel.WriteLine($"  Faces: {diagnostics.TransparentFaceCount}, indices: {diagnostics.TransparentIndexCount}");
 				_netStatsInfoLabel.WriteLine($"  Sort: {diagnostics.TransparentWorkerSortMilliseconds:F2} ms, upload: {diagnostics.TransparentIndexUploadMilliseconds:F2} ms");

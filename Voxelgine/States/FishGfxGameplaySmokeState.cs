@@ -44,6 +44,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		70,
 		CameraProjectionKind.Perspective
 	);
+	private readonly List<FishGfx.AxisAlignedBoundingBox> shadowInvalidations = new();
 	private bool disposed;
 
 	internal bool IsFogVolumeReady => voxelScene.FogVolume.CurrentFrame.HasValue;
@@ -178,6 +179,8 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 
 	public override GameDirectionalShadowRequest? GetDirectionalShadowRequest()
 	{
+		shadowInvalidations.Clear();
+		voxelScene.Renderer.DrainShadowInvalidations(shadowInvalidations);
 		return new GameDirectionalShadowRequest(
 			camera,
 			voxelScene.Renderer.SunSettings.Direction,
@@ -196,6 +199,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 				UpdateIntervals = new[] { 1, 2, 4 },
 			},
 			voxelScene.GeometryRevision,
+			shadowInvalidations,
 			true
 		);
 	}
@@ -206,6 +210,13 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		in FrameTiming timing)
 	{
 		voxelScene.Renderer.RenderShadowCasters(pass, cascade);
+	}
+
+	public override void RenderDynamicShadowCasters(
+		RenderPass pass,
+		in DirectionalShadowCascade cascade,
+		in FrameTiming timing)
+	{
 		npc.RenderShadow(pass);
 		door.RenderShadow(pass, CreateDoorState());
 		pickup.RenderShadow(pass, CreatePickupState(timing.TotalTime));

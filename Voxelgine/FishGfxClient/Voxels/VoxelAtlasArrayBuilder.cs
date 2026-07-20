@@ -17,6 +17,117 @@ internal enum VoxelAtlasMipKind
 
 internal static class VoxelAtlasArrayBuilder
 {
+	internal static Texture CreatePackedSurfaceMaps(
+		GraphicsContext graphics,
+		Bitmap normalAtlas,
+		Bitmap specularAtlas,
+		Bitmap roughnessAtlas,
+		int columns,
+		int rows,
+		out int[] layerInfo
+	)
+	{
+		ArgumentNullException.ThrowIfNull(graphics);
+		ArgumentNullException.ThrowIfNull(normalAtlas);
+		ArgumentNullException.ThrowIfNull(specularAtlas);
+		ArgumentNullException.ThrowIfNull(roughnessAtlas);
+
+		if (normalAtlas.Size != specularAtlas.Size
+			|| normalAtlas.Size != roughnessAtlas.Size)
+		{
+			throw new ArgumentException("Packed voxel surface atlases must have identical dimensions.");
+		}
+
+		ValidateGrid(normalAtlas, columns, rows, out int tileWidth, out int tileHeight);
+		int layers = checked(columns * rows);
+		int mipLevels = 1 + (int)MathF.Log2(tileWidth);
+		Texture texture = graphics.CreateTexture(new TextureDescriptor(
+			tileWidth,
+			tileHeight,
+			TextureFormat.RGBA8Unorm,
+			TextureUsageFlags.Sampled | TextureUsageFlags.TransferDestination,
+			TextureDimension.Texture2DArray,
+			mipLevels,
+			sampling: new TextureSamplingState(
+				TextureFilter.NearestMipmapLinear,
+				TextureFilter.Nearest,
+				TextureWrap.ClampToEdge,
+				TextureWrap.ClampToEdge),
+			arrayLayers: layers));
+
+		try
+		{
+			byte[] normal = SliceLevelZero(
+				ReadRgba(normalAtlas), normalAtlas.Width, columns, rows, tileWidth, tileHeight);
+			byte[] specular = SliceLevelZero(
+				ReadRgba(specularAtlas), specularAtlas.Width, columns, rows, tileWidth, tileHeight);
+			byte[] roughness = SliceLevelZero(
+				ReadRgba(roughnessAtlas), roughnessAtlas.Width, columns, rows, tileWidth, tileHeight);
+			layerInfo = BuildLayerInfo(normal, specular, layers, tileWidth * tileHeight);
+			int width = tileWidth;
+			int height = tileHeight;
+
+			for (int mip = 0; mip < mipLevels; mip++)
+			{
+				byte[] packed = PackSurfaceLevel(normal, specular, roughness);
+				texture.Write(
+					packed,
+					TextureDataFormat.RGBA8Unorm,
+					new TextureArrayRegion(0, 0, 0, width, height, layers),
+					mip);
+
+				if (mip + 1 < mipLevels)
+				{
+					normal = Downsample(normal, width, height, layers, VoxelAtlasMipKind.Normal, null);
+					specular = Downsample(specular, width, height, layers, VoxelAtlasMipKind.Linear, null);
+					roughness = Downsample(roughness, width, height, layers, VoxelAtlasMipKind.Linear, null);
+					width = Math.Max(1, width / 2);
+					height = Math.Max(1, height / 2);
+				}
+			}
+
+			return texture;
+		}
+		catch
+		{
+			texture.Dispose();
+			throw;
+		}
+	}
+
+	internal static int[] BuildLayerInfo(
+		ReadOnlySpan<byte> normal,
+		ReadOnlySpan<byte> specular,
+		int layers,
+		int pixelsPerLayer)
+	{
+		int layerStride = checked(pixelsPerLayer * 4);
+		if (layers <= 0
+			|| pixelsPerLayer <= 0
+			|| normal.Length != checked(layers * layerStride)
+			|| specular.Length != normal.Length)
+		{
+			throw new ArgumentException("Voxel layer-info source data is invalid.");
+		}
+
+		int[] result = new int[layers];
+		for (int layer = 0; layer < layers; layer++)
+		{
+			bool flatNormal = true;
+			bool zeroSpecular = true;
+			int end = (layer + 1) * layerStride;
+			for (int offset = layer * layerStride; offset < end; offset += 4)
+			{
+				flatNormal &= Math.Abs(normal[offset] - 128) <= 1
+					&& Math.Abs(normal[offset + 1] - 128) <= 1;
+				zeroSpecular &= specular[offset] == 0;
+			}
+
+			result[layer] = (flatNormal ? 1 : 0) | (zeroSpecular ? 2 : 0);
+		}
+		return result;
+	}
+
 	internal static Texture Create(
 		GraphicsContext graphics,
 		Bitmap atlas,
@@ -30,20 +141,7 @@ internal static class VoxelAtlasArrayBuilder
 		ArgumentNullException.ThrowIfNull(graphics);
 		ArgumentNullException.ThrowIfNull(atlas);
 
-		if (columns <= 0 || rows <= 0
-			|| atlas.Width % columns != 0
-			|| atlas.Height % rows != 0)
-		{
-			throw new ArgumentException("The atlas must divide evenly into its tile grid.");
-		}
-
-		int tileWidth = atlas.Width / columns;
-		int tileHeight = atlas.Height / rows;
-
-		if (tileWidth != tileHeight || (tileWidth & (tileWidth - 1)) != 0)
-		{
-			throw new ArgumentException("Voxel texture-array tiles must be square powers of two.");
-		}
+		ValidateGrid(atlas, columns, rows, out int tileWidth, out int tileHeight);
 
 		int layers = checked(columns * rows);
 		int mipLevels = 1 + (int)MathF.Log2(tileWidth);
@@ -109,6 +207,54 @@ internal static class VoxelAtlasArrayBuilder
 			texture.Dispose();
 			throw;
 		}
+	}
+
+	private static void ValidateGrid(
+		Bitmap atlas,
+		int columns,
+		int rows,
+		out int tileWidth,
+		out int tileHeight)
+	{
+		if (columns <= 0 || rows <= 0
+			|| atlas.Width % columns != 0
+			|| atlas.Height % rows != 0)
+		{
+			throw new ArgumentException("The atlas must divide evenly into its tile grid.");
+		}
+
+		tileWidth = atlas.Width / columns;
+		tileHeight = atlas.Height / rows;
+
+		if (tileWidth != tileHeight || (tileWidth & (tileWidth - 1)) != 0)
+		{
+			throw new ArgumentException("Voxel texture-array tiles must be square powers of two.");
+		}
+	}
+
+	internal static byte[] PackSurfaceLevel(
+		ReadOnlySpan<byte> normal,
+		ReadOnlySpan<byte> specular,
+		ReadOnlySpan<byte> roughness)
+	{
+		if (normal.Length != specular.Length
+			|| normal.Length != roughness.Length
+			|| normal.Length % 4 != 0)
+		{
+			throw new ArgumentException("Packed voxel surface levels must have matching RGBA data.");
+		}
+
+		byte[] packed = new byte[normal.Length];
+
+		for (int offset = 0; offset < packed.Length; offset += 4)
+		{
+			packed[offset] = normal[offset];
+			packed[offset + 1] = normal[offset + 1];
+			packed[offset + 2] = specular[offset];
+			packed[offset + 3] = roughness[offset];
+		}
+
+		return packed;
 	}
 
 	private static byte[] ReadRgba(Bitmap source)

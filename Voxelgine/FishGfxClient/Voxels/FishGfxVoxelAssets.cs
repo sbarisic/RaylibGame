@@ -325,9 +325,7 @@ internal sealed class FishGfxVoxelAssets
 		using Bitmap roughnessBitmap = LoadAndValidateAtlas("atlas_roughness.png");
 		Texture modelAtlas = null;
 		Texture baseColor = null;
-		Texture normal = null;
-		Texture specular = null;
-		Texture roughness = null;
+		Texture packedSurface = null;
 
 		try
 		{
@@ -350,45 +348,27 @@ internal sealed class FishGfxVoxelAssets
 				VoxelAtlasMipKind.BaseColor,
 				alphaCutoffs
 			);
-			normal = VoxelAtlasArrayBuilder.Create(
+			packedSurface = VoxelAtlasArrayBuilder.CreatePackedSurfaceMaps(
 				graphics,
 				normalBitmap,
-				CubeColumns,
-				CubeRows,
-				TextureFormat.RGBA8Unorm,
-				VoxelAtlasMipKind.Normal
-			);
-			specular = VoxelAtlasArrayBuilder.Create(
-				graphics,
 				specularBitmap,
-				CubeColumns,
-				CubeRows,
-				TextureFormat.RGBA8Unorm,
-				VoxelAtlasMipKind.Linear
-			);
-			roughness = VoxelAtlasArrayBuilder.Create(
-				graphics,
 				roughnessBitmap,
 				CubeColumns,
 				CubeRows,
-				TextureFormat.RGBA8Unorm,
-				VoxelAtlasMipKind.Linear
+				out int[] layerInfo
 			);
 			return new VoxelSurfaceAssetsResource(
 				new VoxelSurfaceTextureSet(
 					modelAtlas,
 					baseColor,
-					normal,
-					specular,
-					roughness
+					packedSurface,
+					layerInfo
 				)
 			);
 		}
 		catch
 		{
-			roughness?.Dispose();
-			specular?.Dispose();
-			normal?.Dispose();
+			packedSurface?.Dispose();
 			baseColor?.Dispose();
 			modelAtlas?.Dispose();
 			throw;
@@ -510,9 +490,7 @@ internal sealed class FishGfxVoxelAssets
 
 		public void Dispose()
 		{
-			Textures.Roughness.Dispose();
-			Textures.Specular.Dispose();
-			Textures.Normal.Dispose();
+			Textures.PackedSurface.Dispose();
 			Textures.CubeBaseColor.Dispose();
 			Textures.ModelAtlas.Dispose();
 		}

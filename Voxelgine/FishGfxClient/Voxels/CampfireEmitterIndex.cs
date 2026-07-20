@@ -148,6 +148,28 @@ public sealed class CampfireEmitterIndex
 		RebuildPositions();
 	}
 
+	public void ReplaceColumn(
+		int chunkX,
+		int chunkZ,
+		IReadOnlyList<VoxelFireEmitter> emitters)
+	{
+		ArgumentNullException.ThrowIfNull(emitters);
+		campfireBlocks.RemoveWhere(position =>
+			FloorChunk(position.X) == chunkX && FloorChunk(position.Z) == chunkZ);
+		torchBlocks.RemoveWhere(position =>
+			FloorChunk(position.X) == chunkX && FloorChunk(position.Z) == chunkZ);
+		foreach (VoxelFireEmitter emitter in emitters)
+		{
+			BlockPosition position = new(
+				(int)MathF.Floor(emitter.Position.X),
+				(int)MathF.Floor(emitter.Position.Y),
+				(int)MathF.Floor(emitter.Position.Z)
+			);
+			GetBlocks(emitter.Type).Add(position);
+		}
+		RebuildPositions();
+	}
+
 	private HashSet<BlockPosition> GetBlocks(BlockType type)
 	{
 		return type switch

@@ -20,11 +20,14 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly CampfireEmitterIndex campfires = new();
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly ConcurrentQueue<ChunkColumnSnapshot> pendingColumns = new();
+	private readonly ConcurrentQueue<PreparedClientColumn> pendingPreparedColumns = new();
+	private readonly List<ChunkCoordinate> columnRemovalScratch = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
 	private readonly VoxelRendererOptions rendererOptions;
 	private float skyLightMultiplier = 1;
 	private byte minimumAmbientLight;
 	private int resetPending;
+	private PreparedColumnApplication currentPreparedColumn;
 	private bool disposed;
 
 	public FishGfxVoxelScene(GraphicsContext graphics, GameAssetStore assetStore, ChunkMap source,
@@ -54,7 +57,9 @@ public sealed class FishGfxVoxelScene : IDisposable
 				GameConfig.MinimumChunkMeshUploadBudget,
 				GameConfig.MaximumChunkMeshUploadBudget
 			),
-			MeshUploadTimeBudgetMilliseconds = 2,
+			MeshUploadTimeBudgetMilliseconds = 1,
+			MeshUploadByteBudget = 1 * 1024 * 1024,
+			MeshUploadSliceBytes = 256 * 1024,
 			AlphaCutoff = FishGfxVoxelAssets.CutoutAlphaCutoff,
 		};
 		Renderer = new VoxelRenderer(
@@ -167,17 +172,60 @@ public sealed class FishGfxVoxelScene : IDisposable
 			while (pendingColumns.TryDequeue(out _))
 			{
 			}
+			while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
+				prepared.Dispose();
+			currentPreparedColumn?.Dispose();
+			currentPreparedColumn = null;
 
 			SynchronizeAll();
 			return;
 		}
 
-		while (pendingColumns.TryDequeue(out ChunkColumnSnapshot column))
-			ApplyColumn(column);
+		if (currentPreparedColumn == null
+			&& pendingPreparedColumns.TryDequeue(out PreparedClientColumn preparedColumn))
+		{
+			currentPreparedColumn = BeginPreparedColumn(preparedColumn);
+		}
 
-		while (pendingChanges.TryDequeue(out BlockChange change))
-			Apply(change);
+		if (currentPreparedColumn != null)
+		{
+			if (!currentPreparedColumn.IsComplete)
+				ApplyNextPreparedChunk(currentPreparedColumn);
+			if (currentPreparedColumn.IsComplete)
+			{
+				currentPreparedColumn.Dispose();
+				currentPreparedColumn = null;
+			}
+		}
+
+		if (currentPreparedColumn == null && pendingPreparedColumns.IsEmpty)
+		{
+			while (pendingColumns.TryDequeue(out ChunkColumnSnapshot column))
+				ApplyColumn(column);
+		}
+
+		if (currentPreparedColumn == null && pendingPreparedColumns.IsEmpty)
+		{
+			while (pendingChanges.TryDequeue(out BlockChange change))
+				Apply(change);
+		}
 	}
+
+	public PreparedClientColumn PrepareStreamedColumn(ChunkColumnSnapshot column)
+	{
+		ThrowIfDisposed();
+		return PreparedClientColumn.Prepare(column, assets.MaterialIds);
+	}
+
+	public void EnqueuePreparedColumn(PreparedClientColumn column)
+	{
+		ThrowIfDisposed();
+		ArgumentNullException.ThrowIfNull(column);
+		pendingPreparedColumns.Enqueue(column);
+	}
+
+	public int PendingPreparedColumnCount => pendingPreparedColumns.Count
+		+ (currentPreparedColumn == null ? 0 : 1);
 
 	public void Update(Camera camera)
 	{
@@ -306,6 +354,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 		source.BlockChanged -= QueueChange;
 		source.ColumnLoaded -= QueueColumn;
 		source.WorldReset -= QueueReset;
+		while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
+			prepared.Dispose();
+		currentPreparedColumn?.Dispose();
+		currentPreparedColumn = null;
 		FogVolume.Dispose();
 		Renderer.Dispose();
 		Lighting.Dispose();
@@ -386,6 +438,45 @@ public sealed class FishGfxVoxelScene : IDisposable
 		RefreshSkyExposure(column.X, column.Z);
 	}
 
+	private PreparedColumnApplication BeginPreparedColumn(PreparedClientColumn column)
+	{
+		PreparedRenderChunk[] chunks = column.ConsumeRenderChunks();
+		int columnX = column.DomainColumn.X;
+		int columnZ = column.DomainColumn.Z;
+		campfires.ReplaceColumn(columnX, columnZ, column.Emitters);
+		columnRemovalScratch.Clear();
+		foreach (ChunkCoordinate coordinate in residents)
+		{
+			if (coordinate.X == columnX && coordinate.Z == columnZ)
+				columnRemovalScratch.Add(coordinate);
+		}
+		foreach (ChunkCoordinate coordinate in columnRemovalScratch)
+		{
+			residents.Remove(coordinate);
+			Lighting.UnloadChunk(coordinate);
+			World.RemoveChunk(coordinate);
+		}
+		column.Dispose();
+		return new PreparedColumnApplication(columnX, columnZ, chunks);
+	}
+
+	private void ApplyNextPreparedChunk(PreparedColumnApplication application)
+	{
+		PreparedRenderChunk chunk = application.Chunks[application.NextChunk++];
+		try
+		{
+			World.SetPreparedChunk(chunk.Coordinate, chunk.ConsumeStorage());
+			residents.Add(chunk.Coordinate);
+			Lighting.LoadChunk(chunk.Coordinate, chunk.SkyExposedAbove);
+		}
+		finally
+		{
+			chunk.Dispose();
+		}
+		if (application.IsComplete)
+			RefreshSkyExposure(application.X, application.Z);
+	}
+
 	private void Apply(BlockChange change)
 	{
 		campfires.Apply(change);
@@ -452,6 +543,29 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private void ThrowIfDisposed()
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
+	}
+
+	private sealed class PreparedColumnApplication : IDisposable
+	{
+		internal PreparedColumnApplication(int x, int z, PreparedRenderChunk[] chunks)
+		{
+			X = x;
+			Z = z;
+			Chunks = chunks;
+		}
+
+		internal int X { get; }
+		internal int Z { get; }
+		internal PreparedRenderChunk[] Chunks { get; }
+		internal int NextChunk { get; set; }
+		internal bool IsComplete => NextChunk >= Chunks.Length;
+
+		public void Dispose()
+		{
+			for (int index = NextChunk; index < Chunks.Length; index++)
+				Chunks[index].Dispose();
+			NextChunk = Chunks.Length;
+		}
 	}
 }
 #endif

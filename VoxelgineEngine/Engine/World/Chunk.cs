@@ -183,6 +183,26 @@ namespace Voxelgine.Graphics
 			fog = nonEmptyCount == 0 ? null : values.ToArray();
 		}
 
+		internal void AdoptPreparedStorage(
+			PlacedBlock[] preparedBlocks,
+			int preparedNonAirCount,
+			FogVoxel[] preparedFog,
+			int preparedNonEmptyFogCount)
+		{
+			ArgumentNullException.ThrowIfNull(preparedBlocks);
+			if (preparedBlocks.Length != ChunkSize * ChunkSize * ChunkSize)
+				throw new ArgumentException("Prepared block storage must contain one complete chunk.", nameof(preparedBlocks));
+			if (preparedFog != null && preparedFog.Length != preparedBlocks.Length)
+				throw new ArgumentException("Prepared fog storage must contain one complete chunk.", nameof(preparedFog));
+
+			Blocks = preparedBlocks;
+			NonAirBlockCount = Math.Clamp(preparedNonAirCount, 0, preparedBlocks.Length);
+			fog = preparedNonEmptyFogCount == 0 ? null : preparedFog;
+			nonEmptyFogCount = Math.Clamp(preparedNonEmptyFogCount, 0, preparedBlocks.Length);
+			Dirty = true;
+			SkyExposureCacheValid = false;
+		}
+
 		public void MarkDirty() => Dirty = true;
 
 		public void RecomputeNonAirBlockCount()

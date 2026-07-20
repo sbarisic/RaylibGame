@@ -5,6 +5,43 @@ namespace UnitTest;
 public sealed class VoxelAtlasArrayBuilderTests
 {
 	[Fact]
+	public void PackedSurfaceLevelUsesNormalXySpecularAndRoughness()
+	{
+		byte[] normal = { 10, 20, 30, 40, 50, 60, 70, 80 };
+		byte[] specular = { 90, 1, 2, 3, 100, 4, 5, 6 };
+		byte[] roughness = { 110, 7, 8, 9, 120, 10, 11, 12 };
+
+		byte[] packed = VoxelAtlasArrayBuilder.PackSurfaceLevel(
+			normal, specular, roughness);
+
+		Assert.Equal(new byte[] { 10, 20, 90, 110, 50, 60, 100, 120 }, packed);
+	}
+
+	[Fact]
+	public void LayerInfoFindsNeutralNormalAndZeroSpecularLayers()
+	{
+		byte[] normal =
+		{
+			128, 128, 255, 255,
+			128, 128, 255, 255,
+			100, 128, 250, 255,
+			128, 128, 255, 255,
+		};
+		byte[] specular =
+		{
+			0, 0, 0, 255,
+			0, 0, 0, 255,
+			0, 0, 0, 255,
+			8, 0, 0, 255,
+		};
+
+		int[] flags = VoxelAtlasArrayBuilder.BuildLayerInfo(normal, specular, 2, 2);
+
+		Assert.Equal(3, flags[0]);
+		Assert.Equal(0, flags[1]);
+	}
+
+	[Fact]
 	public void SliceLevelZeroUsesRowMajorLayersAndFlipsEachTileForOpenGl()
 	{
 		byte[] atlas = new byte[4 * 4 * 4];

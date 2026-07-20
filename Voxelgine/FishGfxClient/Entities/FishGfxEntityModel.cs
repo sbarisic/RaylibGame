@@ -18,6 +18,9 @@ internal sealed class FishGfxEntityModel : IDisposable
 	private const float DegreesToRadians = MathF.PI / 180;
 	private readonly List<ModelPart> parts = new();
 	private readonly Dictionary<string, ModelPart> partsByName = new(StringComparer.Ordinal);
+	private Matrix4x4[] combinedTransforms;
+	private Matrix4x4[] worldTransforms;
+	private bool[] transformResolved;
 	private readonly Winding winding;
 	private bool disposed;
 
@@ -37,10 +40,22 @@ internal sealed class FishGfxEntityModel : IDisposable
 					hasColors: false
 				);
 				mesh.SetNormals(CreateFlatNormals(partSource, winding));
-				ModelPart part = new(partSource, mesh);
+				ModelPart part = new(partSource, mesh, parts.Count);
 				parts.Add(part);
 				partsByName.Add(partSource.Name, part);
 			}
+
+			for (int index = 0; index < parts.Count; index++)
+			{
+				string parentName = parts[index].Source.ParentName;
+				parts[index].ParentIndex = parentName is null
+					? -1
+					: partsByName[parentName].Index;
+			}
+
+			combinedTransforms = new Matrix4x4[parts.Count];
+			worldTransforms = new Matrix4x4[parts.Count];
+			transformResolved = new bool[parts.Count];
 		}
 		catch
 		{
@@ -50,6 +65,41 @@ internal sealed class FishGfxEntityModel : IDisposable
 	}
 
 	public IReadOnlyCollection<string> PartNames => partsByName.Keys;
+
+	public EntityModelFrameData CreateFrameData()
+	{
+		ThrowIfDisposed();
+		return new EntityModelFrameData(parts.Count);
+	}
+
+	public void UpdateFrameData(
+		EntityModelFrameData frameData,
+		Matrix4x4 rootTransform,
+		EntityModelPose pose)
+	{
+		ThrowIfDisposed();
+		ArgumentNullException.ThrowIfNull(frameData);
+		ArgumentNullException.ThrowIfNull(pose);
+		frameData.ValidatePartCount(parts.Count);
+		BuildTransforms(rootTransform, pose);
+		worldTransforms.CopyTo(frameData.WorldTransforms, 0);
+
+		EntityRenderBounds bounds = EntityRenderBounds.Empty;
+		for (int index = 0; index < parts.Count; index++)
+		{
+			ModelPart part = parts[index];
+			Matrix4x4 transform = frameData.WorldTransforms[index];
+			foreach (Triangle3 triangle in part.Source.Triangles)
+			{
+				bounds = bounds.Include(Vector3.Transform(triangle.A, transform));
+				bounds = bounds.Include(Vector3.Transform(triangle.B, transform));
+				bounds = bounds.Include(Vector3.Transform(triangle.C, transform));
+			}
+		}
+
+		frameData.Bounds = bounds;
+		frameData.Revision++;
+	}
 
 	public void Render(
 		RenderPass pass,
@@ -79,15 +129,52 @@ internal sealed class FishGfxEntityModel : IDisposable
 		shader.SetUniform("uShadowEnabled", 0);
 		using IDisposable shadowScope = worldLighting.Shadows?.Bind(shader, 1);
 
-		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		BuildTransforms(rootTransform, pose);
 		using IDisposable stateScope = pass.PushState(pass.State with
 		{
 			Winding = winding,
 		});
-		foreach (ModelPart part in parts)
+		for (int index = 0; index < parts.Count; index++)
 		{
+			ModelPart part = parts[index];
 			part.Mesh.DefaultColor = ColorSpace.SrgbToLinearColor(tint);
-			using IDisposable modelScope = pass.PushModel(transforms[part.Source.Name]);
+			using IDisposable modelScope = pass.PushModel(worldTransforms[index]);
+			pass.DrawMesh(part.Mesh, texture, shader);
+		}
+	}
+
+	public void Render(
+		RenderPass pass,
+		EntityModelFrameData frameData,
+		Texture texture,
+		Color tint,
+		ShaderProgram shader,
+		in EntityLightSample light,
+		in EntityWorldLighting worldLighting)
+	{
+		ThrowIfDisposed();
+		ArgumentNullException.ThrowIfNull(pass);
+		ArgumentNullException.ThrowIfNull(frameData);
+		ArgumentNullException.ThrowIfNull(texture);
+		ArgumentNullException.ThrowIfNull(shader);
+		frameData.ValidatePartCount(parts.Count);
+		VoxelSunSettings sun = worldLighting.Sun;
+		shader.SetUniform("uTexture", 0);
+		shader.SetUniform("uAlphaCutoff", 0.1f);
+		shader.SetUniform("uBlockLight", light.BlockLight);
+		shader.SetUniform("uSkyLight", light.SkyLight);
+		shader.SetUniform("LightDirection", sun.Direction);
+		shader.SetUniform("AmbientLight", sun.AmbientLight);
+		shader.SetUniform("SunColor", ColorSpace.SrgbToLinear(sun.Color));
+		shader.SetUniform("SunIntensity", sun.Intensity);
+		shader.SetUniform("uShadowEnabled", 0);
+		using IDisposable shadowScope = worldLighting.Shadows?.Bind(shader, 1);
+		using IDisposable stateScope = pass.PushState(pass.State with { Winding = winding });
+		for (int index = 0; index < parts.Count; index++)
+		{
+			ModelPart part = parts[index];
+			part.Mesh.DefaultColor = ColorSpace.SrgbToLinearColor(tint);
+			using IDisposable modelScope = pass.PushModel(frameData.WorldTransforms[index]);
 			pass.DrawMesh(part.Mesh, texture, shader);
 		}
 	}
@@ -106,16 +193,44 @@ internal sealed class FishGfxEntityModel : IDisposable
 		ArgumentNullException.ThrowIfNull(shader);
 		shader.SetUniform("uTexture", 0);
 		shader.SetUniform("uAlphaCutoff", 0.1f);
-		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		BuildTransforms(rootTransform, pose);
 		using IDisposable stateScope = pass.PushState(pass.State with
 		{
 			Winding = winding,
 			CullMode = CullMode.Back,
 		});
 
-		foreach (ModelPart part in parts)
+		for (int index = 0; index < parts.Count; index++)
 		{
-			using IDisposable modelScope = pass.PushModel(transforms[part.Source.Name]);
+			ModelPart part = parts[index];
+			using IDisposable modelScope = pass.PushModel(worldTransforms[index]);
+			pass.DrawMesh(part.Mesh, texture, shader);
+		}
+	}
+
+	public void RenderShadow(
+		RenderPass pass,
+		EntityModelFrameData frameData,
+		Texture texture,
+		ShaderProgram shader)
+	{
+		ThrowIfDisposed();
+		ArgumentNullException.ThrowIfNull(pass);
+		ArgumentNullException.ThrowIfNull(frameData);
+		ArgumentNullException.ThrowIfNull(texture);
+		ArgumentNullException.ThrowIfNull(shader);
+		frameData.ValidatePartCount(parts.Count);
+		shader.SetUniform("uTexture", 0);
+		shader.SetUniform("uAlphaCutoff", 0.1f);
+		using IDisposable stateScope = pass.PushState(pass.State with
+		{
+			Winding = winding,
+			CullMode = CullMode.Back,
+		});
+		for (int index = 0; index < parts.Count; index++)
+		{
+			ModelPart part = parts[index];
+			using IDisposable modelScope = pass.PushModel(frameData.WorldTransforms[index]);
 			pass.DrawMesh(part.Mesh, texture, shader);
 		}
 	}
@@ -133,18 +248,20 @@ internal sealed class FishGfxEntityModel : IDisposable
 		{
 			throw new KeyNotFoundException($"Entity model part '{partName}' was not found.");
 		}
-		return BuildTransforms(rootTransform, pose)[partName];
+		BuildTransforms(rootTransform, pose);
+		return worldTransforms[partsByName[partName].Index];
 	}
 
 	public EntityRenderBounds CalculateBounds(Matrix4x4 rootTransform, EntityModelPose pose)
 	{
 		ThrowIfDisposed();
 		ArgumentNullException.ThrowIfNull(pose);
-		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		BuildTransforms(rootTransform, pose);
 		EntityRenderBounds bounds = EntityRenderBounds.Empty;
-		foreach (ModelPart part in parts)
+		for (int index = 0; index < parts.Count; index++)
 		{
-			Matrix4x4 transform = transforms[part.Source.Name];
+			ModelPart part = parts[index];
+			Matrix4x4 transform = worldTransforms[index];
 			foreach (Triangle3 triangle in part.Source.Triangles)
 			{
 				bounds = bounds.Include(Vector3.Transform(triangle.A, transform));
@@ -165,14 +282,15 @@ internal sealed class FishGfxEntityModel : IDisposable
 		ThrowIfDisposed();
 		ArgumentNullException.ThrowIfNull(pose);
 		Ray3 worldRay = ray.Normalized();
-		Dictionary<string, Matrix4x4> transforms = BuildTransforms(rootTransform, pose);
+		BuildTransforms(rootTransform, pose);
 		bool found = false;
 		float closest = float.PositiveInfinity;
 		hit = default;
 
-		foreach (ModelPart part in parts)
+		for (int index = 0; index < parts.Count; index++)
 		{
-			Matrix4x4 transform = transforms[part.Source.Name];
+			ModelPart part = parts[index];
+			Matrix4x4 transform = worldTransforms[index];
 			if (!Matrix4x4.Invert(transform, out Matrix4x4 inverse))
 			{
 				continue;
@@ -229,31 +347,43 @@ internal sealed class FishGfxEntityModel : IDisposable
 		partsByName.Clear();
 	}
 
-	private Dictionary<string, Matrix4x4> BuildTransforms(
+	private void BuildTransforms(
 		Matrix4x4 rootTransform,
 		EntityModelPose pose
 	)
 	{
-		Dictionary<string, Matrix4x4> combined = new(StringComparer.Ordinal);
-		Dictionary<string, Matrix4x4> world = new(StringComparer.Ordinal);
-		foreach (ModelPart part in parts)
+		Array.Clear(transformResolved);
+		for (int index = 0; index < parts.Count; index++)
 		{
-			world[part.Source.Name] = GetCombined(part, pose, combined) * rootTransform;
+			worldTransforms[index] = GetCombined(index, pose) * rootTransform;
 		}
-		return world;
+	}
+
+	public Matrix4x4 GetPartTransform(string partName, EntityModelFrameData frameData)
+	{
+		ThrowIfDisposed();
+		ArgumentException.ThrowIfNullOrWhiteSpace(partName);
+		ArgumentNullException.ThrowIfNull(frameData);
+		frameData.ValidatePartCount(parts.Count);
+		if (!partsByName.TryGetValue(partName, out ModelPart part))
+		{
+			throw new KeyNotFoundException($"Entity model part '{partName}' was not found.");
+		}
+
+		return frameData.WorldTransforms[part.Index];
 	}
 
 	private Matrix4x4 GetCombined(
-		ModelPart part,
-		EntityModelPose pose,
-		Dictionary<string, Matrix4x4> cache
+		int partIndex,
+		EntityModelPose pose
 	)
 	{
-		if (cache.TryGetValue(part.Source.Name, out Matrix4x4 value))
+		if (transformResolved[partIndex])
 		{
-			return value;
+			return combinedTransforms[partIndex];
 		}
 
+		ModelPart part = parts[partIndex];
 		EntityPartPose animated = pose[part.Source.Name];
 		Vector3 baseRotation = part.Source.BaseRotationDegrees;
 		Vector3 degrees = new(
@@ -269,12 +399,13 @@ internal sealed class FishGfxEntityModel : IDisposable
 			* Matrix4x4.CreateTranslation(part.Source.Pivot)
 			* Matrix4x4.CreateTranslation(animated.PositionOffset);
 
-		if (part.Source.ParentName is not null)
+		if (part.ParentIndex >= 0)
 		{
-			local *= GetCombined(partsByName[part.Source.ParentName], pose, cache);
+			local *= GetCombined(part.ParentIndex, pose);
 		}
 
-		cache.Add(part.Source.Name, local);
+		combinedTransforms[partIndex] = local;
+		transformResolved[partIndex] = true;
 		return local;
 	}
 
@@ -308,6 +439,22 @@ internal sealed class FishGfxEntityModel : IDisposable
 		return normals;
 	}
 
-	private sealed record ModelPart(EntityModelPartSource Source, Mesh3D Mesh);
+	private sealed class ModelPart
+	{
+		internal ModelPart(EntityModelPartSource source, Mesh3D mesh, int index)
+		{
+			Source = source;
+			Mesh = mesh;
+			Index = index;
+		}
+
+		internal EntityModelPartSource Source { get; }
+
+		internal Mesh3D Mesh { get; }
+
+		internal int Index { get; }
+
+		internal int ParentIndex { get; set; } = -1;
+	}
 }
 #endif

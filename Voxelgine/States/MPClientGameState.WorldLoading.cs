@@ -5,6 +5,7 @@ using System.Threading.Channels;
 using FishGfx.Voxels;
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.FishGfxClient.Voxels;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.States;
@@ -151,9 +152,12 @@ public partial class MPClientGameState
 					packet.Z,
 					packet.Revision,
 					packet.Payload);
+				FishGfxVoxelScene scene = _fishVoxelScene
+					?? throw new InvalidOperationException("The voxel scene is unavailable while preparing a streamed column.");
+				PreparedClientColumn prepared = scene.PrepareStreamedColumn(column);
 				Interlocked.Add(ref _columnDecodeTicks, Stopwatch.GetTimestamp() - started);
 				Interlocked.Increment(ref _columnDecodeCount);
-				_decodedColumns.Enqueue(new DecodedWorldColumn(packet, column, null));
+				_decodedColumns.Enqueue(new DecodedWorldColumn(packet, prepared, null));
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -185,8 +189,11 @@ public partial class MPClientGameState
 				continue;
 			}
 
-			_simulation.Map.ApplyColumn(decoded.Column);
-			TrackAppliedColumn(decoded.Packet, decoded.Column);
+			PreparedClientColumn prepared = decoded.Prepared;
+			IReadOnlyList<PreparedRenderChunk> renderChunks = prepared.RenderChunks;
+			_simulation.Map.CommitPreparedColumn(prepared.DomainColumn);
+			TrackAppliedColumn(decoded.Packet, renderChunks);
+			_fishVoxelScene.EnqueuePreparedColumn(prepared);
 			_client.Send(new WorldColumnAppliedPacket
 			{
 				StreamId = _worldStreamId,
@@ -211,15 +218,17 @@ public partial class MPClientGameState
 		_statusText = GetWorldLoadStatus();
 	}
 
-	private void TrackAppliedColumn(WorldColumnPacket packet, ChunkColumnSnapshot column)
+	private void TrackAppliedColumn(
+		WorldColumnPacket packet,
+		IReadOnlyList<PreparedRenderChunk> chunks)
 	{
 		ChunkColumnCoordinate coordinate = new(packet.X, packet.Z);
 		switch (packet.Kind)
 		{
 			case WorldColumnStreamKind.BootstrapCore:
 				_appliedCoreColumns.Add(coordinate);
-				ChunkCoordinate[] coreChunks = column.Chunks
-					.Select(static snapshot => new ChunkCoordinate(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ))
+				ChunkCoordinate[] coreChunks = chunks
+					.Select(static chunk => chunk.Coordinate)
 					.ToArray();
 				_coreColumnChunks[coordinate] = coreChunks;
 				foreach (ChunkCoordinate chunk in coreChunks)
@@ -227,8 +236,8 @@ public partial class MPClientGameState
 				break;
 			case WorldColumnStreamKind.BootstrapHalo:
 				_appliedHaloColumns.Add(coordinate);
-				_haloColumnChunks[coordinate] = column.Chunks
-					.Select(static snapshot => new ChunkCoordinate(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ))
+				_haloColumnChunks[coordinate] = chunks
+					.Select(static chunk => chunk.Coordinate)
 					.ToArray();
 				break;
 			default:
@@ -362,6 +371,8 @@ public partial class MPClientGameState
 	{
 		if (_client == null || _worldStreamId == 0)
 			return;
+		if (!force && _fishVoxelScene?.PendingPreparedColumnCount > 32)
+			return;
 		Vector3 focus = _simulation?.LocalPlayer?.Position ?? _worldStreamFocus;
 		int chunkX = (int)Math.Floor((double)focus.X / Chunk.ChunkSize);
 		int chunkZ = (int)Math.Floor((double)focus.Z / Chunk.ChunkSize);
@@ -456,9 +467,8 @@ public partial class MPClientGameState
 			cancellation?.Dispose();
 		}
 
-		while (_decodedColumns.TryDequeue(out _))
-		{
-		}
+		while (_decodedColumns.TryDequeue(out DecodedWorldColumn decoded))
+			decoded.Prepared?.Dispose();
 		_receivedCoreColumns.Clear();
 		_receivedHaloColumns.Clear();
 		_appliedCoreColumns.Clear();
@@ -481,6 +491,6 @@ public partial class MPClientGameState
 
 	private sealed record DecodedWorldColumn(
 		WorldColumnPacket Packet,
-		ChunkColumnSnapshot Column,
+		PreparedClientColumn Prepared,
 		Exception Error);
 }

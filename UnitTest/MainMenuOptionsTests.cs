@@ -296,6 +296,10 @@ public sealed class MainMenuOptionsTests
 		Assert.Contains("Developer Tools", debugEntries);
 		Assert.Contains("Join Game", releaseEntries);
 		Assert.DoesNotContain("Multiplayer", releaseEntries);
+		Assert.Equal(
+			["NPC Preview", "Effects Preview", "Voxel Material Preview"],
+			MainMenuStateFishUI.GetDeveloperToolEntries()
+		);
 	}
 
 	[Fact]

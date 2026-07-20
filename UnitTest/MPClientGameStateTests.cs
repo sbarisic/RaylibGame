@@ -154,6 +154,7 @@ public sealed unsafe class MPClientGameStateTests
 		public MainMenuStateFishUI MainMenuState { get; set; } = null!;
 		public NPCPreviewState NPCPreviewState { get; set; } = null!;
 		public EffectsPreviewState EffectsPreviewState { get; set; } = null!;
+		public VoxelMaterialPreviewState VoxelMaterialPreviewState { get; set; } = null!;
 		public MPClientGameState MultiplayerGameState { get; set; } = null!;
 
 		public void Init()

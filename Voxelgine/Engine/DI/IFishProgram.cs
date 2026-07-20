@@ -10,6 +10,8 @@ public interface IClientEngineRunner : IFishEngineRunner
 
 	EffectsPreviewState EffectsPreviewState { get; set; }
 
+	VoxelMaterialPreviewState VoxelMaterialPreviewState { get; set; }
+
 	MPClientGameState MultiplayerGameState { get; set; }
 }
 

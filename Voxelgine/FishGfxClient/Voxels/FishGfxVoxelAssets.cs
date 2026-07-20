@@ -10,6 +10,7 @@ namespace Voxelgine.FishGfxClient.Voxels;
 
 internal sealed class FishGfxVoxelAssets
 {
+	internal const string SurfaceTextureAssetId = "voxel.surface-textures";
 	private const int AtlasSize = 512;
 	private const int CubeColumns = 16;
 	private const int CubeRows = 16;
@@ -25,15 +26,17 @@ internal sealed class FishGfxVoxelAssets
 
 	private readonly ReadOnlyDictionary<BlockType, ushort> materialIds;
 	private readonly AssetHandle<VoxelSurfaceAssetsResource> surfaceTextures;
+	private readonly GameAssetStore assetStore;
 
 	internal FishGfxVoxelAssets(GraphicsContext graphics, GameAssetStore assetStore)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		ArgumentNullException.ThrowIfNull(assetStore);
+		this.assetStore = assetStore;
 		ModelAssets models = LoadModels();
 		(Palette, materialIds) = CreatePalette(models);
 		surfaceTextures = assetStore.GetOrRegister(
-			"voxel.surface-textures",
+			SurfaceTextureAssetId,
 			() => LoadSurfaceTextures(graphics),
 			TexturePath("atlas.png"),
 			TexturePath("atlas_normal.png"),
@@ -282,6 +285,26 @@ internal sealed class FishGfxVoxelAssets
 		DrawAsset(atlas, ModelPath("torch", "torch_tex.png"), TorchRegion);
 		DrawAsset(atlas, ModelPath("grass", "grass1_tex.png"), FoliageRegion);
 		return atlas;
+	}
+
+	internal bool RequestSurfaceTextureReload()
+	{
+		return assetStore.RequestReload(SurfaceTextureAssetId);
+	}
+
+	internal VoxelMaterialPreviewInfo GetPreviewInfo(BlockType blockType)
+	{
+		ushort materialId = GetMaterialId(blockType);
+		VoxelMaterial material = Palette[materialId];
+		bool isCustomModel = material.Models != null;
+		return new VoxelMaterialPreviewInfo(
+			blockType,
+			material.Name,
+			material.RenderMode,
+			isCustomModel,
+			!isCustomModel,
+			material.Tiles
+		);
 	}
 
 	private static VoxelSurfaceAssetsResource LoadSurfaceTextures(

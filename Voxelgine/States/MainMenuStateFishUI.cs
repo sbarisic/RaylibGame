@@ -17,6 +17,8 @@ namespace Voxelgine.States;
 /// </summary>
 public partial class MainMenuStateFishUI : GameStateImpl
 {
+	private static readonly string[] DeveloperToolEntries =
+		["NPC Preview", "Effects Preview", "Voxel Material Preview"];
 	private readonly FishUIManager gui;
 	private readonly IFishLogging logging;
 	private readonly List<Window> modalWindows = new();
@@ -151,6 +153,11 @@ public partial class MainMenuStateFishUI : GameStateImpl
 			: new[] { "Host Game", "Join Game", "Options", "Quit" };
 	}
 
+	internal static IReadOnlyList<string> GetDeveloperToolEntries()
+	{
+		return DeveloperToolEntries;
+	}
+
 	private void AddMainButton(string text, string tooltip, Action action)
 	{
 		var button = new Button
@@ -167,12 +174,12 @@ public partial class MainMenuStateFishUI : GameStateImpl
 
 	private void CreateDeveloperWindow()
 	{
-		developerWindow = CreateModalWindow("Developer Tools", new Vector2(360, 220));
+		developerWindow = CreateModalWindow("Developer Tools", new Vector2(360, 278));
 		float width = developerWindow.GetContentSize().X - 40;
 		var npcButton = new Button
 		{
 			ID = "developer_npc_preview",
-			Text = "NPC Preview",
+			Text = DeveloperToolEntries[0],
 			Position = new Vector2(20, 20),
 			Size = new Vector2(width, 44),
 		};
@@ -186,7 +193,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		var effectsButton = new Button
 		{
 			ID = "developer_effects_preview",
-			Text = "Effects Preview",
+			Text = DeveloperToolEntries[1],
 			Position = new Vector2(20, 78),
 			Size = new Vector2(width, 44),
 		};
@@ -197,10 +204,24 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		};
 		developerWindow.AddChild(effectsButton);
 
+		var materialButton = new Button
+		{
+			ID = "developer_voxel_material_preview",
+			Text = DeveloperToolEntries[2],
+			Position = new Vector2(20, 136),
+			Size = new Vector2(width, 44),
+		};
+		materialButton.OnButtonPressed += (_, _, _) =>
+		{
+			HideModal(developerWindow);
+			Window.SetState(Eng.AsClient().VoxelMaterialPreviewState);
+		};
+		developerWindow.AddChild(materialButton);
+
 		var closeButton = new Button
 		{
 			Text = "Close",
-			Position = new Vector2(110, 136),
+			Position = new Vector2(110, 194),
 			Size = new Vector2(120, 36),
 		};
 		closeButton.OnButtonPressed += (_, _, _) => HideModal(developerWindow);

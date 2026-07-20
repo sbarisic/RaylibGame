@@ -14,6 +14,7 @@ namespace Voxelgine.FishGfxClient.Voxels;
 
 public sealed class FishGfxVoxelScene : IDisposable
 {
+	public const string SurfaceTextureAssetId = FishGfxVoxelAssets.SurfaceTextureAssetId;
 	private readonly ChunkMap source;
 	private readonly FishGfxVoxelAssets assets;
 	private readonly CampfireEmitterIndex campfires = new();
@@ -102,6 +103,18 @@ public sealed class FishGfxVoxelScene : IDisposable
 	public VoxelRendererFrameDiagnostics FrameDiagnostics => Renderer.FrameDiagnostics;
 
 	public VoxelRendererStatistics Statistics => Renderer.Statistics;
+
+	public bool RequestSurfaceTextureReload()
+	{
+		ThrowIfDisposed();
+		return assets.RequestSurfaceTextureReload();
+	}
+
+	public VoxelMaterialPreviewInfo GetMaterialPreviewInfo(BlockType blockType)
+	{
+		ThrowIfDisposed();
+		return assets.GetPreviewInfo(blockType);
+	}
 
 	public long GeometryRevision => Renderer.GeometryRevision;
 

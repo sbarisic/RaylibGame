@@ -26,6 +26,8 @@ internal sealed class FEngineRunner : IClientEngineRunner
 
 	public EffectsPreviewState EffectsPreviewState { get; set; }
 
+	public VoxelMaterialPreviewState VoxelMaterialPreviewState { get; set; }
+
 	public MPClientGameState MultiplayerGameState { get; set; }
 
 	public void Init()
@@ -145,6 +147,7 @@ internal static class Program
 	{
 		automaticState?.Dispose();
 		engine.MultiplayerGameState?.Dispose();
+		engine.VoxelMaterialPreviewState?.Dispose();
 		engine.EffectsPreviewState?.Dispose();
 		engine.NPCPreviewState?.Dispose();
 		engine.MainMenuState?.Dispose();
@@ -192,6 +195,11 @@ internal static class Program
 		if (args.Contains("--fishgfx-auto-effects", StringComparer.OrdinalIgnoreCase))
 		{
 			return engine.EffectsPreviewState;
+		}
+		if (args.Contains("--fishgfx-auto-voxel-material", StringComparer.OrdinalIgnoreCase))
+		{
+			engine.VoxelMaterialPreviewState.EnableAutomaticValidation();
+			return engine.VoxelMaterialPreviewState;
 		}
 		return engine.MainMenuState;
 	}
@@ -241,6 +249,7 @@ internal static class Program
 		engine.MainMenuState = new MainMenuStateFishUI(window, engine);
 		engine.NPCPreviewState = new NPCPreviewState(window, engine);
 		engine.EffectsPreviewState = new EffectsPreviewState(window, engine);
+		engine.VoxelMaterialPreviewState = new VoxelMaterialPreviewState(window, engine);
 		engine.MultiplayerGameState = new MPClientGameState(window, engine);
 	}
 
@@ -258,10 +267,17 @@ internal static class Program
 		bool automaticRun = args.Any(static argument =>
 			argument.StartsWith("--fishgfx-auto", StringComparison.OrdinalIgnoreCase)
 		);
-		int automaticFrameCount = args.Contains(
+		bool requiresVoxelWarmup = args.Contains(
 			"--fishgfx-auto-gameplay",
 			StringComparer.OrdinalIgnoreCase
-		) ? 90 : 4;
+		) || args.Contains(
+			"--fishgfx-auto-voxel-material",
+			StringComparer.OrdinalIgnoreCase
+		);
+		int automaticFrameCount = args.Contains(
+			"--fishgfx-auto-voxel-material",
+			StringComparer.OrdinalIgnoreCase
+		) ? 120 : requiresVoxelWarmup ? 90 : 4;
 		float simulationTime = 0;
 		float accumulator = 0;
 		float previousTime = 0;
@@ -310,6 +326,13 @@ internal static class Program
 		{
 			throw new InvalidOperationException(
 				"The automatic gameplay fog volume was not uploaded in time."
+			);
+		}
+		if (state is VoxelMaterialPreviewState materialPreview
+			&& !materialPreview.IsReady)
+		{
+			throw new InvalidOperationException(
+				"The automatic voxel material preview did not finish meshing in time."
 			);
 		}
 

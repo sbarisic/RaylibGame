@@ -2,7 +2,6 @@
 using FishGfx.Formats;
 using FishGfx.Graphics;
 using FishGfx.Graphics.Drawables;
-using System.Collections.Concurrent;
 using Voxelgine.Engine.DI;
 
 namespace Voxelgine.FishGfxClient.Assets;
@@ -15,10 +14,12 @@ public sealed class GameAssetStore : IDisposable
 	private readonly Dictionary<string, IAssetSlot> assets = new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, HashSet<string>> assetsByFile = new(StringComparer.OrdinalIgnoreCase);
 	private readonly object assetIndexLock = new();
-	private readonly ConcurrentQueue<string> reloadQueue = new();
+	private readonly AssetReloadQueue reloadQueue = AssetReloadQueue.CreateDefault();
 	private readonly FileSystemWatcher watcher;
 	private int graphicsThreadId;
 	private bool disposed;
+
+	public event Action<AssetReloadResult> ReloadCompleted;
 
 	public GameAssetStore(GraphicsContext graphics, string resourceRoot, Action<GameLogLevel, string> log = null)
 	{
@@ -139,10 +140,7 @@ public sealed class GameAssetStore : IDisposable
 		ThrowIfDisposed();
 		EnsureGraphicsThread();
 		HashSet<string> pending = new(StringComparer.OrdinalIgnoreCase);
-		while (reloadQueue.TryDequeue(out string id))
-		{
-			pending.Add(id);
-		}
+		reloadQueue.DrainReady(pending);
 
 		int successful = 0;
 		foreach (string id in pending)
@@ -157,14 +155,35 @@ public sealed class GameAssetStore : IDisposable
 				slot.ReloadAndSwap();
 				successful++;
 				log(GameLogLevel.Debug, $"Reloaded and swapped id={id}");
+				NotifyReloadCompleted(new AssetReloadResult(id, true, "Reloaded"));
 			}
 			catch (Exception ex)
 			{
 				log(GameLogLevel.Error, $"Reload failed id={id}; retained previous resource. {ex}");
+				NotifyReloadCompleted(new AssetReloadResult(
+					id,
+					false,
+					$"Failed - previous textures retained: {ex.Message}"
+				));
 			}
 		}
 
 		return successful;
+	}
+
+	public bool RequestReload(string assetId)
+	{
+		ThrowIfDisposed();
+		EnsureGraphicsThread();
+		ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+		if (!assets.ContainsKey(assetId))
+		{
+			return false;
+		}
+
+		reloadQueue.QueueManual(assetId);
+		log(GameLogLevel.Trace, $"Queued manual reload id={assetId}");
+		return true;
 	}
 
 	public void Dispose()
@@ -186,6 +205,8 @@ public sealed class GameAssetStore : IDisposable
 		{
 			assetsByFile.Clear();
 		}
+		reloadQueue.Clear();
+		ReloadCompleted = null;
 		disposed = true;
 	}
 
@@ -215,8 +236,29 @@ public sealed class GameAssetStore : IDisposable
 
 		foreach (string id in ids)
 		{
-			reloadQueue.Enqueue(id);
-			log(GameLogLevel.Trace, $"Queued reload id={id} path={fullPath}");
+			reloadQueue.QueueAutomatic(id);
+			log(GameLogLevel.Trace, $"Debounced automatic reload id={id} path={fullPath}");
+		}
+	}
+
+	private void NotifyReloadCompleted(AssetReloadResult result)
+	{
+		Delegate[] handlers = ReloadCompleted?.GetInvocationList();
+		if (handlers == null)
+		{
+			return;
+		}
+
+		foreach (Action<AssetReloadResult> handler in handlers.Cast<Action<AssetReloadResult>>())
+		{
+			try
+			{
+				handler(result);
+			}
+			catch (Exception ex)
+			{
+				log(GameLogLevel.Error, $"Asset reload notification failed id={result.AssetId}. {ex}");
+			}
 		}
 	}
 

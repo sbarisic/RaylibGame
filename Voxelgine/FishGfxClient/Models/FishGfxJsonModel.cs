@@ -28,7 +28,7 @@ public sealed class FishGfxJsonModel
 		ArgumentNullException.ThrowIfNull(window);
 		string fullModelPath = Resolve(modelPath);
 		string fullTexturePath = Resolve(texturePath);
-		texture = window.Assets.LoadTexture($"{id}.texture", fullTexturePath);
+		texture = window.Assets.LoadColorTexture($"{id}.texture", fullTexturePath);
 		mesh = window.Assets.RegisterMesh(
 			$"{id}.mesh",
 			() => LoadMesh(
@@ -107,7 +107,11 @@ public sealed class FishGfxJsonModel
 		{
 			VoxelVertex source = model.Vertices[index];
 			Vector3 position = source.Position - new Vector3(0.5f, 0, 0.5f);
-			vertices[index] = new FishGfx.Vertex3(position, source.TextureCoordinates, source.Color);
+			vertices[index] = new FishGfx.Vertex3(
+				position,
+				source.TextureCoordinates,
+				ColorSpace.SrgbToLinearColor(source.Color)
+			);
 		}
 		for (int index = 0; index < cpuTriangles.Length; index++)
 		{

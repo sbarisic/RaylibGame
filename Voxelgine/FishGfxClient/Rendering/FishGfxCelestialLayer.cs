@@ -27,8 +27,8 @@ public sealed class FishGfxCelestialLayer : IDisposable
 		ArgumentNullException.ThrowIfNull(window);
 		billboards = new BillboardBatch(window.RenderWindow.Graphics);
 		textures = TexturesByWindow.GetValue(window, static value => new SharedTextures(
-			value.Assets.LoadTexture("celestial.sun", "data/textures/sun.png"),
-			value.Assets.LoadTexture("celestial.moon", "data/textures/moon.png")
+			value.Assets.LoadColorTexture("celestial.sun", "data/textures/sun.png"),
+			value.Assets.LoadColorTexture("celestial.moon", "data/textures/moon.png")
 		));
 	}
 

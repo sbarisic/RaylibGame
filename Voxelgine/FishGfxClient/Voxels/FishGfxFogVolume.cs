@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
+using FishGfx;
 using FishGfx.Graphics;
 using Voxelgine.Engine;
 using Voxelgine.Graphics;
@@ -355,10 +356,7 @@ public sealed class FishGfxFogVolume : IDisposable
 			int index = ((localZ * Height + localY) * Width + localX) * BytesPerCell;
 			bool wasEmpty = activeBytes[index + 3] == 0;
 			bool isEmpty = change.NewValue.Density == 0;
-			activeBytes[index] = change.NewValue.R;
-			activeBytes[index + 1] = change.NewValue.G;
-			activeBytes[index + 2] = change.NewValue.B;
-			activeBytes[index + 3] = change.NewValue.Density;
+			WriteLinearPremultipliedFog(activeBytes, index, change.NewValue);
 			if (wasEmpty != isEmpty)
 			{
 				activeCells += isEmpty ? -1 : 1;
@@ -418,6 +416,9 @@ public sealed class FishGfxFogVolume : IDisposable
 	{
 		long started = Stopwatch.GetTimestamp();
 		long allocationStart = GC.GetAllocatedBytesForCurrentThread();
+		// The authoritative layer stores authored premultiplied sRGB bytes. The
+		// sampled GPU volume stores premultiplied linear bytes so trilinear
+		// filtering and scene compositing remain colorimetrically correct.
 		byte[] bytes = new byte[Width * Height * Depth * BytesPerCell];
 		int active = 0;
 		foreach (ChunkSnapshot snapshot in request.Snapshots)
@@ -446,10 +447,7 @@ public sealed class FishGfxFogVolume : IDisposable
 				}
 
 				int output = ((volumeZ * Height + volumeY) * Width + volumeX) * BytesPerCell;
-				bytes[output] = value.R;
-				bytes[output + 1] = value.G;
-				bytes[output + 2] = value.B;
-				bytes[output + 3] = value.Density;
+				WriteLinearPremultipliedFog(bytes, output, value);
 				active++;
 			}
 		}
@@ -462,6 +460,42 @@ public sealed class FishGfxFogVolume : IDisposable
 			Stopwatch.GetElapsedTime(started).TotalMilliseconds,
 			GC.GetAllocatedBytesForCurrentThread() - allocationStart
 		);
+	}
+
+	internal static void WriteLinearPremultipliedFog(
+		Span<byte> destination,
+		int offset,
+		FogVoxel value)
+	{
+		if (offset < 0 || offset > destination.Length - BytesPerCell)
+		{
+			throw new ArgumentOutOfRangeException(nameof(offset));
+		}
+
+		destination[offset + 3] = value.Density;
+		if (value.Density == 0)
+		{
+			destination[offset] = 0;
+			destination[offset + 1] = 0;
+			destination[offset + 2] = 0;
+			return;
+		}
+
+		float density = value.Density / (float)byte.MaxValue;
+		destination[offset] = ToByte(
+			ColorSpace.SrgbToLinear(value.R / (float)value.Density) * density
+		);
+		destination[offset + 1] = ToByte(
+			ColorSpace.SrgbToLinear(value.G / (float)value.Density) * density
+		);
+		destination[offset + 2] = ToByte(
+			ColorSpace.SrgbToLinear(value.B / (float)value.Density) * density
+		);
+	}
+
+	private static byte ToByte(float value)
+	{
+		return (byte)Math.Clamp(MathF.Round(value * byte.MaxValue), 0, byte.MaxValue);
 	}
 
 	private static bool Intersects(ChunkSnapshot snapshot, Vector3 origin)

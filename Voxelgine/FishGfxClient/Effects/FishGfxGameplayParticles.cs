@@ -554,7 +554,7 @@ public sealed class FishGfxGameplayParticles : IDisposable
 			{
 				A = (byte)(tracer.Color.A * remaining),
 			};
-			Color color = ToFishColor(rgba);
+			Color color = ColorSpace.SrgbToLinearColor(ToFishColor(rgba));
 			pass.DrawLine(
 				new FishGfx.Vertex3(tracer.Start, color),
 				new FishGfx.Vertex3(tracer.End, color),
@@ -596,11 +596,21 @@ public sealed class FishGfxGameplayParticles : IDisposable
 
 	private static Rgba32 Multiply(Rgba32 color, Rgba32 light)
 	{
+		Vector3 linear = ColorSpace.SrgbToLinear(
+			new Color(color.R, color.G, color.B, color.A)
+		);
+		linear *= new Vector3(light.R, light.G, light.B) / byte.MaxValue;
+		Vector3 encoded = ColorSpace.LinearToSrgb(linear);
 		return new Rgba32(
-			(byte)(color.R * light.R / byte.MaxValue),
-			(byte)(color.G * light.G / byte.MaxValue),
-			(byte)(color.B * light.B / byte.MaxValue),
+			ToByte(encoded.X),
+			ToByte(encoded.Y),
+			ToByte(encoded.Z),
 			color.A);
+	}
+
+	private static byte ToByte(float value)
+	{
+		return (byte)Math.Clamp(MathF.Round(value * byte.MaxValue), 0, byte.MaxValue);
 	}
 
 	private static Color ToFishColor(Rgba32 color)

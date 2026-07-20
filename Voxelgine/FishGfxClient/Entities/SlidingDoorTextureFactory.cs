@@ -18,7 +18,11 @@ internal static class SlidingDoorTextureFactory
 		Color[] pixels = CreatePixels();
 		FlipVertically(pixels);
 
-		Texture texture = graphics.CreateTexture(new TextureDescriptor(AtlasSize, AtlasSize));
+		Texture texture = graphics.CreateTexture(new TextureDescriptor(
+			AtlasSize,
+			AtlasSize,
+			TextureFormat.SRGB8Alpha8
+		));
 		try
 		{
 			texture.Write(pixels, TextureDataFormat.RGBA8Unorm);

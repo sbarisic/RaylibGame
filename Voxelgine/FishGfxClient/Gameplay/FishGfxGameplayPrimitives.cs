@@ -16,6 +16,7 @@ internal static class FishGfxGameplayPrimitives
 	)
 	{
 		ArgumentNullException.ThrowIfNull(pass);
+		Color linearColor = ColorSpace.SrgbToLinearColor(color);
 		Vector3[] corners =
 		{
 			new(minimum.X, minimum.Y, minimum.Z),
@@ -44,8 +45,8 @@ internal static class FishGfxGameplayPrimitives
 		void DrawEdge(int start, int end)
 		{
 			pass.DrawLine(
-				new FishGfx.Vertex3(corners[start], color),
-				new FishGfx.Vertex3(corners[end], color),
+				new FishGfx.Vertex3(corners[start], linearColor),
+				new FishGfx.Vertex3(corners[end], linearColor),
 				thickness
 			);
 		}

@@ -28,10 +28,10 @@ public sealed class FishGfxParticlePreview : IDisposable
 	public FishGfxParticlePreview(IFishGfxGameWindow window)
 	{
 		ArgumentNullException.ThrowIfNull(window);
-		smoke = window.Assets.LoadTexture("preview.smoke", "data/textures/smoke/1.png");
-		fire = window.Assets.LoadTexture("preview.fire", "data/textures/fire/1.png");
-		blood = window.Assets.LoadTexture("preview.blood", "data/textures/blood/1.png");
-		spark = window.Assets.LoadTexture("preview.spark", "data/textures/spark/1.png");
+		smoke = window.Assets.LoadColorTexture("preview.smoke", "data/textures/smoke/1.png");
+		fire = window.Assets.LoadColorTexture("preview.fire", "data/textures/fire/1.png");
+		blood = window.Assets.LoadColorTexture("preview.blood", "data/textures/blood/1.png");
+		spark = window.Assets.LoadColorTexture("preview.spark", "data/textures/spark/1.png");
 		batch = new BillboardBatch(window.RenderWindow.Graphics);
 	}
 

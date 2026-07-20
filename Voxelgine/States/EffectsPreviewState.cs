@@ -598,6 +598,7 @@ namespace Voxelgine.States
 				FishGfx.Color color = coordinate == 0
 					? new FishGfx.Color(95, 105, 120)
 					: new FishGfx.Color(62, 68, 78);
+				color = FishGfx.ColorSpace.SrgbToLinearColor(color);
 				pass.DrawLine(
 					new FishGfx.Vertex3(new Vector3(coordinate, 0, -5), color),
 					new FishGfx.Vertex3(new Vector3(coordinate, 0, 5), color)

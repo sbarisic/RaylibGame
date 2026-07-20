@@ -45,6 +45,15 @@ public sealed class GameAssetStore : IDisposable
 		return Register(id, () => graphics.LoadTexture(fullPath, options), fullPath);
 	}
 
+	public AssetHandle<Texture> LoadColorTexture(string id, string path)
+	{
+		return LoadTexture(
+			id,
+			path,
+			new TextureLoadOptions { Format = TextureFormat.SRGB8Alpha8 }
+		);
+	}
+
 	public AssetHandle<TrueTypeFont> LoadFont(string id, string path, TrueTypeFontOptions options = null)
 	{
 		string fullPath = Resolve(path);

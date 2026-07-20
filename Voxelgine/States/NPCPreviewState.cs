@@ -227,6 +227,7 @@ namespace Voxelgine.States
 				FishGfx.Color color = coordinate == 0
 					? new FishGfx.Color(95, 105, 120)
 					: new FishGfx.Color(62, 68, 78);
+				color = FishGfx.ColorSpace.SrgbToLinearColor(color);
 				pass.DrawLine(
 					new FishGfx.Vertex3(new Vector3(coordinate, 0, -5), color),
 					new FishGfx.Vertex3(new Vector3(coordinate, 0, 5), color)
@@ -237,17 +238,20 @@ namespace Voxelgine.States
 				);
 			}
 
+			FishGfx.Color red = FishGfx.ColorSpace.SrgbToLinearColor(FishGfx.Color.Red);
+			FishGfx.Color green = FishGfx.ColorSpace.SrgbToLinearColor(FishGfx.Color.Green);
+			FishGfx.Color blue = FishGfx.ColorSpace.SrgbToLinearColor(FishGfx.Color.Blue);
 			pass.DrawLine(
-				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Red),
-				new FishGfx.Vertex3(new Vector3(2, 0, 0), FishGfx.Color.Red)
+				new FishGfx.Vertex3(Vector3.Zero, red),
+				new FishGfx.Vertex3(new Vector3(2, 0, 0), red)
 			);
 			pass.DrawLine(
-				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Green),
-				new FishGfx.Vertex3(new Vector3(0, 2, 0), FishGfx.Color.Green)
+				new FishGfx.Vertex3(Vector3.Zero, green),
+				new FishGfx.Vertex3(new Vector3(0, 2, 0), green)
 			);
 			pass.DrawLine(
-				new FishGfx.Vertex3(Vector3.Zero, FishGfx.Color.Blue),
-				new FishGfx.Vertex3(new Vector3(0, 0, 2), FishGfx.Color.Blue)
+				new FishGfx.Vertex3(Vector3.Zero, blue),
+				new FishGfx.Vertex3(new Vector3(0, 0, 2), blue)
 			);
 			_previewNpc.Render(pass);
 		}

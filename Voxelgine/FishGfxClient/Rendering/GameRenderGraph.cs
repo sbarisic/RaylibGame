@@ -76,6 +76,7 @@ public sealed class GameRenderGraph : IDisposable
 		int height = Math.Max(1, (int)framebufferSize.Y);
 		EnsureTargets(width, height);
 		GameStateRenderSettings settings = state.GetRenderSettings(new Vector2(width, height));
+		Color linearClearColor = ColorSpace.SrgbToLinearColor(settings.ClearColor);
 
 		using RenderFrame frame = graphics.BeginFrame();
 		frameIndex++;
@@ -88,7 +89,7 @@ public sealed class GameRenderGraph : IDisposable
 			CreateDescriptor(
 				settings.WorldView,
 				settings.WorldState,
-				settings.ClearColor,
+				linearClearColor,
 				timing.TotalTime,
 				RenderLoadAction.Clear,
 				RenderLoadAction.Clear
@@ -103,8 +104,17 @@ public sealed class GameRenderGraph : IDisposable
 		}
 
 		RenderTarget sceneTarget = fog.HasValue
-			? RenderFogAndViewmodel(frame, state, settings, timing, fog.Value, width, height)
-			: RenderViewmodel(frame, state, settings, timing);
+			? RenderFogAndViewmodel(
+				frame,
+				state,
+				settings,
+				timing,
+				fog.Value,
+				linearClearColor,
+				width,
+				height
+			)
+			: RenderViewmodel(frame, state, settings, timing, linearClearColor);
 
 		ShaderProgram shader = postShader.Value;
 		shader.SetUniform("uTexture", 0);
@@ -114,7 +124,7 @@ public sealed class GameRenderGraph : IDisposable
 			CreateDescriptor(
 				CreateScreenView(width, height),
 				settings.OverlayState,
-				settings.ClearColor,
+				Color.Black,
 				timing.TotalTime,
 				RenderLoadAction.Clear,
 				RenderLoadAction.Clear
@@ -153,14 +163,15 @@ public sealed class GameRenderGraph : IDisposable
 		RenderFrame frame,
 		GameStateImpl state,
 		GameStateRenderSettings settings,
-		in FrameTiming timing)
+		in FrameTiming timing,
+		Color linearClearColor)
 	{
 		using (RenderPass viewmodel = frame.BeginPass(
 			worldTarget,
 			CreateDescriptor(
 				settings.ViewmodelView,
 				settings.ViewmodelState,
-				settings.ClearColor,
+				linearClearColor,
 				timing.TotalTime,
 				RenderLoadAction.Load,
 				RenderLoadAction.Clear
@@ -185,6 +196,7 @@ public sealed class GameRenderGraph : IDisposable
 		GameStateRenderSettings settings,
 		in FrameTiming timing,
 		in FishGfxFogFrame fog,
+		Color linearClearColor,
 		int width,
 		int height)
 	{
@@ -201,7 +213,7 @@ public sealed class GameRenderGraph : IDisposable
 			CreateDescriptor(
 				CreateScreenView(width, height),
 				settings.OverlayState,
-				settings.ClearColor,
+				linearClearColor,
 				timing.TotalTime,
 				RenderLoadAction.Clear,
 				RenderLoadAction.Clear
@@ -225,7 +237,7 @@ public sealed class GameRenderGraph : IDisposable
 			CreateDescriptor(
 				settings.ViewmodelView,
 				settings.ViewmodelState,
-				settings.ClearColor,
+				linearClearColor,
 				timing.TotalTime,
 				RenderLoadAction.Load,
 				RenderLoadAction.Clear

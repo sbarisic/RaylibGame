@@ -74,7 +74,7 @@ internal sealed class FishGfxEntityModel : IDisposable
 		shader.SetUniform("uSkyLight", light.SkyLight);
 		shader.SetUniform("LightDirection", sun.Direction);
 		shader.SetUniform("AmbientLight", sun.AmbientLight);
-		shader.SetUniform("SunColor", (Vector3)sun.Color);
+		shader.SetUniform("SunColor", ColorSpace.SrgbToLinear(sun.Color));
 		shader.SetUniform("SunIntensity", sun.Intensity);
 		shader.SetUniform("uShadowEnabled", 0);
 		using IDisposable shadowScope = worldLighting.Shadows?.Bind(shader, 1);
@@ -86,7 +86,7 @@ internal sealed class FishGfxEntityModel : IDisposable
 		});
 		foreach (ModelPart part in parts)
 		{
-			part.Mesh.DefaultColor = tint;
+			part.Mesh.DefaultColor = ColorSpace.SrgbToLinearColor(tint);
 			using IDisposable modelScope = pass.PushModel(transforms[part.Source.Name]);
 			pass.DrawMesh(part.Mesh, texture, shader);
 		}

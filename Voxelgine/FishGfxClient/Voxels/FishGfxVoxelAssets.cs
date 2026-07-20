@@ -14,6 +14,12 @@ internal sealed class FishGfxVoxelAssets
 	private const int AtlasSize = 512;
 	private const int CubeColumns = 16;
 	private const int CubeRows = 16;
+	private static readonly TextureSamplingState SurfaceSampling = new(
+		TextureFilter.Nearest,
+		TextureFilter.Nearest,
+		TextureWrap.ClampToEdge,
+		TextureWrap.ClampToEdge
+	);
 
 	private static readonly VoxelTextureRegion BarrelRegion =
 		new(8, 72, 64, 64, AtlasSize, AtlasSize);
@@ -322,10 +328,20 @@ internal sealed class FishGfxVoxelAssets
 
 		try
 		{
-			baseColor = graphics.CreateTextureFromImage(baseColorBitmap);
+			baseColor = graphics.CreateTextureFromImage(
+				baseColorBitmap,
+				new TextureLoadOptions
+				{
+					Format = TextureFormat.SRGB8Alpha8,
+					MipLevels = 1,
+					Sampling = SurfaceSampling,
+				}
+			);
 			TextureLoadOptions linearOptions = new()
 			{
 				Format = TextureFormat.RGBA8Unorm,
+				MipLevels = 1,
+				Sampling = SurfaceSampling,
 			};
 			normal = graphics.CreateTextureFromImage(normalBitmap, linearOptions);
 			specular = graphics.CreateTextureFromImage(specularBitmap, linearOptions);

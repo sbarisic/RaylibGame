@@ -70,7 +70,7 @@ public sealed class BillboardBatch : IDisposable
 			new GroupKey(texture, blendMode),
 			position,
 			size,
-			color,
+			ColorSpace.SrgbToLinearColor(color),
 			Vector3.DistanceSquared(position, cameraPosition),
 			sequence++,
 			axisUp.GetValueOrDefault(),

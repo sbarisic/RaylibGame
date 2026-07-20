@@ -67,11 +67,11 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			),
 			orbPath
 		);
-		AssetHandle<Texture> humanoidTexture = window.Assets.LoadTexture(
+		AssetHandle<Texture> humanoidTexture = window.Assets.LoadColorTexture(
 			"entity.humanoid.texture",
 			Path.Combine(textures, EntityAssetIds.HumanoidTexture)
 		);
-		AssetHandle<Texture> alternateTexture = window.Assets.LoadTexture(
+		AssetHandle<Texture> alternateTexture = window.Assets.LoadColorTexture(
 			"entity.humanoid.alternate-texture",
 			Path.Combine(textures, EntityAssetIds.HumanoidTextureAlternate)
 		);
@@ -79,7 +79,7 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			"entity.door.texture",
 			() => SlidingDoorTextureFactory.Create(window.RenderWindow.Graphics)
 		);
-		AssetHandle<Texture> orbTexture = window.Assets.LoadTexture(
+		AssetHandle<Texture> orbTexture = window.Assets.LoadColorTexture(
 			"entity.orb.texture",
 			Path.Combine(models, EntityAssetIds.ExperienceOrbTexture)
 		);

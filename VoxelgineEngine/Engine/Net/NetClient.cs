@@ -156,7 +156,7 @@ namespace Voxelgine.Engine
 
 		public NetClient(IFishLogging logging = null)
 		{
-			_transport = new UdpTransport();
+			_transport = new UdpTransport(logging);
 			_logging = logging;
 			PacketLoggingEnabled = logging?.MinimumLevel <= GameLogLevel.Trace;
 		}

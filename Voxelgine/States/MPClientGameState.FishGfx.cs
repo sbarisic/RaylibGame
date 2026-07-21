@@ -57,6 +57,9 @@ public unsafe partial class MPClientGameState
 	private string _pendingHitchLog;
 	private GameCameraState _profilingPreviousCamera;
 	private bool _hasProfilingPreviousCamera;
+	private int _profilingGen0Collections;
+	private int _profilingGen1Collections;
+	private int _profilingGen2Collections;
 	private long _lastShadowActorRevision = long.MinValue;
 	private readonly List<FishGfx.AxisAlignedBoundingBox> _shadowInvalidations = new();
 
@@ -160,6 +163,7 @@ public unsafe partial class MPClientGameState
 			synchronizeExisting
 		);
 		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
+		_fishVoxelScene.PreparedColumnApplied += OnPreparedRenderColumnApplied;
 		_fishCelestial = new FishGfxCelestialLayer(fishWindow);
 		_fishParticleAssets ??= FishGfxGameplayParticleAssets.Register(fishWindow.Assets);
 		_fishParticles = new FishGfxGameplayParticles(
@@ -214,7 +218,11 @@ public unsafe partial class MPClientGameState
 		_fishPickupRenderer = null;
 		_fishEntityAssets?.Dispose();
 		_fishEntityAssets = null;
-		_fishVoxelScene?.Dispose();
+		if (_fishVoxelScene != null)
+		{
+			_fishVoxelScene.PreparedColumnApplied -= OnPreparedRenderColumnApplied;
+			_fishVoxelScene.Dispose();
+		}
 		_fishVoxelScene = null;
 		_hasPreviousFishCameraState = false;
 		_lastShadowActorRevision = long.MinValue;
@@ -292,6 +300,7 @@ public unsafe partial class MPClientGameState
 		{
 			_nextRendererProfileLogTime = timing.TotalTime + 1;
 			VoxelRendererStatistics rendererStatistics = _fishVoxelScene.Statistics;
+			VoxelRendererWorkload rendererWorkload = rendererDiagnostics.Workload;
 			NetConnectionDiagnostics networkDiagnostics = _client?.Diagnostics ?? default;
 			DirectionalShadowDiagnostics shadowDiagnostics =
 				((IFishGfxGameWindow)_gameWindow).ShadowDiagnostics;
@@ -310,8 +319,9 @@ public unsafe partial class MPClientGameState
 					+ $"activeSetColumns={rendererDiagnostics.ActiveSetVisitedColumns} activeSetTested={rendererDiagnostics.ActiveSetTestedChunks} "
 					+ $"activeSetDelta=+{rendererDiagnostics.ActiveSetAdditions}/-{rendererDiagnostics.ActiveSetRemovals} activeSetReason={rendererDiagnostics.ActiveSetRefreshReason} "
 					+ $"submitMs={rendererDiagnostics.SubmissionMilliseconds:F3} gpuMs={rendererDiagnostics.GpuMilliseconds:F3} allocations={rendererDiagnostics.ManagedAllocatedBytes} "
-					+ $"meshUploadBytes={rendererDiagnostics.MeshUploadBytes} meshUploadSlices={rendererDiagnostics.MeshUploadSlices} meshUploadQueued={rendererDiagnostics.QueuedMeshUploadBytes} "
+					+ $"meshUploadBytes={rendererDiagnostics.MeshUploadBytes} meshUploadSlices={rendererDiagnostics.MeshUploadSlices} meshUploadQueued={rendererDiagnostics.QueuedMeshUploadBytes} meshPrepareMs={rendererDiagnostics.MeshUploadPreparationMilliseconds:F3} meshGrowths={rendererDiagnostics.MeshUploadStorageGrowths} "
 					+ $"meshUploadOldest={rendererDiagnostics.OldestMeshUploadJobAgeSeconds:F2}s meshUploadJobs={rendererDiagnostics.CompletedUploadJobs}/{rendererDiagnostics.DiscardedUploadJobs} "
+					+ $"meshWork={rendererWorkload.DirtyMeshes}/{rendererWorkload.InFlightMeshes}/{rendererWorkload.CompletedMeshes}/{rendererWorkload.PendingUploadJobs} meshReadyBytes={rendererWorkload.PendingUploadBytes} meshBackpressure={rendererWorkload.IsBackpressured} lightingPending={_fishVoxelScene.LightingPendingCount} "
 					+ $"frameMs={timing.DeltaTime * 1000:F3} frameMedian={_framePercentiles.MedianMilliseconds:F3} frameP95={_framePercentiles.P95Milliseconds:F3} frameP99={_framePercentiles.P99Milliseconds:F3} frameMax={_framePercentiles.MaximumMilliseconds:F3} "
 					+ $"transparentFaces={rendererDiagnostics.TransparentFaceCount} transparentIndices={rendererDiagnostics.TransparentIndexCount} "
 					+ $"transparentSourceMs={rendererDiagnostics.TransparentSourceBuildMilliseconds:F3} transparentSortMs={rendererDiagnostics.TransparentWorkerSortMilliseconds:F3} "
@@ -324,7 +334,7 @@ public unsafe partial class MPClientGameState
 					+ $"transparentGeometryRevision={rendererDiagnostics.TransparentOrderingGeometryRevision} "
 					+ $"transparentCameraDelta={rendererDiagnostics.TransparentOrderingCameraDistanceDelta:F2}/{rendererDiagnostics.TransparentOrderingCameraAngleDeltaDegrees:F2}deg"
 					+ $" streamCore={WorldCoreReceived}/{WorldCoreApplied}/{WorldCoreLit}/{WorldCoreMeshed} streamHalo={WorldHaloReceived}/{WorldHaloApplied}/{WorldHaloLit}/{WorldHaloMeshed} "
-					+ $"streamOrdinary={WorldOrdinaryReceived}/{WorldOrdinaryApplied} decodeQueue={WorldDecodeQueueDepth} applyQueue={WorldApplyQueueDepth} "
+					+ $"streamOrdinary={WorldOrdinaryReceived}/{WorldOrdinaryApplied} decodeQueue={WorldDecodeQueueDepth} applyQueue={WorldApplyQueueDepth} deferredAcks={WorldDeferredAcknowledgements} streamPaused={WorldStreamingBackpressured} "
 					+ $"streamedColumns={WorldCoreReceived + WorldHaloReceived + WorldOrdinaryReceived} cachedColumns={WorldCachedColumns} "
 					+ $"columnDecodeMs={AverageColumnDecodeMilliseconds:F3} columnApplyMs={AverageColumnApplyMilliseconds:F3} "
 					+ $"reliableFlight={networkDiagnostics.ReliableInFlight} queues={networkDiagnostics.ControlQueued}/{networkDiagnostics.GameplayQueued}/{networkDiagnostics.BulkQueued} "
@@ -380,6 +390,9 @@ public unsafe partial class MPClientGameState
 			_framePercentiles = default;
 			_pendingHitchLog = null;
 			_hasProfilingPreviousCamera = false;
+			_profilingGen0Collections = GC.CollectionCount(0);
+			_profilingGen1Collections = GC.CollectionCount(1);
+			_profilingGen2Collections = GC.CollectionCount(2);
 			return;
 		}
 
@@ -400,6 +413,15 @@ public unsafe partial class MPClientGameState
 			: 0;
 		_profilingPreviousCamera = _fishCameraState;
 		_hasProfilingPreviousCamera = true;
+		int gen0 = GC.CollectionCount(0);
+		int gen1 = GC.CollectionCount(1);
+		int gen2 = GC.CollectionCount(2);
+		int gen0Delta = gen0 - _profilingGen0Collections;
+		int gen1Delta = gen1 - _profilingGen1Collections;
+		int gen2Delta = gen2 - _profilingGen2Collections;
+		_profilingGen0Collections = gen0;
+		_profilingGen1Collections = gen1;
+		_profilingGen2Collections = gen2;
 
 		if (timing.DeltaTime * 1000 <= 12 || _pendingHitchLog is not null)
 		{
@@ -409,14 +431,18 @@ public unsafe partial class MPClientGameState
 		DirectionalShadowDiagnostics shadows =
 			((IFishGfxGameWindow)_gameWindow).ShadowDiagnostics;
 		FishGfxFogDiagnostics fog = _fishVoxelScene.FogVolume.Diagnostics;
+		VoxelRendererWorkload workload = rendererDiagnostics.Workload;
+		double presentMilliseconds = ((IFishGfxGameWindow)_gameWindow).LastPresentMilliseconds;
 		_pendingHitchLog =
 			$"frameMs={timing.DeltaTime * 1000:F3} cameraDelta={translation:F3}/{rotation:F2}deg "
 			+ $"activeSet={rendererDiagnostics.ActiveSetRefreshReason}:{rendererDiagnostics.ActiveSetRefreshMilliseconds:F3}ms "
 			+ $"transparent={rendererDiagnostics.TransparentInvalidationReason}:{rendererDiagnostics.TransparentWorkerSortMilliseconds:F3}ms "
-			+ $"meshUpload={rendererDiagnostics.UploadedMeshes}:{rendererDiagnostics.MeshUploadMilliseconds:F3}ms "
+			+ $"meshUpload={rendererDiagnostics.UploadedMeshes}:{rendererDiagnostics.MeshUploadMilliseconds:F3}ms/{rendererDiagnostics.MeshUploadBytes}B prepare={rendererDiagnostics.MeshUploadPreparationMilliseconds:F3}ms/{rendererDiagnostics.MeshUploadStorageGrowths}growth "
+			+ $"meshWork={workload.DirtyMeshes}/{workload.InFlightMeshes}/{workload.CompletedMeshes}/{workload.PendingUploadJobs}:{workload.PendingUploadBytes}B paused={workload.IsBackpressured} "
 			+ $"shadows={shadows.RefreshedCascadeCount}:{shadows.DirtyReasons} "
 			+ $"fogBuild={fog.PendingBuilds}:{fog.RebuildMilliseconds:F3}ms fogUpload={fog.PendingUploads}:{fog.UploadMilliseconds:F3}ms "
-			+ $"columns={WorldApplyQueueDepth}queued/{AverageColumnApplyMilliseconds:F3}ms "
+			+ $"columns={WorldDecodeQueueDepth}/{WorldApplyQueueDepth}/{_fishVoxelScene.PendingPreparedColumnCount}queued deferredAcks={WorldDeferredAcknowledgements} streamPaused={WorldStreamingBackpressured} "
+			+ $"present={presentMilliseconds:F3}ms gc={gen0Delta}/{gen1Delta}/{gen2Delta} "
 			+ $"alloc={rendererDiagnostics.ManagedAllocatedBytes + fog.MainThreadAllocatedBytes}B";
 	}
 
@@ -424,259 +450,13 @@ public unsafe partial class MPClientGameState
 		in GameCameraState previous,
 		in GameCameraState current)
 	{
-		Vector3 previousForward = Vector3.Normalize(previous.Target - previous.Position);
-		Vector3 currentForward = Vector3.Normalize(current.Target - current.Position);
+		Vector3 previousForward = NormalizeOr(previous.Target - previous.Position, Vector3.UnitZ);
+		Vector3 currentForward = NormalizeOr(current.Target - current.Position, Vector3.UnitZ);
 		return MathF.Acos(Math.Clamp(
 			Vector3.Dot(previousForward, currentForward),
 			-1,
 			1
 		)) * (180f / MathF.PI);
-	}
-
-	public override void BeginInputFrame()
-	{
-		_gui?.BeginInputFrame();
-	}
-
-	public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
-	{
-		Vector2 logicalSize = new(
-			Math.Max(1, Window.Width),
-			Math.Max(1, Window.Height)
-		);
-		GameStateRenderSettings overlay = GameStateRenderSettings.CreateOverlay(logicalSize);
-		FishColor clearColor = new(30, 30, 40);
-
-		if ((_initialized && _simulation?.LocalPlayer is not null) || _fishVoxelScene is not null)
-		{
-			ConfigureFishCamera(_fishWorldCamera, _fishCameraState, framebufferSize);
-			if (_simulation != null)
-			{
-				var sky = _simulation.DayNight.SkyColor;
-				clearColor = new FishColor(sky.R, sky.G, sky.B, sky.A);
-			}
-		}
-		else
-		{
-			_fishWorldCamera.Position = new Vector3(0, 0, -1);
-			_fishWorldCamera.CameraUpNormal = Vector3.UnitY;
-			_fishWorldCamera.LookAt(Vector3.Zero);
-			_fishWorldCamera.SetPerspective(framebufferSize, MathF.PI / 2, 0.05f, 512);
-		}
-
-		return new GameStateRenderSettings
-		{
-			WorldView = new RenderView(_fishWorldCamera),
-			ViewmodelView = new RenderView(_fishWorldCamera),
-			OverlayView = overlay.OverlayView,
-			ClearColor = clearColor,
-		};
-	}
-
-	public override GameDirectionalShadowRequest? GetDirectionalShadowRequest()
-	{
-		if (_fishVoxelScene is null || _simulation?.DayNight is null)
-		{
-			return null;
-		}
-
-		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
-		DirectionalShadowOptions options = CreateShadowOptions(
-			config.SunShadowQuality,
-			config.MaxChunkDrawDistance
-		);
-
-		if (options.CascadeCount == 0)
-		{
-			return null;
-		}
-
-		float normalizedDaylight = Math.Clamp(
-			(_simulation.DayNight.SkyLightMultiplier - 0.15f) / 0.85f,
-			0,
-			1
-		);
-		float strength = _simulation.DayNight.SunColor.A == 0
-			? 0
-			: SmoothStep(0.02f, 0.12f, normalizedDaylight);
-		long actorRevision = CalculateShadowActorRevision();
-		bool dynamicActorsChanged = actorRevision != _lastShadowActorRevision;
-		_lastShadowActorRevision = actorRevision;
-
-		_shadowInvalidations.Clear();
-		_fishVoxelScene.Renderer.DrainShadowInvalidations(_shadowInvalidations);
-		return new GameDirectionalShadowRequest(
-			_fishWorldCamera,
-			_fishVoxelScene.Renderer.SunSettings.Direction,
-			strength,
-			options,
-			_fishVoxelScene.GeometryRevision,
-			_shadowInvalidations,
-			dynamicActorsChanged,
-			_rendererProfilingEnabled
-		);
-	}
-
-	private long CalculateShadowActorRevision()
-	{
-		HashCode hash = new();
-		bool animated = false;
-		foreach (RemotePlayer player in _simulation.Players.GetAllRemotePlayers())
-		{
-			hash.Add(player.PlayerId);
-			AddQuantizedVector(ref hash, player.Position);
-			hash.Add(player.CurrentAnimationState);
-			animated = true;
-		}
-
-		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
-		{
-			if (entity is not (VEntNPC or VEntSlidingDoor or VEntPickup))
-			{
-				continue;
-			}
-
-			hash.Add(entity.NetworkId);
-			AddQuantizedVector(ref hash, entity.Position + entity.PresentationOffset);
-			switch (entity)
-			{
-				case VEntNPC npc:
-					hash.Add(npc.CurrentAnimationName, StringComparer.Ordinal);
-					AddQuantizedVector(ref hash, npc.LookDirection);
-					animated = true;
-					break;
-				case VEntSlidingDoor door:
-					hash.Add((int)door.State);
-					hash.Add((int)MathF.Round(door.OpenAmount * 1024));
-					break;
-				case VEntPickup:
-					animated |= entity.IsRotating;
-					break;
-			}
-		}
-
-		// Animation-only pose changes are deliberately quantized to 30 Hz.
-		if (animated)
-		{
-			hash.Add((long)MathF.Floor(Eng.TotalTime * 30f));
-		}
-
-		return hash.ToHashCode();
-	}
-
-	private static void AddQuantizedVector(ref HashCode hash, Vector3 value)
-	{
-		const float scale = 1024f;
-		hash.Add((int)MathF.Round(value.X * scale));
-		hash.Add((int)MathF.Round(value.Y * scale));
-		hash.Add((int)MathF.Round(value.Z * scale));
-	}
-
-	public override void RenderShadowCasters(
-		RenderPass pass,
-		in DirectionalShadowCascade cascade,
-		in FrameTiming timing)
-	{
-		if (_fishVoxelScene is null)
-		{
-			return;
-		}
-
-		_fishVoxelScene.Renderer.RenderShadowCasters(pass, cascade);
-	}
-
-	public override void RenderDynamicShadowCasters(
-		RenderPass pass,
-		in DirectionalShadowCascade cascade,
-		in FrameTiming timing)
-	{
-		if (_initialized)
-		{
-			DrawFishGfxActorShadowCasters(pass, cascade);
-		}
-	}
-
-	public override void RenderWorld(
-		RenderPass pass,
-		in FrameTiming timing,
-		DirectionalShadowFrame? shadows)
-	{
-		if (_fishVoxelScene is null)
-		{
-			return;
-		}
-
-		_fishRenderQueue.BeginFrame();
-		if (_initialized && _simulation?.LocalPlayer is not null)
-			_fishCelestial?.Render(pass, _fishCameraState, _simulation.DayNight);
-		_fishVoxelScene.Enqueue(_fishRenderQueue, _fishWorldCamera, shadows);
-		pass.Execute(_fishRenderQueue, RenderQueueBucket.Opaque);
-		if (_initialized)
-		{
-			DrawFishGfxGameplayGeometry(
-				pass,
-				new EntityWorldLighting(_fishVoxelScene.Renderer.SunSettings, shadows)
-			);
-		}
-		pass.Execute(_fishRenderQueue, RenderQueueBucket.Transparent);
-		if (_initialized)
-		{
-			_fishParticles?.Render(
-				pass,
-				_fishCameraState.Position,
-				_fishCameraState.Target,
-				_fishCameraState.Up);
-		}
-	}
-
-	public override void RenderViewmodel(RenderPass pass, in FrameTiming timing)
-	{
-		(_simulation?.LocalPlayer as ClientPlayer)?.RenderFishGfxViewModel(pass);
-	}
-
-	public override FishGfxFogFrame? GetLocalFogFrame()
-	{
-		return _fishVoxelScene?.FogVolume.CurrentFrame;
-	}
-
-	public override bool RendererProfilingEnabled => _rendererProfilingEnabled;
-
-	public override void RenderFogDepthOccluders(
-		RenderPass pass,
-		in FrameTiming timing)
-	{
-		_fishVoxelScene?.Renderer.RenderFogDepthOccluders(
-			pass,
-			_fishWorldCamera,
-			_fishVoxelScene.MaxChunkDrawDistance
-		);
-	}
-
-	public override void RenderOverlay(RenderPass pass, in FrameTiming timing)
-	{
-		UpdateNpcSpeechOverlay(timing.TotalTime);
-		if (_initialized && _simulation?.LocalPlayer is not null)
-		{
-			if (_simulation.Map.GetBlock(_fishCameraState.Position) == BlockType.Water)
-			{
-				pass.FillRectangle(
-					0,
-					0,
-					Window.Width,
-					Window.Height,
-					new FishColor(30, 80, 150, 105)
-				);
-			}
-
-			pass.DrawCircle(
-				new Vector2(Window.Width * 0.5f, Window.Height * 0.5f),
-				5,
-				1,
-				FishColor.White
-			);
-		}
-
-		_gui?.Render(pass, timing.DeltaTime, timing.TotalTime);
 	}
 
 	private void UpdateNpcSpeechOverlay(float totalTime)
@@ -688,7 +468,7 @@ public unsafe partial class MPClientGameState
 
 		List<NpcSpeechBubbleItem> visible = new();
 		Vector3 cameraPosition = _fishCameraState.Position;
-		Vector3 cameraForward = Vector3.Normalize(_fishCameraState.Target - cameraPosition);
+		Vector3 cameraForward = NormalizeOr(_fishCameraState.Target - cameraPosition, Vector3.UnitZ);
 		IFishGfxGameWindow fishWindow = (IFishGfxGameWindow)_gameWindow;
 		Vector2 framebuffer = fishWindow.RenderWindow.FramebufferSize;
 		Vector2 logicalScale = new(
@@ -745,463 +525,6 @@ public unsafe partial class MPClientGameState
 		}
 
 		_npcSpeechOverlay.SetItems(visible);
-	}
-
-	private void DrawFishGfxGameplayGeometry(
-		RenderPass pass,
-		in EntityWorldLighting lighting)
-	{
-		ViewFrustum frustum = ViewFrustum.FromCamera(_fishWorldCamera);
-		float maximumDistanceSquared = _fishVoxelScene.MaxChunkDrawDistance
-			* _fishVoxelScene.MaxChunkDrawDistance;
-		foreach (RemotePlayer remotePlayer in _simulation.Players.GetAllRemotePlayers())
-		{
-			if (_fishRemotePlayers.TryGetValue(remotePlayer.PlayerId, out FishGfxRemotePlayerRenderAdapter adapter)
-				&& IsVisibleActor(
-					frustum,
-					adapter.GetAnimationBounds(),
-					maximumDistanceSquared))
-			{
-				adapter.Render(pass, lighting);
-			}
-		}
-
-		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
-		{
-			switch (entity)
-			{
-				case VEntNPC npc when _fishNpcs.TryGetValue(npc.NetworkId, out FishGfxNpcRenderAdapter npcAdapter):
-					if (IsVisibleActor(
-						frustum,
-						npcAdapter.GetAnimationBounds(),
-						maximumDistanceSquared))
-					{
-						npcAdapter.Render(pass, lighting);
-					}
-					break;
-				case VEntSlidingDoor door when _fishDoorRenderer is not null:
-					if (!IsVisibleActor(frustum, ToRenderBounds(door.WorldBounds), maximumDistanceSquared))
-					{
-						break;
-					}
-					EntityLightSample doorLight = _fishVoxelScene.SampleEntityLight(
-						door.Position + Vector3.UnitY * 0.5f
-					);
-					_fishDoorRenderer.Render(pass, new SlidingDoorRenderState(
-						door.Position,
-						door.Size,
-						door.FacingDirection,
-						door.OpenAmount,
-						door.OpenAngleDeg,
-						doorLight
-					), lighting);
-					break;
-				case VEntPickup pickup when _fishPickupRenderer is not null:
-					if (!IsVisibleActor(frustum, ToRenderBounds(pickup.WorldBounds), maximumDistanceSquared))
-					{
-						break;
-					}
-					EntityLightSample pickupLight = _fishVoxelScene.SampleEntityLight(
-						pickup.Position + Vector3.UnitY * 0.5f
-					);
-					_fishPickupRenderer.Render(pass, new PickupRenderState(
-						pickup.Position,
-						pickup.Size,
-						pickup.RotationDegrees,
-						pickup.VerticalModelOffset,
-						pickupLight
-					), lighting);
-					break;
-				default:
-					if (IsVisibleActor(frustum, ToRenderBounds(entity.WorldBounds), maximumDistanceSquared))
-					{
-						FishGfxGameplayPrimitives.DrawWireBox(
-							pass,
-							entity.WorldBounds.Min,
-							entity.WorldBounds.Max,
-							FishColor.Amber
-						);
-					}
-					break;
-			}
-		}
-
-		InventoryItem activeItem = (_simulation.LocalPlayer as ClientPlayer)?.GetActiveItem();
-		if (activeItem is null || !activeItem.IsPlaceableBlock())
-		{
-			return;
-		}
-
-		Vector3? placement = activeItem.GetBlockPlacementPosition(
-			_simulation.Map,
-			_simulation.LocalPlayer.Position,
-			_simulation.LocalPlayer.GetForward(),
-			20
-		);
-		if (placement.HasValue)
-		{
-			FishGfxGameplayPrimitives.DrawWireBox(
-				pass,
-				placement.Value,
-				placement.Value + Vector3.One,
-				FishColor.White,
-				2
-			);
-		}
-	}
-
-	private BlockType GetBlockAtImpact(Vector3 hitPosition, Vector3 hitNormal)
-	{
-		if (_simulation?.Map is null)
-		{
-			return BlockType.None;
-		}
-
-		Vector3 sample = hitPosition - hitNormal * 0.5f;
-		return _simulation.Map.GetBlock(
-			(int)MathF.Floor(sample.X),
-			(int)MathF.Floor(sample.Y),
-			(int)MathF.Floor(sample.Z)
-		);
-	}
-
-	private void SpawnFishGfxEntityHit(
-		bool isFlesh,
-		Vector3 hitPosition,
-		Vector3 hitNormal
-	)
-	{
-		if (_fishParticles is null)
-		{
-			return;
-		}
-
-		Vector3 normal = NormalizeHitNormal(hitNormal);
-		if (isFlesh)
-		{
-			for (int index = 0; index < 8; index++)
-			{
-				float scale = 0.68f + Random.Shared.NextSingle() * 0.34f;
-				_fishParticles.EnqueueBlood(hitPosition, normal * 0.5f, scale);
-			}
-			return;
-		}
-
-		SpawnDirectionalFishParticles(
-			FishHitParticleKind.Spark,
-			6,
-			hitPosition,
-			normal,
-			Rgba32.White,
-			0.5f,
-			0.5f,
-			10.6f
-		);
-	}
-
-	private void SpawnFishGfxBlockHit(
-		BlockType blockType,
-		Vector3 hitPosition,
-		Vector3 hitNormal
-	)
-	{
-		if (_fishParticles is null)
-		{
-			return;
-		}
-
-		FishHitMaterial material = blockType switch
-		{
-			BlockType.None or BlockType.Water or BlockType.Leaf or BlockType.Foliage =>
-				FishHitMaterial.None,
-			BlockType.Plank or BlockType.Wood or BlockType.CraftingTable or
-				BlockType.Barrel or BlockType.Campfire or BlockType.Torch =>
-				FishHitMaterial.Wood,
-			BlockType.Dirt or BlockType.Grass or BlockType.Sand => FishHitMaterial.Earth,
-			BlockType.Glass or BlockType.Ice => FishHitMaterial.Glass,
-			_ => FishHitMaterial.Stone,
-		};
-
-		Vector3 normal = NormalizeHitNormal(hitNormal);
-		switch (material)
-		{
-			case FishHitMaterial.Stone:
-				SpawnDirectionalFishParticles(
-					FishHitParticleKind.Spark,
-					6,
-					hitPosition,
-					normal,
-					Rgba32.White,
-					0.5f,
-					0.5f,
-					10.6f
-				);
-				break;
-			case FishHitMaterial.Wood:
-				SpawnDirectionalFishParticles(
-					FishHitParticleKind.Fire,
-					4,
-					hitPosition,
-					normal,
-					Rgba32.White,
-					0.5f,
-					0.5f,
-					8
-				);
-				SpawnDirectionalFishParticles(
-					FishHitParticleKind.Smoke,
-					2,
-					hitPosition,
-					normal,
-					new Rgba32(180, 160, 130),
-					0.4f,
-					0.3f,
-					4
-				);
-				break;
-			case FishHitMaterial.Earth:
-				SpawnDirectionalFishParticles(
-					FishHitParticleKind.Smoke,
-					5,
-					hitPosition,
-					normal,
-					new Rgba32(160, 140, 100),
-					0.5f,
-					0.3f,
-					5
-				);
-				break;
-			case FishHitMaterial.Glass:
-				SpawnDirectionalFishParticles(
-					FishHitParticleKind.Spark,
-					8,
-					hitPosition,
-					normal,
-					new Rgba32(200, 220, 255),
-					0.3f,
-					0.3f,
-					12
-				);
-				break;
-		}
-	}
-
-	private void SpawnDirectionalFishParticles(
-		FishHitParticleKind kind,
-		int count,
-		Vector3 position,
-		Vector3 normal,
-		Rgba32 color,
-		float minimumScale,
-		float scaleRange,
-		float force
-	)
-	{
-		float spread = 0.6f;
-		if (MathF.Abs(normal.Y) < 0.001f)
-		{
-			force *= 2;
-			spread = 0.4f;
-		}
-
-		for (int index = 0; index < count; index++)
-		{
-			Vector3 direction = normal + Utils.GetRandomUnitVector() * spread;
-			if (direction.LengthSquared() < 0.000001f)
-			{
-				direction = normal;
-			}
-			direction = Vector3.Normalize(direction);
-			float scale = minimumScale + Random.Shared.NextSingle() * scaleRange;
-
-			switch (kind)
-			{
-				case FishHitParticleKind.Fire:
-					_fishParticles.EnqueueFire(
-						position,
-						direction * force,
-						color,
-						scale,
-						noCollision: true,
-						lifetime: 1
-					);
-					break;
-				case FishHitParticleKind.Spark:
-					_fishParticles.EnqueueSpark(position, direction * force, color, scale);
-					break;
-				case FishHitParticleKind.Smoke:
-					_fishParticles.EnqueueShortSmoke(position, direction * force, color);
-					break;
-			}
-		}
-	}
-
-	private static Vector3 NormalizeHitNormal(Vector3 hitNormal)
-	{
-		return hitNormal.LengthSquared() >= 0.000001f
-			? Vector3.Normalize(hitNormal)
-			: Vector3.UnitY;
-	}
-
-	private enum FishHitMaterial
-	{
-		None,
-		Stone,
-		Wood,
-		Earth,
-		Glass,
-	}
-
-	private enum FishHitParticleKind
-	{
-		Fire,
-		Spark,
-		Smoke,
-	}
-
-	private void UpdateRemoteInterpolation(float totalTime, float deltaTime)
-	{
-		foreach (RemotePlayer remotePlayer in _simulation.Players.GetAllRemotePlayers())
-		{
-			remotePlayer.Update(totalTime, deltaTime);
-			if (_snd is not null && remotePlayer.TryPlayFootstep())
-			{
-				_snd.Emit(new Voxelgine.Engine.Audio.GameAudioEvent(
-					"walk",
-					remotePlayer.Position,
-					remotePlayer.Velocity,
-					remotePlayer.PlayerId
-				));
-			}
-		}
-	}
-
-	private void UpdateFishGfxEntityAdapters(float deltaTime)
-	{
-		if (_fishEntityAssets is null || _fishVoxelScene is null || _simulation is null)
-			return;
-
-		ViewFrustum frustum = ViewFrustum.FromCamera(_fishWorldCamera);
-		float maximumDistanceSquared = _fishVoxelScene.MaxChunkDrawDistance
-			* _fishVoxelScene.MaxChunkDrawDistance;
-		long lightingRevision = _fishVoxelScene.GeometryRevision;
-		_activeRemotePlayerIds.Clear();
-		foreach (RemotePlayer remotePlayer in _simulation.Players.GetAllRemotePlayers())
-		{
-			_activeRemotePlayerIds.Add(remotePlayer.PlayerId);
-			if (!_fishRemotePlayers.TryGetValue(
-				remotePlayer.PlayerId,
-				out FishGfxRemotePlayerRenderAdapter adapter
-			))
-			{
-				adapter = _fishEntityAssets.CreateRemotePlayerAdapter();
-				_fishRemotePlayers.Add(remotePlayer.PlayerId, adapter);
-			}
-
-			bool hasRemoteLight = _remotePlayerLightCache.TryGetValue(
-				remotePlayer.PlayerId,
-				out ActorLightCache cachedRemoteLight);
-			EntityLightSample light = hasRemoteLight
-				? cachedRemoteLight.Sample
-				: default;
-			adapter.Update(new RemotePlayerRenderState(
-				remotePlayer.Position,
-				remotePlayer.CameraAngle,
-				remotePlayer.CurrentAnimationState,
-				light
-			), deltaTime);
-			if (IsVisibleActor(frustum, adapter.GetAnimationBounds(), maximumDistanceSquared)
-				&& (!hasRemoteLight
-					|| NeedsLightSample(remotePlayer.Position, lightingRevision, cachedRemoteLight)))
-			{
-				light = _fishVoxelScene.SampleEntityLight(remotePlayer.Position);
-				adapter.SetLight(light);
-				_remotePlayerLightCache[remotePlayer.PlayerId] = CreateLightCache(
-					remotePlayer.Position,
-					lightingRevision,
-					light);
-			}
-		}
-		RemoveStaleActors(_fishRemotePlayers, _remotePlayerLightCache, _activeRemotePlayerIds);
-
-		_activeNpcIds.Clear();
-		foreach (VEntNPC npc in _simulation.Entities.GetAllEntities().OfType<VEntNPC>())
-		{
-			_activeNpcIds.Add(npc.NetworkId);
-			if (!_fishNpcs.TryGetValue(npc.NetworkId, out FishGfxNpcRenderAdapter adapter))
-			{
-				adapter = _fishEntityAssets.CreateNpcAdapter();
-				_fishNpcs.Add(npc.NetworkId, adapter);
-			}
-
-			Vector3 lightPosition = npc.Position + Vector3.UnitY;
-			bool hasNpcLight = _npcLightCache.TryGetValue(
-				npc.NetworkId,
-				out ActorLightCache cachedNpcLight);
-			EntityLightSample light = hasNpcLight
-				? cachedNpcLight.Sample
-				: default;
-			adapter.Update(new NpcRenderState(
-				npc.Position,
-				npc.Size,
-				npc.LookDirection,
-				npc.CurrentAnimationName,
-				npc.HeadTrackRotation,
-				npc.TextureAssetId,
-				light
-			), deltaTime);
-			if (IsVisibleActor(frustum, adapter.GetAnimationBounds(), maximumDistanceSquared)
-				&& (!hasNpcLight || NeedsLightSample(lightPosition, lightingRevision, cachedNpcLight)))
-			{
-				light = _fishVoxelScene.SampleEntityLight(lightPosition);
-				adapter.SetLight(light);
-				_npcLightCache[npc.NetworkId] = CreateLightCache(
-					lightPosition,
-					lightingRevision,
-					light);
-			}
-		}
-		RemoveStaleActors(_fishNpcs, _npcLightCache, _activeNpcIds);
-	}
-
-	private static ActorLightCache CreateLightCache(
-		Vector3 position,
-		long revision,
-		in EntityLightSample sample) => new(
-		(int)MathF.Floor(position.X),
-		(int)MathF.Floor(position.Y),
-		(int)MathF.Floor(position.Z),
-		revision,
-		sample);
-
-	private static bool NeedsLightSample(
-		Vector3 position,
-		long revision,
-		in ActorLightCache cached) =>
-		cached.LightingRevision != revision
-		|| cached.X != (int)MathF.Floor(position.X)
-		|| cached.Y != (int)MathF.Floor(position.Y)
-		|| cached.Z != (int)MathF.Floor(position.Z);
-
-	private void RemoveStaleActors<TAdapter>(
-		Dictionary<int, TAdapter> adapters,
-		Dictionary<int, ActorLightCache> lightCache,
-		HashSet<int> activeIds)
-	{
-		_staleActorIds.Clear();
-		foreach (int id in adapters.Keys)
-		{
-			if (!activeIds.Contains(id))
-			{
-				_staleActorIds.Add(id);
-			}
-		}
-
-		foreach (int id in _staleActorIds)
-		{
-			adapters.Remove(id);
-			lightCache.Remove(id);
-		}
 	}
 
 	private void UpdateFishGfxUi(in FrameTiming timing)
@@ -1331,87 +654,6 @@ public unsafe partial class MPClientGameState
 		float verticalFov = Math.Clamp(state.FieldOfView, 1, 179) * MathF.PI / 180;
 		float horizontalFov = 2 * MathF.Atan(MathF.Tan(verticalFov * 0.5f) * width / height);
 		camera.SetPerspective(width, height, horizontalFov, 0.05f, 512);
-	}
-
-	private bool IsVisibleActor(
-		ViewFrustum frustum,
-		EntityRenderBounds bounds,
-		float maximumDistanceSquared)
-	{
-		return !bounds.IsEmpty
-			&& Vector3.DistanceSquared(_fishCameraState.Position, bounds.Center)
-				<= maximumDistanceSquared
-			&& Intersects(frustum, bounds);
-	}
-
-	private static EntityRenderBounds ToRenderBounds(AABB bounds) =>
-		bounds.IsEmpty
-			? EntityRenderBounds.Empty
-			: new EntityRenderBounds(bounds.Min, bounds.Max);
-
-	private void DrawFishGfxActorShadowCasters(
-		RenderPass pass,
-		in DirectionalShadowCascade cascade)
-	{
-		ViewFrustum frustum = cascade.CasterFrustum;
-
-		foreach (FishGfxRemotePlayerRenderAdapter adapter in _fishRemotePlayers.Values)
-		{
-			if (Intersects(frustum, adapter.GetAnimationBounds()))
-			{
-				adapter.RenderShadow(pass);
-			}
-		}
-
-		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
-		{
-			switch (entity)
-			{
-				case VEntNPC npc when _fishNpcs.TryGetValue(
-					npc.NetworkId,
-					out FishGfxNpcRenderAdapter npcAdapter):
-					if (Intersects(frustum, npcAdapter.GetAnimationBounds()))
-					{
-						npcAdapter.RenderShadow(pass);
-					}
-					break;
-
-				case VEntSlidingDoor door when _fishDoorRenderer is not null:
-					SlidingDoorRenderState doorState = new(
-						door.Position,
-						door.Size,
-						door.FacingDirection,
-						door.OpenAmount,
-						door.OpenAngleDeg,
-						default
-					);
-					if (Intersects(frustum, _fishDoorRenderer.GetAnimationBounds(doorState)))
-					{
-						_fishDoorRenderer.RenderShadow(pass, doorState);
-					}
-					break;
-
-				case VEntPickup pickup when _fishPickupRenderer is not null:
-					PickupRenderState pickupState = new(
-						pickup.Position,
-						pickup.Size,
-						pickup.RotationDegrees,
-						pickup.VerticalModelOffset,
-						default
-					);
-					if (Intersects(frustum, _fishPickupRenderer.GetAnimationBounds(pickupState)))
-					{
-						_fishPickupRenderer.RenderShadow(pass, pickupState);
-					}
-					break;
-			}
-		}
-	}
-
-	private static bool Intersects(ViewFrustum frustum, EntityRenderBounds bounds)
-	{
-		return !bounds.IsEmpty
-			&& frustum.Intersects(new FishGfx.AxisAlignedBoundingBox(bounds.Min, bounds.Max));
 	}
 
 	internal static DirectionalShadowOptions CreateShadowOptions(

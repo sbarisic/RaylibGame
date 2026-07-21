@@ -28,6 +28,7 @@ public partial class MPClientGameState
 	private readonly Dictionary<ChunkColumnCoordinate, ChunkCoordinate[]> _coreColumnChunks = new();
 	private readonly Dictionary<ChunkColumnCoordinate, ChunkCoordinate[]> _haloColumnChunks = new();
 	private readonly HashSet<ChunkCoordinate> _coreChunks = new();
+	private readonly DeferredColumnAcknowledgements _columnAcknowledgements = new();
 	private Channel<WorldColumnPacket> _columnDecodeChannel;
 	private CancellationTokenSource _worldLoadCancellation;
 	private Task _worldLoadTask;
@@ -37,6 +38,7 @@ public partial class MPClientGameState
 	private bool _bootstrapComplete;
 	private bool _clientReadySent;
 	private float _nextClientReadySendTime;
+	private float _nextWorldReadinessLogTime;
 	private Vector3 _worldStreamFocus;
 	private long _columnDecodeTicks;
 	private long _columnApplyTicks;
@@ -51,6 +53,8 @@ public partial class MPClientGameState
 	internal int WorldStreamId => _worldStreamId;
 	internal int WorldDecodeQueueDepth => _columnDecodeChannel?.Reader.Count ?? 0;
 	internal int WorldApplyQueueDepth => _decodedColumns.Count;
+	internal int WorldDeferredAcknowledgements => _columnAcknowledgements.Count;
+	internal bool WorldStreamingBackpressured => IsWorldStreamingBackpressured();
 	internal float WorldLoadingProgress => CalculateWorldLoadingProgress();
 	internal int WorldCoreReceived => _receivedCoreColumns.Count;
 	internal int WorldCoreApplied => _appliedCoreColumns.Count;
@@ -82,6 +86,7 @@ public partial class MPClientGameState
 		_expectedHaloColumns = packet.BootstrapHaloColumns;
 		_bootstrapComplete = false;
 		_clientReadySent = false;
+		_nextWorldReadinessLogTime = GetClientTime() + 2;
 		_errorText = string.Empty;
 		_statusText = "Receiving bootstrap columns";
 
@@ -111,6 +116,8 @@ public partial class MPClientGameState
 	private void ReceiveWorldColumn(WorldColumnPacket packet)
 	{
 		if (packet.StreamId != _worldStreamId || _columnDecodeChannel == null)
+			return;
+		if (!_columnAcknowledgements.RegisterReceived(packet))
 			return;
 
 		ChunkColumnCoordinate coordinate = new(packet.X, packet.Z);
@@ -183,6 +190,12 @@ public partial class MPClientGameState
 			processed++;
 			if (decoded.Error != null)
 			{
+				_columnAcknowledgements.Forget(
+					decoded.Packet.StreamId,
+					decoded.Packet.X,
+					decoded.Packet.Z,
+					decoded.Packet.Revision
+				);
 				RequestColumnResync(decoded.Packet, decoded.Error);
 				if (Stopwatch.GetElapsedTime(started).TotalMilliseconds >= budget)
 					break;
@@ -194,13 +207,6 @@ public partial class MPClientGameState
 			_simulation.Map.CommitPreparedColumn(prepared.DomainColumn);
 			TrackAppliedColumn(decoded.Packet, renderChunks);
 			_fishVoxelScene.EnqueuePreparedColumn(prepared);
-			_client.Send(new WorldColumnAppliedPacket
-			{
-				StreamId = _worldStreamId,
-				X = decoded.Packet.X,
-				Z = decoded.Packet.Z,
-				Revision = decoded.Packet.Revision,
-			}, true, GetClientTime());
 			applied++;
 			Interlocked.Increment(ref _columnApplyCount);
 
@@ -209,6 +215,8 @@ public partial class MPClientGameState
 		}
 		if (applied != 0)
 			Interlocked.Add(ref _columnApplyTicks, Stopwatch.GetTimestamp() - started);
+
+		FlushColumnAcknowledgements();
 
 		if (!_initialized)
 			TrySendWorldReady();
@@ -281,6 +289,7 @@ public partial class MPClientGameState
 			!_fishVoxelScene.IsLightingIdle ||
 			!_fishVoxelScene.HasValidTransparentOrdering)
 		{
+			LogWorldReadinessBlockers();
 			return;
 		}
 
@@ -288,7 +297,10 @@ public partial class MPClientGameState
 		{
 			VoxelPresentationState state = _fishVoxelScene.GetPresentationState(coordinate);
 			if (state is not (VoxelPresentationState.Resident or VoxelPresentationState.EmptyComplete))
-			return;
+			{
+				LogWorldReadinessBlockers();
+				return;
+			}
 		}
 
 		float now = GetClientTime();
@@ -304,6 +316,58 @@ public partial class MPClientGameState
 			firstSend ? GameLogLevel.Info : GameLogLevel.Trace,
 			"WorldStream",
 			$"ready-{(firstSend ? "sent" : "retry")} streamId={_worldStreamId} core={_appliedCoreColumns.Count} halo={_appliedHaloColumns.Count} chunks={_coreChunks.Count}");
+	}
+
+	private void LogWorldReadinessBlockers()
+	{
+		float now = GetClientTime();
+		if (now < _nextWorldReadinessLogTime)
+			return;
+		_nextWorldReadinessLogTime = now + 2;
+
+		int missing = 0;
+		int waitingForLighting = 0;
+		int meshing = 0;
+		int resident = 0;
+		int emptyComplete = 0;
+		if (_fishVoxelScene != null)
+		{
+			foreach (ChunkCoordinate coordinate in _coreChunks)
+			{
+				switch (_fishVoxelScene.GetPresentationState(coordinate))
+				{
+					case VoxelPresentationState.Missing:
+						missing++;
+						break;
+					case VoxelPresentationState.WaitingForLighting:
+						waitingForLighting++;
+						break;
+					case VoxelPresentationState.Meshing:
+						meshing++;
+						break;
+					case VoxelPresentationState.Resident:
+						resident++;
+						break;
+					case VoxelPresentationState.EmptyComplete:
+						emptyComplete++;
+						break;
+				}
+			}
+		}
+
+		VoxelRendererWorkload workload = _fishVoxelScene?.Workload ?? default;
+		VoxelRendererFrameDiagnostics renderer = _fishVoxelScene?.FrameDiagnostics ?? default;
+		_logging.Log(
+			GameLogLevel.Debug,
+			"WorldStream",
+			$"bootstrap-wait streamId={_worldStreamId} complete={_bootstrapComplete} "
+			+ $"core={_appliedCoreColumns.Count}/{_expectedCoreColumns} "
+			+ $"halo={_appliedHaloColumns.Count}/{_expectedHaloColumns} "
+			+ $"lightingIdle={_fishVoxelScene?.IsLightingIdle == true} "
+			+ $"transparentReady={_fishVoxelScene?.HasValidTransparentOrdering == true} "
+			+ $"states=missing:{missing},lighting:{waitingForLighting},meshing:{meshing},resident:{resident},empty:{emptyComplete} "
+			+ $"work=dirty:{workload.DirtyMeshes},running:{workload.InFlightMeshes},completed:{workload.CompletedMeshes},uploads:{workload.PendingUploadJobs},bytes:{workload.PendingUploadBytes},backpressured:{workload.IsBackpressured} "
+			+ $"transparent=pending:{renderer.TransparentOrderingPending},running:{renderer.TransparentOrderingRunning},faces:{renderer.TransparentFaceCount},indices:{renderer.TransparentIndexCount},uploadBytes:{renderer.TransparentUploadBytes},stale:{renderer.TransparentStaleResults},reason:{renderer.TransparentInvalidationReason}");
 	}
 
 	private void FinishWorldStart(ClientWorldStartPacket packet)
@@ -371,7 +435,7 @@ public partial class MPClientGameState
 	{
 		if (_client == null || _worldStreamId == 0)
 			return;
-		if (!force && _fishVoxelScene?.PendingPreparedColumnCount > 32)
+		if (!force && IsWorldStreamingBackpressured())
 			return;
 		Vector3 focus = _simulation?.LocalPlayer?.Position ?? _worldStreamFocus;
 		int chunkX = (int)Math.Floor((double)focus.X / Chunk.ChunkSize);
@@ -478,15 +542,51 @@ public partial class MPClientGameState
 		_coreColumnChunks.Clear();
 		_haloColumnChunks.Clear();
 		_coreChunks.Clear();
+		_columnAcknowledgements.Clear();
 		_worldStreamId = 0;
 		_expectedCoreColumns = 0;
 		_expectedHaloColumns = 0;
 		_bootstrapComplete = false;
 		_clientReadySent = false;
 		_nextClientReadySendTime = 0;
+		_nextWorldReadinessLogTime = 0;
 		_lastInterestChunkX = int.MinValue;
 		_lastInterestChunkZ = int.MinValue;
 		_lastInterestRadius = 0;
+	}
+
+	private void OnPreparedRenderColumnApplied(int x, int z, long revision)
+	{
+		_columnAcknowledgements.MarkReady(_worldStreamId, x, z, revision);
+	}
+
+	private void FlushColumnAcknowledgements()
+	{
+		if (_fishVoxelScene?.IsStreamingBackpressured == true)
+			return;
+		float now = GetClientTime();
+		for (int sent = 0; sent < 2
+			&& _columnAcknowledgements.TryDequeueReady(out WorldColumnPacket packet);
+			sent++)
+		{
+			if (packet.StreamId != _worldStreamId)
+				continue;
+			_client.Send(new WorldColumnAppliedPacket
+			{
+				StreamId = _worldStreamId,
+				X = packet.X,
+				Z = packet.Z,
+				Revision = packet.Revision,
+			}, true, now);
+		}
+	}
+
+	private bool IsWorldStreamingBackpressured()
+	{
+		return _fishVoxelScene?.IsStreamingBackpressured == true
+			|| (_fishVoxelScene?.PendingPreparedColumnCount ?? 0) > 32
+			|| (_columnDecodeChannel?.Reader.Count ?? 0) > 12
+			|| _decodedColumns.Count > 32;
 	}
 
 	private sealed record DecodedWorldColumn(

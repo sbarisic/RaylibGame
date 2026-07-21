@@ -39,40 +39,63 @@ public sealed class PreparedClientColumn : IDisposable
 			? int.MinValue
 			: source.Chunks.Max(static chunk => chunk.ChunkY);
 
-		for (int chunkIndex = 0; chunkIndex < render.Length; chunkIndex++)
+		try
 		{
-			ChunkSnapshot snapshot = source.Chunks[chunkIndex];
-			VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
-			ReadOnlySpan<BlockType> blocks = snapshot.BlockMemory.Span;
-			for (int index = 0; index < cells.Length; index++)
+			for (int chunkIndex = 0; chunkIndex < render.Length; chunkIndex++)
 			{
-				BlockType block = blocks[index];
-				cells[index] = new VoxelCell(materialIds[block]);
-				if (block is not (BlockType.Campfire or BlockType.Torch))
-					continue;
+				ChunkSnapshot snapshot = source.Chunks[chunkIndex];
+				VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
+				ReadOnlySpan<BlockType> blocks = snapshot.BlockMemory.Span;
+				for (int index = 0; index < cells.Length; index++)
+				{
+					BlockType block = blocks[index];
+					ushort materialId;
+					if (block == BlockType.None)
+					{
+						materialId = 0;
+					}
+					else if (!materialIds.TryGetValue(block, out materialId))
+					{
+						throw new InvalidOperationException(
+							$"Block type '{block}' has no FishGfx voxel palette mapping.");
+					}
 
-				int z = index / (ChunkSnapshot.Size * ChunkSnapshot.Size);
-				int remainder = index - z * ChunkSnapshot.Size * ChunkSnapshot.Size;
-				int y = remainder / ChunkSnapshot.Size;
-				int x = remainder % ChunkSnapshot.Size;
-				emitters.Add(new VoxelFireEmitter(
-					block,
-					new System.Numerics.Vector3(
-						snapshot.ChunkX * ChunkSnapshot.Size + x + 0.5f,
-						snapshot.ChunkY * ChunkSnapshot.Size + y + 0.5f,
-						snapshot.ChunkZ * ChunkSnapshot.Size + z + 0.5f
-					)
-				));
+					cells[index] = new VoxelCell(materialId);
+					if (block is not (BlockType.Campfire or BlockType.Torch))
+						continue;
+
+					int z = index / (ChunkSnapshot.Size * ChunkSnapshot.Size);
+					int remainder = index - z * ChunkSnapshot.Size * ChunkSnapshot.Size;
+					int y = remainder / ChunkSnapshot.Size;
+					int x = remainder % ChunkSnapshot.Size;
+					emitters.Add(new VoxelFireEmitter(
+						block,
+						new System.Numerics.Vector3(
+							snapshot.ChunkX * ChunkSnapshot.Size + x + 0.5f,
+							snapshot.ChunkY * ChunkSnapshot.Size + y + 0.5f,
+							snapshot.ChunkZ * ChunkSnapshot.Size + z + 0.5f
+						)
+					));
+				}
+
+				render[chunkIndex] = new PreparedRenderChunk(
+					new ChunkCoordinate(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ),
+					PreparedVoxelChunk.TakeOwnership(cells),
+					snapshot.ChunkY == highestY
+				);
 			}
 
-			render[chunkIndex] = new PreparedRenderChunk(
-				new ChunkCoordinate(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ),
-				PreparedVoxelChunk.TakeOwnership(cells),
-				snapshot.ChunkY == highestY
-			);
+			return new PreparedClientColumn(domain, render, emitters.ToArray());
 		}
-
-		return new PreparedClientColumn(domain, render, emitters.ToArray());
+		catch
+		{
+			domain.Dispose();
+			foreach (PreparedRenderChunk? chunk in render)
+			{
+				chunk?.Dispose();
+			}
+			throw;
+		}
 	}
 
 	internal PreparedRenderChunk[] ConsumeRenderChunks() =>

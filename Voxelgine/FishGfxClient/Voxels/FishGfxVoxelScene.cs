@@ -21,12 +21,14 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly ConcurrentQueue<ChunkColumnSnapshot> pendingColumns = new();
 	private readonly ConcurrentQueue<PreparedClientColumn> pendingPreparedColumns = new();
+	private readonly Queue<(int X, int Z, long Revision)> completedPreparedColumns = new();
 	private readonly List<ChunkCoordinate> columnRemovalScratch = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
 	private readonly VoxelRendererOptions rendererOptions;
 	private float skyLightMultiplier = 1;
 	private byte minimumAmbientLight;
 	private int resetPending;
+	private bool streamingBackpressured;
 	private PreparedColumnApplication currentPreparedColumn;
 	private bool disposed;
 
@@ -46,7 +48,12 @@ public sealed class FishGfxVoxelScene : IDisposable
 			new VoxelLightingOptions { UpdateBudget = 65_536 });
 		rendererOptions = new VoxelRendererOptions
 		{
-			WorkerCount = Math.Max(2, Environment.ProcessorCount - 1),
+			WorkerCount = Math.Min(4, Math.Max(2, Environment.ProcessorCount / 2)),
+			MaximumMeshingWorkers = 4,
+			MaximumReadyMeshJobs = 128,
+			MaximumReadyMeshBytes = 32L * 1024 * 1024,
+			ResumeReadyMeshJobs = 64,
+			ResumeReadyMeshBytes = 16L * 1024 * 1024,
 			MaxRenderDistance = Math.Clamp(
 				maxChunkDrawDistance,
 				GameConfig.MinimumMaxChunkDrawDistance,
@@ -106,6 +113,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 	}
 
 	public VoxelRendererFrameDiagnostics FrameDiagnostics => Renderer.FrameDiagnostics;
+	public VoxelRendererWorkload Workload => Renderer.Workload;
+	public int LightingPendingCount => Lighting.PendingCount;
+	public bool IsStreamingBackpressured => streamingBackpressured;
+	public event Action<int, int, long> PreparedColumnApplied;
 
 	public VoxelRendererStatistics Statistics => Renderer.Statistics;
 
@@ -174,6 +185,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			}
 			while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
 				prepared.Dispose();
+			completedPreparedColumns.Clear();
 			currentPreparedColumn?.Dispose();
 			currentPreparedColumn = null;
 
@@ -193,6 +205,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 				ApplyNextPreparedChunk(currentPreparedColumn);
 			if (currentPreparedColumn.IsComplete)
 			{
+				CompletePreparedColumn(currentPreparedColumn);
 				currentPreparedColumn.Dispose();
 				currentPreparedColumn = null;
 			}
@@ -208,6 +221,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 		{
 			while (pendingChanges.TryDequeue(out BlockChange change))
 				Apply(change);
+			while (completedPreparedColumns.TryDequeue(out var completed))
+				PreparedColumnApplied?.Invoke(completed.X, completed.Z, completed.Revision);
 		}
 	}
 
@@ -234,7 +249,31 @@ public sealed class FishGfxVoxelScene : IDisposable
 		ProcessPendingChanges();
 		Lighting.Update();
 		Renderer.UpdateMeshes(camera);
+		UpdateStreamingBackpressure();
 		FogVolume.Update(camera.Position);
+	}
+
+	private void UpdateStreamingBackpressure()
+	{
+		VoxelRendererWorkload workload = Renderer.Workload;
+		int lightingPending = Lighting.PendingCount;
+		if (streamingBackpressured)
+		{
+			if (!workload.IsBackpressured
+				&& workload.DirtyMeshes <= 128
+				&& lightingPending <= 65_536)
+			{
+				streamingBackpressured = false;
+			}
+			return;
+		}
+
+		if (workload.IsBackpressured
+			|| workload.DirtyMeshes >= 256
+			|| lightingPending >= 262_144)
+		{
+			streamingBackpressured = true;
+		}
 	}
 
 	public void Enqueue(RenderQueue queue, Camera camera)
@@ -450,14 +489,17 @@ public sealed class FishGfxVoxelScene : IDisposable
 			if (coordinate.X == columnX && coordinate.Z == columnZ)
 				columnRemovalScratch.Add(coordinate);
 		}
-		foreach (ChunkCoordinate coordinate in columnRemovalScratch)
-		{
-			residents.Remove(coordinate);
-			Lighting.UnloadChunk(coordinate);
-			World.RemoveChunk(coordinate);
-		}
+		ChunkCoordinate[] previous = columnRemovalScratch.ToArray();
+		long revision = column.Revision;
+		VoxelColumnUpdate update = World.BeginColumnUpdate(columnX, columnZ, revision);
 		column.Dispose();
-		return new PreparedColumnApplication(columnX, columnZ, chunks);
+		return new PreparedColumnApplication(
+			columnX,
+			columnZ,
+			revision,
+			chunks,
+			previous,
+			update);
 	}
 
 	private void ApplyNextPreparedChunk(PreparedColumnApplication application)
@@ -465,16 +507,37 @@ public sealed class FishGfxVoxelScene : IDisposable
 		PreparedRenderChunk chunk = application.Chunks[application.NextChunk++];
 		try
 		{
-			World.SetPreparedChunk(chunk.Coordinate, chunk.ConsumeStorage());
-			residents.Add(chunk.Coordinate);
-			Lighting.LoadChunk(chunk.Coordinate, chunk.SkyExposedAbove);
+			World.InstallPreparedChunk(
+				application.Update,
+				chunk.Coordinate,
+				chunk.ConsumeStorage());
 		}
 		finally
 		{
 			chunk.Dispose();
 		}
-		if (application.IsComplete)
-			RefreshSkyExposure(application.X, application.Z);
+	}
+
+	private void CompletePreparedColumn(PreparedColumnApplication application)
+	{
+		World.CompleteColumnUpdate(application.Update);
+		foreach (ChunkCoordinate coordinate in application.PreviousChunks)
+		{
+			if (World.TryGetChunk(coordinate, out _))
+				continue;
+			residents.Remove(coordinate);
+			Lighting.UnloadChunk(coordinate);
+		}
+		foreach (PreparedRenderChunk chunk in application.Chunks)
+		{
+			if (!World.TryGetChunk(chunk.Coordinate, out _))
+				continue;
+			residents.Add(chunk.Coordinate);
+			Lighting.LoadChunk(chunk.Coordinate, chunk.SkyExposedAbove);
+			Lighting.MarkChunkDirty(chunk.Coordinate);
+		}
+		RefreshSkyExposure(application.X, application.Z);
+		completedPreparedColumns.Enqueue((application.X, application.Z, application.Revision));
 	}
 
 	private void Apply(BlockChange change)
@@ -547,16 +610,28 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	private sealed class PreparedColumnApplication : IDisposable
 	{
-		internal PreparedColumnApplication(int x, int z, PreparedRenderChunk[] chunks)
+		internal PreparedColumnApplication(
+			int x,
+			int z,
+			long revision,
+			PreparedRenderChunk[] chunks,
+			ChunkCoordinate[] previousChunks,
+			VoxelColumnUpdate update)
 		{
 			X = x;
 			Z = z;
+			Revision = revision;
 			Chunks = chunks;
+			PreviousChunks = previousChunks;
+			Update = update;
 		}
 
 		internal int X { get; }
 		internal int Z { get; }
+		internal long Revision { get; }
 		internal PreparedRenderChunk[] Chunks { get; }
+		internal ChunkCoordinate[] PreviousChunks { get; }
+		internal VoxelColumnUpdate Update { get; }
 		internal int NextChunk { get; set; }
 		internal bool IsComplete => NextChunk >= Chunks.Length;
 
@@ -565,6 +640,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			for (int index = NextChunk; index < Chunks.Length; index++)
 				Chunks[index].Dispose();
 			NextChunk = Chunks.Length;
+			Update.Dispose();
 		}
 	}
 }

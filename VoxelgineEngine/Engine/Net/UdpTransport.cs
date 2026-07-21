@@ -1,8 +1,10 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Voxelgine.Engine.DI;
 
 namespace Voxelgine.Engine
 {
@@ -19,6 +21,14 @@ namespace Voxelgine.Engine
 		private Task _receiveTask;
 		private bool _disposed;
 		private readonly object _sendLock = new object();
+		private readonly IFishLogging _logging;
+		private int _callbackThreadId;
+		private int _receiveLoopFailed;
+
+		public UdpTransport(IFishLogging logging = null)
+		{
+			_logging = logging;
+		}
 
 		/// <summary>
 		/// Fired when data is received from a remote endpoint.
@@ -30,7 +40,10 @@ namespace Voxelgine.Engine
 		/// <summary>
 		/// Whether the transport is currently active and listening.
 		/// </summary>
-		public bool IsActive => _udpClient != null && !_disposed;
+		public bool IsActive => _udpClient != null
+			&& !_disposed
+			&& Volatile.Read(ref _receiveLoopFailed) == 0
+			&& _receiveTask?.IsFaulted != true;
 
 		/// <summary>
 		/// The local endpoint this transport is bound to, or null if not active.
@@ -109,13 +122,24 @@ namespace Voxelgine.Engine
 			_udpClient?.Dispose();
 			_udpClient = null;
 
+			Task receiveTask = _receiveTask;
 			try
 			{
-				_receiveTask?.Wait(TimeSpan.FromSeconds(1));
+				if (receiveTask != null
+					&& Environment.CurrentManagedThreadId != Volatile.Read(ref _callbackThreadId))
+				{
+					receiveTask.Wait(TimeSpan.FromSeconds(1));
+				}
 			}
-			catch (AggregateException)
+			catch (AggregateException exception)
 			{
-				// Expected when the receive loop is cancelled during shutdown.
+				Exception failure = exception.Flatten().InnerExceptions.FirstOrDefault(
+					static inner => inner is not OperationCanceledException
+						and not ObjectDisposedException
+						and not SocketException
+				);
+				if (failure != null)
+					_logging?.Log(GameLogLevel.Error, "Transport", "UDP receive loop failed during shutdown.", failure);
 			}
 
 			_cts?.Dispose();
@@ -136,6 +160,7 @@ namespace Voxelgine.Engine
 
 		private void StartReceiveLoop()
 		{
+			Volatile.Write(ref _receiveLoopFailed, 0);
 			_cts = new CancellationTokenSource();
 			_receiveTask = Task.Run(() => ReceiveLoopAsync(_cts.Token));
 		}
@@ -146,8 +171,23 @@ namespace Voxelgine.Engine
 			{
 				try
 				{
-					UdpReceiveResult result = await _udpClient.ReceiveAsync(ct);
-					OnDataReceived?.Invoke(result.Buffer, result.RemoteEndPoint);
+					UdpClient client = _udpClient;
+					if (client == null)
+						break;
+					UdpReceiveResult result = await client.ReceiveAsync(ct);
+					try
+					{
+						Volatile.Write(ref _callbackThreadId, Environment.CurrentManagedThreadId);
+						OnDataReceived?.Invoke(result.Buffer, result.RemoteEndPoint);
+					}
+					catch (Exception exception)
+					{
+						_logging?.Log(GameLogLevel.Error, "Transport", "UDP receive handler rejected a datagram.", exception);
+					}
+					finally
+					{
+						Volatile.Write(ref _callbackThreadId, 0);
+					}
 				}
 				catch (OperationCanceledException)
 				{
@@ -161,6 +201,12 @@ namespace Voxelgine.Engine
 				}
 				catch (ObjectDisposedException)
 				{
+					break;
+				}
+				catch (Exception exception)
+				{
+					Volatile.Write(ref _receiveLoopFailed, 1);
+					_logging?.Log(GameLogLevel.Error, "Transport", "UDP receive loop terminated unexpectedly.", exception);
 					break;
 				}
 			}

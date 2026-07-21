@@ -120,7 +120,11 @@ public sealed class FishGfxParticlePreview : IDisposable
 	public void Render(RenderPass pass, Vector3 cameraPosition, Vector3 cameraTarget)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
-		Vector3 forward = Vector3.Normalize(cameraTarget - cameraPosition);
+		Vector3 direction = cameraTarget - cameraPosition;
+		float lengthSquared = direction.LengthSquared();
+		Vector3 forward = float.IsFinite(lengthSquared) && lengthSquared > 1e-12f
+			? direction / MathF.Sqrt(lengthSquared)
+			: Vector3.UnitZ;
 		Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
 		Vector3 up = Vector3.Normalize(Vector3.Cross(right, forward));
 		batch.Begin(cameraPosition, right, up);

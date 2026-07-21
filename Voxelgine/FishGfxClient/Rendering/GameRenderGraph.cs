@@ -2,6 +2,7 @@
 using FishGfx;
 using FishGfx.Graphics;
 using FishGfx.Graphics.Shadows;
+using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
@@ -61,6 +62,7 @@ public sealed class GameRenderGraph : IDisposable
 		shadowRenderer?.Diagnostics ?? default;
 
 	public double FogGpuMilliseconds => localFogGpuTimer.LastMilliseconds;
+	public double LastPresentMilliseconds { get; private set; }
 
 	public void SetMultisampling(bool enabled)
 	{
@@ -170,7 +172,9 @@ public sealed class GameRenderGraph : IDisposable
 			state.RenderOverlay(overlay, timing);
 		}
 
+		long presentStart = Stopwatch.GetTimestamp();
 		frame.Present();
+		LastPresentMilliseconds = Stopwatch.GetElapsedTime(presentStart).TotalMilliseconds;
 	}
 
 	private RenderTarget RenderViewmodel(

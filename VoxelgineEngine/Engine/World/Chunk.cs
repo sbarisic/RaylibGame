@@ -58,8 +58,20 @@ namespace Voxelgine.Graphics
 			return Blocks[x + ChunkSize * (y + ChunkSize * z)];
 		}
 
-		public PlacedBlock GetBlock(Vector3 position) =>
-			GetBlock((int)position.X, (int)position.Y, (int)position.Z);
+		public PlacedBlock GetBlock(Vector3 position)
+		{
+			if (!float.IsFinite(position.X)
+				|| !float.IsFinite(position.Y)
+				|| !float.IsFinite(position.Z))
+			{
+				throw new ArgumentOutOfRangeException(nameof(position));
+			}
+			return GetBlock(
+				(int)MathF.Floor(position.X),
+				(int)MathF.Floor(position.Y),
+				(int)MathF.Floor(position.Z)
+			);
+		}
 
 		public void SetBlock(int x, int y, int z, PlacedBlock block)
 		{
@@ -195,10 +207,17 @@ namespace Voxelgine.Graphics
 			if (preparedFog != null && preparedFog.Length != preparedBlocks.Length)
 				throw new ArgumentException("Prepared fog storage must contain one complete chunk.", nameof(preparedFog));
 
+			if (preparedNonAirCount < 0 || preparedNonAirCount > preparedBlocks.Length)
+				throw new ArgumentOutOfRangeException(nameof(preparedNonAirCount));
+			if (preparedNonEmptyFogCount < 0 || preparedNonEmptyFogCount > preparedBlocks.Length)
+				throw new ArgumentOutOfRangeException(nameof(preparedNonEmptyFogCount));
+			if (preparedNonEmptyFogCount > 0 && preparedFog == null)
+				throw new ArgumentException("Non-empty fog storage is missing.", nameof(preparedFog));
+
 			Blocks = preparedBlocks;
-			NonAirBlockCount = Math.Clamp(preparedNonAirCount, 0, preparedBlocks.Length);
+			NonAirBlockCount = preparedNonAirCount;
 			fog = preparedNonEmptyFogCount == 0 ? null : preparedFog;
-			nonEmptyFogCount = Math.Clamp(preparedNonEmptyFogCount, 0, preparedBlocks.Length);
+			nonEmptyFogCount = preparedNonEmptyFogCount;
 			Dirty = true;
 			SkyExposureCacheValid = false;
 		}

@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Voxelgine.Engine.DI
 {
 	// Dependency injection implementation
-	public class FishDI
+	public sealed class FishDI : IDisposable
 	{
 		HostApplicationBuilder builder;
 		IHost FHost;
@@ -22,12 +17,12 @@ namespace Voxelgine.Engine.DI
 
 		public void AddScoped<TService, TImpl>() where TService : class where TImpl : class, TService
 		{
-			builder.Services.AddScoped<TService, TImpl>();
+			RegisterImplementationAndAlias<TService, TImpl>(ServiceLifetime.Scoped);
 		}
 
 		public void AddSingleton<TService, TImpl>() where TService : class where TImpl : class, TService
 		{
-			builder.Services.AddSingleton<TService, TImpl>();
+			RegisterImplementationAndAlias<TService, TImpl>(ServiceLifetime.Singleton);
 		}
 
 		public void AddSingleton<TService>(Func<IServiceProvider, TService> factory)
@@ -39,11 +34,27 @@ namespace Voxelgine.Engine.DI
 
 		public void AddTransient<TService, TImpl>() where TService : class where TImpl : class, TService
 		{
-			builder.Services.AddTransient<TService, TImpl>();
+			RegisterImplementationAndAlias<TService, TImpl>(ServiceLifetime.Transient);
+		}
+
+		private void RegisterImplementationAndAlias<TService, TImpl>(ServiceLifetime lifetime)
+			where TService : class
+			where TImpl : class, TService
+		{
+			builder.Services.Add(new ServiceDescriptor(typeof(TImpl), typeof(TImpl), lifetime));
+			if (typeof(TService) != typeof(TImpl))
+			{
+				builder.Services.Add(new ServiceDescriptor(
+					typeof(TService),
+					provider => provider.GetRequiredService<TImpl>(),
+					lifetime));
+			}
 		}
 
 		public IHost Build()
 		{
+			if (FHost != null)
+				throw new InvalidOperationException("The service host has already been built.");
 			FHost = builder.Build();
 			return FHost;
 		}
@@ -52,6 +63,8 @@ namespace Voxelgine.Engine.DI
 
 		public void CreateScope()
 		{
+			if (FHost == null)
+				throw new InvalidOperationException("Build the service host before creating a scope.");
 			if (CurScope != null)
 				CurScope.Dispose();
 
@@ -60,24 +73,17 @@ namespace Voxelgine.Engine.DI
 
 		public T GetRequiredService<T>()
 		{
-			Type TType = typeof(T);
+			if (CurScope == null)
+				throw new InvalidOperationException("Create a service scope before resolving services.");
+			return CurScope.ServiceProvider.GetRequiredService<T>();
+		}
 
-			if (TType.IsClass)
-			{
-
-				Type[] Interfaces = TType.GetInterfaces();
-
-				if (Interfaces.Length == 1)
-					return (T)CurScope.ServiceProvider.GetRequiredService(Interfaces[0]);
-
-
-			}
-			else if (TType.IsInterface)
-			{
-				return (T)CurScope.ServiceProvider.GetRequiredService(TType);
-			}
-
-			throw new NotImplementedException();
+		public void Dispose()
+		{
+			CurScope?.Dispose();
+			CurScope = null;
+			FHost?.Dispose();
+			FHost = null;
 		}
 	}
 }

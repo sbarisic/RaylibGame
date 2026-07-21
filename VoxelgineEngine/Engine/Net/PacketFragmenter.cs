@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Voxelgine.Engine
 {
@@ -41,6 +42,7 @@ namespace Voxelgine.Engine
 		/// for this duration are discarded.
 		/// </summary>
 		public const float StaleGroupTimeout = 10f;
+		public const int MaximumPendingGroups = 256;
 
 		private ushort _nextGroupId;
 		private readonly Dictionary<ushort, FragmentGroup> _pendingGroups = new();
@@ -67,9 +69,14 @@ namespace Voxelgine.Engine
 		/// </param>
 		public PacketFragmenter(int maxFragmentPayload = 0)
 		{
-			_maxFragmentPayload = maxFragmentPayload > 0
-				? maxFragmentPayload
-				: PacketBatcher.DefaultMtu - ReliableChannel.HeaderSize - FragmentHeaderSize;
+			int defaultPayload = PacketBatcher.DefaultMtu
+				- ReliableChannel.HeaderSize
+				- FragmentHeaderSize;
+			if (maxFragmentPayload < 0)
+				throw new ArgumentOutOfRangeException(nameof(maxFragmentPayload));
+			_maxFragmentPayload = maxFragmentPayload == 0 ? defaultPayload : maxFragmentPayload;
+			if (_maxFragmentPayload <= 0)
+				throw new ArgumentOutOfRangeException(nameof(maxFragmentPayload));
 		}
 
 		/// <summary>
@@ -94,6 +101,9 @@ namespace Voxelgine.Engine
 		/// </exception>
 		public List<byte[]> Split(byte[] packetData)
 		{
+			ArgumentNullException.ThrowIfNull(packetData);
+			if (packetData.Length == 0)
+				throw new ArgumentException("Cannot fragment an empty packet.", nameof(packetData));
 			var fragments = new List<byte[]>();
 
 			_nextGroupId++;
@@ -154,15 +164,32 @@ namespace Voxelgine.Engine
 			if (total == 0 || index >= total)
 				return null;
 
-			if (!_pendingGroups.TryGetValue(groupId, out var group))
+			if (_pendingGroups.TryGetValue(groupId, out var group)
+				&& group.FragmentCount != total)
 			{
+				_pendingGroups.Remove(groupId);
+				return null;
+			}
+
+			if (group == null)
+			{
+				CleanupStaleGroups(currentTime);
+				if (_pendingGroups.Count >= MaximumPendingGroups)
+				{
+					ushort oldestId = _pendingGroups.MinBy(static pair => pair.Value.LastFragmentTime).Key;
+					_pendingGroups.Remove(oldestId);
+				}
 				group = new FragmentGroup(total);
 				_pendingGroups[groupId] = group;
 			}
 
 			byte[] payload = new byte[packetData.Length - FragmentHeaderSize];
 			Buffer.BlockCopy(packetData, FragmentHeaderSize, payload, 0, payload.Length);
-			group.SetFragment(index, payload, currentTime);
+			if (!group.SetFragment(index, payload, currentTime))
+			{
+				_pendingGroups.Remove(groupId);
+				return null;
+			}
 
 			if (group.IsComplete)
 			{
@@ -228,6 +255,7 @@ namespace Voxelgine.Engine
 			/// Used for stale group cleanup.
 			/// </summary>
 			public float LastFragmentTime { get; private set; }
+			public int FragmentCount => _fragments.Length;
 
 			/// <summary>
 			/// Whether all fragments have been received.
@@ -239,16 +267,19 @@ namespace Voxelgine.Engine
 				_fragments = new byte[totalFragments][];
 			}
 
-			public void SetFragment(int index, byte[] payload, float currentTime)
+			public bool SetFragment(int index, byte[] payload, float currentTime)
 			{
 				if (index < 0 || index >= _fragments.Length)
-					return;
+					return false;
 
 				if (_fragments[index] == null)
 					_receivedCount++;
+				else if (!_fragments[index].AsSpan().SequenceEqual(payload))
+					return false;
 
 				_fragments[index] = payload;
 				LastFragmentTime = currentTime;
+				return true;
 			}
 
 			public byte[] Assemble()

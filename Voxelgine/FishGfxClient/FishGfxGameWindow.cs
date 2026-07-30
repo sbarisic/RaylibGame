@@ -24,12 +24,10 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 	private bool configurationApplyPending;
 	private bool disposed;
 
-	public FishGfxGameWindow(IFishConfig fishConfig, IFishEngineRunner engine)
+	public FishGfxGameWindow(GameConfig fishConfig, IFishLogging logging)
 	{
-		ArgumentNullException.ThrowIfNull(engine);
-		config = fishConfig as GameConfig
-			?? throw new ArgumentException("FishGfxGameWindow requires GameConfig.", nameof(fishConfig));
-		logging = engine.DI.GetRequiredService<IFishLogging>();
+		config = fishConfig ?? throw new ArgumentNullException(nameof(fishConfig));
+		this.logging = logging ?? throw new ArgumentNullException(nameof(logging));
 		WindowMode mode = ResolveMode(config);
 		IReadOnlyList<MonitorInfo> monitors = RenderWindow.GetMonitors();
 		MonitorInfo initialMonitor = ResolveMonitor(config.Monitor, monitors);
@@ -151,17 +149,13 @@ public sealed class FishGfxGameWindow : IFishGfxGameWindow
 		}
 	}
 
-	public void SetState(GameStateImpl nextState)
+	public void RouteState(GameStateImpl nextState)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
-		ArgumentNullException.ThrowIfNull(nextState);
-		logging.Log(GameLogLevel.Info, "State", $"Transition old={state?.GetType().Name ?? "None"} new={nextState.GetType().Name}");
-		state?.SwapFrom();
 		state = nextState;
 		RenderWindow.CaptureCursor = false;
 		RenderWindow.ShowCursor = true;
-		state.SwapTo();
-		state.OnResize(this);
+		state?.OnResize(this);
 	}
 
 	public bool IsOpen()

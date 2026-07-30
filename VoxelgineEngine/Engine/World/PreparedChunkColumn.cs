@@ -1,4 +1,3 @@
-#nullable enable
 using Voxelgine.Engine;
 
 namespace Voxelgine.Graphics;
@@ -10,7 +9,7 @@ namespace Voxelgine.Graphics;
 /// </summary>
 public sealed class PreparedChunkColumn : IDisposable
 {
-	private PreparedChunk[]? chunks;
+	private PreparedChunk[] chunks;
 
 	private PreparedChunkColumn(int x, int z, long revision, PreparedChunk[] chunks)
 	{
@@ -43,7 +42,7 @@ public sealed class PreparedChunkColumn : IDisposable
 				blocks[index] = new PlacedBlock(blockTypes[index]);
 			}
 
-			FogVoxel[]? fog = snapshot.NonEmptyFogCount == 0
+			FogVoxel[] fog = snapshot.NonEmptyFogCount == 0
 				? null
 				: snapshot.FogMemory.ToArray();
 			chunks[chunkIndex] = new PreparedChunk(
@@ -81,7 +80,7 @@ public sealed class PreparedChunk
 		int chunkZ,
 		PlacedBlock[] blocks,
 		int nonAirBlockCount,
-		FogVoxel[]? fog,
+		FogVoxel[] fog,
 		int nonEmptyFogCount)
 	{
 		ChunkX = chunkX;
@@ -103,7 +102,7 @@ public sealed class PreparedChunk
 
 	internal int NonAirBlockCount { get; }
 
-	internal FogVoxel[]? Fog { get; }
+	internal FogVoxel[] Fog { get; }
 
 	internal int NonEmptyFogCount { get; }
 }

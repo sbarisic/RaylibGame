@@ -55,12 +55,7 @@ namespace Voxelgine.Engine
 			ApplyFireEffects(intent);
 
 			// Send fire packet to server for authoritative hit resolution
-			var mpState = Eng.AsClient().MultiplayerGameState;
-			if (mpState != null && mpState.IsActive)
-			{
-				mpState.SendWeaponFire(E.Start, E.Dir);
-				mpState.SpawnPredictedFireEffects(E.Start, E.Dir, E.MaxLen);
-			}
+			Eng.AsClient().FireWeapon(E.Start, E.Dir, E.MaxLen);
 		}
 
 		/// <summary>

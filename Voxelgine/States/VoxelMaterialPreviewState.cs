@@ -55,7 +55,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		fishWindow = window as IFishGfxGameWindow
 			?? throw new ArgumentException("Voxel material preview requires FishGfx.", nameof(window));
-		gui = new FishUIManager(window, engine.DI.GetRequiredService<IFishLogging>());
+		gui = new FishUIManager(window, engine.Logging);
 		map.SetBlock(0, 0, 0, selectedBlock);
 		voxelScene = new FishGfxVoxelScene(
 			fishWindow.RenderWindow.Graphics,
@@ -108,7 +108,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		if (Window.InMgr.IsInputPressed(InputKey.Esc))
 		{
-			Window.SetState(Eng.AsClient().MainMenuState);
+			Client.RequestState(ClientStateKind.MainMenu);
 		}
 	}
 
@@ -211,7 +211,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		gui.Render(pass, timing.DeltaTime, timing.TotalTime);
 	}
 
-	public override void Dispose()
+	protected override void DisposeCore()
 	{
 		if (disposed)
 		{
@@ -371,7 +371,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			Text = "Back to Main Menu",
 			Size = new Vector2(width, 40),
 		};
-		backButton.OnButtonPressed += (_, _, _) => Window.SetState(Eng.AsClient().MainMenuState);
+		backButton.OnButtonPressed += (_, _, _) => Client.RequestState(ClientStateKind.MainMenu);
 		stack.AddChild(backButton);
 
 		scroll.AddChild(stack);

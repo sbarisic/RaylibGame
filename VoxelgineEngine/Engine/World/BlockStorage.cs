@@ -16,9 +16,6 @@ namespace Voxelgine.Graphics
 	{
 		public static readonly BlockLight Black = new(0, 0);
 		public static readonly BlockLight FullBright = new(15, 15);
-		public static bool FullbrightMode;
-		public static float SkyLightMultiplier = 1f;
-		public static byte AmbientLight = 2;
 
 		[FieldOffset(0)] public byte Sky;
 		[FieldOffset(1)] public byte Block;
@@ -37,26 +34,22 @@ namespace Voxelgine.Graphics
 
 		public BlockLight(byte amount) : this(amount, amount) { }
 
-		public byte R => GetEffectiveLight();
-		public byte G => GetEffectiveLight();
-		public byte B => GetEffectiveLight();
-
-		private byte GetEffectiveLight()
+		public byte GetEffectiveLight(in WorldLightingState lighting)
 		{
-			int combined = Math.Max((int)(Sky * SkyLightMultiplier), Block);
-			return (byte)Math.Min(Math.Max(combined, AmbientLight), 15);
+			int combined = Math.Max((int)(Sky * lighting.SkyLightMultiplier), Block);
+			return (byte)Math.Min(Math.Max(combined, lighting.AmbientLight), 15);
 		}
 
 		public void SetSkylight(byte amount) => Sky = (byte)Math.Min((int)amount, 15);
 		public void SetBlockLight(byte amount) => Block = (byte)Math.Min((int)amount, 15);
 		public void Set(byte amount) => Sky = Block = (byte)Math.Min((int)amount, 15);
 
-		public Rgba32 ToColor()
+		public Rgba32 ToColor(in WorldLightingState lighting)
 		{
-			if (FullbrightMode)
+			if (lighting.Fullbright)
 				return Rgba32.White;
 
-			byte value = (byte)(GetEffectiveLight() * 17);
+			byte value = (byte)(GetEffectiveLight(lighting) * 17);
 			return new Rgba32(value, value, value, 255);
 		}
 
@@ -131,7 +124,8 @@ namespace Voxelgine.Graphics
 
 		public BlockLight GetBlockLightRaw(int index) => Lights[index];
 
-		public Rgba32 GetColor(Vector3 normal) => GetBlockLight(normal).ToColor();
+		public Rgba32 GetColor(Vector3 normal, in WorldLightingState lighting) =>
+			GetBlockLight(normal).ToColor(lighting);
 
 		public void Write(BinaryWriter writer) => writer.Write((ushort)Type);
 		public void Read(BinaryReader reader) => Type = (Voxelgine.Engine.BlockType)reader.ReadUInt16();

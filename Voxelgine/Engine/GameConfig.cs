@@ -10,7 +10,8 @@ namespace Voxelgine.Engine
 {
 	public class GameConfig : IFishConfig
 	{
-		const string ConfigFileName = "data/config.json";
+		private readonly RuntimePaths runtimePaths;
+		private readonly string defaultsFile;
 		public const int DefaultMaxChunkDrawDistance = 108;
 		public const int MinimumMaxChunkDrawDistance = 32;
 		public const int MaximumMaxChunkDrawDistance = 512;
@@ -40,7 +41,8 @@ namespace Voxelgine.Engine
 
 		public string Title { get; set; } = "Aurora Falls";
 
-		public string LogFolder { get; set; } = "data";
+		[JsonIgnore]
+		public string LogFolder { get; set; }
 
 		[SettingsHidden]
 		public GameLogLevel LogLevel { get; set; } = GameLogLevel.Debug; // Leave default to Debug, i'll change to Trace when required
@@ -82,25 +84,37 @@ namespace Voxelgine.Engine
 		[SettingsHidden]
 		public KeyValuePair<InputKey, KeyValuePair<PhysicalKey, PhysicalKey>>[] TwoKeysDown;
 
-		public GameConfig(IFishEngineRunner _)
+		public GameConfig(RuntimePaths runtimePaths)
 		{
+			this.runtimePaths = runtimePaths ?? throw new ArgumentNullException(nameof(runtimePaths));
+			defaultsFile = Path.Combine(AppContext.BaseDirectory, "data", "config.defaults.json");
+			LogFolder = runtimePaths.LogDirectory;
 			MouseButtonDown = Array.Empty<KeyValuePair<InputKey, PhysicalMouseButton>>();
 			KeyDown = Array.Empty<KeyValuePair<InputKey, PhysicalKey>>();
 			TwoKeysDown = Array.Empty<KeyValuePair<InputKey, KeyValuePair<PhysicalKey, PhysicalKey>>>();
+			GenerateDefaultKeybinds();
 		}
 
 		public void SaveToJson()
 		{
+			runtimePaths.CreateDirectories();
 			string json = JsonConvert.SerializeObject(this, Formatting.Indented, CreateJsonSettings());
-			File.WriteAllText(ConfigFileName, json);
+			string temporaryFile = runtimePaths.ConfigurationFile + ".tmp";
+			File.WriteAllText(temporaryFile, json);
+			File.Move(temporaryFile, runtimePaths.ConfigurationFile, true);
 		}
 
 		public void LoadFromJson()
 		{
-			if (!File.Exists(ConfigFileName))
-				return;
-			string json = File.ReadAllText(ConfigFileName);
-			JsonConvert.PopulateObject(json, this, CreateJsonSettings());
+			if (File.Exists(defaultsFile))
+			{
+				JsonConvert.PopulateObject(File.ReadAllText(defaultsFile), this, CreateJsonSettings());
+			}
+			if (File.Exists(runtimePaths.ConfigurationFile))
+			{
+				JsonConvert.PopulateObject(File.ReadAllText(runtimePaths.ConfigurationFile), this, CreateJsonSettings());
+			}
+			LogFolder = runtimePaths.LogDirectory;
 		}
 
 		internal static JsonSerializerSettings CreateJsonSettings()

@@ -55,7 +55,8 @@ namespace Voxelgine.Engine
 			set
 			{
 				_engine = value;
-				Logging = value.DI.GetRequiredService<IFishLogging>();
+				Logging = value?.Logging
+					?? throw new ArgumentNullException(nameof(value));
 			}
 		}
 

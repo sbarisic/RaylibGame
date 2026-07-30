@@ -440,7 +440,7 @@ public partial class MPClientGameState
 		Vector3 focus = _simulation?.LocalPlayer?.Position ?? _worldStreamFocus;
 		int chunkX = (int)Math.Floor((double)focus.X / Chunk.ChunkSize);
 		int chunkZ = (int)Math.Floor((double)focus.Z / Chunk.ChunkSize);
-		int radius = Eng.DI.GetRequiredService<GameConfig>().MaxChunkDrawDistance + 32;
+		int radius = Client.Config.MaxChunkDrawDistance + 32;
 		float now = GetClientTime();
 		if (!force && chunkX == _lastInterestChunkX && chunkZ == _lastInterestChunkZ &&
 			radius == _lastInterestRadius && now < _nextInterestRefreshTime)

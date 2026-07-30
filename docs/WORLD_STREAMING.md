@@ -5,7 +5,7 @@ There is one active schema and no legacy reader, converter, or old-client path.
 
 ## Column archive
 
-`data/map.bin` is an indexed column archive. Its header stores the schema magic
+`<runtime-root>/worlds/map.bin` is an indexed column archive. Its header stores the schema magic
 and version, world seed, and authoritative player, pickup, and NPC spawn
 positions. The directory maps each X/Z column to an offset, compressed length,
 and checksum. Each payload contains the complete vertical column as chunk-Y
@@ -60,7 +60,7 @@ the same update. Retransmission starts at 200 ms, adapts toward twice the measur
 RTT, clamps to 100-1000 ms, backs off exponentially, and disconnects after 12
 unsuccessful retries.
 
-Search `data/console.log` for `[WorldStream]`, `[Persistence]`, or `[Network]` to
+Search `<runtime-root>/logs/console.log` for `[WorldStream]`, `[Persistence]`, or `[Network]` to
 diagnose checksums, revision resynchronization, backpressure, retries, archive
 replacement, and readiness transitions. F5 exposes stream, queue, reliability,
 lighting, and meshing progress.

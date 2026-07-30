@@ -32,7 +32,8 @@ namespace Voxelgine.Engine
 		{
 			Entities = new List<VoxEntity>();
 			EntitiesById = new Dictionary<int, VoxEntity>();
-			Logging = eng.DI.GetRequiredService<IFishLogging>();
+			ArgumentNullException.ThrowIfNull(eng);
+			Logging = eng.Logging;
 
 			this.Eng = eng;
 		}
@@ -45,7 +46,7 @@ namespace Voxelgine.Engine
 				return;
 
 			Ent.NetworkId = _nextNetworkId++;
-			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
+			Ent.Eng = Eng;
 			Ent.SetEntityManager(this);
 			Ent.SetSimulation(simulation);
 			Entities.Add(Ent);
@@ -65,7 +66,7 @@ namespace Voxelgine.Engine
 				return;
 
 			Ent.NetworkId = networkId;
-			Ent.Eng = Eng.DI.GetRequiredService<IFishEngineRunner>();
+			Ent.Eng = Eng;
 			Ent.SetEntityManager(this);
 			Ent.SetSimulation(simulation);
 			Entities.Add(Ent);

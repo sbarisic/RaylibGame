@@ -62,7 +62,7 @@ public unsafe partial class MPClientGameState
 			return null;
 		}
 
-		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
+		GameConfig config = Client.Config;
 		DirectionalShadowOptions options = CreateShadowOptions(
 			config.SunShadowQuality,
 			config.MaxChunkDrawDistance

@@ -186,9 +186,7 @@ public partial class MainMenuStateFishUI
 
 		int port = (int)connectPortInput.Value;
 		HideModal(connectWindow);
-		var multiplayerState = Eng.AsClient().MultiplayerGameState;
-		Window.SetState(multiplayerState);
-		multiplayerState.Connect(address, port, playerName);
+		Client.Connect(address, port, playerName);
 	}
 
 	private void StartHostedGame()
@@ -209,7 +207,7 @@ public partial class MainMenuStateFishUI
 		string playerName = NormalizePlayerName(hostNameInput.Text);
 		bool forceNewWorld = forceNewWorldCheckBox.IsChecked;
 		StopHostedServer();
-		if (hostedServer != null)
+		if (Client.HostedServer != null)
 		{
 			hostStatusLabel.Text = "The previous hosted server is still stopping";
 			return;
@@ -221,29 +219,12 @@ public partial class MainMenuStateFishUI
 
 		try
 		{
-			ServerLoop server = new(Eng.DI.GetRequiredService<IFishConfig>().LogLevel);
-			hostedServer = server;
+			ServerApplication server = Client.StartHostedServer(port, seed, forceNewWorld);
 			pendingHostPort = port;
 			pendingHostPlayerName = playerName;
 			hostedServerStartupPending = true;
 			hostedServerStartupTimestamp = Stopwatch.GetTimestamp();
 			SetHostControlsStarting(true);
-			hostThread = new Thread(() =>
-			{
-				try
-				{
-					server.Start(port, seed, forceNewWorld);
-				}
-				catch (Exception exception)
-				{
-					logging.Log(GameLogLevel.Error, "HostedServer", "Hosted server thread failed.", exception);
-				}
-			})
-			{
-				IsBackground = true,
-				Name = "HostedServer",
-			};
-			hostThread.Start();
 		}
 		catch (Exception exception)
 		{
@@ -254,10 +235,10 @@ public partial class MainMenuStateFishUI
 
 	private void UpdateHostedServerStartup()
 	{
-		if (!hostedServerStartupPending || hostedServer == null)
+		if (!hostedServerStartupPending || Client.HostedServer == null)
 			return;
 
-		var startupTask = hostedServer.StartupTask;
+		var startupTask = Client.HostedServer.StartupTask;
 		if (!startupTask.IsCompleted)
 		{
 			TimeSpan elapsed = Stopwatch.GetElapsedTime(hostedServerStartupTimestamp);
@@ -278,9 +259,7 @@ public partial class MainMenuStateFishUI
 			);
 			HideModal(hostWindow);
 
-			var multiplayerState = Eng.AsClient().MultiplayerGameState;
-			Window.SetState(multiplayerState);
-			multiplayerState.Connect("127.0.0.1", port, playerName);
+			Client.Connect("127.0.0.1", port, playerName);
 			return;
 		}
 

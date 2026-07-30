@@ -1,18 +1,35 @@
 using Voxelgine.States;
+using Voxelgine.Audio;
+using Voxelgine.Engine.Server;
 
 namespace Voxelgine.Engine.DI;
 
 public interface IClientEngineRunner : IFishEngineRunner
 {
-	MainMenuStateFishUI MainMenuState { get; set; }
+	GameConfig Config { get; }
 
-	NPCPreviewState NPCPreviewState { get; set; }
+	IAudioSystem Audio { get; }
 
-	EffectsPreviewState EffectsPreviewState { get; set; }
+	RuntimePaths RuntimePaths { get; }
 
-	VoxelMaterialPreviewState VoxelMaterialPreviewState { get; set; }
+	IGameWindow Window { get; }
 
-	MPClientGameState MultiplayerGameState { get; set; }
+	/// <summary>The hosted server loop, or null when this client is not hosting.</summary>
+	ServerLoop HostedServer { get; }
+
+	bool IsMultiplayerActive { get; }
+
+	bool IsLocalPlayerSubmerged { get; }
+
+	void RequestState(ClientStateKind state);
+
+	void Connect(string address, int port, string playerName);
+
+	ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate);
+
+	void StopHostedServer();
+
+	void FireWeapon(System.Numerics.Vector3 start, System.Numerics.Vector3 direction, float maximumLength);
 }
 
 public static class ClientEngineRunnerExtensions
@@ -21,4 +38,13 @@ public static class ClientEngineRunnerExtensions
 	{
 		return (IClientEngineRunner)engine;
 	}
+}
+
+public enum ClientStateKind
+{
+	MainMenu,
+	Multiplayer,
+	NpcPreview,
+	EffectsPreview,
+	VoxelMaterialPreview,
 }

@@ -59,7 +59,7 @@ namespace Voxelgine.States
 
 		public EffectsPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
-			_gui = new FishUIManager(window, Eng.DI.GetRequiredService<IFishLogging>());
+			_gui = new FishUIManager(window, Eng.Logging);
 			IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
 				?? throw new ArgumentException("Effects preview requires FishGfx.", nameof(window));
 			_fishParticles = new FishGfxParticlePreview(fishWindow);
@@ -359,7 +359,7 @@ namespace Voxelgine.States
 			stack.AddChild(btnClear);
 
 			var btnBack = new Button { Text = "Back to Main Menu", Size = new Vector2(cw, 40) };
-			btnBack.Clicked += (s, e) => Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
+			btnBack.Clicked += (s, e) => Client.RequestState(ClientStateKind.MainMenu);
 			stack.AddChild(btnBack);
 
 			scroll.AddChild(stack);
@@ -525,7 +525,7 @@ namespace Voxelgine.States
 		{
 			if (Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
-				Eng.DI.GetRequiredService<IGameWindow>().SetState(Eng.AsClient().MainMenuState);
+				Client.RequestState(ClientStateKind.MainMenu);
 			}
 		}
 
@@ -622,7 +622,7 @@ namespace Voxelgine.States
 			_gui.Render(pass, timing.DeltaTime, timing.TotalTime);
 		}
 
-		public override void Dispose()
+		protected override void DisposeCore()
 		{
 			_fishParticles.Dispose();
 			_gui.Dispose();

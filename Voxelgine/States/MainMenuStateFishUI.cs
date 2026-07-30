@@ -32,8 +32,6 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	private Window developerWindow;
 	private ImageBox titleLogo;
 	private Vector2 titleImageSize;
-	private ServerLoop hostedServer;
-	private Thread hostThread;
 	private bool hostedServerStartupPending;
 	private int pendingHostPort;
 	private string pendingHostPlayerName;
@@ -42,7 +40,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	/// <summary>
 	/// The hosted server instance, or null when no local server is running.
 	/// </summary>
-	public ServerLoop HostedServer => hostedServer;
+	public ServerLoop HostedServer => Client.HostedServer;
 
 	internal IReadOnlyList<Button> MainButtons => mainButtons;
 
@@ -71,7 +69,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	public MainMenuStateFishUI(IGameWindow window, IFishEngineRunner engine)
 		: base(window, engine)
 	{
-		logging = engine.DI.GetRequiredService<IFishLogging>();
+		logging = engine.Logging;
 		gui = new FishUIManager(window, logging);
 
 		CreateTitleLogo();
@@ -186,7 +184,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		npcButton.OnButtonPressed += (_, _, _) =>
 		{
 			HideModal(developerWindow);
-			Window.SetState(Eng.AsClient().NPCPreviewState);
+			Client.RequestState(ClientStateKind.NpcPreview);
 		};
 		developerWindow.AddChild(npcButton);
 
@@ -200,7 +198,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		effectsButton.OnButtonPressed += (_, _, _) =>
 		{
 			HideModal(developerWindow);
-			Window.SetState(Eng.AsClient().EffectsPreviewState);
+			Client.RequestState(ClientStateKind.EffectsPreview);
 		};
 		developerWindow.AddChild(effectsButton);
 
@@ -214,7 +212,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		materialButton.OnButtonPressed += (_, _, _) =>
 		{
 			HideModal(developerWindow);
-			Window.SetState(Eng.AsClient().VoxelMaterialPreviewState);
+			Client.RequestState(ClientStateKind.VoxelMaterialPreview);
 		};
 		developerWindow.AddChild(materialButton);
 
@@ -336,31 +334,9 @@ public partial class MainMenuStateFishUI : GameStateImpl
 	/// </summary>
 	public void StopHostedServer()
 	{
-		ServerLoop server = hostedServer;
-		Thread serverThread = hostThread;
 		hostedServerStartupPending = false;
 		SetHostControlsStarting(false);
-
-		if (server == null)
-		{
-			return;
-		}
-
-		server.Stop();
-		if (serverThread is { IsAlive: true }
-			&& !serverThread.Join(TimeSpan.FromSeconds(30)))
-		{
-			logging.Log(
-				GameLogLevel.Error,
-				"HostedServer",
-				"Hosted server did not stop within 30 seconds; resources were left intact to avoid disposing a live server thread."
-			);
-			return;
-		}
-
-		server.Dispose();
-		hostedServer = null;
-		hostThread = null;
+		Client.StopHostedServer();
 	}
 
 	public override void SwapTo()
@@ -410,9 +386,8 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		LayoutMenu(window.Width, window.Height);
 	}
 
-	public override void Dispose()
+	protected override void DisposeCore()
 	{
-		StopHostedServer();
 		gui.Dispose();
 	}
 }

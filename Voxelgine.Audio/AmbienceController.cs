@@ -52,7 +52,7 @@ public sealed class AmbienceController : IDisposable
 
     public AmbienceController(
         IAudioSystem audio,
-        AmbienceControllerOptions? options = null)
+        AmbienceControllerOptions options = null)
     {
         _audio = audio ?? throw new ArgumentNullException(nameof(audio));
         _options = options ?? new AmbienceControllerOptions();
@@ -164,7 +164,7 @@ public sealed class AmbienceController : IDisposable
 
     private void UpdateCampfires(
         Vector3 listenerPosition,
-        IReadOnlyList<Vector3>? positions)
+        IReadOnlyList<Vector3> positions)
     {
         positions ??= Array.Empty<Vector3>();
         float rangeSquared = _options.CampfireRange * _options.CampfireRange;

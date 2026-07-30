@@ -140,10 +140,13 @@ namespace Voxelgine.States
 		/// <summary>The entity manager (available after world data is loaded).</summary>
 		public EntityManager Entities => _simulation?.Entities;
 
+		public bool IsLocalPlayerSubmerged => _simulation?.LocalPlayer != null
+			&& _simulation.Map.IsWaterAt(_simulation.LocalPlayer.Position);
+
 		public MPClientGameState(IGameWindow window, IFishEngineRunner eng) : base(window, eng)
 		{
 			_gameWindow = window;
-			_logging = eng.DI.GetRequiredService<IFishLogging>();
+			_logging = eng.Logging;
 			_neutralInputManager = new InputMgr(_neutralInputSource);
 		}
 
@@ -255,7 +258,7 @@ namespace Voxelgine.States
 					{
 						// Return to main menu
 						Cleanup();
-						Window.SetState(Eng.AsClient().MainMenuState);
+						Client.RequestState(ClientStateKind.MainMenu);
 						return;
 					}
 
@@ -559,7 +562,7 @@ namespace Voxelgine.States
 				}
 			}
 			Cleanup();
-			Window.SetState(Eng.AsClient().MainMenuState);
+			Client.RequestState(ClientStateKind.MainMenu);
 		}
 
 		private void Cleanup()
@@ -632,7 +635,7 @@ namespace Voxelgine.States
 			_showPlayerList = false;
 		}
 
-		public override void Dispose()
+		protected override void DisposeCore()
 		{
 			Cleanup();
 		}

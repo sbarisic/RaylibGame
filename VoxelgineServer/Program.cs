@@ -9,6 +9,7 @@ namespace VoxelgineServer
 			int port = 7777;
 			int seed = 666;
 			bool forceRegen = false;
+			string dataRoot = null;
 			Voxelgine.Engine.DI.GameLogLevel logLevel = Voxelgine.Engine.DI.GameLogLevel.Trace;
 
 			for (int i = 0; i < args.Length; i++)
@@ -37,6 +38,10 @@ namespace VoxelgineServer
 						}
 						break;
 
+					case "--data-root" when i + 1 < args.Length:
+						dataRoot = args[++i];
+						break;
+
 					case "--help":
 						Console.WriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 						Console.WriteLine("Usage: VoxelgineServer [options]");
@@ -44,12 +49,19 @@ namespace VoxelgineServer
 						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
 						Console.WriteLine("  --force-regen   Force world regeneration even if save file exists");
 						Console.WriteLine("  --log-level     Minimum console.log level (default: Trace)");
+						Console.WriteLine("  --data-root     Writable world, player, and log directory");
 						Console.WriteLine("  --help          Show this help message");
 						return;
 				}
 			}
 
-			using ServerLoop server = new ServerLoop(logLevel);
+			Voxelgine.Engine.RuntimePaths runtimePaths = Voxelgine.Engine.RuntimePathResolver.ResolveRuntimePaths(
+				Voxelgine.Engine.ApplicationKind.DedicatedServer,
+				dataRoot,
+				Environment.CurrentDirectory,
+				message => Console.Error.WriteLine(message));
+			using ServerApplication application = new(runtimePaths, logLevel);
+			ServerLoop server = application.Server;
 
 			Console.CancelKeyPress += (_, e) =>
 			{
@@ -80,7 +92,7 @@ namespace VoxelgineServer
 			consoleThread.Start();
 
 			// Start blocks until Stop() is called
-			server.Start(port, seed, forceRegen);
+			application.Run(port, seed, forceRegen);
 		}
 	}
 }

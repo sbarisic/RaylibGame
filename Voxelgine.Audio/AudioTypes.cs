@@ -157,7 +157,7 @@ public sealed record AudioSystemOptions
 
     public int? RandomSeed { get; init; }
 
-    public Action<string>? Log { get; init; }
+    public Action<string> Log { get; init; }
 }
 
 public readonly record struct AudioSystemStats(

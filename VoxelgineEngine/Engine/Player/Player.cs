@@ -72,7 +72,7 @@ public unsafe partial class Player : IDisposable
 	)
 	{
 		Eng = engine ?? throw new ArgumentNullException(nameof(engine));
-		Logging = engine.DI.GetRequiredService<IFishLogging>();
+		Logging = engine.Logging;
 		PlayerId = playerId;
 		Snd = audioSink ?? NullGameAudioSink.Instance;
 		Camera = new FPSCamera(mouseSensitivity);

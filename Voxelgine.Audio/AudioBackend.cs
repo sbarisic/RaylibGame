@@ -50,7 +50,7 @@ internal interface IAudioBackend : IDisposable
 {
     bool IsAvailable { get; }
 
-    BackendClip? LoadClip(
+    BackendClip LoadClip(
         string path,
         bool streamed,
         AudioSpatialMode spatialMode);
@@ -118,7 +118,7 @@ internal sealed class NativeAudioBackend : IAudioBackend
 
     public bool IsAvailable => !_disposed;
 
-    public BackendClip? LoadClip(
+    public BackendClip LoadClip(
         string path,
         bool streamed,
         AudioSpatialMode spatialMode)
@@ -469,7 +469,7 @@ internal sealed class NullAudioBackend : IAudioBackend
 {
     public bool IsAvailable => false;
 
-    public BackendClip? LoadClip(
+    public BackendClip LoadClip(
         string path,
         bool streamed,
         AudioSpatialMode spatialMode) => null;

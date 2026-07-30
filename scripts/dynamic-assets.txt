@@ -1,0 +1,8 @@
+# Paths selected by runtime data or conventions rather than string literals.
+data/animations/**
+data/entities/**
+data/models/**
+data/shaders/**
+data/sound/**
+data/textures/**
+data/themes/**

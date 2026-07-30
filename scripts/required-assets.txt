@@ -1,0 +1,15 @@
+# Required immutable assets checked in every client publish.
+data/audio/audio-bank.json
+data/config.defaults.json
+data/fonts/medodica.otf
+data/fonts/shpinch.otf
+data/fonts/vt323.ttf
+data/models/npc/humanoid.json
+data/models/orb_xp/orb_xp.obj
+data/shaders/fishgfx/entity_lit.vert
+data/shaders/fishgfx/entity_lit.frag
+data/textures/atlas.png
+data/textures/atlas_normal.png
+data/textures/atlas_specular.png
+data/textures/atlas_roughness.png
+data/textures/title.png

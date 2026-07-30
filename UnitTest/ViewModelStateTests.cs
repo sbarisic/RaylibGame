@@ -21,12 +21,7 @@ public sealed class ViewModelStateTests
 
 	private static TestEngineRunner CreateEngine()
 	{
-		FishDI services = new();
-		services.AddSingleton<IFishLogging, NullLogging>();
-		services.AddSingleton<ILerpManager, LerpManager>();
-		services.Build();
-		services.CreateScope();
-		return new TestEngineRunner { DI = services };
+		return new TestEngineRunner();
 	}
 
 	private sealed class NullLogging : IFishLogging
@@ -41,15 +36,10 @@ public sealed class ViewModelStateTests
 
 	private sealed class TestEngineRunner : IFishEngineRunner
 	{
-		public FishDI DI { get; set; } = null!;
+		public IFishLogging Logging { get; } = new NullLogging();
+		public ILerpManager LerpManager { get; } = new LerpManager();
 		public int ChunkDrawCalls { get; set; }
 		public bool DebugMode { get; set; }
 		public float TotalTime { get; set; }
-		public MainMenuStateFishUI MainMenuState { get; set; } = null!;
-		public NPCPreviewState NPCPreviewState { get; set; } = null!;
-		public EffectsPreviewState EffectsPreviewState { get; set; } = null!;
-		public MPClientGameState MultiplayerGameState { get; set; } = null!;
-
-		public void Init() { }
 	}
 }

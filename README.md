@@ -63,6 +63,11 @@ git submodule sync --recursive
 git submodule update --init --recursive
 ```
 
+Mutable configuration, saves, player records, and logs are stored in a
+writable per-user runtime directory, not beside the executable. See
+[`docs/RUNTIME_DATA.md`](docs/RUNTIME_DATA.md), or pass `--data-root <path>` to
+the client or dedicated server.
+
 Do not use `git submodule update --remote`. The parent repositories deliberately
 pin exact dependency commits.
 

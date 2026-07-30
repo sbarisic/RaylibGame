@@ -67,6 +67,21 @@ if ($Kind -eq 'Client') {
         'phonon*.dll'
     )
     $clientFiles = @(Get-ChildItem -LiteralPath $publishRoot -Recurse -File)
+
+    function Test-ManifestPattern([string] $relativePath, [string] $pattern) {
+        $regex = '^' + [regex]::Escape($pattern).Replace('\*\*', '.*').Replace('\*', '[^/]*') + '$'
+        return [regex]::IsMatch($relativePath, $regex, [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    }
+
+    $forbiddenManifest = Join-Path $PSScriptRoot 'forbidden-assets.txt'
+    $forbiddenAssetPatterns = Get-Content -LiteralPath $forbiddenManifest |
+        Where-Object { $_ -and -not $_.StartsWith('#', [StringComparison]::Ordinal) }
+    foreach ($file in $clientFiles) {
+        $relativePath = [System.IO.Path]::GetRelativePath($publishRoot, $file.FullName).Replace('\', '/')
+        if ($forbiddenAssetPatterns | Where-Object { Test-ManifestPattern $relativePath $_ }) {
+            throw "Client publish contains forbidden content: $relativePath"
+        }
+    }
     foreach ($pattern in $forbiddenClientPatterns) {
         $matches = @($clientFiles | Where-Object Name -Like $pattern)
         if ($matches.Count -gt 0) {

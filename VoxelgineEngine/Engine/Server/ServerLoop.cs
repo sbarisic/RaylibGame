@@ -60,13 +60,14 @@ namespace Voxelgine.Engine.Server
 		/// <summary>
 		/// File path for the persisted server world.
 		/// </summary>
-		private const string MapFile = "data/map.bin";
+		private readonly string _mapFile;
+		private readonly RuntimePaths _runtimePaths;
 
 		private readonly NetServer _server;
 		private readonly WorldStreamManager _worldStream;
 		private readonly IFishLogging _logging;
 		private readonly IFishEngineRunner _eng;
-		private readonly FishDI _di;
+		private readonly LerpManager _lerpManager;
 		private GameSimulation _simulation;
 		private int _worldSeed;
 		private WorldArchivePayloadCache _archivePayloadCache;
@@ -147,36 +148,30 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		public Task StartupTask => _startupCompletion.Task;
 
-		public ServerLoop(GameLogLevel minimumLogLevel = GameLogLevel.Trace)
+		public ServerLoop(
+			RuntimePaths runtimePaths,
+			GameLogLevel minimumLogLevel = GameLogLevel.Trace)
 		{
-			_di = new FishDI();
-			_di.AddSingleton<IFishEngineRunner, ServerEngineRunner>();
-			_di.AddSingleton<IFishConfig, ServerConfig>();
-			_di.AddSingleton<IFishDebug, Debug>();
-			_di.AddSingleton<IFishLogging, FishLogging>();
-			_di.AddSingleton<ILerpManager, LerpManager>();
-
-			_di.Build();
-			_di.CreateScope();
-
-			IFishEngineRunner eng = _di.GetRequiredService<IFishEngineRunner>();
-			eng.DI = _di;
-			_eng = eng;
-
-			ServerConfig cfg = _di.GetRequiredService<ServerConfig>();
-			cfg.LogFolder = "data";
-			cfg.LogLevel = minimumLogLevel;
-
-			_logging = _di.GetRequiredService<IFishLogging>();
+			_runtimePaths = runtimePaths ?? throw new ArgumentNullException(nameof(runtimePaths));
+			_runtimePaths.CreateDirectories();
+			_mapFile = Path.Combine(_runtimePaths.WorldDirectory, "map.bin");
+			ServerConfig cfg = new()
+			{
+				LogFolder = _runtimePaths.LogDirectory,
+				LogLevel = minimumLogLevel,
+			};
+			_logging = new FishLogging(cfg);
 			_logging.Init(true);
-			_playerData = new PlayerDataStore("data/players", _logging);
+			_lerpManager = new LerpManager();
+			_eng = new ServerEngineRunner(_logging, _lerpManager);
+			_playerData = new PlayerDataStore(_runtimePaths.PlayerDirectory, _logging);
 			_logging.Log(GameLogLevel.Info, "Startup", $"Server initialized processId={Environment.ProcessId} logLevel={minimumLogLevel} workingDirectory={Environment.CurrentDirectory}");
 
 			_server = new NetServer(_logging);
 #if DEBUG
 			//_server.PacketLoggingEnabled = true;
 #endif
-			_simulation = new GameSimulation(eng);
+			_simulation = new GameSimulation(_eng);
 			_simulation.Entities.PlayerTouchedEntity += OnPlayerTouchedEntity;
 			_worldStream = new WorldStreamManager(_server, _simulation.Map, _logging);
 
@@ -204,14 +199,14 @@ namespace Voxelgine.Engine.Server
 				_worldSeed = worldSeed;
 				_logging.ServerWriteLine("VoxelgineServer - Aurora Falls Dedicated Server");
 
-				string mapDirectory = Path.GetDirectoryName(MapFile);
+				string mapDirectory = Path.GetDirectoryName(_mapFile);
 				if (!string.IsNullOrEmpty(mapDirectory))
 					Directory.CreateDirectory(mapDirectory);
 
 				bool generated = true;
-				if (File.Exists(MapFile) && !forceRegenerate)
+				if (File.Exists(_mapFile) && !forceRegenerate)
 				{
-					string backup = WorldArchive.MoveIncompatibleFileToBackup(MapFile);
+					string backup = WorldArchive.MoveIncompatibleFileToBackup(_mapFile);
 					if (backup != null)
 					{
 						_logging.Log(
@@ -223,7 +218,7 @@ namespace Voxelgine.Engine.Server
 					{
 						Stopwatch loadTimer = Stopwatch.StartNew();
 						WorldArchiveReadResult archive;
-						using (FileStream archiveStream = File.OpenRead(MapFile))
+						using (FileStream archiveStream = File.OpenRead(_mapFile))
 							archive = WorldArchive.Read(archiveStream, cancellationToken);
 						_simulation.Map.ReplaceAllColumns(archive.Columns);
 						_archivePayloadCache = archive.PayloadCache;
@@ -236,7 +231,7 @@ namespace Voxelgine.Engine.Server
 						_logging.Log(
 							GameLogLevel.Info,
 							"Persistence",
-							$"world-load path={Path.GetFullPath(MapFile)} columns={archive.Columns.Count} seed={_worldSeed} durationMs={loadTimer.Elapsed.TotalMilliseconds:F1}");
+							$"world-load path={Path.GetFullPath(_mapFile)} columns={archive.Columns.Count} seed={_worldSeed} durationMs={loadTimer.Elapsed.TotalMilliseconds:F1}");
 					}
 				}
 
@@ -458,7 +453,7 @@ namespace Voxelgine.Engine.Server
 			try
 			{
 				Stopwatch timer = Stopwatch.StartNew();
-				string temporaryPath = MapFile + ".tmp";
+				string temporaryPath = _mapFile + ".tmp";
 				using (FileStream fileStream = File.Create(temporaryPath))
 				{
 					_archivePayloadCache = WorldArchive.Write(
@@ -468,16 +463,16 @@ namespace Voxelgine.Engine.Server
 						_archivePayloadCache);
 					fileStream.Flush(flushToDisk: true);
 				}
-				File.Move(temporaryPath, MapFile, overwrite: true);
+				File.Move(temporaryPath, _mapFile, overwrite: true);
 				_worldStream.SetArchivePayloadCache(_archivePayloadCache);
 				_logging.Log(
 					GameLogLevel.Info,
 					"Persistence",
-					$"world-save path={Path.GetFullPath(MapFile)} columns={_simulation.Map.ColumnCount} bytes={new FileInfo(MapFile).Length} durationMs={timer.Elapsed.TotalMilliseconds:F1}");
+					$"world-save path={Path.GetFullPath(_mapFile)} columns={_simulation.Map.ColumnCount} bytes={new FileInfo(_mapFile).Length} durationMs={timer.Elapsed.TotalMilliseconds:F1}");
 			}
 			catch (Exception ex)
 			{
-				_logging.Log(GameLogLevel.Error, "Persistence", $"Failed to save world path={Path.GetFullPath(MapFile)}", ex);
+				_logging.Log(GameLogLevel.Error, "Persistence", $"Failed to save world path={Path.GetFullPath(_mapFile)}", ex);
 			}
 		}
 
@@ -530,7 +525,7 @@ namespace Voxelgine.Engine.Server
 			public int WindowWidth { get; set; } = 0;
 			public int WindowHeight { get; set; } = 0;
 			public string Title { get; set; } = "VoxelgineServer";
-			public string LogFolder { get; set; } = "data";
+			public string LogFolder { get; set; }
 			public GameLogLevel LogLevel { get; set; } = GameLogLevel.Trace;
 			public void LoadFromJson() { }
 		}
@@ -540,12 +535,17 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private class ServerEngineRunner : IFishEngineRunner
 		{
-			public FishDI DI { get; set; }
+			public ServerEngineRunner(IFishLogging logging, ILerpManager lerpManager)
+			{
+				Logging = logging;
+				LerpManager = lerpManager;
+			}
+
+			public IFishLogging Logging { get; }
+			public ILerpManager LerpManager { get; }
 			public int ChunkDrawCalls { get; set; }
 			public bool DebugMode { get; set; }
 			public float TotalTime { get; set; }
-
-			public void Init() { }
 		}
 	}
 }

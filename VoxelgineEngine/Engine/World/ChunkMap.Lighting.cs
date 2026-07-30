@@ -79,23 +79,27 @@ namespace Voxelgine.Graphics
 			Parallel.ForEach(chunks, static chunk => chunk.MarkDirty());
 		}
 
-		public float GetLightLevel(Vector3 position) => GetLightLevel(
+		public float GetLightLevel(Vector3 position, in WorldLightingState lighting) => GetLightLevel(
 			(int)MathF.Floor(position.X),
 			(int)MathF.Floor(position.Y),
-			(int)MathF.Floor(position.Z));
+			(int)MathF.Floor(position.Z),
+			lighting);
 
-		public float GetLightLevel(int x, int y, int z)
+		public float GetLightLevel(int x, int y, int z, in WorldLightingState lighting)
 		{
+			if (lighting.Fullbright)
+				return 1f;
+
 			PlacedBlock block = GetPlacedBlock(x, y, z, out _);
-			float skyContribution = block.GetMaxSkylight() * BlockLight.SkyLightMultiplier;
+			float skyContribution = block.GetMaxSkylight() * lighting.SkyLightMultiplier;
 			float combined = MathF.Max(skyContribution, block.GetMaxBlockLight());
-			combined = MathF.Max(combined, BlockLight.AmbientLight);
+			combined = MathF.Max(combined, lighting.AmbientLight);
 			return combined / 15f;
 		}
 
-		public Rgba32 GetLightColor(Vector3 position)
+		public Rgba32 GetLightColor(Vector3 position, in WorldLightingState lighting)
 		{
-			byte value = (byte)(GetLightLevel(position) * byte.MaxValue);
+			byte value = (byte)(GetLightLevel(position, lighting) * byte.MaxValue);
 			return new Rgba32(value, value, value);
 		}
 	}

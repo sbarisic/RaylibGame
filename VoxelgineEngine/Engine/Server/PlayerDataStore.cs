@@ -22,9 +22,12 @@ namespace Voxelgine.Engine.Server
 		private readonly string _directory;
 		private readonly IFishLogging _logging;
 
-		public PlayerDataStore(string directory = "data/players", IFishLogging logging = null)
+		/// <param name="directory">Required writable player-data directory.</param>
+		/// <param name="logging">Optional logger. Errors are otherwise suppressed.</param>
+		public PlayerDataStore(string directory, IFishLogging logging = null)
 		{
-			_directory = directory;
+			ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+			_directory = Path.GetFullPath(directory);
 			_logging = logging;
 		}
 

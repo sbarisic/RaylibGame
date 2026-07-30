@@ -89,23 +89,4 @@ public sealed class CorrectnessRegressionTests
 			visited);
 	}
 
-	[Fact]
-	public void FishDi_ResolvesConcreteClassWithoutGuessingItsInterfaces()
-	{
-		using FishDI services = new();
-		services.AddSingleton<IConcreteService, ConcreteService>();
-		services.Build();
-		services.CreateScope();
-
-		ConcreteService concrete = services.GetRequiredService<ConcreteService>();
-		Assert.Same(concrete, services.GetRequiredService<IConcreteService>());
-	}
-
-	private interface IConcreteService
-	{
-	}
-
-	private sealed class ConcreteService : IConcreteService
-	{
-	}
 }

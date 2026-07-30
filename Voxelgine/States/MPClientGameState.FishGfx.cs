@@ -152,7 +152,7 @@ public unsafe partial class MPClientGameState
 			return;
 		}
 
-		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
+		GameConfig config = Client.Config;
 		_fishVoxelScene = new FishGfxVoxelScene(
 			fishWindow.RenderWindow.Graphics,
 			fishWindow.Assets,
@@ -177,7 +177,7 @@ public unsafe partial class MPClientGameState
 			$"Configured drawDistance={_fishVoxelScene.MaxChunkDrawDistance} meshUploadBudget={_fishVoxelScene.ChunkMeshUploadBudget}; indexed fire emitters campfires={_fishVoxelScene.CampfirePositions.Count} torches={_fishVoxelScene.TorchCount}"
 		);
 		_fishAmbience = new FishGfxAmbienceSession(
-			Eng.DI.GetRequiredService<IAudioSystem>(),
+			Client.Audio,
 			_fishVoxelScene
 		);
 		try
@@ -242,9 +242,7 @@ public unsafe partial class MPClientGameState
 		{
 			return;
 		}
-		_fishVoxelScene.FogVolume.Quality = Eng.DI
-			.GetRequiredService<GameConfig>()
-			.VolumetricFogQuality;
+		_fishVoxelScene.FogVolume.Quality = Client.Config.VolumetricFogQuality;
 		if (!_initialized || _simulation?.LocalPlayer is null)
 		{
 			Vector2 loadingFramebuffer = ((IFishGfxGameWindow)_gameWindow).RenderWindow.FramebufferSize;

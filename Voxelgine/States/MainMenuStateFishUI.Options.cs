@@ -421,7 +421,7 @@ public partial class MainMenuStateFishUI
 
 	private void ShowOptionsWindow()
 	{
-		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
+		GameConfig config = Client.Config;
 		optionsBaseline = GameOptionsDraft.FromConfig(config);
 		optionsDraft = optionsBaseline with { };
 		optionMonitors.Clear();
@@ -694,7 +694,7 @@ public partial class MainMenuStateFishUI
 			return;
 		}
 
-		GameConfig config = Eng.DI.GetRequiredService<GameConfig>();
+		GameConfig config = Client.Config;
 		GameOptionsDraft previous = GameOptionsDraft.FromConfig(config);
 		try
 		{

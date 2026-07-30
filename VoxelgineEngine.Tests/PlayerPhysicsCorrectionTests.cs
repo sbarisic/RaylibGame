@@ -301,20 +301,16 @@ public sealed class PlayerPhysicsCorrectionTests
 
 	private static Player CreatePlayer()
 	{
-		FishDI services = new();
-		services.AddSingleton<IFishLogging>(_ => new NullLogging());
-		services.Build();
-		services.CreateScope();
-		return new Player(new TestEngineRunner { DI = services }, 1);
+		return new Player(new TestEngineRunner(), 1);
 	}
 
 	private sealed class TestEngineRunner : IFishEngineRunner
 	{
-		public FishDI DI { get; set; } = null!;
+		public IFishLogging Logging { get; } = new NullLogging();
+		public ILerpManager LerpManager { get; } = new LerpManager();
 		public int ChunkDrawCalls { get; set; }
 		public bool DebugMode { get; set; }
 		public float TotalTime { get; set; }
-		public void Init() { }
 	}
 
 	private sealed class NullLogging : IFishLogging

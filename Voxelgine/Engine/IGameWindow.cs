@@ -24,5 +24,5 @@ public interface IGameWindow : IDisposable
 
 	bool IsOpen();
 
-	void SetState(GameStateImpl state);
+	void RouteState(GameStateImpl state);
 }

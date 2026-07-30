@@ -64,7 +64,11 @@ public class PhysicalInputTests
 		  ]
 		}
 		""";
-		GameConfig config = new(null);
+		RuntimePaths paths = RuntimePathResolver.ResolveRuntimePaths(
+			ApplicationKind.Test,
+			Path.Combine(Path.GetTempPath(), $"aurora-falls-input-{Guid.NewGuid():N}"),
+			Environment.CurrentDirectory);
+		GameConfig config = new(paths);
 
 		JsonConvert.PopulateObject(json, config, GameConfig.CreateJsonSettings());
 

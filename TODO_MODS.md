@@ -33,7 +33,7 @@ Planned tasks for implementing the mod system API.
 | **Event system** | Publish/subscribe event bus | Mods subscribe to game events (block changes, entity spawns, player actions, tick); avoids tight coupling |
 | **Mod lifecycle** | Init → Load → Enable → Tick → Disable → Unload | Clear lifecycle with hooks at each stage |
 | **Multiplayer execution** | Server-authoritative, client presentation | Gameplay mods (world/entity/player changes) run on the server. Client receives changes via existing sync. Client-side mods handle presentation only (particles, sounds, GUI). Mod manifest declares `side` (server/client/both). |
-| **Service integration** | Extend `FishDI` for mod service registration | Mods can register/resolve services using existing DI infrastructure |
+| **Service integration** | Define an explicit mod-service registry owned by the application | Mods can register and resolve only supported services |
 
 ### Systems to Expose
 

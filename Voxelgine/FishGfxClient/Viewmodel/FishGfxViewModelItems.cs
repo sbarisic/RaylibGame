@@ -53,11 +53,7 @@ internal sealed class FishGfxGunItem : Weapon, IViewModelAssetProvider
 
 		ParentPlayer.ViewMdl.ApplyKickback();
 		ParentPlayer.PlaySound("shoot1", ParentPlayer.Position);
-		if (Eng.AsClient().MultiplayerGameState is { IsActive: true } multiplayer)
-		{
-			multiplayer.SendWeaponFire(args.Start, args.Dir);
-			multiplayer.SpawnPredictedFireEffects(args.Start, args.Dir, args.MaxLen);
-		}
+		Eng.AsClient().FireWeapon(args.Start, args.Dir, args.MaxLen);
 	}
 }
 

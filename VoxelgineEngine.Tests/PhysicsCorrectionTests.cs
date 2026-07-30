@@ -168,12 +168,7 @@ public sealed class DoorPhysicsSnapshotTests
 	[Fact]
 	public void ReplicatedClosedAndOpeningDoorStatesProduceIdenticalColliders()
 	{
-		FishDI services = new();
-		services.AddSingleton<IFishLogging>(_ => new NullLogging());
-		TestEngineRunner runner = new() { DI = services };
-		services.AddSingleton<IFishEngineRunner>(_ => runner);
-		services.Build();
-		services.CreateScope();
+		TestEngineRunner runner = new();
 		GameSimulation simulation = new(runner);
 		VEntSlidingDoor door = new();
 		door.Initialize(new Vector3(3f, 0f, 0f), new Vector3(1f, 2f, 1f));
@@ -243,11 +238,11 @@ public sealed class DoorPhysicsSnapshotTests
 
 	private sealed class TestEngineRunner : IFishEngineRunner
 	{
-		public FishDI DI { get; set; } = null!;
+		public IFishLogging Logging { get; } = new NullLogging();
+		public ILerpManager LerpManager { get; } = new LerpManager();
 		public int ChunkDrawCalls { get; set; }
 		public bool DebugMode { get; set; }
 		public float TotalTime { get; set; }
-		public void Init() { }
 	}
 
 	private sealed class NullLogging : IFishLogging

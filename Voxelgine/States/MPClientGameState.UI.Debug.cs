@@ -87,12 +87,12 @@ namespace Voxelgine.States
 			// Server packet logging (only when hosting)
 			var chkServerPacketLog = new CheckBox("Server Packet Logging")
 			{
-				IsChecked = Eng.AsClient().MainMenuState?.HostedServer?.Server?.PacketLoggingEnabled ?? false,
+				IsChecked = Client.HostedServer?.Server?.PacketLoggingEnabled ?? false,
 				Size = new Vector2(24, 24)
 			};
 			chkServerPacketLog.OnCheckedChanged += (sender, isChecked) =>
 			{
-				var server = Eng.AsClient().MainMenuState?.HostedServer?.Server;
+				var server = Client.HostedServer?.Server;
 				if (server != null) server.PacketLoggingEnabled = isChecked;
 			};
 			stack.AddChild(chkServerPacketLog);
@@ -301,4 +301,3 @@ namespace Voxelgine.States
 		/// </summary>
 	}
 }
-

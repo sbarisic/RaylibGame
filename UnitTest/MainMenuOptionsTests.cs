@@ -347,6 +347,10 @@ public sealed class MainMenuOptionsTests
 
 	private static GameConfig CreateConfig()
 	{
-		return new GameConfig(null);
+		RuntimePaths paths = RuntimePathResolver.ResolveRuntimePaths(
+			ApplicationKind.Test,
+			Path.Combine(Path.GetTempPath(), $"aurora-falls-options-{Guid.NewGuid():N}"),
+			Environment.CurrentDirectory);
+		return new GameConfig(paths);
 	}
 }

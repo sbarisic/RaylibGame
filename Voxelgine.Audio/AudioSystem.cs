@@ -13,7 +13,7 @@ public sealed class AudioSystem : IAudioSystem
     private ulong _observedDroppedEvents;
     private bool _disposed;
 
-    public AudioSystem(AudioSystemOptions? options = null)
+    public AudioSystem(AudioSystemOptions options = null)
     {
         options ??= new AudioSystemOptions();
         ValidateOptions(options);
@@ -38,7 +38,7 @@ public sealed class AudioSystem : IAudioSystem
     internal AudioSystem(
         IAudioBackend backend,
         IAudioRandom random,
-        Action<string>? logger = null)
+        Action<string> logger = null)
     {
         _backend = backend;
         _random = random;
@@ -55,7 +55,7 @@ public sealed class AudioSystem : IAudioSystem
         ArgumentNullException.ThrowIfNull(cue);
         ValidateCue(cue);
 
-        if (_cues.Remove(cue.CueId, out CueRuntime? existing))
+        if (_cues.Remove(cue.CueId, out CueRuntime existing))
         {
             DisposeCue(existing);
         }
@@ -64,7 +64,7 @@ public sealed class AudioSystem : IAudioSystem
         foreach (AudioCueVariant variant in cue.Variants)
         {
             string path = Path.GetFullPath(variant.Path);
-            BackendClip? clip = _backend.LoadClip(
+            BackendClip clip = _backend.LoadClip(
                 path,
                 cue.Streamed,
                 cue.SpatialMode);
@@ -95,7 +95,7 @@ public sealed class AudioSystem : IAudioSystem
         ArgumentException.ThrowIfNullOrWhiteSpace(cueId);
         ValidateEmitter(emitter);
 
-        if (!_cues.TryGetValue(cueId, out CueRuntime? cue))
+        if (!_cues.TryGetValue(cueId, out CueRuntime cue))
         {
             LogOnce($"Unknown audio cue '{cueId}'; playback will be silent.");
             return default;
@@ -156,7 +156,7 @@ public sealed class AudioSystem : IAudioSystem
         ValidateStream(stream);
 
         string path = Path.GetFullPath(stream.Path);
-        BackendClip? clip = _backend.LoadClip(path, true, stream.SpatialMode);
+        BackendClip clip = _backend.LoadClip(path, true, stream.SpatialMode);
         if (clip is null)
         {
             LogOnce($"Audio stream '{path}' could not be loaded; playback will be silent.");
@@ -368,7 +368,7 @@ public sealed class AudioSystem : IAudioSystem
         }
 
         uint fadeMilliseconds = ToMilliseconds(fadeSeconds);
-        if (_voices.TryGetValue(voice, out VoiceRuntime? runtime))
+        if (_voices.TryGetValue(voice, out VoiceRuntime runtime))
         {
             runtime.Variant?.ActiveVoices.Remove(voice);
         }
@@ -383,7 +383,7 @@ public sealed class AudioSystem : IAudioSystem
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ValidateGain(gain);
-        if (voice != 0 && _voices.TryGetValue(voice, out VoiceRuntime? runtime))
+        if (voice != 0 && _voices.TryGetValue(voice, out VoiceRuntime runtime))
         {
             _backend.SetGain(
                 voice,
@@ -407,10 +407,10 @@ public sealed class AudioSystem : IAudioSystem
 
     private void PruneFinished(VariantRuntime variant)
     {
-        LinkedListNode<ulong>? node = variant.ActiveVoices.First;
+        LinkedListNode<ulong> node = variant.ActiveVoices.First;
         while (node is not null)
         {
-            LinkedListNode<ulong>? next = node.Next;
+            LinkedListNode<ulong> next = node.Next;
             if (!_backend.IsVoiceActive(node.Value))
             {
                 variant.ActiveVoices.Remove(node);
@@ -433,7 +433,7 @@ public sealed class AudioSystem : IAudioSystem
 
     private void ReleaseVoice(ulong voice)
     {
-        if (!_voices.Remove(voice, out VoiceRuntime? runtime))
+        if (!_voices.Remove(voice, out VoiceRuntime runtime))
         {
             return;
         }
@@ -604,7 +604,7 @@ public sealed class AudioSystem : IAudioSystem
         public VariantRuntime(
             AudioCueVariant definition,
             string path,
-            BackendClip? clip)
+            BackendClip clip)
         {
             Definition = definition;
             Path = path;
@@ -615,14 +615,14 @@ public sealed class AudioSystem : IAudioSystem
 
         public string Path { get; }
 
-        public BackendClip? Clip { get; }
+        public BackendClip Clip { get; }
 
         public LinkedList<ulong> ActiveVoices { get; } = [];
     }
 
     private sealed record VoiceRuntime(
-        VariantRuntime? Variant,
-        BackendClip? OwnedClip,
+        VariantRuntime Variant,
+        BackendClip OwnedClip,
         AudioBus Bus,
         bool IsStream,
         float DefinitionGain);

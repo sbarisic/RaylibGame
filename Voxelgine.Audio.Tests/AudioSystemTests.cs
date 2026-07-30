@@ -211,7 +211,7 @@ internal sealed class FakeBackend : IAudioBackend
 
     public uint LastGainFadeMilliseconds { get; private set; }
 
-    public BackendClip? LoadClip(string path, bool streamed, AudioSpatialMode spatialMode) =>
+    public BackendClip LoadClip(string path, bool streamed, AudioSpatialMode spatialMode) =>
         FailLoads ? null : new FakeClip(path, () => DisposedClipCount++);
 
     public ulong Play(BackendClip clip, in BackendPlayback playback)

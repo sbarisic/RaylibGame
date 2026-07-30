@@ -148,7 +148,7 @@ internal sealed class SafeAudioEngineHandle : SafeHandleZeroOrMinusOneIsInvalid
 
 internal sealed class SafeAudioClipHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
-    private SafeAudioEngineHandle? _engine;
+    private SafeAudioEngineHandle _engine;
 
     internal SafeAudioClipHandle(
         nint handle,
@@ -183,7 +183,7 @@ internal sealed class SafeAudioClipHandle : SafeHandleZeroOrMinusOneIsInvalid
 
 internal sealed class SafePcmStreamHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
-    private SafeAudioEngineHandle? _engine;
+    private SafeAudioEngineHandle _engine;
 
     internal SafePcmStreamHandle(
         nint handle,

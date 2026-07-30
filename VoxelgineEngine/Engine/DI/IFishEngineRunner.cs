@@ -6,7 +6,11 @@ namespace Voxelgine.Engine.DI;
 /// </summary>
 public interface IFishEngineRunner
 {
-	FishDI DI { get; set; }
+	/// <summary>Structured process logger. Never returns null.</summary>
+	IFishLogging Logging { get; }
+
+	/// <summary>Animation interpolation service. Never returns null.</summary>
+	ILerpManager LerpManager { get; }
 
 	int ChunkDrawCalls { get; set; }
 
@@ -14,5 +18,4 @@ public interface IFishEngineRunner
 
 	float TotalTime { get; set; }
 
-	void Init();
 }

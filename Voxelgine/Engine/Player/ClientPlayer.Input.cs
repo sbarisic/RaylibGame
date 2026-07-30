@@ -63,7 +63,7 @@ namespace Voxelgine.Engine
 		public void ToggleMouse(bool? Enable = null)
 		{
 			bool capture = Enable ?? !CursorDisabled;
-			IFishGfxGameWindow window = (IFishGfxGameWindow)Eng.DI.GetRequiredService<IGameWindow>();
+			IFishGfxGameWindow window = (IFishGfxGameWindow)Eng.AsClient().Window;
 			window.RenderWindow.CaptureCursor = capture;
 			window.RenderWindow.ShowCursor = !capture;
 			CursorDisabled = capture;

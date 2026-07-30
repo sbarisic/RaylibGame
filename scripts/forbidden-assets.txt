@@ -1,0 +1,9 @@
+data/config.json
+data/map.bin
+data/player.bin
+data/players/**
+data/FishUISamples/**
+**/*.bbmodel
+**/*.fbx
+**/*.mcmeta
+**/*.cs

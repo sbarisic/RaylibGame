@@ -57,7 +57,7 @@ public sealed class ViewModel : IDisposable
 	public ViewModel(IFishEngineRunner engine, bool useLegacyRenderer = false)
 	{
 		this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
-		ILerpManager lerpManager = engine.DI.GetRequiredService<ILerpManager>();
+		ILerpManager lerpManager = engine.LerpManager;
 
 		offsetLerp = new LerpVec3(lerpManager)
 		{
@@ -211,7 +211,7 @@ public sealed class ViewModel : IDisposable
 		jiggleOffset = jiggleLerp.GetVec3();
 		swingAngle = swingLerp.GetFloat();
 
-		bool isSubmerged = engine.AsClient().MultiplayerGameState?.Map?.IsWaterAt(player.Position) ?? false;
+		bool isSubmerged = engine.AsClient().IsLocalPlayerSubmerged;
 		float pitchTarget = isSubmerged ? SubmergedPitchTarget : 0;
 		submergedPitch += (pitchTarget - submergedPitch)
 			* MathF.Min(1, SubmergedLerpSpeed * 0.015f);

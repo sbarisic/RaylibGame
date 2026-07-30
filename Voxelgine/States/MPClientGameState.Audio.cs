@@ -15,7 +15,7 @@ public unsafe partial class MPClientGameState
 	private IGameAudioSink CreateAudioSink()
 	{
 		return new MiniaudioGameAudioSink(
-			Eng.DI.GetRequiredService<IAudioSystem>()
+			Client.Audio
 		);
 	}
 

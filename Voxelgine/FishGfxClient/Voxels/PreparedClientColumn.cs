@@ -1,5 +1,4 @@
 #if WINDOWS
-#nullable enable
 using FishGfx.Voxels;
 using Voxelgine.Engine;
 using Voxelgine.Graphics;
@@ -8,7 +7,7 @@ namespace Voxelgine.FishGfxClient.Voxels;
 
 public sealed class PreparedClientColumn : IDisposable
 {
-	private PreparedRenderChunk[]? renderChunks;
+	private PreparedRenderChunk[] renderChunks;
 
 	private PreparedClientColumn(
 		PreparedChunkColumn domainColumn,
@@ -90,7 +89,7 @@ public sealed class PreparedClientColumn : IDisposable
 		catch
 		{
 			domain.Dispose();
-			foreach (PreparedRenderChunk? chunk in render)
+			foreach (PreparedRenderChunk chunk in render)
 			{
 				chunk?.Dispose();
 			}
@@ -105,7 +104,7 @@ public sealed class PreparedClientColumn : IDisposable
 	public void Dispose()
 	{
 		DomainColumn.Dispose();
-		PreparedRenderChunk[]? chunks = Interlocked.Exchange(ref renderChunks, null);
+		PreparedRenderChunk[] chunks = Interlocked.Exchange(ref renderChunks, null);
 		if (chunks == null)
 			return;
 		foreach (PreparedRenderChunk chunk in chunks)
@@ -115,7 +114,7 @@ public sealed class PreparedClientColumn : IDisposable
 
 public sealed class PreparedRenderChunk : IDisposable
 {
-	private PreparedVoxelChunk? storage;
+	private PreparedVoxelChunk storage;
 
 	internal PreparedRenderChunk(
 		ChunkCoordinate coordinate,

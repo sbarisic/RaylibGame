@@ -25,7 +25,7 @@ public class InventoryItem
 	private InventoryItem(IFishEngineRunner engine)
 	{
 		Eng = engine ?? throw new ArgumentNullException(nameof(engine));
-		Logging = engine.DI.GetRequiredService<IFishLogging>();
+		Logging = engine.Logging;
 	}
 
 	public InventoryItem(

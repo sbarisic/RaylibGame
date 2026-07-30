@@ -1,0 +1,21 @@
+{
+  "Monitor": -1,
+  "WindowWidth": 1920,
+  "WindowHeight": 1080,
+  "Fullscreen": false,
+  "UseFSDesktopRes": true,
+  "Borderless": false,
+  "SetFocused": true,
+  "Resizable": true,
+  "TargetFPS": -1,
+  "MouseSensitivity": 0.35,
+  "Title": "Aurora Falls",
+  "LogLevel": "Debug",
+  "HighDpiWindow": true,
+  "VSync": true,
+  "Msaa": true,
+  "MaxChunkDrawDistance": 108,
+  "ChunkMeshUploadBudget": 24,
+  "SunShadowQuality": "Medium",
+  "VolumetricFogQuality": "Medium"
+}

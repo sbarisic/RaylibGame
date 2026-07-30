@@ -1,4 +1,3 @@
-#nullable enable
 using System.Buffers;
 
 namespace Voxelgine.Graphics;
@@ -52,7 +51,7 @@ public readonly record struct FogChunkBounds
 /// </summary>
 public sealed class FogChunkSnapshotLease : IDisposable
 {
-	private FogVoxel[]? buffer;
+	private FogVoxel[] buffer;
 
 	internal FogChunkSnapshotLease(
 		int chunkX,
@@ -82,7 +81,7 @@ public sealed class FogChunkSnapshotLease : IDisposable
 
 	public void Dispose()
 	{
-		FogVoxel[]? released = Interlocked.Exchange(ref buffer, null);
+		FogVoxel[] released = Interlocked.Exchange(ref buffer, null);
 		if (released != null)
 		{
 			ArrayPool<FogVoxel>.Shared.Return(released, clearArray: false);

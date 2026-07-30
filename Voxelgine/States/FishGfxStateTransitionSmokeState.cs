@@ -13,16 +13,13 @@ namespace Voxelgine.States;
 /// </summary>
 internal sealed class FishGfxStateTransitionSmokeState : GameStateImpl
 {
-	private readonly GameStateImpl replacement;
 	private bool transitioned;
 
 	public FishGfxStateTransitionSmokeState(
 		IGameWindow window,
-		IFishEngineRunner engine,
-		GameStateImpl replacement
+		IFishEngineRunner engine
 	) : base(window, engine)
 	{
-		this.replacement = replacement ?? throw new ArgumentNullException(nameof(replacement));
 	}
 
 	public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
@@ -40,7 +37,7 @@ internal sealed class FishGfxStateTransitionSmokeState : GameStateImpl
 		}
 
 		transitioned = true;
-		Window.SetState(replacement);
+		Client.RequestState(ClientStateKind.MainMenu);
 	}
 
 	public override void RenderOverlay(RenderPass pass, in FrameTiming timing)

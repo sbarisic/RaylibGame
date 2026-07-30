@@ -7,8 +7,17 @@ using Voxelgine.FishGfxClient.Voxels;
 
 namespace Voxelgine.Engine;
 
-public abstract class GameStateImpl : IDisposable
+public interface IGameState : IDisposable
 {
+	void Prepare();
+	void Activate();
+	void Deactivate();
+}
+
+public abstract class GameStateImpl : IGameState
+{
+	private int disposed;
+
 	protected GameStateImpl(IGameWindow window, IFishEngineRunner engine)
 	{
 		Window = window ?? throw new ArgumentNullException(nameof(window));
@@ -18,6 +27,22 @@ public abstract class GameStateImpl : IDisposable
 	public IGameWindow Window { get; }
 
 	protected IFishEngineRunner Eng { get; }
+
+	protected IClientEngineRunner Client => (IClientEngineRunner)Eng;
+
+	public virtual void Prepare()
+	{
+	}
+
+	public virtual void Activate()
+	{
+		SwapTo();
+	}
+
+	public virtual void Deactivate()
+	{
+		SwapFrom();
+	}
 
 	public virtual void SwapTo()
 	{
@@ -113,7 +138,15 @@ public abstract class GameStateImpl : IDisposable
 	{
 	}
 
-	public virtual void Dispose()
+	public void Dispose()
+	{
+		if (Interlocked.Exchange(ref disposed, 1) == 0)
+		{
+			DisposeCore();
+		}
+	}
+
+	protected virtual void DisposeCore()
 	{
 	}
 }

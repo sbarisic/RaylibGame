@@ -32,22 +32,39 @@ namespace Voxelgine.Engine
 		/// <summary>Shared collision view over the voxel map and replicated entities.</summary>
 		public PhysicsWorld PhysicsWorld { get; }
 
+		public WorldLightingState Lighting { get; private set; }
+
+		private readonly WorldLightingService lightingService;
+
 		public GameSimulation(IFishEngineRunner eng)
 		{
+			ArgumentNullException.ThrowIfNull(eng);
 			PhysicsData = new PhysData();
+			lightingService = new WorldLightingService();
 			DayNight = new DayNightCycle();
-			DayNight.LightingChanged += ApplyDayNightLighting;
-			ApplyDayNightLighting(DayNight.Lighting);
+			DayNight.LightingChanged += PublishDayNightLighting;
+			PublishDayNightLighting(DayNight.Lighting);
 			Players = new PlayerManager();
 			Entities = new EntityManager(eng);
 			Map = new ChunkMap();
 			PhysicsWorld = new PhysicsWorld(Map, Entities);
 		}
 
-		private static void ApplyDayNightLighting(DayNightLightingState lighting)
+		public void PublishLighting(in WorldLightingState lighting)
 		{
-			BlockLight.SkyLightMultiplier = lighting.SkyLightMultiplier;
-			BlockLight.AmbientLight = lighting.AmbientLight;
+			if (!float.IsFinite(lighting.SkyLightMultiplier)
+				|| lighting.SkyLightMultiplier < 0f)
+			{
+				throw new ArgumentOutOfRangeException(nameof(lighting));
+			}
+
+			Lighting = lighting;
+		}
+
+		private void PublishDayNightLighting(DayNightLightingState dayNightState)
+		{
+			WorldLightingState next = lightingService.Calculate(Lighting, dayNightState);
+			PublishLighting(next);
 		}
 	}
 }

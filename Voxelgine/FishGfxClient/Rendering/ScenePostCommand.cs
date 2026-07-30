@@ -1,5 +1,4 @@
 #if WINDOWS
-#nullable enable
 using FishGfx;
 using FishGfx.Graphics;
 
@@ -36,7 +35,7 @@ internal sealed class ScenePostCommand : RenderCommand
 		shader.SetUniform("uOverlayTexture", 1);
 		shader.SetUniform("uUseFxaa", useFxaa ? 1 : 0);
 		shader.SetUniform("uUseOverlay", overlay == null ? 0 : 1);
-		using IDisposable? overlayBinding = overlay?.Bind(1);
+		using IDisposable overlayBinding = overlay?.Bind(1);
 		pass.DrawTexturedRectangle(
 			0,
 			0,

@@ -108,9 +108,9 @@ public sealed class NativeAudioTests
     {
         string path = Path.Combine(Path.GetTempPath(), $"voxel-audio-{Guid.NewGuid():N}.wav");
         WriteTestWave(path, channels: 1, frameCount: 480);
-        NativeAudioBackend? backend = null;
-        BackendClip? clip = null;
-        BackendPcmStream? stream = null;
+        NativeAudioBackend backend = null;
+        BackendClip clip = null;
+        BackendPcmStream stream = null;
         try
         {
             backend = new NativeAudioBackend(
@@ -372,7 +372,7 @@ public sealed class NativeAudioTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        DirectoryInfo directory = new(AppContext.BaseDirectory);
         while (directory is not null)
         {
             if (Directory.Exists(Path.Combine(directory.FullName, "Voxelgine")) &&

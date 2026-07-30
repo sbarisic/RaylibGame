@@ -25,7 +25,7 @@ state; GPU resources are owned by client render components.
 ## Data-format invariants
 
 The current development build intentionally has no compatibility path for old
-world archives or network schemas. `map.bin` and packet layouts may be replaced
+world archives or network schemas. The runtime-root `worlds/map.bin` and packet layouts may be replaced
 directly while the game remains pre-release. The invariants that remain are:
 
 - numeric `BlockType` values;

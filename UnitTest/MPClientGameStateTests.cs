@@ -1,6 +1,8 @@
 using Voxelgine.Engine;
 using Voxelgine.Engine.DI;
+using Voxelgine.Engine.Server;
 using Voxelgine.States;
+using Voxelgine.Audio;
 
 namespace UnitTest;
 
@@ -127,12 +129,8 @@ public sealed unsafe class MPClientGameStateTests
 	{
 		public TestContext()
 		{
-			FishDI services = new();
-			services.AddSingleton<IFishLogging>(_ => new NullLogging());
-			services.Build();
-			services.CreateScope();
-			Engine = new TestEngineRunner { DI = services };
 			Window = new TestGameWindow();
+			Engine = new TestEngineRunner(Window);
 		}
 
 		public TestEngineRunner Engine { get; }
@@ -141,25 +139,42 @@ public sealed unsafe class MPClientGameStateTests
 
 		public void Dispose()
 		{
+			Engine.Audio.Dispose();
 			Window.Dispose();
 		}
 	}
 
 	private sealed class TestEngineRunner : IClientEngineRunner
 	{
-		public FishDI DI { get; set; } = null!;
+		public TestEngineRunner(IGameWindow window)
+		{
+			Window = window;
+			RuntimePaths = RuntimePathResolver.ResolveRuntimePaths(
+				ApplicationKind.Test,
+				Path.Combine(Path.GetTempPath(), $"aurora-falls-tests-{Guid.NewGuid():N}"),
+				Environment.CurrentDirectory);
+			Config = new GameConfig(RuntimePaths);
+			Audio = new AudioSystem(new AudioSystemOptions { NoDevice = true });
+		}
+
+		public IFishLogging Logging { get; } = new NullLogging();
+		public ILerpManager LerpManager { get; } = new LerpManager();
+		public GameConfig Config { get; }
+		public IAudioSystem Audio { get; }
+		public RuntimePaths RuntimePaths { get; }
+		public IGameWindow Window { get; }
+		public ServerLoop HostedServer => null;
+		public bool IsMultiplayerActive => false;
+		public bool IsLocalPlayerSubmerged => false;
 		public int ChunkDrawCalls { get; set; }
 		public bool DebugMode { get; set; }
 		public float TotalTime { get; set; }
-		public MainMenuStateFishUI MainMenuState { get; set; } = null!;
-		public NPCPreviewState NPCPreviewState { get; set; } = null!;
-		public EffectsPreviewState EffectsPreviewState { get; set; } = null!;
-		public VoxelMaterialPreviewState VoxelMaterialPreviewState { get; set; } = null!;
-		public MPClientGameState MultiplayerGameState { get; set; } = null!;
 
-		public void Init()
-		{
-		}
+		public void RequestState(ClientStateKind state) => Window.RouteState(null);
+		public void Connect(string address, int port, string playerName) { }
+		public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate) => throw new NotSupportedException();
+		public void StopHostedServer() { }
+		public void FireWeapon(System.Numerics.Vector3 start, System.Numerics.Vector3 direction, float maximumLength) { }
 	}
 
 	private sealed class TestGameWindow : IGameWindow
@@ -183,9 +198,9 @@ public sealed unsafe class MPClientGameStateTests
 
 		public int StateChangeCount { get; private set; }
 
-		public GameStateImpl? LastState { get; private set; }
+		public GameStateImpl LastState { get; private set; }
 
-		public void SetState(GameStateImpl state)
+		public void RouteState(GameStateImpl state)
 		{
 			StateChangeCount++;
 			LastState = state;

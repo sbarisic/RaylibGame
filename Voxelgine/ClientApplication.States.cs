@@ -1,0 +1,92 @@
+using System.Numerics;
+using Voxelgine.Engine;
+using Voxelgine.Engine.DI;
+using Voxelgine.Engine.Server;
+using Voxelgine.States;
+
+namespace Voxelgine;
+
+internal sealed partial class ClientApplication
+{
+	private GameStateImpl CreateInitialState()
+	{
+		if (arguments.Contains("--fishgfx-auto-gameplay", StringComparer.OrdinalIgnoreCase))
+			return new FishGfxGameplaySmokeState(Window, this);
+		if (arguments.Contains("--fishgfx-auto-transition", StringComparer.OrdinalIgnoreCase))
+			return new FishGfxStateTransitionSmokeState(Window, this);
+		if (arguments.Contains("--fishgfx-auto-npc", StringComparer.OrdinalIgnoreCase))
+			return CreateState(ClientStateKind.NpcPreview);
+		if (arguments.Contains("--fishgfx-auto-effects", StringComparer.OrdinalIgnoreCase))
+			return CreateState(ClientStateKind.EffectsPreview);
+		if (arguments.Contains("--fishgfx-auto-voxel-material", StringComparer.OrdinalIgnoreCase))
+		{
+			VoxelMaterialPreviewState state = (VoxelMaterialPreviewState)CreateState(ClientStateKind.VoxelMaterialPreview);
+			state.EnableAutomaticValidation();
+			return state;
+		}
+		return CreateState(ClientStateKind.MainMenu);
+	}
+
+	private GameStateImpl CreateState(ClientStateKind state)
+	{
+		return state switch
+		{
+			ClientStateKind.MainMenu => new MainMenuStateFishUI(Window, this),
+			ClientStateKind.Multiplayer => new MPClientGameState(Window, this),
+			ClientStateKind.NpcPreview => new NPCPreviewState(Window, this),
+			ClientStateKind.EffectsPreview => new EffectsPreviewState(Window, this),
+			ClientStateKind.VoxelMaterialPreview => new VoxelMaterialPreviewState(Window, this),
+			_ => throw new ArgumentOutOfRangeException(nameof(state)),
+		};
+	}
+
+	public void RequestState(ClientStateKind state)
+	{
+		stateHost.Request(() => CreateState(state));
+	}
+
+	public void Connect(string address, int port, string playerName)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(address);
+		ArgumentException.ThrowIfNullOrWhiteSpace(playerName);
+		stateHost.Request(
+			() => CreateState(ClientStateKind.Multiplayer),
+			state => ((MPClientGameState)state).Connect(address, port, playerName));
+	}
+
+	public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate)
+	{
+		StopHostedServer();
+		RuntimePaths serverPaths = RuntimePathResolver.ResolveRuntimePaths(
+			ApplicationKind.HostedServer,
+			Path.Combine(RuntimePaths.Root, "hosted-server"),
+			Environment.CurrentDirectory);
+		ServerApplication application = new(serverPaths, Config.LogLevel);
+		try
+		{
+			application.StartHosted(port, seed, forceRegenerate);
+			hostedServer = application;
+			return application;
+		}
+		catch
+		{
+			application.Dispose();
+			throw;
+		}
+	}
+
+	public void StopHostedServer()
+	{
+		ServerApplication application = hostedServer;
+		hostedServer = null;
+		application?.Dispose();
+	}
+
+	public void FireWeapon(Vector3 start, Vector3 direction, float maximumLength)
+	{
+		if (stateHost.ActiveState is not MPClientGameState { IsActive: true } multiplayer)
+			return;
+		multiplayer.SendWeaponFire(start, direction);
+		multiplayer.SpawnPredictedFireEffects(start, direction, maximumLength);
+	}
+}

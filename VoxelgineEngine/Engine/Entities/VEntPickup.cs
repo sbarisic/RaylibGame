@@ -19,7 +19,7 @@ namespace Voxelgine.Engine
 		{
 			base.OnInit();
 
-			_bobbing = new LerpVec3(Eng.DI.GetRequiredService<ILerpManager>())
+			_bobbing = new LerpVec3(Eng.LerpManager)
 			{
 				Loop = true,
 				Easing = Easing.EaseInOutQuart,

@@ -27,14 +27,14 @@ public unsafe partial class ClientPlayer : Player
 			engine,
 			playerId,
 			audioSink,
-			(engine.DI.GetRequiredService<IFishConfig>() as GameConfig)?.MouseSensitivity ?? 0.35f
+			engine.AsClient().Config.MouseSensitivity
 		)
 	{
 		GUI = gui;
 		LocalPlayer = localPlayer;
 		_ = modelName;
 
-		IGameWindow gameWindow = engine.DI.GetRequiredService<IGameWindow>();
+		IGameWindow gameWindow = engine.AsClient().Window;
 		ViewMdl = new ViewModel(engine);
 		if (gameWindow is IFishGfxGameWindow fishGfxWindow)
 		{

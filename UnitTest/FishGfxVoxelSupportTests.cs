@@ -172,27 +172,4 @@ public sealed class FishGfxVoxelSupportTests
 		return new ChunkMap();
 	}
 
-	private sealed class NullLogging : IFishLogging
-	{
-		public void Init(bool IsServer = false) { }
-		public void WriteLine(string message) { }
-		public void ServerWriteLine(string message) { }
-		public void ClientWriteLine(string message) { }
-		public void ServerNetworkWriteLine(string message) { }
-		public void ClientNetworkWriteLine(string message) { }
-	}
-
-	private sealed class TestEngineRunner : IFishEngineRunner
-	{
-		public FishDI DI { get; set; } = null!;
-		public int ChunkDrawCalls { get; set; }
-		public bool DebugMode { get; set; }
-		public float TotalTime { get; set; }
-		public MainMenuStateFishUI MainMenuState { get; set; } = null!;
-		public NPCPreviewState NPCPreviewState { get; set; } = null!;
-		public EffectsPreviewState EffectsPreviewState { get; set; } = null!;
-		public MPClientGameState MultiplayerGameState { get; set; } = null!;
-
-		public void Init() { }
-	}
 }

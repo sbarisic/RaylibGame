@@ -88,6 +88,22 @@ public sealed class EntityModelSourceTests
 		}
 	}
 
+	[Fact]
+	public void BlockModelWithRepeatedDisplayNamesGetsStableUniquePartNames()
+	{
+		EntityModelSource source = EntityModelSource.LoadBlockModel(Path.Combine(
+			AppContext.BaseDirectory,
+			"data",
+			"models",
+			"grass",
+			"grass1.json"));
+
+		Assert.NotEmpty(source.Parts);
+		Assert.Equal(
+			source.Parts.Count,
+			source.Parts.Select(static part => part.Name).Distinct(StringComparer.Ordinal).Count());
+	}
+
 	private static EntityModelSource LoadHumanoid()
 	{
 		return EntityModelSource.LoadBlockModel(Path.Combine(

@@ -4,6 +4,7 @@ using FishGfx.Formats;
 using FishGfx.Graphics;
 using System.Numerics;
 using System.Text.Json;
+using Voxelgine.Engine;
 using Voxelgine.Engine.Geometry;
 using FishColor = FishGfx.Color;
 using FishVertex3 = FishGfx.Vertex3;
@@ -23,6 +24,73 @@ internal sealed class EntityModelSource
 	public IReadOnlyList<EntityModelPartSource> Parts => parts;
 	public Winding FrontFaceWinding { get; }
 
+	public static EntityModelSource CreateBlockCube(BlockType block)
+	{
+		if (block == BlockType.None)
+			throw new ArgumentOutOfRangeException(nameof(block));
+
+		EntityModelSource source = new(Winding.CounterClockwise);
+		List<FishVertex3> vertices = new(36);
+		Vector3 min = new(-0.5f, 0, -0.5f);
+		Vector3 max = new(0.5f, 1, 0.5f);
+		(string Name, Vector3 Normal)[] faces =
+		[
+			("east", Vector3.UnitX),
+			("west", -Vector3.UnitX),
+			("up", Vector3.UnitY),
+			("down", -Vector3.UnitY),
+			("south", Vector3.UnitZ),
+			("north", -Vector3.UnitZ),
+		];
+
+		foreach ((string name, Vector3 normal) in faces)
+		{
+			GetFace(name, min, max, out Vector3[] corners, out Vector2[] cornerUvs);
+			BlockPresentationInfo.GetBlockTexCoords(block, normal, out Vector2 uvSize, out Vector2 uvPosition);
+			for (int triangleIndex = 0; triangleIndex < TriangleOrder.Length; triangleIndex++)
+			{
+				int cornerIndex = TriangleOrder[triangleIndex];
+				Vector2 logicalUv = uvPosition + cornerUvs[cornerIndex] * uvSize;
+				Vector2 uv = new(logicalUv.X, 1 - logicalUv.Y);
+				vertices.Add(new FishVertex3(corners[cornerIndex], uv, FishColor.White));
+			}
+		}
+
+		FishVertex3[] array = vertices.ToArray();
+		source.parts.Add(new EntityModelPartSource(
+			"block",
+			null,
+			Vector3.Zero,
+			Vector3.Zero,
+			array,
+			CreateTriangles(array)
+		));
+		return source;
+	}
+
+	public static EntityModelSource CreateIconQuad()
+	{
+		EntityModelSource source = new(Winding.CounterClockwise);
+		FishVertex3[] vertices =
+		[
+			new(new Vector3(-0.5f, 0, 0), new Vector2(0, 1), FishColor.White),
+			new(new Vector3(0.5f, 0, 0), new Vector2(1, 1), FishColor.White),
+			new(new Vector3(0.5f, 1, 0), new Vector2(1, 0), FishColor.White),
+			new(new Vector3(-0.5f, 0, 0), new Vector2(0, 1), FishColor.White),
+			new(new Vector3(0.5f, 1, 0), new Vector2(1, 0), FishColor.White),
+			new(new Vector3(-0.5f, 1, 0), new Vector2(0, 0), FishColor.White),
+		];
+		source.parts.Add(new EntityModelPartSource(
+			"icon",
+			null,
+			Vector3.Zero,
+			Vector3.Zero,
+			vertices,
+			CreateTriangles(vertices)
+		));
+		return source;
+	}
+
 	public static EntityModelSource LoadBlockModel(string path)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -38,10 +106,19 @@ internal sealed class EntityModelSource
 			}
 
 			EntityModelSource source = new(Winding.CounterClockwise);
+			HashSet<string> usedPartNames = new(StringComparer.Ordinal);
 			int index = 0;
 			foreach (JsonElement element in elements.EnumerateArray())
 			{
-				source.parts.Add(ReadElement(element, index));
+				EntityModelPartSource part = ReadElement(element, index);
+				if (!usedPartNames.Add(part.Name))
+				{
+					string uniqueName = $"{part.Name}#{index}";
+					while (!usedPartNames.Add(uniqueName))
+						uniqueName += "#";
+					part = part with { Name = uniqueName };
+				}
+				source.parts.Add(part);
 				index++;
 			}
 
@@ -158,10 +235,7 @@ internal sealed class EntityModelSource
 		Dictionary<string, int> elementByName = new(StringComparer.Ordinal);
 		for (int index = 0; index < parts.Count; index++)
 		{
-			if (!elementByName.TryAdd(parts[index].Name, index))
-			{
-				throw new FormatException($"Model contains duplicate element name '{parts[index].Name}'.");
-			}
+			elementByName.Add(parts[index].Name, index);
 		}
 
 		foreach (JsonElement group in groups.EnumerateArray())

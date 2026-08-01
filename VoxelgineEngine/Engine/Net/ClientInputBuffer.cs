@@ -21,6 +21,7 @@ namespace Voxelgine.Engine
 
 		/// <summary>Whether collision-free movement was active for this command.</summary>
 		public bool NoClip;
+		public byte SelectedHotbarSlot;
 	}
 
 	/// <summary>
@@ -64,7 +65,8 @@ namespace Voxelgine.Engine
 			int tickNumber,
 			InputState state,
 			Vector2 cameraAngle,
-			bool noClip = false)
+			bool noClip = false,
+			byte selectedHotbarSlot = 0)
 		{
 			int index = tickNumber % BufferSize;
 			if (index < 0) index += BufferSize;
@@ -73,6 +75,7 @@ namespace Voxelgine.Engine
 			_buffer[index].State = state;
 			_buffer[index].CameraAngle = cameraAngle;
 			_buffer[index].NoClip = noClip;
+			_buffer[index].SelectedHotbarSlot = selectedHotbarSlot;
 			_occupied[index] = true;
 
 			if (_count < BufferSize)
@@ -80,7 +83,7 @@ namespace Voxelgine.Engine
 
 			var commands = new List<InputCommand>(4)
 			{
-				InputCommand.FromState(tickNumber, state, cameraAngle, noClip),
+				InputCommand.FromState(tickNumber, state, cameraAngle, noClip, selectedHotbarSlot),
 			};
 
 			for (int previousTick = tickNumber - 1; previousTick >= tickNumber - 3; previousTick--)
@@ -91,7 +94,8 @@ namespace Voxelgine.Engine
 						previous.TickNumber,
 						previous.State,
 						previous.CameraAngle,
-						previous.NoClip
+						previous.NoClip,
+						previous.SelectedHotbarSlot
 					));
 				}
 			}

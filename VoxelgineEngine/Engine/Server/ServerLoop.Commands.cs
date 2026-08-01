@@ -230,6 +230,7 @@ namespace Voxelgine.Engine.Server
 #if DEBUG
 			_logging.ServerWriteLine("  /fog fill ...  - Fill a player-centered fog volume");
 			_logging.ServerWriteLine("  /fog clear ... - Clear a player-centered fog volume");
+			_logging.ServerWriteLine("  /give <item> [count] - Add an item to your inventory");
 #endif
 		}
 
@@ -264,6 +265,10 @@ namespace Voxelgine.Engine.Server
 					break;
 
 #if DEBUG
+				case "give":
+					CmdGive(connection, args);
+					break;
+
 				case "fog":
 					CmdFog(connection, args);
 					break;
@@ -335,6 +340,55 @@ namespace Voxelgine.Engine.Server
 			}
 
 #if DEBUG
+			private void CmdGive(NetConnection connection, string arguments)
+			{
+				if (!_sessions.TryGetValue(connection.PlayerId, out ServerClientSession session))
+				{
+					SendServerMessageTo(connection.PlayerId, "No active inventory session.");
+					return;
+				}
+
+				string[] values = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+				if (values.Length is < 1 or > 2 || !TryResolveItem(values[0], out ItemDefinition item))
+				{
+					SendServerMessageTo(connection.PlayerId, "Usage: /give <item-id|name> [count]");
+					return;
+				}
+
+				int requested = 1;
+				if (values.Length == 2 && (!int.TryParse(values[1], out requested) || requested <= 0 || requested > 3840))
+				{
+					SendServerMessageTo(connection.PlayerId, "Count must be between 1 and 3840.");
+					return;
+				}
+
+				int granted = session.Inventory.Grant(item.Id, requested);
+				SendInventoryState(session, 0, true);
+				SendServerMessageTo(connection.PlayerId, granted == requested
+					? $"Granted {granted} x {item.DisplayName}."
+					: $"Granted {granted} x {item.DisplayName}; inventory is full.");
+			}
+
+			private static bool TryResolveItem(string value, out ItemDefinition item)
+			{
+				if (ushort.TryParse(value, out ushort numeric) && ItemCatalog.TryGet(new ItemId(numeric), out item))
+					return true;
+
+				string normalized = value.Replace("_", string.Empty).Replace("-", string.Empty).Replace(" ", string.Empty);
+				foreach (ItemDefinition candidate in ItemCatalog.AllItems)
+				{
+					string candidateName = candidate.DisplayName.Replace(" ", string.Empty);
+					if (string.Equals(candidateName, normalized, StringComparison.OrdinalIgnoreCase))
+					{
+						item = candidate;
+						return true;
+					}
+				}
+
+				item = null;
+				return false;
+			}
+
 			private void CmdFog(NetConnection connection, string arguments)
 			{
 				Player player = _simulation.Players.GetPlayer(connection.PlayerId);

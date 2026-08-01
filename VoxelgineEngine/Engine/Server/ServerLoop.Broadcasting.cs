@@ -41,8 +41,8 @@ namespace Voxelgine.Engine.Server
 			{
 				Player p = allPlayers[i];
 				Vector3 camAngle = p.GetCamAngle();
-				int lastInputTick = _playerCommandQueues.TryGetValue(p.PlayerId, out ServerCommandQueue commandQueue)
-					? commandQueue.LastSimulatedCommandTick
+				int lastInputTick = _sessions.TryGetValue(p.PlayerId, out ServerClientSession session)
+					? session.CommandQueue.LastSimulatedCommandTick
 					: 0;
 				PlayerPhysicsState physicsState = p.CapturePhysicsState();
 				snapshot.Players[i] = new WorldSnapshotPacket.PlayerEntry
@@ -54,6 +54,8 @@ namespace Voxelgine.Engine.Server
 					Health = p.Health,
 					AnimationState = GetPlayerAnimationState(p),
 					LastInputTick = lastInputTick,
+					SelectedHotbarSlot = session?.SelectedHotbarSlot ?? 0,
+					SelectionCommandTick = session?.SelectionCommandTick ?? 0,
 					PhysicsState = physicsState,
 				};
 			}
@@ -247,7 +249,7 @@ namespace Voxelgine.Engine.Server
 		private byte GetPlayerAnimationState(Player player)
 		{
 			// Attack takes priority — check if the player recently performed an action
-			if (_playerAttackEndTimes.TryGetValue(player.PlayerId, out float attackEnd) && CurrentTime < attackEnd)
+			if (_sessions.TryGetValue(player.PlayerId, out ServerClientSession session) && CurrentTime < session.AttackAnimationEndTime)
 				return 2;
 
 			// Walk vs idle based on XZ velocity

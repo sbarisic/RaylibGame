@@ -42,6 +42,9 @@ public sealed class BlockChangePacket : Packet
 public sealed class BlockPlaceRequestPacket : Packet
 {
 	public override PacketType Type => PacketType.BlockPlaceRequest;
+	public uint ItemUseActionId { get; set; }
+	public int CommandTick { get; set; }
+	public ItemUseChannel Channel { get; set; }
 	public int X { get; set; }
 	public int Y { get; set; }
 	public int Z { get; set; }
@@ -49,6 +52,9 @@ public sealed class BlockPlaceRequestPacket : Packet
 
 	public override void Write(BinaryWriter writer)
 	{
+		writer.Write(ItemUseActionId);
+		writer.Write(CommandTick);
+		writer.Write((byte)Channel);
 		writer.Write(X);
 		writer.Write(Y);
 		writer.Write(Z);
@@ -57,6 +63,9 @@ public sealed class BlockPlaceRequestPacket : Packet
 
 	public override void Read(BinaryReader reader)
 	{
+		ItemUseActionId = reader.ReadUInt32();
+		CommandTick = reader.ReadInt32();
+		Channel = (ItemUseChannel)reader.ReadByte();
 		X = reader.ReadInt32();
 		Y = reader.ReadInt32();
 		Z = reader.ReadInt32();
@@ -95,12 +104,18 @@ public sealed class FogChangePacket : Packet
 public sealed class BlockRemoveRequestPacket : Packet
 {
 	public override PacketType Type => PacketType.BlockRemoveRequest;
+	public uint ItemUseActionId { get; set; }
+	public int CommandTick { get; set; }
+	public ItemUseChannel Channel { get; set; }
 	public int X { get; set; }
 	public int Y { get; set; }
 	public int Z { get; set; }
 
 	public override void Write(BinaryWriter writer)
 	{
+		writer.Write(ItemUseActionId);
+		writer.Write(CommandTick);
+		writer.Write((byte)Channel);
 		writer.Write(X);
 		writer.Write(Y);
 		writer.Write(Z);
@@ -108,6 +123,9 @@ public sealed class BlockRemoveRequestPacket : Packet
 
 	public override void Read(BinaryReader reader)
 	{
+		ItemUseActionId = reader.ReadUInt32();
+		CommandTick = reader.ReadInt32();
+		Channel = (ItemUseChannel)reader.ReadByte();
 		X = reader.ReadInt32();
 		Y = reader.ReadInt32();
 		Z = reader.ReadInt32();

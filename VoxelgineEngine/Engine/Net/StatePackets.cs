@@ -12,12 +12,14 @@ namespace Voxelgine.Engine
 		public Vector2 CameraAngle;
 		public float MouseWheel;
 		public bool NoClip;
+		public byte SelectedHotbarSlot;
 
 		public static unsafe InputCommand FromState(
 			int tickNumber,
 			InputState state,
 			Vector2 cameraAngle,
-			bool noClip = false)
+			bool noClip = false,
+			byte selectedHotbarSlot = 0)
 		{
 			ulong mask = 0;
 			int count = Math.Min((int)InputKey.InputKeyCount, 64);
@@ -34,6 +36,7 @@ namespace Voxelgine.Engine
 				CameraAngle = cameraAngle,
 				MouseWheel = state.MouseWheel,
 				NoClip = noClip,
+				SelectedHotbarSlot = selectedHotbarSlot,
 			};
 		}
 
@@ -108,6 +111,16 @@ namespace Voxelgine.Engine
 				SetNewest(command);
 			}
 		}
+		public byte SelectedHotbarSlot
+		{
+			get => GetNewest().SelectedHotbarSlot;
+			set
+			{
+				InputCommand command = GetNewest();
+				command.SelectedHotbarSlot = value;
+				SetNewest(command);
+			}
+		}
 
 		/// <summary>
 		/// Packs an <see cref="InputState"/> struct's key states into the bitmask.
@@ -119,7 +132,8 @@ namespace Voxelgine.Engine
 				newest.TickNumber,
 				state,
 				newest.CameraAngle,
-				newest.NoClip
+				newest.NoClip,
+				newest.SelectedHotbarSlot
 			);
 			SetNewest(newest);
 		}
@@ -145,6 +159,7 @@ namespace Voxelgine.Engine
 				writer.WriteVector2(Commands[i].CameraAngle);
 				writer.Write(Commands[i].MouseWheel);
 				writer.Write(Commands[i].NoClip);
+				writer.Write(Commands[i].SelectedHotbarSlot);
 			}
 		}
 
@@ -162,6 +177,9 @@ namespace Voxelgine.Engine
 				Commands[i].CameraAngle = reader.ReadVector2();
 				Commands[i].MouseWheel = reader.ReadSingle();
 				Commands[i].NoClip = reader.ReadBoolean();
+				Commands[i].SelectedHotbarSlot = reader.ReadByte();
+				if (Commands[i].SelectedHotbarSlot >= PlayerInventory.HotbarSlotCount)
+					throw new InvalidDataException("Invalid selected hotbar slot.");
 			}
 		}
 
@@ -240,6 +258,8 @@ namespace Voxelgine.Engine
 			/// reconciliation. 0 if no input has been received yet.
 			/// </summary>
 			public int LastInputTick;
+			public byte SelectedHotbarSlot;
+			public int SelectionCommandTick;
 		}
 
 		public PlayerEntry[] Players { get; set; } = Array.Empty<PlayerEntry>();
@@ -258,6 +278,8 @@ namespace Voxelgine.Engine
 				writer.Write(Players[i].Health);
 				writer.Write(Players[i].AnimationState);
 				writer.Write(Players[i].LastInputTick);
+				writer.Write(Players[i].SelectedHotbarSlot);
+				writer.Write(Players[i].SelectionCommandTick);
 				WritePhysicsState(writer, Players[i].PhysicsState);
 			}
 		}
@@ -277,6 +299,8 @@ namespace Voxelgine.Engine
 				Players[i].Health = reader.ReadSingle();
 				Players[i].AnimationState = reader.ReadByte();
 				Players[i].LastInputTick = reader.ReadInt32();
+				Players[i].SelectedHotbarSlot = reader.ReadByte();
+				Players[i].SelectionCommandTick = reader.ReadInt32();
 				Players[i].PhysicsState = ReadPhysicsState(reader);
 			}
 		}

@@ -13,13 +13,6 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private void SpawnEntities()
 		{
-			// Stable asset IDs are replicated without loading client resources.
-			var pickup = new VEntPickup();
-			pickup.SetPosition(_pickupSpawnPos);
-			pickup.SetSize(Vector3.One);
-			pickup.SetModelName("orb_xp/orb_xp.obj");
-			_simulation.Entities.Spawn(_simulation, pickup);
-
 			// The client presentation layer resolves this model and texture.
 			var npc = new VEntNPC();
 			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
@@ -135,16 +128,12 @@ namespace Voxelgine.Engine.Server
 
 		/// <summary>
 		/// Handles entity-player touch events raised by <see cref="EntityManager"/>.
-		/// Refills the player's inventory when they touch a <see cref="VEntPickup"/>.
+		/// Legacy refill pickups no longer mutate inventory; item drops use their
+		/// own authoritative pickup stage.
 		/// </summary>
 		private void OnPlayerTouchedEntity(VoxEntity entity, Player player)
 		{
-			if (entity is VEntPickup && _playerInventories.TryGetValue(player.PlayerId, out ServerInventory inventory))
-			{
-				inventory.ResetToDefaults();
-				_server.SendTo(player.PlayerId, inventory.CreateFullUpdatePacket(), true, CurrentTime);
-				_logging.ServerWriteLine($"Player [{player.PlayerId}] touched pickup — inventory refilled.");
-			}
+			// Intentionally empty until authoritative item-drop pickup is processed.
 		}
 	}
 }

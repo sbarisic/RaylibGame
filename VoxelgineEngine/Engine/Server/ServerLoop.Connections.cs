@@ -6,22 +6,23 @@ namespace Voxelgine.Engine.Server;
 
 public partial class ServerLoop
 {
-	private sealed record PendingPlayer(Player Player, ServerInventory Inventory, string Name);
-
 	private void OnClientConnected(NetConnection connection)
 	{
 		int playerId = connection.PlayerId;
-		string playerName = connection.PlayerName;
-		_logging.Log(
-			GameLogLevel.Info,
-			"Connection",
-			$"reserved playerId={playerId} name={playerName} endpoint={connection.RemoteEndPoint}");
+		_logging.Log(GameLogLevel.Info, "Connection", $"reserved playerId={playerId} name={connection.PlayerName} endpoint={connection.RemoteEndPoint}");
 
 		Player player = new(_eng, playerId);
-		ServerInventory inventory = new();
-		if (_playerData.TryLoad(playerName, out Vector3 savedPos, out float savedHealth, out Vector3 savedVel, inventory))
+		var inventory = new PlayerInventory();
+		byte selectedHotbarSlot = 0;
+		if (_playerData.TryLoad(
+			connection.PlayerName,
+			out Vector3 savedPosition,
+			out float savedHealth,
+			out Vector3 savedVelocity,
+			inventory,
+			out selectedHotbarSlot))
 		{
-			if (savedHealth <= 0 || !IsSpawnPositionValid(savedPos))
+			if (savedHealth <= 0 || !IsSpawnPositionValid(savedPosition))
 			{
 				player.SetPosition(PlayerSpawnPosition);
 				player.ResetHealth();
@@ -29,9 +30,9 @@ public partial class ServerLoop
 			}
 			else
 			{
-				player.SetPosition(savedPos);
+				player.SetPosition(savedPosition);
 				player.Health = savedHealth;
-				player.SetVelocity(savedVel);
+				player.SetVelocity(savedVelocity);
 			}
 		}
 		else
@@ -39,26 +40,28 @@ public partial class ServerLoop
 			player.SetPosition(PlayerSpawnPosition);
 		}
 
-		_pendingPlayers[playerId] = new PendingPlayer(player, inventory, playerName);
+		var session = new ServerClientSession(
+			new PlayerSessionId(_nextPlayerSessionId++),
+			connection,
+			player,
+			inventory)
+		{
+			SelectedHotbarSlot = selectedHotbarSlot,
+		};
+		_sessions.Add(playerId, session);
 		_worldStream.Begin(playerId, player.Position, _worldSeed, CurrentTime);
 	}
 
 	private void ActivatePendingPlayer(int playerId)
 	{
-		if (!_pendingPlayers.Remove(playerId, out PendingPlayer pending))
+		if (!_sessions.TryGetValue(playerId, out ServerClientSession session) || session.IsGameplayActive)
 			return;
 
-		NetConnection connection = _server.GetConnection(playerId);
-		if (connection == null || connection.State != ConnectionState.Connected)
+		NetConnection connection = session.Connection;
+		if (connection.State != ConnectionState.Connected)
 			return;
 
-		Player player = pending.Player;
-		_playerInventories[playerId] = pending.Inventory;
-		NetworkInputSource inputSource = new();
-		_playerInputSources[playerId] = inputSource;
-		_playerInputMgrs[playerId] = new InputMgr(inputSource);
-		_playerCommandQueues[playerId] = new ServerCommandQueue();
-
+		Player player = session.Player;
 		foreach (Player existing in _simulation.Players.GetAllPlayers())
 		{
 			_server.SendTo(playerId, new PlayerJoinedPacket
@@ -76,16 +79,17 @@ public partial class ServerLoop
 		}
 
 		_simulation.Players.AddPlayer(playerId, player);
+		session.IsGameplayActive = true;
 		connection.IsGameplayActive = true;
 		_server.BroadcastExcept(playerId, new PlayerJoinedPacket
 		{
 			PlayerId = playerId,
-			PlayerName = pending.Name,
+			PlayerName = session.PlayerName,
 			Position = player.Position,
 		}, true, CurrentTime);
 
 		_server.SendTo(playerId, new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
-		_server.SendTo(playerId, pending.Inventory.CreateFullUpdatePacket(), true, CurrentTime);
+		SendInventoryState(session, 0, true);
 		_server.SendTo(playerId, new ClientWorldStartPacket
 		{
 			StreamId = _worldStream.GetStreamId(playerId),
@@ -94,46 +98,40 @@ public partial class ServerLoop
 			PhysicsState = player.CapturePhysicsState(),
 		}, true, CurrentTime);
 
-		_logging.Log(
-			GameLogLevel.Info,
-			"Connection",
-			$"activated playerId={playerId} name={pending.Name} position={player.Position} players={_simulation.Players.Count}");
+		_logging.Log(GameLogLevel.Info, "Connection", $"activated playerId={playerId} name={session.PlayerName} position={player.Position} players={_simulation.Players.Count}");
 	}
 
 	private void OnClientDisconnected(NetConnection connection, string reason)
 	{
 		int playerId = connection.PlayerId;
-		string playerName = connection.PlayerName;
 		_worldStream.Cancel(playerId);
+		if (!_sessions.Remove(playerId, out ServerClientSession session))
+			return;
 
-		if (_pendingPlayers.Remove(playerId))
+		if (!session.IsGameplayActive)
 		{
-			_logging.Log(
-				GameLogLevel.Info,
-				"Connection",
-				$"loading-disconnect playerId={playerId} name={playerName} reason={reason}");
+			_logging.Log(GameLogLevel.Info, "Connection", $"loading-disconnect playerId={playerId} name={session.PlayerName} reason={reason}");
 			return;
 		}
 
-		Player player = _simulation.Players.GetPlayer(playerId);
-		if (player != null)
-		{
-			_playerInventories.TryGetValue(playerId, out ServerInventory inventory);
-			_playerData.Save(playerName, player.Position, player.Health, player.GetVelocity(), inventory);
-		}
-
-		_playerInputMgrs.Remove(playerId);
-		_playerInputSources.Remove(playerId);
-		_playerCommandQueues.Remove(playerId);
-		_respawnTimers.Remove(playerId);
-		_playerAttackEndTimes.Remove(playerId);
-		_playerInventories.Remove(playerId);
+		ResolveCursorForDisconnect(session.Inventory);
+		_playerData.Save(
+			session.PlayerName,
+			session.Player.Position,
+			session.Player.Health,
+			session.Player.GetVelocity(),
+			session.Inventory,
+			session.SelectedHotbarSlot);
+		session.ClearTransientState();
 		_simulation.Players.RemovePlayer(playerId);
 		_server.Broadcast(new PlayerLeftPacket { PlayerId = playerId }, true, CurrentTime);
-		_logging.Log(
-			GameLogLevel.Info,
-			"Connection",
-			$"disconnected playerId={playerId} name={playerName} reason={reason} players={_simulation.Players.Count}");
+		_logging.Log(GameLogLevel.Info, "Connection", $"disconnected playerId={playerId} name={session.PlayerName} reason={reason} players={_simulation.Players.Count}");
+	}
+
+	private static void ResolveCursorForDisconnect(PlayerInventory inventory)
+	{
+		if (!inventory.Cursor.IsEmpty)
+			inventory.ApplyClick(InventoryActionKind.CancelCursor, PlayerInventory.NoCursorOrigin);
 	}
 
 	private bool IsSpawnPositionValid(Vector3 position)

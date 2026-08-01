@@ -28,7 +28,7 @@ public sealed class WorldBoundsPolicyTests
 		{
 			Position = new Vector3(1, WorldBoundsPolicy.VoidThreshold, 2),
 		};
-		VEntPickup fallenPickup = new()
+		VEntItemDrop fallenPickup = new()
 		{
 			Position = new Vector3(1, -100, 2),
 		};

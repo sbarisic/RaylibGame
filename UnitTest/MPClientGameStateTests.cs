@@ -78,6 +78,7 @@ public sealed unsafe class MPClientGameStateTests
 	[Theory]
 	[InlineData((int)GameplayInputMode.Chat)]
 	[InlineData((int)GameplayInputMode.DebugMenu)]
+	[InlineData((int)GameplayInputMode.Inventory)]
 	public void UiModesProduceNeutralNetworkAndPredictionInput(int modeValue)
 	{
 		GameplayInputMode mode = (GameplayInputMode)modeValue;

@@ -19,28 +19,18 @@ namespace Voxelgine.Engine.Server
 		/// Performs server-authoritative raycast against world blocks, entities, and other players.
 		/// Broadcasts the resolved <see cref="WeaponFireEffectPacket"/> to all clients.
 		/// </summary>
-		private void HandleWeaponFire(NetConnection connection, WeaponFirePacket packet)
+		private void ExecuteWeaponFire(
+			ServerClientSession shooterSession,
+			in SimulatedCommandRecord command,
+			WeaponFirePacket packet)
 		{
-			int playerId = connection.PlayerId;
-			Player player = _simulation.Players.GetPlayer(playerId);
-			if (player == null)
-				return;
-
-			Vector3 origin = packet.AimOrigin;
-			Vector3 direction = packet.AimDirection;
-
-			// Validate direction is normalized (prevent malicious packets)
-			float dirLen = direction.Length();
-			if (dirLen < 0.9f || dirLen > 1.1f)
-				return;
-			direction = Vector3.Normalize(direction);
-
-			// Validate origin is near the player (anti-cheat: origin should be at eye position)
-			if (Vector3.Distance(origin, player.Position) > 3f)
-				return;
+			int playerId = shooterSession.Player.PlayerId;
+			Player player = shooterSession.Player;
+			Vector3 origin = command.InteractionOrigin;
+			Vector3 direction = command.InteractionDirection;
 
 			// Set attack animation timer for the shooter
-			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
+			shooterSession.AttackAnimationEndTime = CurrentTime + AttackAnimDuration;
 
 			// --- Raycast against world blocks ---
 			Vector3 worldHitPos = Vector3.Zero;
@@ -123,7 +113,11 @@ namespace Voxelgine.Engine.Server
 					if (hitPlayer.IsDead)
 						{
 							_logging.ServerWriteLine($"Player [{hitPlayerId}] \"{GetPlayerName(hitPlayerId)}\" killed by [{playerId}] \"{GetPlayerName(playerId)}\"");
-							_respawnTimers[hitPlayerId] = CurrentTime;
+							if (_sessions.TryGetValue(hitPlayerId, out ServerClientSession victimSession))
+							{
+								victimSession.RespawnStartedAt = CurrentTime;
+								ResolveCursorForDeath(victimSession);
+							}
 
 							// Broadcast kill feed event to all clients
 							var killFeedPacket = new KillFeedPacket
@@ -208,7 +202,11 @@ namespace Voxelgine.Engine.Server
 				if (WorldBoundsPolicy.IsBelowVoid(player.Position))
 				{
 					player.TakeDamage(player.MaxHealth);
-					_respawnTimers[player.PlayerId] = CurrentTime;
+					if (_sessions.TryGetValue(player.PlayerId, out ServerClientSession session))
+					{
+						session.RespawnStartedAt = CurrentTime;
+						ResolveCursorForDeath(session);
+					}
 					_logging.ServerWriteLine($"Player [{player.PlayerId}] \"{GetPlayerName(player.PlayerId)}\" fell out of the world and died.");
 				}
 			}
@@ -220,16 +218,13 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private void ProcessRespawns()
 		{
-			if (_respawnTimers.Count == 0)
-				return;
-
 			List<int> toRespawn = null;
-			foreach (var kvp in _respawnTimers)
+			foreach (ServerClientSession session in _sessions.Values)
 			{
-				if (CurrentTime - kvp.Value >= RespawnDelay)
+				if (session.RespawnStartedAt is float startedAt && CurrentTime - startedAt >= RespawnDelay)
 				{
 					toRespawn ??= new List<int>();
-					toRespawn.Add(kvp.Key);
+					toRespawn.Add(session.Player.PlayerId);
 				}
 			}
 
@@ -238,7 +233,8 @@ namespace Voxelgine.Engine.Server
 
 			foreach (int playerId in toRespawn)
 			{
-				_respawnTimers.Remove(playerId);
+				if (_sessions.TryGetValue(playerId, out ServerClientSession session))
+					session.RespawnStartedAt = null;
 
 				Player player = _simulation.Players.GetPlayer(playerId);
 				if (player == null)

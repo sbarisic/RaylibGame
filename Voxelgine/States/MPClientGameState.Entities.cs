@@ -223,18 +223,10 @@ public unsafe partial class MPClientGameState
 					}
 					break;
 
-				case VEntPickup pickup when _fishPickupRenderer is not null:
-					PickupRenderState pickupState = new(
-						pickup.Position,
-						pickup.Size,
-						pickup.RotationDegrees,
-						pickup.VerticalModelOffset,
-						default
-					);
-					if (Intersects(frustum, _fishPickupRenderer.GetAnimationBounds(pickupState)))
-					{
-						_fishPickupRenderer.RenderShadow(pass, pickupState);
-					}
+				case VEntItemDrop drop when _fishItemDropRenderer is not null:
+					ItemDropRenderState dropState = CreateItemDropRenderState(drop, default);
+					if (Intersects(frustum, _fishItemDropRenderer.GetAnimationBounds(dropState)))
+						_fishItemDropRenderer.RenderShadow(pass, dropState);
 					break;
 			}
 		}

@@ -109,5 +109,6 @@ public sealed class ServerCommandQueue
 	private static bool IsFinite(in InputCommand command) =>
 		float.IsFinite(command.CameraAngle.X) &&
 		float.IsFinite(command.CameraAngle.Y) &&
-		float.IsFinite(command.MouseWheel);
+		float.IsFinite(command.MouseWheel) &&
+		command.SelectedHotbarSlot < PlayerInventory.HotbarSlotCount;
 }

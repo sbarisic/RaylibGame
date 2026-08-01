@@ -92,19 +92,15 @@ namespace Voxelgine.Engine.Server
 		/// Per-player input managers. Each player's <see cref="InputMgr"/> is backed by a
 		/// <see cref="NetworkInputSource"/> that receives input from the client's <see cref="InputStatePacket"/>.
 		/// </summary>
-		private readonly Dictionary<int, InputMgr> _playerInputMgrs = new();
-		private readonly Dictionary<int, NetworkInputSource> _playerInputSources = new();
-		private readonly Dictionary<int, ServerCommandQueue> _playerCommandQueues = new();
-		private readonly Dictionary<int, ServerInventory> _playerInventories = new();
-		private readonly Dictionary<int, PendingPlayer> _pendingPlayers = new();
+		private readonly Dictionary<int, ServerClientSession> _sessions = new();
 		private readonly PlayerDataStore _playerData;
+		private ulong _nextPlayerSessionId = 1;
 
 		private float _lastTimeSyncTime;
 
 		/// <summary>
 		/// Tracks death time for each dead player. Key = playerId, Value = time of death.
 		/// </summary>
-		private readonly Dictionary<int, float> _respawnTimers = new();
 
 		/// <summary>
 		/// Duration of the attack animation in seconds, used for animation state broadcasting.
@@ -115,7 +111,6 @@ namespace Voxelgine.Engine.Server
 		/// Tracks the time at which each player's attack animation ends.
 		/// Key = playerId, Value = time when the attack animation expires.
 		/// </summary>
-		private readonly Dictionary<int, float> _playerAttackEndTimes = new();
 
 		private volatile bool _running;
 		private readonly CancellationTokenSource _stopSource = new();
@@ -355,6 +350,7 @@ namespace Voxelgine.Engine.Server
 
 			// 4. Process player input and run authoritative physics
 			ProcessPlayerPhysics(dt);
+			ProcessPendingItemUses();
 
 			// 5. Kill players who fell out of the world
 			CheckPlayerBounds();
@@ -372,6 +368,7 @@ namespace Voxelgine.Engine.Server
 
 			// 9. Kill and remove NPCs which fell out of the world
 			RemoveFallenNpcs();
+			ProcessItemDrops();
 
 			// 10. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
@@ -413,10 +410,12 @@ namespace Voxelgine.Engine.Server
 			{
 				int playerId = player.PlayerId;
 
-				if (!_playerInputMgrs.TryGetValue(playerId, out InputMgr inputMgr) ||
-					!_playerInputSources.TryGetValue(playerId, out NetworkInputSource inputSource) ||
-					!_playerCommandQueues.TryGetValue(playerId, out ServerCommandQueue commandQueue))
+				if (!_sessions.TryGetValue(playerId, out ServerClientSession session) ||
+					!session.IsGameplayActive)
 					continue;
+				InputMgr inputMgr = session.InputManager;
+				NetworkInputSource inputSource = session.InputSource;
+				ServerCommandQueue commandQueue = session.CommandQueue;
 
 				commandQueue.BeginFrame();
 				for (int processed = 0; processed < 4 && commandQueue.TryDequeue(out InputCommand command); processed++)
@@ -428,6 +427,8 @@ namespace Voxelgine.Engine.Server
 
 					player.SetCamAngle(new Vector3(command.CameraAngle.X, command.CameraAngle.Y, 0));
 					player.UpdateDirectionVectors();
+					session.SelectedHotbarSlot = command.SelectedHotbarSlot;
+					session.SelectionCommandTick = command.TickNumber;
 					if (player.NoClip != command.NoClip)
 					{
 						player.NoClip = command.NoClip;
@@ -440,9 +441,23 @@ namespace Voxelgine.Engine.Server
 
 					if (!player.IsDead)
 						player.UpdatePhysics(_simulation.PhysicsWorld, physData, dt, inputMgr);
+
+					Vector3 interactionDirection = player.GetForward();
+					if (!float.IsFinite(interactionDirection.X) || interactionDirection.LengthSquared() < 0.0001f)
+						interactionDirection = Vector3.UnitZ;
+					session.CommandHistory.Record(new SimulatedCommandRecord(
+						command.TickNumber,
+						command.SelectedHotbarSlot,
+						player.Position,
+						Vector3.Normalize(interactionDirection),
+						IsCommandInputDown(command, InputKey.Click_Left),
+						IsCommandInputDown(command, InputKey.Click_Right)));
 				}
 			}
 		}
+
+		private static bool IsCommandInputDown(InputCommand command, InputKey key) =>
+			(int)key < 64 && (command.KeysBitmask & (1UL << (int)key)) != 0;
 
 		/// <summary>
 		/// Saves the current world state to <see cref="MapFile"/>.
@@ -465,6 +480,7 @@ namespace Voxelgine.Engine.Server
 				}
 				File.Move(temporaryPath, _mapFile, overwrite: true);
 				_worldStream.SetArchivePayloadCache(_archivePayloadCache);
+				SaveActivePlayers();
 				_logging.Log(
 					GameLogLevel.Info,
 					"Persistence",
@@ -514,6 +530,22 @@ namespace Voxelgine.Engine.Server
 			_server.Dispose();
 			(_logging as IDisposable)?.Dispose();
 			_stopSource.Dispose();
+		}
+
+		private void SaveActivePlayers()
+		{
+			foreach (ServerClientSession session in _sessions.Values)
+			{
+				if (!session.IsGameplayActive)
+					continue;
+				_playerData.Save(
+					session.PlayerName,
+					session.Player.Position,
+					session.Player.Health,
+					session.Player.GetVelocity(),
+					session.Inventory,
+					session.SelectedHotbarSlot);
+			}
 		}
 
 		/// <summary>

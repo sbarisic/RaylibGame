@@ -233,6 +233,8 @@ namespace Voxelgine.States
 			_playerListPanel.AddChild(_playerListInfoLabel);
 			_gui.AddControl(_playerListPanel);
 
+			CreateInventoryUI(screenW, screenH);
+
 			// Death overlay — full-screen red tint with centered text
 			_deathOverlayPanel = new Panel
 			{
@@ -640,6 +642,8 @@ namespace Voxelgine.States
 			// Player list panel — centered
 			if (_playerListPanel != null)
 				_playerListPanel.Position = new Vector2(screenW / 2f - 145, screenH / 2f - 130);
+			if (_inventoryWindow != null)
+				_inventoryWindow.Position = new Vector2(screenW / 2f - _inventoryWindow.Size.X / 2f, screenH / 2f - _inventoryWindow.Size.Y / 2f);
 		}
 	}
 }

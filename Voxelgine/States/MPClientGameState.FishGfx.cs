@@ -47,7 +47,7 @@ public unsafe partial class MPClientGameState
 	private readonly List<int> _staleActorIds = new();
 	private readonly Dictionary<int, SpeechOcclusionCache> _speechOcclusion = new();
 	private FishGfxSlidingDoorRenderAdapter _fishDoorRenderer;
-	private FishGfxPickupRenderAdapter _fishPickupRenderer;
+	private FishGfxItemDropRenderAdapter _fishItemDropRenderer;
 	private GameCameraState _fishCameraState;
 	private GameCameraState _previousFishCameraState;
 	private bool _hasPreviousFishCameraState;
@@ -106,43 +106,6 @@ public unsafe partial class MPClientGameState
 		}
 	}
 
-	private static void ReadFishGfxSpawnProperties(VoxEntity entity, BinaryReader reader)
-	{
-		Vector3 size = new(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-		string modelName = reader.ReadString();
-		entity.SetSize(size);
-		entity.SetModelName(modelName);
-
-		switch (entity)
-		{
-			case VEntNPC npc:
-				string textureName = reader.ReadString();
-				if (!string.IsNullOrWhiteSpace(textureName))
-				{
-					npc.SetTextureName(textureName);
-				}
-				break;
-
-			case VEntSlidingDoor door:
-				float openAngle = reader.ReadSingle();
-				float triggerRadius = reader.ReadSingle();
-				Vector3 closedPosition = new(
-					reader.ReadSingle(),
-					reader.ReadSingle(),
-					reader.ReadSingle()
-				);
-				Vector3 facing = new(
-					reader.ReadSingle(),
-					reader.ReadSingle(),
-					reader.ReadSingle()
-				);
-				door.Initialize(closedPosition, size, openAngle);
-				door.TriggerRadius = triggerRadius;
-				door.FacingDirection = facing;
-				break;
-		}
-	}
-
 	private void CreateFishGfxVoxelScene(bool synchronizeExisting = true)
 	{
 #if WINDOWS
@@ -184,7 +147,7 @@ public unsafe partial class MPClientGameState
 		{
 			_fishEntityAssets = new FishGfxEntityRenderAssets(fishWindow);
 			_fishDoorRenderer = _fishEntityAssets.CreateSlidingDoorAdapter();
-			_fishPickupRenderer = _fishEntityAssets.CreatePickupAdapter();
+			_fishItemDropRenderer = _fishEntityAssets.CreateItemDropAdapter();
 		}
 		catch (Exception exception)
 		{
@@ -215,7 +178,7 @@ public unsafe partial class MPClientGameState
 		_staleActorIds.Clear();
 		_speechOcclusion.Clear();
 		_fishDoorRenderer = null;
-		_fishPickupRenderer = null;
+		_fishItemDropRenderer = null;
 		_fishEntityAssets?.Dispose();
 		_fishEntityAssets = null;
 		if (_fishVoxelScene != null)
@@ -247,14 +210,14 @@ public unsafe partial class MPClientGameState
 		{
 			Vector2 loadingFramebuffer = ((IFishGfxGameWindow)_gameWindow).RenderWindow.FramebufferSize;
 			_fishCameraState = new GameCameraState(
-				_worldStreamFocus + new Vector3(0, 12, -20),
-				_worldStreamFocus,
+				WorldStreamFocus + new Vector3(0, 12, -20),
+				WorldStreamFocus,
 				Vector3.UnitY,
 				60,
 				CameraProjectionKind.Perspective);
 			ConfigureFishCamera(_fishWorldCamera, _fishCameraState, loadingFramebuffer);
 			if (_simulation != null)
-				ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, _worldStreamFocus);
+				ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, WorldStreamFocus);
 			_fishVoxelScene.Update(_fishWorldCamera);
 			return;
 		}
@@ -566,6 +529,7 @@ public unsafe partial class MPClientGameState
 			UpdateHUDInfo();
 			UpdateHealthBar();
 			UpdateConnectionStatus();
+			UpdateInventoryUI();
 
 			if (_netStatsPanel is not null)
 			{

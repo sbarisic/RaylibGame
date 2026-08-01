@@ -113,7 +113,7 @@ public unsafe partial class MPClientGameState
 
 		foreach (VoxEntity entity in _simulation.Entities.GetAllEntities())
 		{
-			if (entity is not (VEntNPC or VEntSlidingDoor or VEntPickup))
+			if (entity is not (VEntNPC or VEntSlidingDoor or VEntItemDrop))
 			{
 				continue;
 			}
@@ -131,7 +131,7 @@ public unsafe partial class MPClientGameState
 					hash.Add((int)door.State);
 					hash.Add((int)MathF.Round(door.OpenAmount * 1024));
 					break;
-				case VEntPickup:
+				case VEntItemDrop:
 					animated |= entity.IsRotating;
 					break;
 			}

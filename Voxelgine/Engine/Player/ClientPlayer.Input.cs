@@ -41,15 +41,16 @@ namespace Voxelgine.Engine
 				);
 			});
 
-			AddOnKeyPressed(InputKey.Num1, (K) => { Inventory?.SetSelectedIndex(0); });
-			AddOnKeyPressed(InputKey.Num2, (K) => { Inventory?.SetSelectedIndex(1); });
-			AddOnKeyPressed(InputKey.Num3, (K) => { Inventory?.SetSelectedIndex(2); });
-			AddOnKeyPressed(InputKey.Num4, (K) => { Inventory?.SetSelectedIndex(3); });
-			AddOnKeyPressed(InputKey.Num5, (K) => { Inventory?.SetSelectedIndex(4); });
-			AddOnKeyPressed(InputKey.Num6, (K) => { Inventory?.SetSelectedIndex(5); });
-			AddOnKeyPressed(InputKey.Num7, (K) => { Inventory?.SetSelectedIndex(6); });
-			AddOnKeyPressed(InputKey.Num8, (K) => { Inventory?.SetSelectedIndex(7); });
-			AddOnKeyPressed(InputKey.Num9, (K) => { Inventory?.SetSelectedIndex(8); });
+			AddOnKeyPressed(InputKey.Num1, _ => SetSelectedInventoryIndex(0));
+			AddOnKeyPressed(InputKey.Num2, _ => SetSelectedInventoryIndex(1));
+			AddOnKeyPressed(InputKey.Num3, _ => SetSelectedInventoryIndex(2));
+			AddOnKeyPressed(InputKey.Num4, _ => SetSelectedInventoryIndex(3));
+			AddOnKeyPressed(InputKey.Num5, _ => SetSelectedInventoryIndex(4));
+			AddOnKeyPressed(InputKey.Num6, _ => SetSelectedInventoryIndex(5));
+			AddOnKeyPressed(InputKey.Num7, _ => SetSelectedInventoryIndex(6));
+			AddOnKeyPressed(InputKey.Num8, _ => SetSelectedInventoryIndex(7));
+			AddOnKeyPressed(InputKey.Num9, _ => SetSelectedInventoryIndex(8));
+			AddOnKeyPressed(InputKey.Num0, _ => SetSelectedInventoryIndex(9));
 
 			AddOnKeyPressed(InputKey.I, (K) =>
 			{
@@ -71,7 +72,6 @@ namespace Voxelgine.Engine
 
 		public void Tick(InputMgr InMgr)
 		{
-			ActiveSelection?.Tick(ViewMdl, InMgr);
 			Camera.Update(CursorDisabled, ref Cam, InMgr.GetMousePos());
 			UpdateDirectionVectors();
 

@@ -62,21 +62,12 @@ public unsafe partial class MPClientGameState
 						doorLight
 					), lighting);
 					break;
-				case VEntPickup pickup when _fishPickupRenderer is not null:
-					if (!IsVisibleActor(frustum, ToRenderBounds(pickup.WorldBounds), maximumDistanceSquared))
-					{
+				case VEntItemDrop drop when _fishItemDropRenderer is not null:
+					if (!IsVisibleActor(frustum, ToRenderBounds(drop.WorldBounds), maximumDistanceSquared))
 						break;
-					}
-					EntityLightSample pickupLight = _fishVoxelScene.SampleEntityLight(
-						pickup.Position + Vector3.UnitY * 0.5f
-					);
-					_fishPickupRenderer.Render(pass, new PickupRenderState(
-						pickup.Position,
-						pickup.Size,
-						pickup.RotationDegrees,
-						pickup.VerticalModelOffset,
-						pickupLight
-					), lighting);
+					EntityLightSample dropLight = _fishVoxelScene.SampleEntityLight(drop.Position + Vector3.UnitY * 0.5f);
+					ItemDropRenderState dropState = CreateItemDropRenderState(drop, dropLight);
+					_fishItemDropRenderer.Render(pass, dropState, lighting);
 					break;
 				default:
 					if (IsVisibleActor(frustum, ToRenderBounds(entity.WorldBounds), maximumDistanceSquared))
@@ -92,28 +83,45 @@ public unsafe partial class MPClientGameState
 			}
 		}
 
-		InventoryItem activeItem = (_simulation.LocalPlayer as ClientPlayer)?.GetActiveItem();
-		if (activeItem is null || !activeItem.IsPlaceableBlock())
+		ItemStack selected = (_simulation.LocalPlayer as ClientPlayer)?.GetSelectedStack() ?? ItemStack.Empty;
+		if (selected.IsEmpty || ItemCatalog.Get(selected.Item).PlacesBlock == null)
 		{
 			return;
 		}
 
-		Vector3? placement = activeItem.GetBlockPlacementPosition(
-			_simulation.Map,
+		if (_simulation.Map.TryRaycast(
 			_simulation.LocalPlayer.Position,
 			_simulation.LocalPlayer.GetForward(),
-			20
-		);
-		if (placement.HasValue)
+			20,
+			out VoxelRaycastHit hit))
 		{
+			Vector3 placement = new(
+				hit.X + hit.Normal.X,
+				hit.Y + hit.Normal.Y,
+				hit.Z + hit.Normal.Z);
 			FishGfxGameplayPrimitives.DrawWireBox(
 				pass,
-				placement.Value,
-				placement.Value + Vector3.One,
+				placement,
+				placement + Vector3.One,
 				FishColor.White,
 				2
 			);
 		}
+	}
+
+	private ItemDropRenderState CreateItemDropRenderState(
+		VEntItemDrop drop,
+		EntityLightSample light)
+	{
+		float phase = _totalTime * 2.5f + drop.NetworkId * 0.73f;
+		return new ItemDropRenderState(
+			drop.Stack,
+			drop.Position,
+			drop.Size,
+			_fishCameraState.Position,
+			(_totalTime * 45f + drop.NetworkId * 37f) % 360f,
+			0.12f + MathF.Sin(phase) * 0.08f,
+			light);
 	}
 
 	private BlockType GetBlockAtImpact(Vector3 hitPosition, Vector3 hitNormal)

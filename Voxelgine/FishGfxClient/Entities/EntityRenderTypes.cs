@@ -117,6 +117,16 @@ public readonly record struct PickupRenderState(
 	EntityLightSample Light
 );
 
+public readonly record struct ItemDropRenderState(
+	ItemStack Stack,
+	Vector3 Position,
+	Vector3 Size,
+	Vector3 CameraPosition,
+	float RotationDegrees,
+	float BobOffset,
+	EntityLightSample Light
+);
+
 internal readonly record struct EntityPartPose(Vector3 RotationDegrees, Vector3 PositionOffset);
 
 internal sealed class EntityModelFrameData

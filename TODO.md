@@ -32,9 +32,9 @@ Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (sh
 | **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameSimulation`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr`, explicit application composition, `FishLogging` |
 | **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
 | **Voxel World** | ✅ | Procedural island generation via simplex noise, block types, dual-channel lighting (skylight/block light) |
-| **Entity System** | ✅ | `VoxEntity` base, `VEntPickup`, `VEntNPC`, `VEntSlidingDoor`, `EntityManager` with network IDs, authority flag, spawn properties |
+| **Entity System** | ✅ | `VoxEntity` base, `VEntItemDrop`, `VEntNPC`, `VEntSlidingDoor`, `EntityManager` with network IDs, authority flag, spawn properties |
 | **Player** | ✅ | `Player`, `FPSCamera` (instance-based), `PlayerManager`, `RemotePlayer`, `ViewModel`, inventory, health/respawn |
-| **Weapons** | ✅ | `Weapon`, `WeaponGun` (fire intent/resolve/effects separation), `WeaponPicker`, `InventoryItem` |
+| **Items and weapons** | ✅ | Deterministic item catalog, 60-slot authoritative inventory, transactional placement/breaking, gun and hammer item definitions |
 | **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls, main menu with connect/host dialogs |
 | **Particles** | ✅ | `ParticleSystem` with smoke, fire, blood, spark effects and `EffectsPreviewState` with custom particle sandbox |
 | **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |

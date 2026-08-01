@@ -55,7 +55,9 @@ namespace Voxelgine.Engine
 		Pong = 0x81,
 
 		// Inventory
-		InventoryUpdate = 0x90,
+		InventoryState = 0x90,
+		InventoryActionRequest = 0x91,
+		ItemUseResult = 0x92,
 
 		// Sound/particle events
 		SoundEvent = 0xA0,
@@ -252,7 +254,9 @@ namespace Voxelgine.Engine
 			Register<PongPacket>(PacketType.Pong);
 
 			// Inventory
-			Register<InventoryUpdatePacket>(PacketType.InventoryUpdate);
+			Register<InventoryStatePacket>(PacketType.InventoryState);
+			Register<InventoryActionRequestPacket>(PacketType.InventoryActionRequest);
+			Register<ItemUseResultPacket>(PacketType.ItemUseResult);
 
 			// Sound/particle events
 			Register<SoundEventPacket>(PacketType.SoundEvent);

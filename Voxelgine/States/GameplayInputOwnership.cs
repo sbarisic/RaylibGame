@@ -5,6 +5,7 @@ internal enum GameplayInputMode
 	Gameplay,
 	DebugMenu,
 	Chat,
+	Inventory,
 }
 
 /// <summary>
@@ -45,7 +46,7 @@ internal sealed class GameplayInputOwnership
 
 	public bool ToggleDebugMenu()
 	{
-		if (Mode == GameplayInputMode.Chat)
+		if (Mode is GameplayInputMode.Chat or GameplayInputMode.Inventory)
 		{
 			return false;
 		}
@@ -53,6 +54,15 @@ internal sealed class GameplayInputOwnership
 		Mode = Mode == GameplayInputMode.DebugMenu
 			? GameplayInputMode.Gameplay
 			: GameplayInputMode.DebugMenu;
+		return true;
+	}
+
+	public bool OpenInventory()
+	{
+		if (Mode != GameplayInputMode.Gameplay)
+			return false;
+
+		Mode = GameplayInputMode.Inventory;
 		return true;
 	}
 

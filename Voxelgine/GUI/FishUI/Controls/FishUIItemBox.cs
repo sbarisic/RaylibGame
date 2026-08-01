@@ -13,9 +13,9 @@ namespace Voxelgine.GUI
 	public class FishUIItemBox : Control
 	{
 		public bool IsSelected { get; set; }
+		public int SlotIndex { get; set; } = -1;
 		public FishUIInventory ParentInventory { get; set; }
-		public InventoryItem Item { get; set; }
-		public bool UpdateTextFromItem { get; set; }
+		public ItemStack Stack { get; private set; }
 		public string Text { get; set; }
 
 		private ImageRef _icon;
@@ -27,6 +27,7 @@ namespace Voxelgine.GUI
 		private bool _hasIcon;
 
 		public event Action<FishUIItemBox> OnItemClicked;
+		public event Action<FishUIItemBox, FishMouseButton> OnItemMouseClicked;
 
 		public FishUIItemBox()
 		{
@@ -63,10 +64,16 @@ namespace Voxelgine.GUI
 			_hasIcon = true;
 		}
 
-		public void SetItem(FishUIInventory parent, InventoryItem item)
+		public void ClearIcon()
 		{
-			ParentInventory = parent;
-			Item = item;
+			_icon = default;
+			_hasIcon = false;
+		}
+
+		public void SetStack(ItemStack stack)
+		{
+			Stack = stack;
+			Text = stack.IsEmpty || stack.Count <= 1 ? null : stack.Count.ToString();
 		}
 
 		public override void DrawControl(global::FishUI.FishUI UI, float Dt, float Time)
@@ -129,12 +136,6 @@ namespace Voxelgine.GUI
 				}
 			}
 
-			// Update text from item if needed
-			if (UpdateTextFromItem)
-			{
-				Text = Item?.GetInvText();
-			}
-
 			// Draw count text in bottom-right corner
 			if (!string.IsNullOrEmpty(Text))
 			{
@@ -164,6 +165,7 @@ namespace Voxelgine.GUI
 			{
 				OnItemClicked?.Invoke(this);
 			}
+			OnItemMouseClicked?.Invoke(this, Btn);
 		}
 	}
 }

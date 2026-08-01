@@ -57,9 +57,8 @@ namespace Voxelgine.States
 				case WorldColumnPacket column:
 					ReceiveWorldColumn(column);
 					return;
-				case WorldBootstrapCompletePacket complete when complete.StreamId == _worldStreamId:
-					_bootstrapComplete = true;
-					_logging.Log(GameLogLevel.Debug, "WorldStream", $"bootstrap-complete streamId={complete.StreamId}");
+				case WorldBootstrapCompletePacket complete when complete.StreamId == WorldStreamId:
+					_worldStream?.CompleteBootstrap(complete.StreamId);
 					return;
 				case ClientWorldStartPacket start:
 					FinishWorldStart(start);
@@ -125,8 +124,12 @@ namespace Voxelgine.States
 					HandlePlayerDamage(damage);
 					break;
 
-				case InventoryUpdatePacket inventoryUpdate:
-					HandleInventoryUpdate(inventoryUpdate);
+				case InventoryStatePacket inventoryState:
+					HandleInventoryState(inventoryState);
+					break;
+
+				case ItemUseResultPacket itemUseResult:
+					HandleItemUseResult(itemUseResult);
 					break;
 
 				case SoundEventPacket soundEvent:
@@ -154,6 +157,7 @@ namespace Voxelgine.States
 				{
 					// Sync health from server
 					_simulation.LocalPlayer.Health = entry.Health;
+					_inventoryModel?.ApplySelection(entry.SelectedHotbarSlot, entry.SelectionCommandTick);
 
 					// Skip prediction reconciliation until the server has processed
 					// at least one of our InputStatePackets
@@ -255,7 +259,7 @@ namespace Voxelgine.States
 					$"revision-gap column={columnX},{columnZ} expected={blockChange.ColumnRevision} local={_simulation.Map.GetColumnRevision(columnX, columnZ)}");
 				_client.Send(new WorldColumnResyncRequestPacket
 				{
-					StreamId = _worldStreamId,
+					StreamId = WorldStreamId,
 					X = columnX,
 					Z = columnZ,
 					Revision = _simulation.Map.GetColumnRevision(columnX, columnZ),
@@ -317,7 +321,7 @@ namespace Voxelgine.States
 			);
 			_client.Send(new WorldColumnResyncRequestPacket
 			{
-				StreamId = _worldStreamId,
+				StreamId = WorldStreamId,
 				X = columnX,
 				Z = columnZ,
 				Revision = localRevision,
@@ -351,14 +355,7 @@ namespace Voxelgine.States
 			{
 				using var ms = new MemoryStream(packet.Properties);
 				using var reader = new BinaryReader(ms);
-				if (IsUsingFishGfx)
-				{
-					ReadFishGfxSpawnProperties(entity, reader);
-				}
-				else
-				{
-					entity.ReadSpawnProperties(reader);
-				}
+				entity.ReadSpawnProperties(reader);
 			}
 
 			_simulation.Entities.SpawnWithNetworkId(_simulation, entity, packet.NetworkId);
@@ -511,7 +508,7 @@ namespace Voxelgine.States
 			return entityType switch
 			{
 				"VEntNPC" => new VEntNPC(),
-				"VEntPickup" => new VEntPickup(),
+				"VEntItemDrop" => new VEntItemDrop(),
 				"VEntSlidingDoor" => new VEntSlidingDoor(),
 				"VEntPlayer" => new VEntPlayer(),
 				_ => null,
@@ -519,61 +516,11 @@ namespace Voxelgine.States
 		}
 
 		/// <summary>
-		/// Collects local block changes (from player placing/removing blocks) and sends them
-		/// to the server as <see cref="BlockPlaceRequestPacket"/> or <see cref="BlockRemoveRequestPacket"/>.
-		/// </summary>
-		private void SendPendingBlockChanges(float currentTime)
-		{
-			if (_simulation == null || _client == null || !_client.IsConnected)
-				return;
-
-			var changes = _simulation.Map.GetPendingChanges();
-			if (changes.Count == 0)
-				return;
-
-			foreach (var change in changes)
-			{
-				if (change.NewType == BlockType.None)
-				{
-					var packet = new BlockRemoveRequestPacket
-					{
-						X = change.X,
-						Y = change.Y,
-						Z = change.Z,
-					};
-					_client.Send(packet, true, currentTime);
-				}
-				else
-				{
-					var packet = new BlockPlaceRequestPacket
-					{
-						X = change.X,
-						Y = change.Y,
-						Z = change.Z,
-						BlockType = (ushort)change.NewType,
-					};
-					_client.Send(packet, true, currentTime);
-				}
-			}
-
-			_simulation.Map.ClearPendingChanges();
-		}
-
-		/// <summary>
 		/// Sends a <see cref="WeaponFirePacket"/> to the server for authoritative hit resolution.
 		/// </summary>
 		public void SendWeaponFire(Vector3 origin, Vector3 direction)
 		{
-			if (_client == null || !_client.IsConnected)
-				return;
-
-			var packet = new WeaponFirePacket
-			{
-				WeaponType = 0,
-				AimOrigin = origin,
-				AimDirection = direction,
-			};
-			_client.Send(packet, true, GetClientTime());
+			HandleLocalItemUseRequested(ItemUseChannel.Primary);
 		}
 
 		/// <summary>
@@ -785,17 +732,9 @@ namespace Voxelgine.States
 			AppendChatEntry(displayText, "Chat");
 		}
 
-		private void HandleInventoryUpdate(InventoryUpdatePacket packet)
+		private void HandleInventoryState(InventoryStatePacket packet)
 		{
-			if (_simulation?.LocalPlayer == null)
-				return;
-
-			foreach (var slot in packet.Slots)
-			{
-				InventoryItem item = (_simulation.LocalPlayer as ClientPlayer)?.GetInventoryItem(slot.SlotIndex);
-				if (item != null)
-					item.Count = slot.Count;
-			}
+			_inventoryModel?.Apply(packet);
 		}
 
 	}

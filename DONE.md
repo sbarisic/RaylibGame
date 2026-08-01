@@ -7,7 +7,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 ## Features
 
 - **Voxel World** — Procedural island generation, transparent blocks, real-time block creation/destruction, block placement preview
-- **Entity System** — Pickup entity (`VEntPickup`), NPC entity base (`VEntNPC`), sliding door entity (`VEntSlidingDoor`)
+- **Entity System** — Authoritative item drops (`VEntItemDrop`), NPC entity base (`VEntNPC`), and sliding doors (`VEntSlidingDoor`)
 - **GUI System** — Migrated to FishUI with Raylib backend (`FishUIManager`, `RaylibFishUIGfx`, `RaylibFishUIInput`). Custom controls: `FishUIItemBox`, `FishUIInventory`, `FishUIInfoLabel`. Removed old GUI code.
 - **GUI: Main menu refactor** — Refactored main menu to use FishUI `ScrollablePane` with properly positioned buttons, tooltips, and `OnButtonPressed` event pattern.
 - **GUI: Main menu title logo** — Added `ImageBox` displaying game logo at top of main menu.
@@ -47,7 +47,7 @@ Consolidated list of completed features, improvements, and bug fixes.
 - **Physics: Water buoyancy** — Added proper buoyancy force so player floats in water instead of sinking quickly
 - **Rendering** — Frame interpolation for smooth camera/position/view model rendering
 - **Unit Testing** — Tests for AABB, Easing, Utils, Noise
-- **Weapons: Require aim to fire** — Gun now requires right-click (aim/ironsight) to be held before firing. Moved aim handling from base `InventoryItem.Tick()` to `WeaponGun.Tick()` override with `IsAiming` property.
+- **Inventory and item authority** — Added deterministic item definitions, a private 60-slot authoritative inventory with synchronized cursor state, transactional item use, and server-authoritative selection.
 - **Particles: Fire effect** — Added `SpawnFire()` method with fire textures (1-4.png). Fire rises upward with random drift, semi-transparent, short-lived (0.6-1.0s), shrinks over lifetime, supports initial force/direction for wall impact effects. Added `ParticleType` enum for type-specific behavior.
 - **Particles: Spark effect** — Added `SpawnSpark()` with spark textures (1-4.png). Sparks orient along movement direction via `DrawBillboardPro`, fall slowly with gravity, shrink over 1.2-2.0s lifetime, additive blend, emissive.
 - **Weapons: Gun fire particles** — Gun now spawns fire particles instead of smoke on impact, using the wall normal as initial force direction.
@@ -92,7 +92,7 @@ works for any connected client.
 - **Chunk mesh lighting seams** — Fixed by splitting lighting computation into reset and compute phases; all chunks now reset before any propagation to prevent cross-chunk values from being overwritten
 - **Physics: Corner collision creep/stick** — Fixed player creeping into blocks and getting stuck when holding forwards into a corner. Replaced blind 10% movement fraction in `QuakeMoveWithCollision` with binary-search collision fraction (`FindCollisionFraction`) and proper multi-plane crease handling that projects velocity along the intersection of two blocking planes
 - **Multiplayer: Prediction tick desync** — Fixed sluggish movement at high ping caused by `LocalTick` freezing during world loading. Server now tracks per-player `LastInputTick` for independent tick comparison.
-- **Multiplayer: Block placement propagation** — Fixed `InventoryUpdatePacket` dropping before simulation existed. Client buffers pre-simulation packets; server re-sends inventory after world transfer.
+- **Multiplayer: Inventory reconciliation** — Full authoritative inventory snapshots now reconcile bounded predicted cursor actions and independently ordered hotbar selection.
 - **Multiplayer: Viewmodel rendering** — Fixed viewmodel at wrong screen position (moved overlay to after `EndMode3D`), broken arm orientation (rewrote rotation to clean 3-quaternion composition), direction vectors zero during tick.
 - **Multiplayer: Various network fixes** — Block placing/destroying echo loop, missing remote player avatars on join, raycast face hit precision, weapon effect particle types, `SoundMgr` double-init crash, cross-chunk skylight propagation at chunk boundaries.
 - **Multiplayer: Render distance & lighting** — Reduced render distance to 128 blocks. Deferred relighting for chunks outside render distance via `NeedsRelighting` flag.

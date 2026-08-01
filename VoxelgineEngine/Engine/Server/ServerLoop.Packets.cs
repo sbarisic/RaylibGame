@@ -40,16 +40,20 @@ namespace Voxelgine.Engine.Server
 					HandleInputState(connection, inputPacket);
 					break;
 
+				case InventoryActionRequestPacket inventoryAction:
+					HandleInventoryAction(connection, inventoryAction);
+					break;
+
 				case BlockPlaceRequestPacket placeReq:
-					HandleBlockPlaceRequest(connection, placeReq);
+					EnqueueItemUse(connection, placeReq);
 					break;
 
 				case BlockRemoveRequestPacket removeReq:
-					HandleBlockRemoveRequest(connection, removeReq);
+					EnqueueItemUse(connection, removeReq);
 					break;
 
 				case WeaponFirePacket weaponFire:
-					HandleWeaponFire(connection, weaponFire);
+					EnqueueItemUse(connection, weaponFire);
 					break;
 
 						case ChatMessagePacket chatMsg:
@@ -74,113 +78,8 @@ namespace Voxelgine.Engine.Server
 		private void HandleInputState(NetConnection connection, InputStatePacket inputPacket)
 		{
 			int playerId = connection.PlayerId;
-			if (_playerCommandQueues.TryGetValue(playerId, out ServerCommandQueue commandQueue))
-				commandQueue.Enqueue(inputPacket);
-		}
-
-		/// <summary>
-		/// Handles a <see cref="BlockPlaceRequestPacket"/> from a client.
-		/// Validates that the player is within reach and has the item in inventory,
-		/// then applies the block change to the ChunkMap and decrements the inventory count.
-		/// The change is automatically logged by <see cref="ChunkMap.SetPlacedBlock"/> and
-		/// will be broadcast to all clients in <see cref="BroadcastBlockChanges"/>.
-		/// </summary>
-		private void HandleBlockPlaceRequest(NetConnection connection, BlockPlaceRequestPacket packet)
-		{
-			int playerId = connection.PlayerId;
-			Player player = _simulation.Players.GetPlayer(playerId);
-			if (player == null)
-			{
-				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: player not found in simulation");
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
-			float distance = Vector3.Distance(player.Position, blockCenter);
-			if (distance > MaxBlockReach)
-			{
-				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: distance {distance:F1} > {MaxBlockReach} (player={player.Position}, block={blockCenter})");
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			// Validate inventory: find the slot for this block type and check count
-			BlockType blockType = (BlockType)packet.BlockType;
-			int slot = ServerInventory.FindSlotByBlockType(blockType);
-			if (slot < 0)
-			{
-				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory slot for BlockType {blockType} (raw byte: 0x{packet.BlockType:X2})");
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			if (!_playerInventories.TryGetValue(playerId, out var inventory))
-			{
-				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: no inventory entry for player");
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			if (!inventory.TryDecrement(slot))
-			{
-				_logging.ServerWriteLine($"BlockPlace REJECTED [{playerId}]: slot {slot} ({blockType}) has no items left (count={inventory.GetCount(slot)})");
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
-
-			// Trigger attack animation for block placement
-			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
-
-			// Send updated count to the client (server correction)
-			if (inventory.GetCount(slot) != -1) // Only send for finite items
-				_server.SendTo(playerId, inventory.CreateSlotUpdatePacket(slot), true, CurrentTime);
-
-			// Broadcast block place sound event to all clients
-			_server.Broadcast(new SoundEventPacket
-			{
-				EventType = (byte)SoundEventType.BlockPlace,
-				Position = blockCenter,
-				SourcePlayerId = playerId,
-			}, false, CurrentTime);
-		}
-
-		/// <summary>
-		/// Handles a <see cref="BlockRemoveRequestPacket"/> from a client.
-		/// Validates that the player is within reach, then removes the block from the ChunkMap.
-		/// </summary>
-		private void HandleBlockRemoveRequest(NetConnection connection, BlockRemoveRequestPacket packet)
-		{
-			int playerId = connection.PlayerId;
-			Player player = _simulation.Players.GetPlayer(playerId);
-			if (player == null)
-			{
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			Vector3 blockCenter = new Vector3(packet.X + 0.5f, packet.Y + 0.5f, packet.Z + 0.5f);
-			float distance = Vector3.Distance(player.Position, blockCenter);
-			if (distance > MaxBlockReach)
-			{
-				_worldStream.RequestFreshSnapshot(playerId, packet.X, packet.Z);
-				return;
-			}
-
-			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, BlockType.None);
-
-			// Trigger attack animation for block destruction
-			_playerAttackEndTimes[playerId] = CurrentTime + AttackAnimDuration;
-
-			// Broadcast block break sound event to all clients
-			_server.Broadcast(new SoundEventPacket
-			{
-				EventType = (byte)SoundEventType.BlockBreak,
-				Position = blockCenter,
-				SourcePlayerId = playerId,
-			}, false, CurrentTime);
+			if (_sessions.TryGetValue(playerId, out ServerClientSession session))
+				session.CommandQueue.Enqueue(inputPacket);
 		}
 
 		/// <summary>

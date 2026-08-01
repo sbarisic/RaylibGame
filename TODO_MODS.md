@@ -40,9 +40,9 @@ Planned tasks for implementing the mod system API.
 | System | Engine Class(es) | Mod API Surface |
 |--------|-------------------|-----------------|
 | **World** | `ChunkMap`, `Chunk`, `BlockInfo`, `BlockType` | Get/set blocks, query chunks, world generation hooks, lighting |
-| **Entities** | `EntityManager`, `VoxEntity`, `VEntPickup`, `VEntNPC`, `VEntSlidingDoor` | Spawn/remove entities, register custom entity types, query entities, raycasting |
+| **Entities** | `EntityManager`, `VoxEntity`, `VEntItemDrop`, `VEntNPC`, `VEntSlidingDoor` | Spawn/remove entities, register custom entity types, query entities, raycasting |
 | **Player** | `Player`, `FPSCamera` | Position, velocity, camera, inventory access |
-| **Items/Weapons** | `InventoryItem`, `Weapon`, `WeaponGun`, `WeaponPicker` | Register custom items/weapons, inventory manipulation |
+| **Items/Weapons** | `ItemCatalog`, `PlayerInventory`, `GameplayItemUseController` | Register item definitions and capabilities; request authoritative inventory and item-use operations |
 | **Particles** | `ParticleSystem` | Spawn smoke/fire/blood/custom particles, register particle types |
 | **Sound** | `SoundMgr` | Play sounds, register sound combos |
 | **Resources** | `ResMgr` | Register textures, models, shaders; texture collections |
@@ -115,7 +115,7 @@ mods/
 ### Medium Priority
 
 - [ ] **Resource API** (`IResourceAPI`) — Expose: `RegisterTexture(name, path)`, `RegisterModel(name, path)`, `RegisterShader(name, vertPath, fragPath)`, `RegisterSoundCombo(name, pathPattern, count, volume)`, `GetTexture(name)`, `GetModel(name)`. Mod resource paths are relative to the mod's `data/` folder. Backed by `ResMgr` and `SoundMgr` **[CPX: 3]**
-- [ ] **Item/Weapon API** (`IItemAPI`) — Expose: `RegisterItem(name, properties)`, `RegisterWeapon(name, properties)`, custom `OnLeftClick`/`OnRightClick`/`OnSelected`/`OnDeselected` callbacks. Allow mods to create new `InventoryItem` subclasses or use a data-driven item definition. Backed by `InventoryItem`, `Weapon` **[CPX: 3]**
+- [ ] **Item/Weapon API** (`IItemAPI`) — Expose deterministic item-definition registration and authoritative use callbacks. Inventory state stays private and all mutations run through validated transactions. Backed by `ItemCatalog` and `PlayerInventory` **[CPX: 3]**
 - [ ] **Particle API** (`IParticleAPI`) — Expose: `SpawnSmoke(pos, vel, color)`, `SpawnFire(pos, force, color, scale)`, `SpawnBlood(pos, normal, scale)`, `SpawnTracer(start, end, color)`. Future: `RegisterParticleType(name, properties)` for custom particle types. Backed by `ParticleSystem` **[CPX: 2]**
 - [ ] **Sound API** (`ISoundAPI`) — Expose: `PlayCombo(name, listenerPos, listenerDir, soundPos)`, `RegisterCombo(name, pathPattern, count, volume)`, `SetMasterVolume(vol)`. Backed by `SoundMgr` **[CPX: 2]**
 - [ ] **GUI API** (`IGuiAPI`) — Expose: `CreateWindow(title, pos, size)`, `CreateButton(text, pos, size)`, `CreateLabel(text, pos, size)`, `CreateCheckbox(pos, size)`, `AddToScreen(control)`, `RemoveFromScreen(control)`. Allow mods to create FishUI controls and add them to the game GUI. Backed by `FishUIManager` **[CPX: 3]**

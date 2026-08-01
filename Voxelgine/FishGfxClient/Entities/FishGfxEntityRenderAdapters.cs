@@ -83,6 +83,52 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			"entity.orb.texture",
 			Path.Combine(models, EntityAssetIds.ExperienceOrbTexture)
 		);
+		Dictionary<ItemId, AssetHandle<FishGfxEntityModel>> itemModels = new();
+		Dictionary<ItemId, AssetHandle<Texture>> itemTextures = new();
+		AssetHandle<Texture> blockAtlas = window.Assets.LoadColorTexture(
+			"entity.item.block-atlas",
+			Path.Combine(textures, "atlas.png")
+		);
+		foreach (ItemDefinition item in ItemCatalog.AllItems)
+		{
+			if (item.PlacesBlock is BlockType block)
+			{
+				if (TryGetCustomBlockAsset(block, models, out string modelPath, out string texturePath))
+				{
+					itemModels.Add(item.Id, window.Assets.Register(
+						$"entity.item.model.{item.Id.Value}",
+						() => new FishGfxEntityModel(
+							window.RenderWindow.Graphics,
+							EntityModelSource.LoadBlockModel(modelPath)),
+						modelPath));
+					itemTextures.Add(item.Id, window.Assets.LoadColorTexture(
+						$"entity.item.texture.{item.Id.Value}",
+						texturePath));
+				}
+				else
+				{
+					itemModels.Add(item.Id, window.Assets.Register(
+						$"entity.item.model.{item.Id.Value}",
+						() => new FishGfxEntityModel(
+							window.RenderWindow.Graphics,
+							EntityModelSource.CreateBlockCube(block))));
+					itemTextures.Add(item.Id, blockAtlas);
+				}
+				continue;
+			}
+
+			string iconPath = Path.Combine(
+				AppContext.BaseDirectory,
+				ClientItemPresentationCatalog.Get(item.Id).IconAsset);
+			itemModels.Add(item.Id, window.Assets.Register(
+				$"entity.item.model.{item.Id.Value}",
+				() => new FishGfxEntityModel(
+					window.RenderWindow.Graphics,
+					EntityModelSource.CreateIconQuad())));
+			itemTextures.Add(item.Id, window.Assets.LoadColorTexture(
+				$"entity.item.texture.{item.Id.Value}",
+				iconPath));
+		}
 		AssetHandle<FishGfxAnimationLibrary> animations = window.Assets.Register(
 			"entity.animations",
 			() => FishGfxAnimationLibrary.LoadStandard(animationDirectory),
@@ -109,8 +155,36 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 			orbTexture,
 			animations,
 			litShader,
-			shadowShader
+			shadowShader,
+			itemModels,
+			itemTextures
 		);
+	}
+
+	private static bool TryGetCustomBlockAsset(
+		BlockType block,
+		string models,
+		out string modelPath,
+		out string texturePath)
+	{
+		(string Directory, string Model, string Texture)? asset = block switch
+		{
+			BlockType.Barrel => ("barrel", "barrel.json", "barrel_tex.png"),
+			BlockType.Campfire => ("campfire", "campfire.json", "campfire_tex.png"),
+			BlockType.Torch => ("torch", "torch.json", "torch_tex.png"),
+			BlockType.Foliage => ("grass", "grass1.json", "grass1_tex.png"),
+			_ => null,
+		};
+		if (asset is null)
+		{
+			modelPath = null;
+			texturePath = null;
+			return false;
+		}
+
+		modelPath = Path.Combine(models, asset.Value.Directory, asset.Value.Model);
+		texturePath = Path.Combine(models, asset.Value.Directory, asset.Value.Texture);
+		return true;
 	}
 
 	public FishGfxRemotePlayerRenderAdapter CreateRemotePlayerAdapter()
@@ -141,6 +215,12 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 	{
 		ThrowIfDisposed();
 		return new FishGfxPickupRenderAdapter(this);
+	}
+
+	public FishGfxItemDropRenderAdapter CreateItemDropAdapter()
+	{
+		ThrowIfDisposed();
+		return new FishGfxItemDropRenderAdapter(this);
 	}
 
 	public void Dispose()
@@ -210,6 +290,22 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 		}
 	}
 
+	internal FishGfxEntityModel ItemModel(ItemId item)
+	{
+		ThrowIfDisposed();
+		return resources.ItemModels.TryGetValue(item, out AssetHandle<FishGfxEntityModel> model)
+			? model.Value
+			: throw new KeyNotFoundException($"Missing render model for item {item.Value}.");
+	}
+
+	internal Texture ItemTexture(ItemId item)
+	{
+		ThrowIfDisposed();
+		return resources.ItemTextures.TryGetValue(item, out AssetHandle<Texture> texture)
+			? texture.Value
+			: throw new KeyNotFoundException($"Missing render texture for item {item.Value}.");
+	}
+
 	internal ShaderProgram LitShader
 	{
 		get
@@ -243,7 +339,9 @@ public sealed class FishGfxEntityRenderAssets : IDisposable
 		AssetHandle<Texture> ExperienceOrbTexture,
 		AssetHandle<FishGfxAnimationLibrary> Animations,
 		AssetHandle<ShaderProgram> LitShader,
-		AssetHandle<ShaderProgram> ShadowShader
+		AssetHandle<ShaderProgram> ShadowShader,
+		IReadOnlyDictionary<ItemId, AssetHandle<FishGfxEntityModel>> ItemModels,
+		IReadOnlyDictionary<ItemId, AssetHandle<Texture>> ItemTextures
 	);
 }
 

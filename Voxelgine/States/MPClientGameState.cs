@@ -24,9 +24,13 @@ namespace Voxelgine.States
 		private const float DeltaTime = 0.015f;
 
 		// Networking
-		private NetClient _client;
+		private ClientSessionController _sessionController;
+		private NetClient _client => _sessionController?.Client;
 		private ClientInputBuffer _inputBuffer;
 		private ClientPrediction _prediction;
+		private ClientInventoryModel _inventoryModel;
+		private GameplayInventoryController _inventoryController;
+		private GameplayItemUseController _itemUseController;
 		private readonly PredictionReconciler _predictionReconciler = new();
 		private string _serverHost;
 		private int _serverPort;
@@ -90,6 +94,12 @@ namespace Voxelgine.States
 		// FishUI HUD controls — Player list
 		private Panel _playerListPanel;
 		private FishUIInfoLabel _playerListInfoLabel;
+
+		// FishUI controls — authoritative inventory
+		private Window _inventoryWindow;
+		private FishUIItemBox[] _inventorySlotBoxes;
+		private FishUIItemBox _inventoryCursorGhost;
+		private Label _inventoryStatusLabel;
 
 		// FishUI HUD controls — Chat
 		private ToastNotification _chatToast;
@@ -161,18 +171,28 @@ namespace Voxelgine.States
 
 			Cleanup();
 
-			_client = new NetClient(_logging);
+			_sessionController = new ClientSessionController(
+				_logging,
+				OnConnected,
+				OnDisconnected,
+				OnConnectionRejected,
+				OnPacketReceived);
 #if DEBUG
 			//_client.PacketLoggingEnabled = true;
 #endif
 			_inputBuffer = new ClientInputBuffer();
 			_prediction = new ClientPrediction();
-
-			// Wire up events
-			_client.OnConnected += OnConnected;
-			_client.OnDisconnected += OnDisconnected;
-			_client.OnConnectionRejected += OnConnectionRejected;
-			_client.OnPacketReceived += OnPacketReceived;
+			_inventoryModel = new ClientInventoryModel();
+			_inventoryController = new GameplayInventoryController(
+				_inventoryModel,
+				packet => _client?.Send(packet, true, GetClientTime()));
+			_itemUseController = new GameplayItemUseController(
+				() => _client?.IsConnected == true,
+				() => (_client?.LocalTick ?? 0) + 1,
+				() => _simulation?.LocalPlayer as ClientPlayer,
+				() => _simulation?.Map,
+				packet => _client?.Send(packet, true, GetClientTime()),
+				_logging);
 
 			_statusText = $"Connecting to {host}:{port}...";
 			_errorText = "";
@@ -184,7 +204,7 @@ namespace Voxelgine.States
 
 			try
 			{
-				_client.Connect(host, port, playerName, GetClientTime());
+				_sessionController.Connect(host, port, playerName, GetClientTime());
 			}
 			catch (Exception ex)
 			{
@@ -270,7 +290,7 @@ namespace Voxelgine.States
 				if (!_initialized)
 				{
 					// Update loading progress
-					_statusText = GetWorldLoadStatus();
+					_statusText = _worldStream?.Status ?? _statusText;
 					return;
 				}
 
@@ -294,6 +314,15 @@ namespace Voxelgine.States
 					{
 						CloseChatInput();
 					}
+
+					TickWorldWithoutGameplayInput();
+					return;
+				}
+
+				if (_inputOwnership.Mode == GameplayInputMode.Inventory)
+				{
+					if (Window.InMgr.IsInputPressed(InputKey.Tab) || Window.InMgr.IsInputPressed(InputKey.Esc))
+						CloseInventory();
 
 					TickWorldWithoutGameplayInput();
 					return;
@@ -331,13 +360,16 @@ namespace Voxelgine.States
 					_showNetStats = !_showNetStats;
 
 				if (Window.InMgr.IsInputPressed(InputKey.Tab))
-					_showPlayerList = !_showPlayerList;
+				{
+					OpenInventory();
+					TickWorldWithoutGameplayInput();
+					return;
+				}
 
-				// Update game systems
-				// Discard block changes logged by server-broadcasted BlockChangePackets
-				// (processed during _client.Tick above) so they are not echoed back as
-				// client requests in SendPendingBlockChanges. Only changes from local
-				// player interaction (TickGUI below) should be sent to the server.
+				_showPlayerList = Window.InMgr.IsInputDown(InputKey.P);
+
+				// Update game systems. World changes are authoritative packets; local
+				// interaction requests never mutate the client map optimistically.
 				_simulation.Map.ClearPendingChanges();
 
 				_simulation.Map.Tick();
@@ -345,8 +377,6 @@ namespace Voxelgine.States
 				(_simulation.LocalPlayer as ClientPlayer)?.TickGUI(Window.InMgr, _simulation.Map);
 				(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
 
-				// Send pending block changes to server
-				SendPendingBlockChanges(GetClientTime());
 			}
 			catch (Exception ex)
 			{
@@ -383,7 +413,8 @@ namespace Voxelgine.States
 					_client.LocalTick,
 					simulationInput,
 					new Vector2(_simulation.LocalPlayer.Camera.CamAngle.X, _simulation.LocalPlayer.Camera.CamAngle.Y),
-					_simulation.LocalPlayer.NoClip
+					_simulation.LocalPlayer.NoClip,
+					checked((byte)(_simulation.LocalPlayer as ClientPlayer).GetSelectedInventoryIndex())
 				);
 				_client.Send(inputPacket, false, currentTime);
 
@@ -496,7 +527,6 @@ namespace Voxelgine.States
 			_simulation.Map.ClearPendingChanges();
 			_simulation.Map.Tick();
 			(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
-			SendPendingBlockChanges(GetClientTime());
 		}
 
 		internal static InputState CreateSimulationInputState(
@@ -575,20 +605,20 @@ namespace Voxelgine.States
 			_statusText = "";
 			_errorText = "";
 
-			if (_client != null)
-			{
-				_client.OnConnected -= OnConnected;
-				_client.OnDisconnected -= OnDisconnected;
-				_client.OnConnectionRejected -= OnConnectionRejected;
-				_client.OnPacketReceived -= OnPacketReceived;
-				_client.Dispose();
-				_client = null;
-			}
+			_sessionController?.Dispose();
+			_sessionController = null;
 
 			_simulation?.LocalPlayer?.Dispose();
 			DisposeFishGfxVoxelScene();
 			_inputBuffer = null;
 			_prediction = null;
+			if (_inventoryModel is not null)
+				_inventoryModel.Changed -= RefreshInventoryUI;
+			_inventoryController?.Dispose();
+			_inventoryController = null;
+			_itemUseController?.Dispose();
+			_itemUseController = null;
+			_inventoryModel = null;
 			_simulation = null;
 			_gui?.Dispose();
 			_gui = null;
@@ -633,11 +663,17 @@ namespace Voxelgine.States
 			_playerListPanel = null;
 			_playerListInfoLabel = null;
 			_showPlayerList = false;
+			_inventoryWindow = null;
+			_inventorySlotBoxes = null;
+			_inventoryCursorGhost = null;
+			_inventoryStatusLabel = null;
 		}
 
 		protected override void DisposeCore()
 		{
 			Cleanup();
+			_worldStream?.Dispose();
+			_worldStream = null;
 		}
 	}
 }

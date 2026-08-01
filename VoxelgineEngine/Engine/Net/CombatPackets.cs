@@ -10,22 +10,25 @@ namespace Voxelgine.Engine
 	{
 		public override PacketType Type => PacketType.WeaponFire;
 
+		public uint ItemUseActionId { get; set; }
+		public int CommandTick { get; set; }
+		public ItemUseChannel Channel { get; set; }
 		public byte WeaponType { get; set; }
-		public Vector3 AimOrigin { get; set; }
-		public Vector3 AimDirection { get; set; }
 
 		public override void Write(BinaryWriter writer)
 		{
+			writer.Write(ItemUseActionId);
+			writer.Write(CommandTick);
+			writer.Write((byte)Channel);
 			writer.Write(WeaponType);
-			writer.WriteVector3(AimOrigin);
-			writer.WriteVector3(AimDirection);
 		}
 
 		public override void Read(BinaryReader reader)
 		{
+			ItemUseActionId = reader.ReadUInt32();
+			CommandTick = reader.ReadInt32();
+			Channel = (ItemUseChannel)reader.ReadByte();
 			WeaponType = reader.ReadByte();
-			AimOrigin = reader.ReadVector3();
-			AimDirection = reader.ReadVector3();
 		}
 	}
 

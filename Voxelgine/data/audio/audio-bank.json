@@ -66,6 +66,19 @@
       "maxInstancesPerVariant": 6
     },
     {
+      "id": "item_pickup",
+      "variants": [
+        { "path": "../sound/pickup/pickup1.wav" },
+        { "path": "../sound/pickup/pickup2.wav" },
+        { "path": "../sound/pickup/pickup3.wav" }
+      ],
+      "bus": "Sfx",
+      "spatialMode": "ThreeDimensional",
+      "minDistance": 1,
+      "maxDistance": 24,
+      "maxInstancesPerVariant": 6
+    },
+    {
       "id": "shoot1",
       "variants": [{ "path": "../sound/shoot1/shoot1.wav" }],
       "bus": "Sfx",

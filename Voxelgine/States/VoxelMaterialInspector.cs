@@ -164,7 +164,9 @@ internal sealed class VoxelMaterialInspector
 		central.Position = Layout.CentralPosition;
 		central.Size = Layout.CentralSize;
 		centralStack.Position = Vector2.Zero;
-		centralStack.Size = new Vector2(Math.Max(0, contentWidth - 20), 688);
+		float stackHeight = VoxelMaterialInspectorLayout.CalculateStackContentHeight(
+			centralStack.Children.Select(static child => child.Size.Y));
+		centralStack.Size = new Vector2(Math.Max(0, contentWidth - 20), stackHeight);
 		blockList.Size = new Vector2(centralStack.Size.X, VoxelMaterialInspectorLayout.MinimumBlockListHeight);
 		foreach (Control card in centralStack.Children.Where(child => child is Panel))
 			card.Size = new Vector2(centralStack.Size.X, card.Size.Y);

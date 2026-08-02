@@ -72,6 +72,13 @@ internal readonly record struct VoxelMaterialInspectorLayout(
 			MinimumBlockListHeight);
 	}
 
+	internal static float CalculateStackContentHeight(IEnumerable<float> childHeights)
+	{
+		ArgumentNullException.ThrowIfNull(childHeights);
+		float[] heights = childHeights.Select(static height => Math.Max(0, height)).ToArray();
+		return heights.Sum() + Math.Max(0, heights.Length - 1) * Spacing;
+	}
+
 	internal bool Contains(Vector2 point) =>
 		point.X >= Position.X && point.Y >= Position.Y
 		&& point.X <= Position.X + Size.X && point.Y <= Position.Y + Size.Y;

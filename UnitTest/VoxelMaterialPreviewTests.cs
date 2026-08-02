@@ -65,6 +65,16 @@ public sealed class VoxelMaterialPreviewTests
 	}
 
 	[Fact]
+	public void InspectorStackHeightIncludesEveryCardAndSpacing()
+	{
+		float height = VoxelMaterialInspectorLayout.CalculateStackContentHeight(
+			[180, 142, 276, 116]);
+
+		Assert.Equal(750, height);
+		Assert.True(height >= 180 + 142 + 276 + 116);
+	}
+
+	[Fact]
 	public void FishUiManagerRequiresRuntimePathsAndOwnsCentralDiagnosticsPolicy()
 	{
 		var constructors = typeof(FishUIManager).GetConstructors();

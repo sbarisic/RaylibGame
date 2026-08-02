@@ -32,7 +32,7 @@ namespace Voxelgine.States
 
 		public NPCPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
-			_gui = new FishUIManager(window, Eng.Logging);
+			_gui = new FishUIManager(window, Eng.Logging, Eng.AsClient().RuntimePaths);
 			IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
 				?? throw new ArgumentException("NPC preview requires FishGfx.", nameof(window));
 			_assets = new FishGfxEntityRenderAssets(fishWindow);

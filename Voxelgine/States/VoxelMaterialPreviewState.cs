@@ -1,4 +1,5 @@
 #if WINDOWS
+using System.Buffers.Binary;
 using System.Numerics;
 using FishGfx.Graphics;
 using FishGfx.Voxels;
@@ -17,7 +18,6 @@ namespace Voxelgine.States;
 
 public sealed class VoxelMaterialPreviewState : GameStateImpl
 {
-	private const float ControlsWidth = 380;
 	internal const BlockType DefaultBlockType = BlockType.Stone;
 	private static readonly BlockType[] BlockTypes = Enum.GetValues<BlockType>()
 		.Where(static type => type != BlockType.None)
@@ -25,16 +25,14 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		.ToArray();
 
 	private readonly IFishGfxGameWindow fishWindow;
+	private readonly RuntimePaths runtimePaths;
 	private readonly FishUIManager gui;
 	private readonly ChunkMap map = new();
 	private readonly FishGfxVoxelScene voxelScene;
 	private readonly RenderQueue renderQueue = new();
 	private readonly Camera camera = new();
-	private readonly DropDown materialDropDown;
-	private readonly Label materialInfoLabel;
-	private readonly Label reloadStatusLabel;
-	private readonly Slider lightAzimuthSlider;
-	private readonly CheckBox automaticLightCheckBox;
+	private readonly VoxelMaterialInspectorModel inspectorModel;
+	private readonly VoxelMaterialInspector inspector;
 	private BlockType selectedBlock = DefaultBlockType;
 	private float cameraYaw = 35;
 	private float cameraElevation = 20;
@@ -47,6 +45,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private bool automaticLightRotation;
 	private bool automaticValidation;
 	private bool automaticReloadSucceeded;
+	private Task<FishUIDebugSnapshot> automaticCapture;
 	private int automaticFrame;
 	private bool disposed;
 
@@ -55,7 +54,8 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		fishWindow = window as IFishGfxGameWindow
 			?? throw new ArgumentException("Voxel material preview requires FishGfx.", nameof(window));
-		gui = new FishUIManager(window, engine.Logging);
+		runtimePaths = engine.AsClient().RuntimePaths;
+		gui = new FishUIManager(window, engine.Logging, runtimePaths);
 		map.SetBlock(0, 0, 0, selectedBlock);
 		voxelScene = new FishGfxVoxelScene(
 			fishWindow.RenderWindow.Graphics,
@@ -67,10 +67,19 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		);
 		voxelScene.Renderer.FogSettings = VoxelFogSettings.Disabled;
 		fishWindow.Assets.ReloadCompleted += OnAssetReloadCompleted;
-
-		(materialDropDown, materialInfoLabel, reloadStatusLabel, lightAzimuthSlider,
-			automaticLightCheckBox) = CreateUi();
-		SelectDropDownBlock(selectedBlock);
+		inspectorModel = new VoxelMaterialInspectorModel(selectedBlock);
+		inspector = new VoxelMaterialInspector(
+			inspectorModel,
+			SelectBlock,
+			value => lightAzimuth = value,
+			value => lightElevation = value,
+			value => directIntensity = value,
+			value => ambientIntensity = value,
+			value => automaticLightRotation = value,
+			RequestAtlasReload,
+			() => Client.RequestState(ClientStateKind.MainMenu));
+		inspector.UpdateLayout(window.Width, window.Height);
+		gui.AddControl(inspector.Root);
 		UpdateMaterialInfo();
 		ConfigureCamera();
 	}
@@ -90,6 +99,36 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		automaticValidation = true;
 	}
 
+	internal void ValidateAutomaticSnapshotBundle()
+	{
+		if (!automaticValidation || automaticCapture == null)
+			throw new InvalidOperationException("The automatic snapshot request was not queued.");
+		FishUIDebugSnapshot snapshot = automaticCapture.WaitAsync(TimeSpan.FromSeconds(10))
+			.GetAwaiter().GetResult();
+		gui.UI.Diagnostics.WaitForPendingExportsAsync().WaitAsync(TimeSpan.FromSeconds(10))
+			.GetAwaiter().GetResult();
+		if (snapshot.CaptureStatus != FishUIDebugCaptureStatus.Complete
+			|| snapshot.ScreenshotPng == null || snapshot.OverlayPng == null)
+			throw new InvalidOperationException("The automatic FishUI snapshot did not produce both image artifacts.");
+		if (snapshot.FramebufferWidthPixels != fishWindow.RenderWindow.FramebufferWidth
+			|| snapshot.FramebufferHeightPixels != fishWindow.RenderWindow.FramebufferHeight)
+			throw new InvalidOperationException("FishUI snapshot framebuffer metadata does not match the rendered target.");
+		(int screenshotWidth, int screenshotHeight) = ReadPngSize(snapshot.ScreenshotPng);
+		(int overlayWidth, int overlayHeight) = ReadPngSize(snapshot.OverlayPng);
+		if (screenshotWidth != overlayWidth || screenshotHeight != overlayHeight
+			|| screenshotWidth != snapshot.FramebufferWidthPixels
+			|| screenshotHeight != snapshot.FramebufferHeightPixels)
+			throw new InvalidOperationException("FishUI screenshot and annotated overlay dimensions are not aligned.");
+
+		string root = Path.Combine(runtimePaths.Root, "diagnostics", "fishui");
+		string directory = Directory.GetDirectories(root, snapshot.DefaultExportName + "*")
+			.OrderByDescending(Directory.GetCreationTimeUtc).FirstOrDefault()
+			?? throw new InvalidOperationException("The automatic FishUI snapshot bundle was not exported.");
+		foreach (string artifact in new[] { "snapshot.json", "recent-events.json", "interaction-summary.txt", "screenshot.png", "overlay.png" })
+			if (!File.Exists(Path.Combine(directory, artifact)))
+				throw new InvalidOperationException($"FishUI snapshot bundle is missing '{artifact}'.");
+	}
+
 	public override void SwapTo()
 	{
 		gui.InputEnabled = true;
@@ -101,7 +140,6 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	public override void SwapFrom()
 	{
 		gui.InputEnabled = false;
-		materialDropDown.Close();
 	}
 
 	public override void Tick(float gameTime)
@@ -120,8 +158,9 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	public override void BeginFrame(in FrameTiming timing)
 	{
 		RunAutomaticValidationStep();
+		inspector.UpdateLayout(Window.Width, Window.Height);
 		Vector2 mouse = Window.InMgr.GetMousePos();
-		bool overControls = mouse.X <= ControlsWidth + 20;
+		bool overControls = inspector.Contains(mouse);
 		if (!overControls && Window.InMgr.IsInputDown(InputKey.Click_Left))
 		{
 			Vector2 delta = mouse - lastMousePosition;
@@ -142,7 +181,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		if (automaticLightRotation)
 		{
 			lightAzimuth = WrapDegrees(lightAzimuth + 30 * timing.DeltaTime);
-			lightAzimuthSlider.Value = lightAzimuth;
+			inspector.LightAzimuthSlider.Value = lightAzimuth;
 		}
 
 		ConfigureCamera();
@@ -239,145 +278,8 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 
 		selectedBlock = blockType;
 		map.SetBlock(0, 0, 0, selectedBlock);
+		inspector.Select(blockType);
 		UpdateMaterialInfo();
-	}
-
-	private (DropDown, Label, Label, Slider, CheckBox) CreateUi()
-	{
-		var controlsWindow = new Window
-		{
-			Title = "Voxel Material Preview",
-			Position = new Vector2(20, 20),
-			Size = new Vector2(ControlsWidth, 750),
-			IsResizable = false,
-			ShowCloseButton = false,
-		};
-		var scroll = new ScrollablePane
-		{
-			Position = Vector2.Zero,
-			Size = controlsWindow.GetContentSize(),
-			Anchor = FishUIAnchor.All,
-			AutoContentSize = true,
-		};
-		var stack = new StackLayout
-		{
-			Orientation = StackOrientation.Vertical,
-			Spacing = 7,
-			Position = new Vector2(10, 10),
-			Size = new Vector2(ControlsWidth - 42, 920),
-			IsTransparent = true,
-		};
-		float width = ControlsWidth - 48;
-
-		stack.AddChild(new Label { Text = "Block material", Size = new Vector2(width, 22) });
-		var dropDown = new DropDown
-		{
-			ID = "voxel_material_block",
-			Size = new Vector2(width, 30),
-			MaxVisibleItems = 12,
-		};
-		foreach (BlockType blockType in BlockTypes)
-		{
-			dropDown.AddItem(new DropDownItem($"{(int)blockType}: {blockType}", blockType));
-		}
-		dropDown.OnItemSelected += (_, item) =>
-		{
-			if (item.UserData is BlockType blockType)
-			{
-				SelectBlock(blockType);
-			}
-		};
-		stack.AddChild(dropDown);
-
-		var info = new Label
-		{
-			ID = "voxel_material_info",
-			Size = new Vector2(width, 128),
-		};
-		stack.AddChild(info);
-
-		Slider AddSlider(string id, string title, float minimum, float maximum,
-			float value, float step, Action<float> changed)
-		{
-			stack.AddChild(new Label { Text = title, Size = new Vector2(width, 20) });
-			var slider = new Slider
-			{
-				ID = id,
-				Size = new Vector2(width, 26),
-				MinValue = minimum,
-				MaxValue = maximum,
-				Value = value,
-				Step = step,
-				ShowValueLabel = true,
-				ValueLabelFormat = "0.00",
-			};
-			slider.OnValueChanged += (_, newValue) => changed(newValue);
-			stack.AddChild(slider);
-			return slider;
-		}
-
-		Slider azimuth = AddSlider(
-			"voxel_material_light_azimuth", "Light azimuth", 0, 360, 45, 1,
-			value => lightAzimuth = value);
-		AddSlider(
-			"voxel_material_light_elevation", "Light elevation", 5, 85, 35, 1,
-			value => lightElevation = value);
-		AddSlider(
-			"voxel_material_direct", "Direct intensity", 0, 2, 1, 0.05f,
-			value => directIntensity = value);
-		AddSlider(
-			"voxel_material_ambient", "Ambient intensity", 0, 0.5f, 0.15f, 0.01f,
-			value => ambientIntensity = value);
-
-		var automatic = new CheckBox("Automatic light rotation (30 degrees/second)")
-		{
-			ID = "voxel_material_auto_light",
-			IsChecked = false,
-			Size = new Vector2(width, 28),
-		};
-		automatic.OnCheckedChanged += (_, value) => automaticLightRotation = value;
-		stack.AddChild(automatic);
-
-		var reloadButton = new Button
-		{
-			ID = "voxel_material_reload_atlases",
-			Text = "Reload All Atlas Textures",
-			Size = new Vector2(width, 38),
-		};
-		reloadButton.OnButtonPressed += (_, _, _) =>
-		{
-			reloadStatusLabel.Text = voxelScene.RequestSurfaceTextureReload()
-				? "Queued"
-				: "Failed - surface texture asset is unavailable";
-		};
-		stack.AddChild(reloadButton);
-
-		var reloadStatus = new Label
-		{
-			ID = "voxel_material_reload_status",
-			Text = "Watching deployed data/textures (200 ms debounce)",
-			Size = new Vector2(width, 50),
-		};
-		stack.AddChild(reloadStatus);
-		stack.AddChild(new Label
-		{
-			Text = "Drag outside this panel to orbit. Use the mouse wheel to zoom.",
-			Size = new Vector2(width, 44),
-		});
-
-		var backButton = new Button
-		{
-			ID = "voxel_material_back",
-			Text = "Back to Main Menu",
-			Size = new Vector2(width, 40),
-		};
-		backButton.OnButtonPressed += (_, _, _) => Client.RequestState(ClientStateKind.MainMenu);
-		stack.AddChild(backButton);
-
-		scroll.AddChild(stack);
-		controlsWindow.AddChild(scroll);
-		gui.AddControl(controlsWindow);
-		return (dropDown, info, reloadStatus, azimuth, automatic);
 	}
 
 	private void ConfigureCamera()
@@ -422,33 +324,17 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		);
 	}
 
-	private void SelectDropDownBlock(BlockType blockType)
-	{
-		int index = materialDropDown.Items.FindIndex(
-			item => item.UserData is BlockType candidate && candidate == blockType
-		);
-		if (index >= 0)
-		{
-			materialDropDown.SelectIndex(index);
-		}
-	}
-
 	private void UpdateMaterialInfo()
 	{
 		VoxelMaterialPreviewInfo info = voxelScene.GetMaterialPreviewInfo(selectedBlock);
-		VoxelFaceTiles tiles = info.AtlasTiles;
-		string geometry = info.IsCustomModel ? "Custom model" : "Cube";
-		string surfaceMaps = info.SurfaceMapsEnabled
-			? "Enabled"
-			: "Disabled (custom-model tangents are zero)";
-		materialInfoLabel.Text =
-			$"Name: {info.Name}\n" +
-			$"Render mode: {info.RenderMode}\n" +
-			$"Geometry: {geometry}\n" +
-			$"Surface maps: {surfaceMaps}\n" +
-			$"Atlas +X/-X/+Y/-Y/+Z/-Z: " +
-			$"{tiles.PositiveX}/{tiles.NegativeX}/{tiles.PositiveY}/" +
-			$"{tiles.NegativeY}/{tiles.PositiveZ}/{tiles.NegativeZ}";
+		inspector.UpdateMaterialInfo(info);
+	}
+
+	private void RequestAtlasReload()
+	{
+		inspector.SetReloadStatus(voxelScene.RequestSurfaceTextureReload()
+			? "Queued"
+			: "Failed - surface texture asset is unavailable");
 	}
 
 	private void OnAssetReloadCompleted(AssetReloadResult result)
@@ -461,9 +347,9 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			return;
 		}
 
-		reloadStatusLabel.Text = result.Succeeded
+		inspector.SetReloadStatus(result.Succeeded
 			? "Reloaded"
-			: result.Message;
+			: result.Message);
 		if (automaticValidation)
 		{
 			automaticReloadSucceeded = result.Succeeded;
@@ -480,10 +366,11 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		automaticFrame++;
 		if (automaticFrame == 2)
 		{
-			reloadStatusLabel.Text = voxelScene.RequestSurfaceTextureReload()
-				? "Queued"
-				: "Failed - surface texture asset is unavailable";
+			RequestAtlasReload();
 		}
+		if (automaticFrame == 90)
+			automaticCapture = FishUIDiagnostics.CaptureAsync(gui.UI,
+				new FishUIDebugSnapshotOptions(), FishUIDebugCaptureReason.TestFailure);
 
 		BlockType? blockType = automaticFrame switch
 		{
@@ -500,7 +387,6 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		if (blockType.HasValue)
 		{
 			SelectBlock(blockType.Value);
-			SelectDropDownBlock(blockType.Value);
 		}
 	}
 
@@ -508,6 +394,15 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		value %= 360;
 		return value < 0 ? value + 360 : value;
+	}
+
+	private static (int Width, int Height) ReadPngSize(byte[] png)
+	{
+		if (png.Length < 24 || !png.AsSpan(1, 3).SequenceEqual("PNG"u8))
+			throw new InvalidOperationException("FishUI image artifact is not a PNG file.");
+		return (
+			BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4)),
+			BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4)));
 	}
 }
 #endif

@@ -70,7 +70,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		: base(window, engine)
 	{
 		logging = engine.Logging;
-		gui = new FishUIManager(window, logging);
+		gui = new FishUIManager(window, logging, engine.AsClient().RuntimePaths);
 
 		CreateTitleLogo();
 		CreateMainMenu();

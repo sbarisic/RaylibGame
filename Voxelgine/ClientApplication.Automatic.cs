@@ -20,6 +20,8 @@ internal sealed partial class ClientApplication
 			throw new InvalidOperationException("The automatic gameplay fog volume was not uploaded in time.");
 		if (state is VoxelMaterialPreviewState materialPreview && !materialPreview.IsReady)
 			throw new InvalidOperationException("The automatic voxel material preview did not finish meshing in time.");
+		if (state is VoxelMaterialPreviewState validatedMaterialPreview)
+			validatedMaterialPreview.ValidateAutomaticSnapshotBundle();
 
 		const int channelTolerance = 16;
 		const int minimumForegroundPixels = 64;

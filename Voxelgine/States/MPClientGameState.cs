@@ -205,7 +205,7 @@ namespace Voxelgine.States
 			_errorText = "";
 
 			// Create FishUI for loading screen
-			_gui = new FishUIManager(_gameWindow, _logging);
+			_gui = new FishUIManager(_gameWindow, _logging, Eng.AsClient().RuntimePaths);
 			_gui.InputEnabled = _inputOwnership.UiInputEnabled;
 			CreateLoadingUI();
 

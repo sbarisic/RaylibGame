@@ -87,7 +87,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 		door = entityAssets.CreateSlidingDoorAdapter();
 		pickup = entityAssets.CreatePickupAdapter();
 		viewmodelAssetProbe = new FishGfxViewModelRenderer(window);
-		gui = new FishUIManager(window, engine.Logging);
+		gui = new FishUIManager(window, engine.Logging, engine.AsClient().RuntimePaths);
 		speechOverlay = new NpcSpeechBubbleOverlay
 		{
 			Size = new Vector2(window.Width, window.Height),

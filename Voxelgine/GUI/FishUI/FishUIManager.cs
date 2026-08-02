@@ -20,10 +20,11 @@ public sealed class FishUIManager : IDisposable
 	private readonly FishUIInputAdapter input;
 	private bool disposed;
 
-	public FishUIManager(IGameWindow window, IFishLogging logging)
+	public FishUIManager(IGameWindow window, IFishLogging logging, RuntimePaths runtimePaths)
 	{
 		ArgumentNullException.ThrowIfNull(window);
 		ArgumentNullException.ThrowIfNull(logging);
+		ArgumentNullException.ThrowIfNull(runtimePaths);
 		IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
 			?? throw new ArgumentException("FishUI requires the FishGfx client window.", nameof(window));
 
@@ -61,6 +62,7 @@ public sealed class FishUIManager : IDisposable
 		graphics = graphicsBackend;
 		input = inputAdapter;
 		UI = context;
+		GameFishUIDiagnosticsPolicy.Apply(UI, runtimePaths, logging);
 
 		string themePath = Path.Combine(AppContext.BaseDirectory, "data", "themes", "gwen.yaml");
 		if (File.Exists(themePath))
@@ -168,6 +170,7 @@ public sealed class FishUIManager : IDisposable
 			return;
 		}
 
+		UI.Dispose();
 		input.Dispose();
 		graphics.Dispose();
 		disposed = true;

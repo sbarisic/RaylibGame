@@ -59,7 +59,7 @@ namespace Voxelgine.States
 
 		public EffectsPreviewState(IGameWindow window, IFishEngineRunner Eng) : base(window, Eng)
 		{
-			_gui = new FishUIManager(window, Eng.Logging);
+			_gui = new FishUIManager(window, Eng.Logging, Eng.AsClient().RuntimePaths);
 			IFishGfxGameWindow fishWindow = window as IFishGfxGameWindow
 				?? throw new ArgumentException("Effects preview requires FishGfx.", nameof(window));
 			_fishParticles = new FishGfxParticlePreview(fishWindow);

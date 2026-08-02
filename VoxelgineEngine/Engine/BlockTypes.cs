@@ -41,6 +41,12 @@ public enum BlockType : ushort
 	GravityCoil = 30,
 	LinearActuator = 31,
 	FabricatorCore = 32,
+	DryFarmland = 33,
+	WetFarmland = 34,
+	Concrete = 35,
+	StoneStairs = 36,
+	WoodStairs = 37,
+	ConcreteStairs = 38,
 }
 
 /// <summary>Stable inventory icon identifiers.</summary>
@@ -151,6 +157,17 @@ public static class BlockInfo
 				return 247;
 			return face.X is 1 or -1 ? 245 : 246;
 		}
+
+		if (type == BlockType.DryFarmland)
+			return face.Y == 1 ? 53 : 1;
+		if (type == BlockType.WetFarmland)
+			return face.Y == 1 ? 54 : 1;
+		if (type is BlockType.Concrete or BlockType.ConcreteStairs)
+			return 55;
+		if (type == BlockType.StoneStairs)
+			return 0;
+		if (type == BlockType.WoodStairs)
+			return 5;
 
 		return type == BlockType.Barrel ? 8 : blockId;
 	}

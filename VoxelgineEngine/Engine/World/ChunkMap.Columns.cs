@@ -11,14 +11,21 @@ namespace Voxelgine.Graphics
 
 		public bool TryGetBlock(int x, int y, int z, out BlockType type)
 		{
+			bool found = TryGetBlockValue(x, y, z, out BlockValue value);
+			type = value.Type;
+			return found;
+		}
+
+		public bool TryGetBlockValue(int x, int y, int z, out BlockValue value)
+		{
 			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
 			if (!Chunks.TryGetValue(chunkIndex, out Chunk chunk))
 			{
-				type = BlockType.None;
+				value = BlockValue.Empty;
 				return false;
 			}
 
-			type = chunk.GetBlock((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z).Type;
+			value = chunk.GetBlock((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z).Value;
 			return true;
 		}
 
@@ -53,10 +60,10 @@ namespace Voxelgine.Graphics
 				if (!Chunks.TryGetValue(coordinate, out Chunk chunk))
 					continue;
 
-				BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+				BlockValue[] blocks = new BlockValue[ChunkSnapshot.BlockCount];
 				FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
 				for (int index = 0; index < blocks.Length; index++)
-					blocks[index] = chunk.Blocks[index].Type;
+					blocks[index] = chunk.Blocks[index].Value;
 				chunk.CopyFogTo(fog);
 				snapshots.Add(new ChunkSnapshot(
 					chunkX,
@@ -125,11 +132,12 @@ namespace Voxelgine.Graphics
 					throw new InvalidDataException($"Column ({column.X}, {column.Z}) contains duplicate chunk Y {snapshot.ChunkY}.");
 
 				Chunk chunk = new(coordinate, this, initializeBlocks: false);
-				ReadOnlySpan<BlockType> blocks = snapshot.BlockMemory.Span;
+				ReadOnlySpan<BlockValue> blocks = snapshot.ValueMemory.Span;
 				for (int index = 0; index < blocks.Length; index++)
 				{
-					BlockType type = blocks[index];
-					chunk.Blocks[index] = new PlacedBlock(type);
+					BlockValue value = blocks[index];
+					BlockType type = value.Type;
+					chunk.Blocks[index] = new PlacedBlock(value);
 					if (InfrastructureBlockCatalog.TryGet(type, out _))
 					{
 						int localX = index % Chunk.ChunkSize;
@@ -295,10 +303,16 @@ namespace Voxelgine.Graphics
 		private long IncrementColumnRevision(int chunkX, int chunkZ)
 		{
 			ChunkColumnCoordinate coordinate = new(chunkX, chunkZ);
+			if (_activeBlockBatchRevisions != null &&
+				_activeBlockBatchRevisions.TryGetValue(coordinate, out long batchRevision))
+			{
+				return batchRevision;
+			}
 			long revision = _columnRevisions.TryGetValue(coordinate, out long current)
 				? checked(current + 1)
 				: 1;
 			_columnRevisions[coordinate] = revision;
+			_activeBlockBatchRevisions?.Add(coordinate, revision);
 			return revision;
 		}
 

@@ -144,6 +144,46 @@ public sealed class PlayerInventory
 		return granted;
 	}
 
+	public bool TryApplyRecipe(IReadOnlyList<ItemStack> ingredients, ItemStack result)
+	{
+		ArgumentNullException.ThrowIfNull(ingredients);
+		if (!ItemCatalog.IsCanonical(result) || result.IsEmpty || ingredients.Count == 0 ||
+			ingredients.Any(static ingredient => !ItemCatalog.IsCanonical(ingredient) || ingredient.IsEmpty))
+			throw new ArgumentException("Recipe stacks must be canonical.");
+		ItemStack[] candidate = (ItemStack[])_slots.Clone();
+		foreach (IGrouping<ItemId, ItemStack> group in ingredients.GroupBy(static ingredient => ingredient.Item))
+		{
+			int remaining = group.Sum(static ingredient => ingredient.Count);
+			for (int slot = 0; slot < candidate.Length && remaining > 0; slot++)
+			{
+				if (candidate[slot].Item != group.Key) continue;
+				int consumed = Math.Min(remaining, candidate[slot].Count);
+				remaining -= consumed;
+				ushort left = checked((ushort)(candidate[slot].Count - consumed));
+				candidate[slot] = left == 0 ? ItemStack.Empty : new ItemStack(group.Key, left);
+			}
+			if (remaining != 0) return false;
+		}
+
+		ItemStack remainder = result;
+		ushort maximum = ItemCatalog.Get(result.Item).MaximumStack;
+		for (int slot = 0; slot < candidate.Length && !remainder.IsEmpty; slot++)
+		{
+			ItemStack current = candidate[slot];
+			if (!current.IsEmpty && current.Item != remainder.Item) continue;
+			int capacity = current.IsEmpty ? maximum : maximum - current.Count;
+			if (capacity <= 0) continue;
+			ushort moved = checked((ushort)Math.Min(capacity, remainder.Count));
+			candidate[slot] = new ItemStack(remainder.Item, checked((ushort)(current.Count + moved)));
+			ushort left = checked((ushort)(remainder.Count - moved));
+			remainder = left == 0 ? ItemStack.Empty : new ItemStack(remainder.Item, left);
+		}
+		if (!remainder.IsEmpty) return false;
+		candidate.CopyTo(_slots, 0);
+		Revision++;
+		return true;
+	}
+
 	/// <summary>
 	/// Inserts as much of the cursor as possible, clears it, and returns the
 	/// remainder that must become a protected death drop. This is one inventory
@@ -179,6 +219,20 @@ public sealed class PlayerInventory
 		Cursor = cursor;
 		CursorOriginSlot = cursorOriginSlot;
 		Revision = 1;
+	}
+
+	internal bool TryCommitTransaction(ReadOnlySpan<ItemStack> slots, ItemStack cursor, int cursorOriginSlot, long expectedRevision)
+	{
+		if (expectedRevision != Revision || slots.Length != SlotCount) return false;
+		for (int index = 0; index < slots.Length; index++) if (!ItemCatalog.IsCanonical(slots[index])) return false;
+		ValidateCursor(cursor, cursorOriginSlot);
+		slots.CopyTo(_slots); Cursor = cursor; CursorOriginSlot = cursorOriginSlot; Revision++; return true;
+	}
+
+	internal bool TryReplaceCursor(ItemStack cursor, long expectedRevision)
+	{
+		if (expectedRevision != Revision || !ItemCatalog.IsCanonical(cursor)) return false;
+		Cursor = cursor; CursorOriginSlot = cursor.IsEmpty ? NoCursorOrigin : Math.Clamp(CursorOriginSlot, 0, SlotCount - 1); Revision++; return true;
 	}
 
 	private InventoryMutationResult LeftClick(int slot)

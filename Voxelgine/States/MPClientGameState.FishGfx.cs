@@ -131,7 +131,8 @@ public unsafe partial class MPClientGameState
 			config.MaxChunkDrawDistance,
 			config.ChunkMeshUploadBudget,
 			config.VolumetricFogQuality,
-			synchronizeExisting
+			synchronizeExisting,
+			_simulation.WorldObjects
 		);
 		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
 		_fishVoxelScene.PreparedColumnApplied += OnPreparedRenderColumnApplied;
@@ -345,10 +346,13 @@ public unsafe partial class MPClientGameState
 
 	private void RecordReplicatedBlockChange(BlockChangePacket change)
 	{
+		if (change.Changes.Length == 0)
+			return;
+		BlockChangeEntry last = change.Changes[^1];
 		_hasReplicatedBlockChange = true;
-		_lastReplicatedBlockX = change.X;
-		_lastReplicatedBlockY = change.Y;
-		_lastReplicatedBlockZ = change.Z;
+		_lastReplicatedBlockX = last.X;
+		_lastReplicatedBlockY = last.Y;
+		_lastReplicatedBlockZ = last.Z;
 		_lastReplicatedBlockRevision = change.ColumnRevision;
 		_lastReplicatedBlockChangeTime = GetClientTime();
 	}

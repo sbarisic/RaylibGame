@@ -130,7 +130,7 @@ namespace Voxelgine.Engine.Pathfinding
 		public bool IsWalkable(Vector3Int pos)
 		{
 			// Check ground below - must be solid
-			if (!_map.IsSolid(pos.X, pos.Y - 1, pos.Z))
+			if (!HasWalkSurface(pos.X, pos.Y - 1, pos.Z))
 				return false;
 
 			// Check space for entity body - must be non-solid
@@ -151,7 +151,7 @@ namespace Voxelgine.Engine.Pathfinding
 						if (dx == 0 && dz == 0) continue;
 
 						// Ground must be solid
-						if (!_map.IsSolid(pos.X + dx, pos.Y - 1, pos.Z + dz))
+						if (!HasWalkSurface(pos.X + dx, pos.Y - 1, pos.Z + dz))
 							return false;
 
 						// Body space must be clear
@@ -166,6 +166,13 @@ namespace Voxelgine.Engine.Pathfinding
 
 			return true;
 		}
+
+		private bool HasWalkSurface(int x, int y, int z) =>
+			BlockShapeCatalog.TryGetHighestWalkSurface(
+				_map.GetBlockValue(x, y, z),
+				LocalAgentFootprint.Centered(Math.Clamp(EntityWidth, 0.1f, 1f)),
+				1f,
+				out _);
 
 		/// <summary>
 		/// Checks if a position is walkable using Vector3.

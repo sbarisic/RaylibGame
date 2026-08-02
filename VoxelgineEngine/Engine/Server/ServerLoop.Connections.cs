@@ -115,6 +115,7 @@ public partial class ServerLoop
 			return;
 		}
 
+		CloseContainer(session, resolveCursor:true);
 		ResolveCursorForDisconnect(session.Inventory);
 		_playerData.Save(
 			session.PlayerName,

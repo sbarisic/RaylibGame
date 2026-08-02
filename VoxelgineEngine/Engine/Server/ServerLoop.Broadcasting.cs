@@ -145,8 +145,9 @@ namespace Voxelgine.Engine.Server
 			if (mutations.Count == 0)
 				return;
 
-			foreach (WorldMutation mutation in mutations)
+			for (int mutationIndex = 0; mutationIndex < mutations.Count; mutationIndex++)
 			{
+				WorldMutation mutation = mutations[mutationIndex];
 				Packet packet;
 				int worldX;
 				int worldZ;
@@ -158,13 +159,28 @@ namespace Voxelgine.Engine.Server
 					worldX = change.X;
 					worldZ = change.Z;
 					revision = change.ColumnRevision;
+					int batchColumnX = Utils.FloorDiv(worldX, Chunk.ChunkSize);
+					int batchColumnZ = Utils.FloorDiv(worldZ, Chunk.ChunkSize);
+					List<BlockChangeEntry> entries = new() { ToEntry(change) };
+					while (mutationIndex + 1 < mutations.Count &&
+						mutations[mutationIndex + 1].Kind == WorldMutationKind.Block)
+					{
+						BlockChange candidate = mutations[mutationIndex + 1].Block;
+						if (candidate.ColumnRevision != revision ||
+							Utils.FloorDiv(candidate.X, Chunk.ChunkSize) != batchColumnX ||
+							Utils.FloorDiv(candidate.Z, Chunk.ChunkSize) != batchColumnZ)
+						{
+							break;
+						}
+						entries.Add(ToEntry(candidate));
+						mutationIndex++;
+					}
 					packet = new BlockChangePacket
 					{
-						X = change.X,
-						Y = change.Y,
-						Z = change.Z,
-						BlockType = (ushort)change.NewType,
+						ColumnX = batchColumnX,
+						ColumnZ = batchColumnZ,
 						ColumnRevision = revision,
+						Changes = entries.ToArray(),
 					};
 				}
 				else
@@ -221,6 +237,13 @@ namespace Voxelgine.Engine.Server
 			}
 
 			_simulation.Map.ClearPendingChanges();
+
+			static BlockChangeEntry ToEntry(BlockChange change) => new(
+				change.X,
+				change.Y,
+				change.Z,
+				(ushort)change.NewValue.Type,
+				change.NewValue.State);
 		}
 
 		/// <summary>

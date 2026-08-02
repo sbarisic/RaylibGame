@@ -5,6 +5,21 @@ using Voxelgine.Graphics;
 
 namespace Voxelgine.FishGfxClient.Voxels;
 
+public readonly record struct VoxelMaterialKey
+{
+	public VoxelMaterialKey(BlockType authoritativeType, byte state = 0)
+	{
+		BlockStateCatalog.Validate(authoritativeType, state);
+		AuthoritativeType = authoritativeType;
+		State = state;
+	}
+
+	public BlockType AuthoritativeType { get; }
+	public byte State { get; }
+	public BlockValue Value => new(AuthoritativeType, State);
+	public static VoxelMaterialKey From(BlockValue value) => new(value.Type, value.State);
+}
+
 public sealed class PreparedClientColumn : IDisposable
 {
 	private PreparedRenderChunk[] renderChunks;
@@ -29,6 +44,17 @@ public sealed class PreparedClientColumn : IDisposable
 		ChunkColumnSnapshot source,
 		IReadOnlyDictionary<BlockType, ushort> materialIds)
 	{
+		ArgumentNullException.ThrowIfNull(materialIds);
+		Dictionary<VoxelMaterialKey, ushort> values = materialIds.ToDictionary(
+			static pair => new VoxelMaterialKey(pair.Key),
+			static pair => pair.Value);
+		return Prepare(source, values);
+	}
+
+	internal static PreparedClientColumn Prepare(
+		ChunkColumnSnapshot source,
+		IReadOnlyDictionary<VoxelMaterialKey, ushort> materialIds)
+	{
 		ArgumentNullException.ThrowIfNull(source);
 		ArgumentNullException.ThrowIfNull(materialIds);
 		PreparedChunkColumn domain = PreparedChunkColumn.Prepare(source);
@@ -44,23 +70,23 @@ public sealed class PreparedClientColumn : IDisposable
 			{
 				ChunkSnapshot snapshot = source.Chunks[chunkIndex];
 				VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
-				ReadOnlySpan<BlockType> blocks = snapshot.BlockMemory.Span;
+				ReadOnlySpan<BlockValue> blocks = snapshot.ValueMemory.Span;
 				for (int index = 0; index < cells.Length; index++)
 				{
-					BlockType block = blocks[index];
+					BlockValue block = blocks[index];
 					ushort materialId;
-					if (block == BlockType.None)
+					if (block.Type == BlockType.None)
 					{
 						materialId = 0;
 					}
-					else if (!materialIds.TryGetValue(block, out materialId))
+					else if (!materialIds.TryGetValue(VoxelMaterialKey.From(block), out materialId))
 					{
 						throw new InvalidOperationException(
-							$"Block type '{block}' has no FishGfx voxel palette mapping.");
+							$"Block value '{block.Type}' state {block.State} has no FishGfx voxel palette mapping.");
 					}
 
 					cells[index] = new VoxelCell(materialId);
-					if (block is not (BlockType.Campfire or BlockType.Torch))
+					if (block.Type is not (BlockType.Campfire or BlockType.Torch))
 						continue;
 
 					int z = index / (ChunkSnapshot.Size * ChunkSnapshot.Size);
@@ -68,7 +94,7 @@ public sealed class PreparedClientColumn : IDisposable
 					int y = remainder / ChunkSnapshot.Size;
 					int x = remainder % ChunkSnapshot.Size;
 					emitters.Add(new VoxelFireEmitter(
-						block,
+						block.Type,
 						new System.Numerics.Vector3(
 							snapshot.ChunkX * ChunkSnapshot.Size + x + 0.5f,
 							snapshot.ChunkY * ChunkSnapshot.Size + y + 0.5f,

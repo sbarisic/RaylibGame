@@ -53,20 +53,25 @@ public sealed class WorldPacketTests
 	}
 
 	[Fact]
-	public void BlockChangePacket_PreservesUshortBlockIdAndRevision()
+	public void BlockChangePacket_PreservesBoundedColumnBatchAndRevision()
 	{
 		BlockChangePacket source = new()
 		{
-			X = 1,
-			Y = 2,
-			Z = 3,
-			BlockType = ushort.MaxValue,
+			ColumnX = -1,
+			ColumnZ = 0,
 			ColumnRevision = long.MaxValue,
+			Changes = new[]
+			{
+				new BlockChangeEntry(-1, 2, 3, (ushort)BlockType.Stone, 0),
+				new BlockChangeEntry(-16, 5, 15, (ushort)BlockType.Dirt, 0),
+			},
 		};
 
 		BlockChangePacket decoded = Assert.IsType<BlockChangePacket>(Packet.Deserialize(source.Serialize()));
 
-		Assert.Equal(ushort.MaxValue, decoded.BlockType);
+		Assert.Equal(source.ColumnX, decoded.ColumnX);
+		Assert.Equal(source.ColumnZ, decoded.ColumnZ);
+		Assert.Equal(source.Changes, decoded.Changes);
 		Assert.Equal(long.MaxValue, decoded.ColumnRevision);
 	}
 
@@ -93,17 +98,17 @@ public sealed class WorldPacketTests
 	}
 
 	[Fact]
-	public void BlockPlacementPackets_PreserveUshortBlockIds()
+	public void BlockPlacementPackets_PreserveBlockValues()
 	{
-		BlockPlaceRequestPacket placement = new() { BlockType = ushort.MaxValue };
-		DebugPlaceBlockRequestPacket debugPlacement = new() { BlockType = ushort.MaxValue };
+		BlockPlaceRequestPacket placement = new() { BlockType = (ushort)BlockType.Stone, BlockState = 0 };
+		DebugPlaceBlockRequestPacket debugPlacement = new() { BlockType = (ushort)BlockType.Dirt, BlockState = 0 };
 
-		Assert.Equal(
-			ushort.MaxValue,
-			Assert.IsType<BlockPlaceRequestPacket>(Packet.Deserialize(placement.Serialize())).BlockType);
-		Assert.Equal(
-			ushort.MaxValue,
-			Assert.IsType<DebugPlaceBlockRequestPacket>(Packet.Deserialize(debugPlacement.Serialize())).BlockType);
+		BlockPlaceRequestPacket decodedPlacement = Assert.IsType<BlockPlaceRequestPacket>(Packet.Deserialize(placement.Serialize()));
+		DebugPlaceBlockRequestPacket decodedDebug = Assert.IsType<DebugPlaceBlockRequestPacket>(Packet.Deserialize(debugPlacement.Serialize()));
+		Assert.Equal(placement.BlockType, decodedPlacement.BlockType);
+		Assert.Equal(placement.BlockState, decodedPlacement.BlockState);
+		Assert.Equal(debugPlacement.BlockType, decodedDebug.BlockType);
+		Assert.Equal(debugPlacement.BlockState, decodedDebug.BlockState);
 	}
 
 	[Fact]
@@ -122,5 +127,57 @@ public sealed class WorldPacketTests
 		Assert.Equal((byte)SoundEventType.ItemPickup, decoded.EventType);
 		Assert.Equal(source.Position, decoded.Position);
 		Assert.Equal(source.SourcePlayerId, decoded.SourcePlayerId);
+	}
+
+	[Fact]
+	public void PhaseOneFarmingPacketIdsAreStable()
+	{
+		Assert.Equal(0x34, (byte)PacketType.WorldInteractRequest);
+		Assert.Equal(0x35, (byte)PacketType.WorldObjectPlaceRequest);
+		Assert.Equal(0x36, (byte)PacketType.WorldObjectColumn);
+		Assert.Equal(0x37, (byte)PacketType.WorldObjectDelta);
+		Assert.Equal(0x38, (byte)PacketType.WorldObjectResyncRequest);
+		Assert.Equal(0x39, (byte)PacketType.WorldObjectColumnApplied);
+		Assert.Equal(0x94, (byte)PacketType.CraftRequest);
+		Assert.Equal(0x95, (byte)PacketType.CraftResult);
+	}
+
+	[Fact]
+	public void WorldInteractRequest_RoundTripsFurnitureRemovalIntent()
+	{
+		WorldInteractRequestPacket source = new()
+		{
+			X = -12,
+			Y = 65,
+			Z = 48,
+			Interaction = WorldInteractionKind.RemoveFurniture,
+		};
+
+		WorldInteractRequestPacket decoded = Assert.IsType<WorldInteractRequestPacket>(
+			Packet.Deserialize(source.Serialize()));
+
+		Assert.Equal(source.X, decoded.X);
+		Assert.Equal(source.Y, decoded.Y);
+		Assert.Equal(source.Z, decoded.Z);
+		Assert.Equal(WorldInteractionKind.RemoveFurniture, decoded.Interaction);
+	}
+
+	[Fact]
+	public void WorldObjectPacketsRoundTripOrderingAndPayloadFields()
+	{
+		WorldObjectColumnPacket source = new()
+		{
+			StreamId = 7, X = -2, Z = 4, Epoch = 11, Revision = 22, SnapshotId = 33,
+			PartIndex = 1, PartCount = 2, TotalRecordCount = 3, TotalDecodedBytes = 5,
+			FullPayloadChecksum = 44, PartRecordCount = 1, Payload = new byte[] { 1, 2 },
+		};
+
+		WorldObjectColumnPacket decoded = Assert.IsType<WorldObjectColumnPacket>(Packet.Deserialize(source.Serialize()));
+		Assert.Equal(source.StreamId, decoded.StreamId);
+		Assert.Equal(source.Epoch, decoded.Epoch);
+		Assert.Equal(source.Revision, decoded.Revision);
+		Assert.Equal(source.SnapshotId, decoded.SnapshotId);
+		Assert.Equal(source.PartIndex, decoded.PartIndex);
+		Assert.Equal(source.Payload, decoded.Payload);
 	}
 }

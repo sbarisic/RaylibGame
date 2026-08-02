@@ -61,7 +61,46 @@ public sealed class WorldArchiveTests
 		Assert.Equal(metadata.PlayerSpawn, all.Metadata.PlayerSpawn);
 		Assert.Empty(all.Metadata.GeneratedFeatures.Sites);
 		Assert.Equal(2, all.Columns.Count);
+		Assert.Contains(all.Columns, column => column.X == 2 && column.Z == 3 && column.Revision == 1);
 		Assert.Equal(BlockType.Water, random.Chunks[0].Blocks[0]);
+		Assert.Equal(1, random.Revision);
+	}
+
+	[Fact]
+	public void Archive_WritesFixedV6HeaderAndMandatorySectionDirectory()
+	{
+		ChunkMap map = new();
+		map.SetBlock(0, 0, 0, BlockType.Stone);
+		using MemoryStream archive = new();
+		WorldArchive.Write(archive, map, default);
+		archive.Position = 0;
+		using BinaryReader reader = new(archive, System.Text.Encoding.UTF8, leaveOpen: true);
+
+		Assert.Equal(WorldArchive.Magic, reader.ReadUInt32());
+		Assert.Equal(WorldArchive.FormatVersion, reader.ReadUInt16());
+		Assert.Equal(0, reader.ReadUInt16());
+		Assert.Equal(2u, reader.ReadUInt32());
+		Assert.Equal(WorldArchive.HeaderSize, reader.ReadInt64());
+		Assert.Equal(WorldArchive.MetadataSectionId, reader.ReadUInt32());
+		Assert.Equal(1, reader.ReadUInt16());
+		Assert.Equal(1, reader.ReadUInt16());
+	}
+
+	[Fact]
+	public void Archive_RejectsDuplicatedSectionIdsBeforeDecode()
+	{
+		ChunkMap map = new();
+		map.SetBlock(0, 0, 0, BlockType.Stone);
+		using MemoryStream archive = new();
+		WorldArchive.Write(archive, map, default);
+		byte[] bytes = archive.ToArray();
+		BitConverter.GetBytes(WorldArchive.MetadataSectionId).CopyTo(
+			bytes,
+			WorldArchive.HeaderSize + WorldArchive.SectionDirectoryEntrySize);
+
+		InvalidDataException exception = Assert.Throws<InvalidDataException>(
+			() => WorldArchive.Read(new MemoryStream(bytes)));
+		Assert.Contains("duplicated", exception.Message, StringComparison.OrdinalIgnoreCase);
 	}
 
 	[Fact]

@@ -36,10 +36,10 @@ public sealed class PreparedChunkColumn : IDisposable
 		{
 			ChunkSnapshot snapshot = source.Chunks[chunkIndex];
 			PlacedBlock[] blocks = new PlacedBlock[ChunkSnapshot.BlockCount];
-			ReadOnlySpan<BlockType> blockTypes = snapshot.BlockMemory.Span;
+			ReadOnlySpan<BlockValue> values = snapshot.ValueMemory.Span;
 			for (int index = 0; index < blocks.Length; index++)
 			{
-				blocks[index] = new PlacedBlock(blockTypes[index]);
+				blocks[index] = new PlacedBlock(values[index]);
 			}
 
 			FogVoxel[] fog = snapshot.NonEmptyFogCount == 0

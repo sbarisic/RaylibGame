@@ -14,12 +14,28 @@ namespace Voxelgine.Graphics
 		public readonly int Y;
 		/// <summary>World-space Z coordinate of the changed block.</summary>
 		public readonly int Z;
-		/// <summary>The block type before the change.</summary>
-		public readonly BlockType OldType;
-		/// <summary>The block type after the change.</summary>
-		public readonly BlockType NewType;
+		/// <summary>The complete block value before the change.</summary>
+		public readonly BlockValue OldValue;
+		/// <summary>The complete block value after the change.</summary>
+		public readonly BlockValue NewValue;
 		/// <summary>Authoritative revision of the containing horizontal column.</summary>
 		public readonly long ColumnRevision;
+
+		public BlockChange(
+			int x,
+			int y,
+			int z,
+			BlockValue oldValue,
+			BlockValue newValue,
+			long columnRevision = 0)
+		{
+			X = x;
+			Y = y;
+			Z = z;
+			OldValue = oldValue;
+			NewValue = newValue;
+			ColumnRevision = columnRevision;
+		}
 
 		public BlockChange(
 			int x,
@@ -28,13 +44,10 @@ namespace Voxelgine.Graphics
 			BlockType oldType,
 			BlockType newType,
 			long columnRevision = 0)
-		{
-			X = x;
-			Y = y;
-			Z = z;
-			OldType = oldType;
-			NewType = newType;
-			ColumnRevision = columnRevision;
-		}
+			: this(x, y, z, new BlockValue(oldType), new BlockValue(newType), columnRevision) { }
+
+		public BlockType OldType => OldValue.Type;
+
+		public BlockType NewType => NewValue.Type;
 	}
 }

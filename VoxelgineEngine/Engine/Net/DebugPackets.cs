@@ -43,6 +43,7 @@ namespace Voxelgine.Engine
 		public int Y { get; set; }
 		public int Z { get; set; }
 		public ushort BlockType { get; set; }
+		public byte BlockState { get; set; }
 
 		public override void Write(BinaryWriter writer)
 		{
@@ -50,6 +51,7 @@ namespace Voxelgine.Engine
 			writer.Write(Y);
 			writer.Write(Z);
 			writer.Write(BlockType);
+			writer.Write(BlockState);
 		}
 
 		public override void Read(BinaryReader reader)
@@ -58,6 +60,7 @@ namespace Voxelgine.Engine
 			Y = reader.ReadInt32();
 			Z = reader.ReadInt32();
 			BlockType = reader.ReadUInt16();
+			BlockState = reader.ReadByte();
 		}
 	}
 }

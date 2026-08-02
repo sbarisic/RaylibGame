@@ -42,6 +42,12 @@ namespace Voxelgine.Engine
 		EntityRemove = 0x31,
 		EntitySnapshot = 0x32,
 		EntitySpeech = 0x33,
+		WorldInteractRequest = 0x34,
+		WorldObjectPlaceRequest = 0x35,
+		WorldObjectColumn = 0x36,
+		WorldObjectDelta = 0x37,
+		WorldObjectResyncRequest = 0x38,
+		WorldObjectColumnApplied = 0x39,
 
 		// Combat (0x60–0x62)
 		WeaponFire = 0x60,
@@ -59,6 +65,11 @@ namespace Voxelgine.Engine
 		InventoryActionRequest = 0x91,
 		ItemUseResult = 0x92,
 		InfrastructureState = 0x93,
+		CraftRequest = 0x94,
+		CraftResult = 0x95,
+		ContainerState = 0x96,
+		ContainerActionRequest = 0x97,
+		ContainerClose = 0x98,
 
 		// Sound/particle events
 		SoundEvent = 0xA0,
@@ -242,6 +253,12 @@ namespace Voxelgine.Engine
 			Register<EntityRemovePacket>(PacketType.EntityRemove);
 			Register<EntitySnapshotPacket>(PacketType.EntitySnapshot);
 			Register<EntitySpeechPacket>(PacketType.EntitySpeech);
+			Register<WorldInteractRequestPacket>(PacketType.WorldInteractRequest);
+			Register<WorldObjectPlaceRequestPacket>(PacketType.WorldObjectPlaceRequest);
+			Register<WorldObjectColumnPacket>(PacketType.WorldObjectColumn);
+			Register<WorldObjectDeltaPacket>(PacketType.WorldObjectDelta);
+			Register<WorldObjectResyncRequestPacket>(PacketType.WorldObjectResyncRequest);
+			Register<WorldObjectColumnAppliedPacket>(PacketType.WorldObjectColumnApplied);
 
 			// Combat
 			Register<WeaponFirePacket>(PacketType.WeaponFire);
@@ -259,6 +276,11 @@ namespace Voxelgine.Engine
 			Register<InventoryActionRequestPacket>(PacketType.InventoryActionRequest);
 			Register<ItemUseResultPacket>(PacketType.ItemUseResult);
 			Register<InfrastructureStatePacket>(PacketType.InfrastructureState);
+			Register<CraftRequestPacket>(PacketType.CraftRequest);
+			Register<CraftResultPacket>(PacketType.CraftResult);
+			Register<ContainerStatePacket>(PacketType.ContainerState);
+			Register<ContainerActionRequestPacket>(PacketType.ContainerActionRequest);
+			Register<ContainerClosePacket>(PacketType.ContainerClose);
 
 			// Sound/particle events
 			Register<SoundEventPacket>(PacketType.SoundEvent);

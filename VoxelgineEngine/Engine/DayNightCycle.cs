@@ -36,6 +36,7 @@ public sealed class DayNightCycle
 	public event Action<DayNightLightingState> LightingChanged;
 
 	public float TimeOfDay { get; private set; } = 8f;
+	public double AbsoluteGameHours { get; private set; } = 8d;
 
 	public float DayLengthSeconds { get; set; } = 600f;
 
@@ -72,7 +73,9 @@ public sealed class DayNightCycle
 			if (DayLengthSeconds <= 0f)
 				return;
 
-			TimeOfDay += deltaTime * (24f / DayLengthSeconds) * TimeScale;
+			float elapsedHours = deltaTime * (24f / DayLengthSeconds) * TimeScale;
+			TimeOfDay += elapsedHours;
+			AbsoluteGameHours += elapsedHours;
 			WrapTime();
 		}
 		else if (targetTime >= 0f)
@@ -122,6 +125,11 @@ public sealed class DayNightCycle
 		}
 
 		targetTime = hours;
+	}
+
+	public void RestoreAbsoluteGameTime(double hours)
+	{
+		if(!double.IsFinite(hours)||hours<0)throw new ArgumentOutOfRangeException(nameof(hours));AbsoluteGameHours=hours;TimeOfDay=(float)(hours%24d);targetTime=-1f;UpdateLighting();
 	}
 
 	public Vector3 GetSunDirection()

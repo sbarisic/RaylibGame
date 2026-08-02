@@ -14,6 +14,15 @@ namespace Voxelgine.Engine
 	/// </summary>
 	public partial class VEntNPC : VoxEntity
 	{
+		public StableNpcId StableId { get; private set; }
+		public bool IsSleeping { get; private set; }
+		public bool IsLifeControlled { get; internal set; }
+		public override EntityPhysicsProperties PhysicsProperties => IsSleeping
+			? new EntityPhysicsProperties(false,false,false,false,false,false)
+			: EntityPhysicsProperties.DynamicTrigger;
+		public void SetStableId(StableNpcId id) => StableId = id;
+		public void EnterSleep(Vector3 anchor){IsSleeping=true;IsLifeControlled=true;StopNavigation();Velocity=Vector3.Zero;Position=anchor;PlayAnimationOverride("sleep",float.PositiveInfinity);}
+		public void WakeFromSleep(){IsSleeping=false;IsLifeControlled=false;_animOverrideTimer=0;_renderAnimationName="idle";}
 		// Stable presentation asset and animation identifiers.
 		private string _textureName;
 		private string _renderAnimationName = "idle";
@@ -189,10 +198,12 @@ namespace Voxelgine.Engine
 		/// <summary>Applies the compact animation state replicated by the server.</summary>
 		public void SetAnimationState(byte animationState)
 		{
+			IsSleeping = animationState == 3;
 			_renderAnimationName = animationState switch
 			{
 				1 => "walk",
 				2 => "attack",
+				3 => "sleep",
 				_ => "idle",
 			};
 		}
@@ -363,6 +374,7 @@ namespace Voxelgine.Engine
 		protected override void WriteSpawnPropertiesExtra(BinaryWriter writer)
 		{
 			writer.Write(_textureName ?? string.Empty);
+			StableNpcId.Write(writer, StableId);
 		}
 
 		protected override void ReadSpawnPropertiesExtra(BinaryReader reader)
@@ -370,6 +382,7 @@ namespace Voxelgine.Engine
 			string texName = reader.ReadString();
 			if (!string.IsNullOrEmpty(texName))
 				SetTextureName(texName);
+			StableId = StableNpcId.Read(reader);
 		}
 
 		protected override void WriteSnapshotExtra(BinaryWriter writer)

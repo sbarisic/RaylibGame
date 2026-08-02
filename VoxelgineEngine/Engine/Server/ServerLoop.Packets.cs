@@ -1,4 +1,5 @@
 using System.Numerics;
+using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server
@@ -15,7 +16,19 @@ namespace Voxelgine.Engine.Server
 
 			if (packet is WorldColumnAppliedPacket applied)
 			{
-				_worldStream.HandleApplied(connection.PlayerId, applied);
+				if (_worldStream.HandleApplied(connection.PlayerId, applied))
+					_worldObjectStream.SendSnapshot(connection.PlayerId, applied.X, applied.Z, CurrentTime);
+				return;
+			}
+
+			if (packet is WorldObjectResyncRequestPacket objectResync)
+			{
+				_worldObjectStream.HandleResync(connection.PlayerId, objectResync, CurrentTime);
+				return;
+			}
+
+			if (packet is WorldObjectColumnAppliedPacket)
+			{
 				return;
 			}
 
@@ -54,6 +67,21 @@ namespace Voxelgine.Engine.Server
 
 				case WeaponFirePacket weaponFire:
 					EnqueueItemUse(connection, weaponFire);
+					break;
+				case WorldObjectPlaceRequestPacket placeObject:
+					HandleWorldObjectPlace(connection, placeObject);
+					break;
+				case WorldInteractRequestPacket interact:
+					HandleWorldInteract(connection, interact);
+					break;
+				case CraftRequestPacket craft:
+					HandleCraftRequest(connection, craft);
+					break;
+				case ContainerActionRequestPacket containerAction:
+					HandleContainerAction(connection, containerAction);
+					break;
+				case ContainerClosePacket containerClose:
+					HandleContainerClose(connection, containerClose);
 					break;
 
 						case ChatMessagePacket chatMsg:
@@ -159,8 +187,15 @@ namespace Voxelgine.Engine.Server
 		{
 			_logging.ServerWriteLine($"DebugPlaceBlock [{connection.PlayerId}]: ({packet.X}, {packet.Y}, {packet.Z}) type={packet.BlockType}");
 
-			BlockType blockType = (BlockType)packet.BlockType;
-			_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, blockType);
+			try
+			{
+				BlockValue value = new((BlockType)packet.BlockType, packet.BlockState);
+				_simulation.Map.SetBlock(packet.X, packet.Y, packet.Z, value);
+			}
+			catch (ArgumentOutOfRangeException exception)
+			{
+				_logging.Log(GameLogLevel.Warning, "World", "Rejected invalid debug block value.", exception);
+			}
 		}
 	}
 }

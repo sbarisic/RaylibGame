@@ -91,21 +91,27 @@ public sealed class PhysicsWorld
 					if (!Map.IsSolid(x, y, z))
 						continue;
 
-					AABB bounds = new(new Vector3(x, y, z), Vector3.One);
-					PhysicsCollider collider = new(bounds, null, true, x, y, z);
-					ConsiderCollider(
-						movingBounds,
-						delta,
-						collider,
-						ref found,
-						ref bestFraction,
-						ref bestPenetration,
-						ref normal1,
-						ref normal2,
-						ref normal3,
-						ref normalCount,
-						ref bestCollider
-					);
+					IReadOnlyList<AABB> boxes = BlockShapeCatalog.GetCollisionBoxes(Map.GetBlockValue(x, y, z));
+					if (boxes.Count == 0)
+						boxes = new[] { new AABB(Vector3.Zero, Vector3.One) };
+					foreach (AABB localBounds in boxes)
+					{
+						AABB bounds = localBounds.Offset(new Vector3(x, y, z));
+						PhysicsCollider collider = new(bounds, null, true, x, y, z);
+						ConsiderCollider(
+							movingBounds,
+							delta,
+							collider,
+							ref found,
+							ref bestFraction,
+							ref bestPenetration,
+							ref normal1,
+							ref normal2,
+							ref normal3,
+							ref normalCount,
+							ref bestCollider
+						);
+					}
 				}
 			}
 		}

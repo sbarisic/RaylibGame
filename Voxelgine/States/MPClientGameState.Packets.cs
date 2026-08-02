@@ -100,6 +100,14 @@ namespace Voxelgine.States
 					HandleFogChange(fogChange);
 					break;
 
+				case WorldObjectColumnPacket objectColumn:
+					HandleWorldObjectColumn(objectColumn, currentTime);
+					break;
+
+				case WorldObjectDeltaPacket objectDelta:
+					HandleWorldObjectDelta(objectDelta);
+					break;
+
 				case EntitySpawnPacket entitySpawn:
 					HandleEntitySpawn(entitySpawn);
 					break;
@@ -130,6 +138,14 @@ namespace Voxelgine.States
 
 				case ItemUseResultPacket itemUseResult:
 					HandleItemUseResult(itemUseResult);
+					break;
+
+				case CraftResultPacket craftResult:
+					HandleCraftResult(craftResult);
+					break;
+
+				case ContainerStatePacket containerState:
+					HandleContainerState(containerState);
 					break;
 
 				case InfrastructureStatePacket infrastructureState:
@@ -248,19 +264,36 @@ namespace Voxelgine.States
 			if (_simulation == null)
 				return;
 
-			if (!_simulation.Map.TryApplyReplicatedBlockChange(
-				blockChange.X,
-				blockChange.Y,
-				blockChange.Z,
-				(BlockType)blockChange.BlockType,
-				blockChange.ColumnRevision))
+			BlockMutationRequest[] changes;
+			try
 			{
-				int columnX = (int)Math.Floor((double)blockChange.X / Chunk.ChunkSize);
-				int columnZ = (int)Math.Floor((double)blockChange.Z / Chunk.ChunkSize);
+				changes = blockChange.Changes.Select(static change => new BlockMutationRequest(
+					change.X,
+					change.Y,
+					change.Z,
+					new BlockValue((BlockType)change.BlockType, change.BlockState))).ToArray();
+			}
+			catch (ArgumentOutOfRangeException exception)
+			{
+				_logging.Log(GameLogLevel.Warning, "WorldStream", "invalid-block-change-batch", exception);
 				_worldStream?.RequestFreshColumn(
-					columnX,
-					columnZ,
-					_simulation.Map.GetColumnRevision(columnX, columnZ),
+					blockChange.ColumnX,
+					blockChange.ColumnZ,
+					_simulation.Map.GetColumnRevision(blockChange.ColumnX, blockChange.ColumnZ),
+					"invalid-block-change-value");
+				return;
+			}
+
+			if (!_simulation.Map.TryApplyReplicatedBlockBatch(
+				blockChange.ColumnX,
+				blockChange.ColumnZ,
+				blockChange.ColumnRevision,
+				changes))
+			{
+				_worldStream?.RequestFreshColumn(
+					blockChange.ColumnX,
+					blockChange.ColumnZ,
+					_simulation.Map.GetColumnRevision(blockChange.ColumnX, blockChange.ColumnZ),
 					$"block-revision-gap-expected-{blockChange.ColumnRevision}");
 			}
 			else
@@ -505,6 +538,8 @@ namespace Voxelgine.States
 				"VEntNPC" => new VEntNPC(),
 				"VEntItemDrop" => new VEntItemDrop(),
 				"VEntSlidingDoor" => new VEntSlidingDoor(),
+				"VEntItemBasket" => new VEntItemBasket(),
+				"VEntBed" => new VEntBed(),
 				"VEntPlayer" => new VEntPlayer(),
 				_ => null,
 			};

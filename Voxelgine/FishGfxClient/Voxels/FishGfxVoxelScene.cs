@@ -9,6 +9,7 @@ using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
 using Voxelgine.FishGfxClient.Entities;
 using Voxelgine.Graphics;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.FishGfxClient.Voxels;
 
@@ -21,6 +22,9 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly ConcurrentQueue<ChunkColumnSnapshot> pendingColumns = new();
 	private readonly ConcurrentQueue<PreparedClientColumn> pendingPreparedColumns = new();
+	private readonly ConcurrentQueue<WorldObjectColumnState> pendingObjectColumns = new();
+	private readonly Dictionary<(int X, int Z), HashSet<BlockCoordinate>> objectOverlays = new();
+	private readonly WorldObjectStore worldObjects;
 	private readonly Queue<(int X, int Z, long Revision)> completedPreparedColumns = new();
 	private readonly List<ChunkCoordinate> columnRemovalScratch = new();
 	private readonly HashSet<ChunkCoordinate> residents = new();
@@ -36,10 +40,12 @@ public sealed class FishGfxVoxelScene : IDisposable
 		int maxChunkDrawDistance = GameConfig.DefaultMaxChunkDrawDistance,
 		int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
 		VolumetricFogQuality fogQuality = VolumetricFogQuality.Medium,
-		bool synchronizeExisting = true)
+		bool synchronizeExisting = true,
+		WorldObjectStore worldObjects = null)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		this.source = source ?? throw new ArgumentNullException(nameof(source));
+		this.worldObjects = worldObjects;
 		assets = new FishGfxVoxelAssets(graphics, assetStore);
 		World = new VoxelWorld();
 		Lighting = new VoxelLighting(
@@ -82,8 +88,19 @@ public sealed class FishGfxVoxelScene : IDisposable
 		source.BlockChanged += QueueChange;
 		source.ColumnLoaded += QueueColumn;
 		source.WorldReset += QueueReset;
+		if (worldObjects != null)
+		{
+			worldObjects.ColumnReplaced += QueueObjectColumn;
+			worldObjects.ColumnChanged += QueueObjectColumn;
+		}
 		if (synchronizeExisting)
+		{
 			SynchronizeAll();
+			if (worldObjects != null)
+				foreach (IGrouping<(int X, int Z), WorldPlantRecord> group in worldObjects.GetAll().GroupBy(static record =>
+					(Voxelgine.Utils.FloorDiv(record.Position.X, Chunk.ChunkSize), Voxelgine.Utils.FloorDiv(record.Position.Z, Chunk.ChunkSize))))
+					QueueObjectColumn(worldObjects.GetColumn(group.Key.X, group.Key.Z));
+		}
 	}
 
 	public VoxelWorld World { get; }
@@ -185,6 +202,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 			}
 			while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
 				prepared.Dispose();
+			while (pendingObjectColumns.TryDequeue(out _)) { }
+			objectOverlays.Clear();
 			completedPreparedColumns.Clear();
 			currentPreparedColumn?.Dispose();
 			currentPreparedColumn = null;
@@ -223,13 +242,15 @@ public sealed class FishGfxVoxelScene : IDisposable
 				Apply(change);
 			while (completedPreparedColumns.TryDequeue(out var completed))
 				PreparedColumnApplied?.Invoke(completed.X, completed.Z, completed.Revision);
+			while (pendingObjectColumns.TryDequeue(out WorldObjectColumnState objectColumn))
+				ApplyObjectColumn(objectColumn);
 		}
 	}
 
 	public PreparedClientColumn PrepareStreamedColumn(ChunkColumnSnapshot column)
 	{
 		ThrowIfDisposed();
-		return PreparedClientColumn.Prepare(column, assets.MaterialIds);
+		return PreparedClientColumn.Prepare(column, assets.MaterialValueIds);
 	}
 
 	public void EnqueuePreparedColumn(PreparedClientColumn column)
@@ -379,6 +400,11 @@ public sealed class FishGfxVoxelScene : IDisposable
 		source.BlockChanged -= QueueChange;
 		source.ColumnLoaded -= QueueColumn;
 		source.WorldReset -= QueueReset;
+		if (worldObjects != null)
+		{
+			worldObjects.ColumnReplaced -= QueueObjectColumn;
+			worldObjects.ColumnChanged -= QueueObjectColumn;
+		}
 		while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
 			prepared.Dispose();
 		currentPreparedColumn?.Dispose();
@@ -421,7 +447,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			ChunkCoordinate coordinate = new(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ);
 			VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
 			for (int index = 0; index < cells.Length; index++)
-				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Blocks[index]));
+				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Values[index]));
 
 			World.SetChunk(coordinate, cells);
 			residents.Add(coordinate);
@@ -454,7 +480,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			ChunkCoordinate coordinate = new(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ);
 			VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
 			for (int index = 0; index < cells.Length; index++)
-				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Blocks[index]));
+				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Values[index]));
 
 			World.SetChunk(coordinate, cells);
 			residents.Add(coordinate);
@@ -529,7 +555,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private void Apply(BlockChange change)
 	{
 		campfires.Apply(change);
-		ushort materialId = assets.GetMaterialId(change.NewType);
+		ushort materialId = assets.GetMaterialId(change.NewValue);
 		World.SetVoxel(change.X, change.Y, change.Z, new VoxelCell(materialId));
 		ChunkCoordinate coordinate = ChunkCoordinate.FromWorld(
 			change.X,
@@ -548,8 +574,11 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	private BlockType GetBlockType(int x, int y, int z)
 	{
-		return assets.GetBlockType(World.GetVoxel(x, y, z).MaterialId);
+		return GetBlockValue(x, y, z).Type;
 	}
+
+	private BlockValue GetBlockValue(int x, int y, int z) =>
+		assets.GetBlockValue(World.GetVoxel(x, y, z).MaterialId);
 
 	private void RefreshSkyExposure(int chunkX, int chunkZ)
 	{
@@ -571,6 +600,31 @@ public sealed class FishGfxVoxelScene : IDisposable
 	{
 		if (Volatile.Read(ref resetPending) == 0)
 			pendingChanges.Enqueue(change);
+	}
+
+	private void QueueObjectColumn(WorldObjectColumnState column) => pendingObjectColumns.Enqueue(column);
+	private void QueueObjectColumn(WorldObjectColumnState column, WorldObjectDeltaRecord _) => pendingObjectColumns.Enqueue(column);
+
+	private void ApplyObjectColumn(WorldObjectColumnState column)
+	{
+		(int X, int Z) key = (column.X, column.Z);
+		if (objectOverlays.Remove(key, out HashSet<BlockCoordinate> previous))
+			foreach (BlockCoordinate position in previous)
+			{
+				World.SetVoxel(position.X, position.Y, position.Z, new VoxelCell(assets.GetMaterialId(source.GetBlockValue(position.X, position.Y, position.Z))));
+				ChunkCoordinate previousChunk = ChunkCoordinate.FromWorld(position.X, position.Y, position.Z, out _, out _, out _);
+				Lighting.MarkChunkDirty(previousChunk);
+			}
+		HashSet<BlockCoordinate> current = new();
+		foreach (WorldPlantRecord plant in column.Records)
+		{
+			BlockCoordinate position = plant.Position;
+			World.SetVoxel(position.X, position.Y, position.Z, new VoxelCell(assets.WheatMaterialIds[plant.GrowthStage]));
+			current.Add(position);
+			ChunkCoordinate chunk = ChunkCoordinate.FromWorld(position.X, position.Y, position.Z, out _, out _, out _);
+			Lighting.MarkChunkDirty(chunk);
+		}
+		objectOverlays[key] = current;
 	}
 
 	private void QueueReset()

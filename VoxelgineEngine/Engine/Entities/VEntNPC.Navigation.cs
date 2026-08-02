@@ -186,7 +186,8 @@ namespace Voxelgine.Engine
 			}
 
 			// AI behavior program
-			_aiRunner?.Tick(this, Dt);
+			if (!IsLifeControlled)
+				_aiRunner?.Tick(this, Dt);
 
 			// Speech timer
 			if (_speechTimer > 0)

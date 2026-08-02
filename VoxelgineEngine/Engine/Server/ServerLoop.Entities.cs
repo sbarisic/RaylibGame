@@ -20,10 +20,10 @@ namespace Voxelgine.Engine.Server
 				.ThenBy(static marker => marker.Id.BlueprintMarkerId, StringComparer.Ordinal)
 				.ToArray();
 			if (npcMarkers.Length == 0)
-				SpawnNpc(_npcSpawnPos);
+				SpawnNpc(_npcSpawnPos,StableNpcId.Persistent(_simulation.PersistentEntityIds.Allocate()));
 			else
 				foreach (PlannedMarker marker in npcMarkers)
-					SpawnNpc(new Vector3(marker.Position.X + 0.5f, marker.Position.Y, marker.Position.Z + 0.5f));
+					SpawnNpc(new Vector3(marker.Position.X + 0.5f, marker.Position.Y, marker.Position.Z + 0.5f),StableNpcId.Generated(marker.Id));
 
 			PlannedMarker[] doorMarkers = _simulation.Map.GeneratedFeatures.Markers
 				.Where(static marker => marker.Kind == StructureMarkerKind.Door)
@@ -38,12 +38,24 @@ namespace Voxelgine.Engine.Server
 						new Vector3(marker.Position.X + 0.5f, marker.Position.Y, marker.Position.Z + 0.5f),
 						GetDoorFacing(_simulation.Map.GeneratedFeatures, marker));
 
+			foreach (PersistentFurnitureRecord record in _simulation.Furniture.GetAll().ToArray())
+				if (record.Type == FurnitureType.ItemBasket)
+				{
+					if(!BlockInfo.IsSolid(_simulation.Map.GetBlock(record.Anchor.X,record.Anchor.Y-1,record.Anchor.Z))){_simulation.Furniture.Remove(record.Key,out _);_logging.Log(GameLogLevel.Warning,"Furniture",$"removed unsupported basket key={record.Key} anchor={record.Anchor}");continue;}
+					SpawnBasket(record, broadcast: false);
+				}
+				else if(record.Type==FurnitureType.Bed)
+				{
+					BlockCoordinate head=record.Anchor+VEntBed.FacingOffset(record.Facing);if(!BlockInfo.IsSolid(_simulation.Map.GetBlock(record.Anchor.X,record.Anchor.Y-1,record.Anchor.Z))||!BlockInfo.IsSolid(_simulation.Map.GetBlock(head.X,head.Y-1,head.Z))){_simulation.Furniture.Remove(record.Key,out _);_logging.Log(GameLogLevel.Warning,"Furniture",$"removed unsupported bed key={record.Key}");continue;}SpawnBed(record,broadcast:false);
+				}
+
 			_logging.ServerWriteLine($"Spawned {_simulation.Entities.GetEntityCount()} entities.");
 		}
 
-		private void SpawnNpc(Vector3 position)
+		private void SpawnNpc(Vector3 position,StableNpcId stableId)
 		{
 			var npc = new VEntNPC();
+			npc.SetStableId(stableId);
 			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
 			npc.SetPosition(position);
 			npc.SetModelName("npc/humanoid.json");
@@ -51,6 +63,7 @@ namespace Voxelgine.Engine.Server
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
 			npc.SetAIProgram(AIPrograms.FunkyBehavior());
+			_npcLife?.Attach(npc);
 		}
 
 		private void SpawnDoor(Vector3 position, Vector3? facing = null)
@@ -60,6 +73,18 @@ namespace Voxelgine.Engine.Server
 			door.Initialize(position, new Vector3(1.0f, 2.0f, 0.125f));
 			door.FacingDirection = facing ?? Vector3.UnitZ;
 			_simulation.Entities.Spawn(_simulation, door);
+		}
+
+		private VEntItemBasket SpawnBasket(PersistentFurnitureRecord record, bool broadcast)
+		{
+			var basket = new VEntItemBasket(); basket.Initialize(record.Key, record.Anchor, record.Facing, record.Slots.ToArray());
+			if (broadcast) SpawnEntityAndBroadcast(basket); else _simulation.Entities.Spawn(_simulation, basket);
+			return basket;
+		}
+
+		private VEntBed SpawnBed(PersistentFurnitureRecord record,bool broadcast)
+		{
+			var bed=new VEntBed();bed.Initialize(record.Key,record.Anchor,record.Facing);if(broadcast)SpawnEntityAndBroadcast(bed);else _simulation.Entities.Spawn(_simulation,bed);return bed;
 		}
 
 		internal static Vector3 GetDoorFacing(WorldFeaturePlan features, PlannedMarker marker)
@@ -120,6 +145,7 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private static byte GetEntityAnimationState(VoxEntity entity)
 		{
+			if(entity is VEntNPC sleeping&&sleeping.IsSleeping)return 3;
 			if (entity is VEntNPC)
 			{
 				float horizontalSpeedSq = entity.Velocity.X * entity.Velocity.X + entity.Velocity.Z * entity.Velocity.Z;

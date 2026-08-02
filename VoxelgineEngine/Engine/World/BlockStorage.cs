@@ -63,17 +63,26 @@ namespace Voxelgine.Graphics
 	public struct PlacedBlock
 	{
 		public Voxelgine.Engine.BlockType Type;
+		public byte State;
 		public BlockLightArray Lights;
 
-		public PlacedBlock(Voxelgine.Engine.BlockType type, BlockLight defaultLight)
+		public PlacedBlock(BlockValue value, BlockLight defaultLight)
 		{
-			Type = type;
+			Type = value.Type;
+			State = value.State;
 			Lights = default;
 			for (int i = 0; i < 6; i++)
 				Lights[i] = defaultLight;
 		}
 
+		public PlacedBlock(Voxelgine.Engine.BlockType type, BlockLight defaultLight)
+			: this(new BlockValue(type), defaultLight) { }
+
+		public PlacedBlock(BlockValue value) : this(value, BlockLight.Black) { }
+
 		public PlacedBlock(Voxelgine.Engine.BlockType type) : this(type, BlockLight.Black) { }
+
+		public readonly BlockValue Value => new(Type, State);
 
 		public void SetAllLights(BlockLight light)
 		{
@@ -127,7 +136,17 @@ namespace Voxelgine.Graphics
 		public Rgba32 GetColor(Vector3 normal, in WorldLightingState lighting) =>
 			GetBlockLight(normal).ToColor(lighting);
 
-		public void Write(BinaryWriter writer) => writer.Write((ushort)Type);
-		public void Read(BinaryReader reader) => Type = (Voxelgine.Engine.BlockType)reader.ReadUInt16();
+		public readonly void Write(BinaryWriter writer)
+		{
+			writer.Write((ushort)Type);
+			writer.Write(State);
+		}
+
+		public void Read(BinaryReader reader)
+		{
+			BlockValue value = new((Voxelgine.Engine.BlockType)reader.ReadUInt16(), reader.ReadByte());
+			Type = value.Type;
+			State = value.State;
+		}
 	}
 }

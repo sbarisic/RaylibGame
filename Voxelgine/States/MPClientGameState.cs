@@ -100,6 +100,12 @@ namespace Voxelgine.States
 		private FishUIItemBox[] _inventorySlotBoxes;
 		private FishUIItemBox _inventoryCursorGhost;
 		private Label _inventoryStatusLabel;
+		private uint _nextCraftActionId = 1;
+		private string _craftStatusText = string.Empty;
+		private Window _containerWindow;
+		private FishUIItemBox[] _containerSlotBoxes;
+		private ContainerStatePacket _containerState;
+		private uint _nextContainerActionId = 1;
 
 		// FishUI HUD controls — Chat
 		private ToastNotification _chatToast;
@@ -191,6 +197,7 @@ namespace Voxelgine.States
 				() => (_client?.LocalTick ?? 0) + 1,
 				() => _simulation?.LocalPlayer as ClientPlayer,
 				() => _simulation?.Map,
+				() => _simulation?.Entities,
 				packet => _client?.Send(packet, true, GetClientTime()),
 				_logging);
 
@@ -259,6 +266,7 @@ namespace Voxelgine.States
 				// Process network (client may still be processing final packets)
 				_client?.Tick(currentTime);
 				UpdateWorldStream();
+				ExpireWorldObjectAssemblies(currentTime);
 
 				// Handle connection lost overlay input
 				if (_connectionLost)
@@ -358,6 +366,8 @@ namespace Voxelgine.States
 				// Gameplay hotkeys are unavailable while Chat or DebugMenu owns input.
 				if (Window.InMgr.IsInputPressed(InputKey.F5))
 					_showNetStats = !_showNetStats;
+				if (Window.InMgr.IsInputPressed(InputKey.E))
+					TryRequestWorldObjectInteraction();
 
 				if (Window.InMgr.IsInputPressed(InputKey.Tab))
 				{
@@ -675,6 +685,11 @@ namespace Voxelgine.States
 			_inventorySlotBoxes = null;
 			_inventoryCursorGhost = null;
 			_inventoryStatusLabel = null;
+			_containerWindow = null;
+			_containerSlotBoxes = null;
+			_containerState = null;
+			_craftStatusText = string.Empty;
+			_nextCraftActionId = 1;
 		}
 
 		protected override void DisposeCore()

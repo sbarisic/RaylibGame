@@ -1,9 +1,12 @@
 #if WINDOWS
 using System.Collections.ObjectModel;
+using System.Numerics;
+using FishGfx;
 using FishGfx.Graphics;
 using FishGfx.Voxels;
 using Voxelgine.Engine;
 using Voxelgine.FishGfxClient.Assets;
+using Voxelgine.Graphics;
 using Bitmap = System.Drawing.Bitmap;
 
 namespace Voxelgine.FishGfxClient.Voxels;
@@ -32,6 +35,9 @@ internal sealed class FishGfxVoxelAssets
 		new(200, 72, 16, 16, AtlasSize, AtlasSize);
 
 	private readonly ReadOnlyDictionary<BlockType, ushort> materialIds;
+	private readonly ReadOnlyDictionary<VoxelMaterialKey, ushort> materialValueIds;
+	private readonly ReadOnlyDictionary<ushort, BlockValue> authoritativeValues;
+	private readonly ushort[] wheatMaterialIds;
 	private readonly AssetHandle<VoxelSurfaceAssetsResource> surfaceTextures;
 	private readonly GameAssetStore assetStore;
 
@@ -41,7 +47,7 @@ internal sealed class FishGfxVoxelAssets
 		ArgumentNullException.ThrowIfNull(assetStore);
 		this.assetStore = assetStore;
 		ModelAssets models = LoadModels();
-		(Palette, materialIds) = CreatePalette(models);
+		(Palette, materialIds, materialValueIds, authoritativeValues, wheatMaterialIds) = CreatePalette(models);
 		surfaceTextures = assetStore.GetOrRegister(
 			SurfaceTextureAssetId,
 			() => LoadSurfaceTextures(graphics),
@@ -64,28 +70,33 @@ internal sealed class FishGfxVoxelAssets
 		new(CubeColumns, CubeRows, AtlasSize, AtlasSize);
 
 	internal IReadOnlyDictionary<BlockType, ushort> MaterialIds => materialIds;
+	internal IReadOnlyDictionary<VoxelMaterialKey, ushort> MaterialValueIds => materialValueIds;
+	internal IReadOnlyList<ushort> WheatMaterialIds => wheatMaterialIds;
 
 	internal ushort GetMaterialId(BlockType blockType)
+		=> GetMaterialId(new BlockValue(blockType));
+
+	internal ushort GetMaterialId(BlockValue value)
 	{
-		if (blockType == BlockType.None)
+		if (value.Type == BlockType.None)
 			return 0;
 
-		if (materialIds.TryGetValue(blockType, out ushort materialId))
+		if (materialValueIds.TryGetValue(VoxelMaterialKey.From(value), out ushort materialId))
 			return materialId;
 
-		throw new InvalidOperationException($"Block type '{blockType}' has no FishGfx material.");
+		throw new InvalidOperationException($"Block value '{value.Type}' state {value.State} has no FishGfx material.");
 	}
 
 	internal BlockType GetBlockType(ushort materialId)
+		=> GetBlockValue(materialId).Type;
+
+	internal BlockValue GetBlockValue(ushort materialId)
 	{
 		if (materialId == 0)
-			return BlockType.None;
+			return BlockValue.Empty;
 
-		foreach ((BlockType blockType, ushort candidate) in materialIds)
-		{
-			if (candidate == materialId)
-				return blockType;
-		}
+		if (authoritativeValues.TryGetValue(materialId, out BlockValue value))
+			return value;
 
 		throw new InvalidOperationException(
 			$"FishGfx material ID '{materialId}' has no authoritative block mapping.");
@@ -132,11 +143,19 @@ internal sealed class FishGfxVoxelAssets
 		return MinecraftVoxelModelLoader.LoadFile(ModelPath(directory, fileName), regions);
 	}
 
-	private static (VoxelPalette Palette, ReadOnlyDictionary<BlockType, ushort> MaterialIds)
+	private static (
+		VoxelPalette Palette,
+		ReadOnlyDictionary<BlockType, ushort> MaterialIds,
+		ReadOnlyDictionary<VoxelMaterialKey, ushort> MaterialValueIds,
+		ReadOnlyDictionary<ushort, BlockValue> AuthoritativeValues,
+		ushort[] WheatMaterialIds)
 		CreatePalette(ModelAssets models)
 	{
 		VoxelPaletteBuilder builder = new();
 		Dictionary<BlockType, ushort> ids = new();
+		Dictionary<VoxelMaterialKey, ushort> valueIds = new();
+		Dictionary<ushort, BlockValue> reverse = new();
+		ushort[] wheatIds = new ushort[8];
 
 		Add(BlockType.Stone, Opaque("Stone", 0));
 		Add(BlockType.Dirt, Opaque("Dirt", 1));
@@ -228,6 +247,15 @@ internal sealed class FishGfxVoxelAssets
 				occludesFaces: false,
 				models: models.Foliage,
 				light: new VoxelMaterialLightSettings(1)));
+		for (int stage = 0; stage < wheatIds.Length; stage++)
+		{
+			wheatIds[stage] = builder.Add(new VoxelMaterial(
+				$"Wheat Stage {stage}", VoxelRenderMode.Cutout, new VoxelFaceTiles(56 + stage),
+				occludesFaces: false, doubleSided: true,
+				models: new VoxelModelSet(CreatePlantModel(56 + stage)),
+				light: new VoxelMaterialLightSettings(1)));
+			reverse.Add(wheatIds[stage], new BlockValue(BlockType.Foliage));
+		}
 		Add(BlockType.Gravel, Opaque("Gravel", 21));
 		foreach (MachineBlockTextureDefinition definition in MachineBlockTextureCatalog.All)
 		{
@@ -244,6 +272,12 @@ internal sealed class FishGfxVoxelAssets
 						faces.PositiveZ,
 						faces.NegativeZ)));
 		}
+		Add(BlockType.DryFarmland, Opaque("Dry Farmland", new VoxelFaceTiles(1, 1, 53, 1, 1, 1)));
+		Add(BlockType.WetFarmland, Opaque("Wet Farmland", new VoxelFaceTiles(1, 1, 54, 1, 1, 1)));
+		Add(BlockType.Concrete, Opaque("Concrete", 55));
+		AddStairs(BlockType.StoneStairs, "Stone Stairs", 0);
+		AddStairs(BlockType.WoodStairs, "Wood Stairs", 5);
+		AddStairs(BlockType.ConcreteStairs, "Concrete Stairs", 55);
 
 		foreach (BlockType blockType in Enum.GetValues<BlockType>())
 		{
@@ -251,12 +285,91 @@ internal sealed class FishGfxVoxelAssets
 				throw new InvalidOperationException($"Block type '{blockType}' has no palette entry.");
 		}
 
-		return (builder.Build(), new ReadOnlyDictionary<BlockType, ushort>(ids));
+		return (
+			builder.Build(),
+			new ReadOnlyDictionary<BlockType, ushort>(ids),
+			new ReadOnlyDictionary<VoxelMaterialKey, ushort>(valueIds),
+			new ReadOnlyDictionary<ushort, BlockValue>(reverse),
+			wheatIds);
 
 		void Add(BlockType blockType, VoxelMaterial material)
 		{
-			if (!ids.TryAdd(blockType, builder.Add(material)))
+			ushort materialId = builder.Add(material);
+			BlockValue value = new(blockType);
+			if (!ids.TryAdd(blockType, materialId) ||
+				!valueIds.TryAdd(VoxelMaterialKey.From(value), materialId) ||
+				!reverse.TryAdd(materialId, value))
 				throw new InvalidOperationException($"Block type '{blockType}' is mapped twice.");
+		}
+
+		void AddStairs(BlockType blockType, string name, int tile)
+		{
+			for (byte state = 0; state < 8; state++)
+			{
+				BlockValue value = new(blockType, state);
+				ushort materialId = builder.Add(new VoxelMaterial(
+					$"{name} {state}",
+					VoxelRenderMode.Opaque,
+					new VoxelFaceTiles(tile),
+					occludesFaces: false,
+					models: new VoxelModelSet(CreateStairModel(value, tile))));
+				if (!valueIds.TryAdd(VoxelMaterialKey.From(value), materialId) ||
+					!reverse.TryAdd(materialId, value))
+					throw new InvalidOperationException($"Block value '{blockType}' state {state} is mapped twice.");
+				if (state == 0 && !ids.TryAdd(blockType, materialId))
+					throw new InvalidOperationException($"Block type '{blockType}' is mapped twice.");
+			}
+		}
+	}
+
+	private static VoxelModel CreateStairModel(BlockValue value, int tile)
+	{
+		List<VoxelVertex> vertices = new();
+		VoxelTextureRegion region = new(
+			(tile % CubeColumns) * (AtlasSize / CubeColumns),
+			(tile / CubeColumns) * (AtlasSize / CubeRows),
+			AtlasSize / CubeColumns,
+			AtlasSize / CubeRows,
+			AtlasSize,
+			AtlasSize);
+		foreach (AABB box in BlockShapeCatalog.GetCollisionBoxes(value))
+			AppendBox(vertices, box.Min, box.Max, region);
+		return new VoxelModel(vertices);
+	}
+
+	private static VoxelModel CreatePlantModel(int tile)
+	{
+		List<VoxelVertex> vertices = new();
+		VoxelTextureRegion region = new((tile % 16) * 32, (tile / 16) * 32, 32, 32, AtlasSize, AtlasSize);
+		AddPlane(new Vector3(0,0,0), new Vector3(1,0,1), new Vector3(1,1,1), new Vector3(0,1,0));
+		AddPlane(new Vector3(1,0,0), new Vector3(0,0,1), new Vector3(0,1,1), new Vector3(1,1,0));
+		return new VoxelModel(vertices);
+
+		void AddPlane(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+		{
+			Vector3 normal = Vector3.Normalize(Vector3.Cross(b-a, c-a));
+			Vector2[] uv={Vector2.UnitY,Vector2.One,Vector2.UnitX,Vector2.UnitY,Vector2.UnitX,Vector2.Zero};
+			Vector3[] positions={a,b,c,a,c,d};
+			for(int index=0;index<6;index++) vertices.Add(new VoxelVertex(positions[index], Color.White, region.Map(uv[index]), normal));
+		}
+	}
+
+	private static void AppendBox(List<VoxelVertex> vertices, Vector3 min, Vector3 max, VoxelTextureRegion region)
+	{
+		AddQuad(Vector3.UnitX, new(max.X, min.Y, min.Z), new(max.X, max.Y, min.Z), new(max.X, max.Y, max.Z), new(max.X, min.Y, max.Z));
+		AddQuad(-Vector3.UnitX, new(min.X, min.Y, max.Z), new(min.X, max.Y, max.Z), new(min.X, max.Y, min.Z), new(min.X, min.Y, min.Z));
+		AddQuad(Vector3.UnitY, new(min.X, max.Y, max.Z), new(max.X, max.Y, max.Z), new(max.X, max.Y, min.Z), new(min.X, max.Y, min.Z));
+		AddQuad(-Vector3.UnitY, new(min.X, min.Y, min.Z), new(max.X, min.Y, min.Z), new(max.X, min.Y, max.Z), new(min.X, min.Y, max.Z));
+		AddQuad(Vector3.UnitZ, new(max.X, min.Y, max.Z), new(max.X, max.Y, max.Z), new(min.X, max.Y, max.Z), new(min.X, min.Y, max.Z));
+		AddQuad(-Vector3.UnitZ, new(min.X, min.Y, min.Z), new(min.X, max.Y, min.Z), new(max.X, max.Y, min.Z), new(max.X, min.Y, min.Z));
+
+		void AddQuad(Vector3 normal, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+		{
+			Vector2[] uv = { Vector2.Zero, Vector2.UnitY, Vector2.One, Vector2.UnitX };
+			Vector3[] positions = { a, b, c, a, c, d };
+			int[] uvIndices = { 0, 1, 2, 0, 2, 3 };
+			for (int index = 0; index < positions.Length; index++)
+				vertices.Add(new VoxelVertex(positions[index], Color.White, region.Map(uv[uvIndices[index]]), normal));
 		}
 	}
 

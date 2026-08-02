@@ -183,6 +183,7 @@ public static class WorldStructurePlanner
 		else
 		{
 			localPosition = Rotate(localPosition, blueprintSize, rotation);
+			data = PhaseOneMarkerSchemas.RotateData(marker.Kind,data,blueprintSize,rotation,origin);
 		}
 
 		return new PlannedMarker(
@@ -192,6 +193,8 @@ public static class WorldStructurePlanner
 			marker.ExpectedBlock,
 			data);
 	}
+
+	public static BlockCoordinate RotateLocalPosition(BlockCoordinate position,BlockCoordinate size,int rotation)=>Rotate(position,size,rotation);
 
 	private static bool TryReadDynamicFogSize(
 		StructureMarker marker,

@@ -18,15 +18,16 @@ public static class WorldColumnCodec
 			foreach (ChunkSnapshot chunk in column.Chunks.OrderBy(static chunk => chunk.ChunkY))
 			{
 				writer.Write(chunk.ChunkY);
-				ReadOnlySpan<BlockType> blocks = chunk.BlockMemory.Span;
-				for (int index = 0; index < blocks.Length;)
+				ReadOnlySpan<BlockValue> values = chunk.ValueMemory.Span;
+				for (int index = 0; index < values.Length;)
 				{
-					BlockType type = blocks[index];
+					BlockValue value = values[index];
 					int end = index + 1;
-					while (end < blocks.Length && blocks[end] == type && end - index < ushort.MaxValue)
+					while (end < values.Length && values[end] == value && end - index < ushort.MaxValue)
 						end++;
 					writer.Write((ushort)(end - index));
-					writer.Write((ushort)type);
+					writer.Write((ushort)value.Type);
+					writer.Write(value.State);
 					index = end;
 				}
 
@@ -72,15 +73,25 @@ public static class WorldColumnCodec
 			if (!chunkYs.Add(chunkY))
 				throw new InvalidDataException($"Duplicate chunk Y={chunkY} in column ({x}, {z}).");
 
-			BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+			BlockValue[] values = new BlockValue[ChunkSnapshot.BlockCount];
 			int nonAirBlockCount = 0;
-			for (int index = 0; index < blocks.Length;)
+			for (int index = 0; index < values.Length;)
 			{
 				ushort runLength = reader.ReadUInt16();
 				BlockType type = (BlockType)reader.ReadUInt16();
-				if (runLength == 0 || index + runLength > blocks.Length)
+				byte state = reader.ReadByte();
+				BlockValue value;
+				try
+				{
+					value = new BlockValue(type, state);
+				}
+				catch (ArgumentOutOfRangeException exception)
+				{
+					throw new InvalidDataException($"Invalid block value in column ({x}, {z}) chunk Y={chunkY}.", exception);
+				}
+				if (runLength == 0 || index + runLength > values.Length)
 					throw new InvalidDataException($"Invalid RLE run in column ({x}, {z}) chunk Y={chunkY}.");
-				Array.Fill(blocks, type, index, runLength);
+				Array.Fill(values, value, index, runLength);
 				if (type != BlockType.None)
 					nonAirBlockCount += runLength;
 				index += runLength;
@@ -124,7 +135,7 @@ public static class WorldColumnCodec
 				x,
 				chunkY,
 				z,
-				blocks,
+				values,
 				nonAirBlockCount,
 				fog,
 				nonEmptyFogCount

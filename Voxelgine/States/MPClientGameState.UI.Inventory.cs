@@ -16,8 +16,8 @@ public unsafe partial class MPClientGameState
 		_inventoryWindow = new Window
 		{
 			Title = "Inventory",
-			Size = new Vector2(566, 408),
-			Position = new Vector2(screenWidth / 2f - 283, screenHeight / 2f - 204),
+			Size = new Vector2(566, 448),
+			Position = new Vector2(screenWidth / 2f - 283, screenHeight / 2f - 224),
 			IsResizable = false,
 			ShowCloseButton = true,
 			Visible = false,
@@ -60,10 +60,20 @@ public unsafe partial class MPClientGameState
 				new Vector2(18 + slot * (InventorySlotSize + InventorySlotSpacing), 332)));
 		}
 
+		var concreteButton = new Button
+		{
+			ID = "inventory_craft_concrete",
+			Text = "Craft Concrete (1 Sand + 1 Gravel, nearby Water)",
+			Position = new Vector2(18, 384),
+			Size = new Vector2(530, 30),
+		};
+		concreteButton.OnButtonPressed += (_, _, _) => RequestConcreteCraft();
+		_inventoryWindow.AddChild(concreteButton);
+
 		_inventoryStatusLabel = new Label
 		{
 			Text = "Left click: move stack   Right click: split/place one",
-			Position = new Vector2(18, 384),
+			Position = new Vector2(18, 418),
 			Size = new Vector2(530, 20),
 			Alignment = Align.Center,
 		};
@@ -140,15 +150,36 @@ public unsafe partial class MPClientGameState
 			if (_inventoryCursorGhost.Stack.Item != cursor.Item)
 				ClientItemPresentationCatalog.ApplyIcon(_gui.UI, _inventoryCursorGhost, cursor);
 			_inventoryCursorGhost.SetStack(cursor);
-			_inventoryCursorGhost.Visible = _inventoryWindow?.Visible == true && !cursor.IsEmpty;
+			_inventoryCursorGhost.Visible = (_inventoryWindow?.Visible == true || _containerWindow?.Visible == true) && !cursor.IsEmpty;
 		}
 
 		if (_inventoryStatusLabel is not null)
 		{
-			_inventoryStatusLabel.Text = _inventoryModel.IsQueueFull
+			string inventoryStatus = _inventoryModel.IsQueueFull
 				? "Waiting for server — action queue is full"
 				: $"Revision {_inventoryModel.Revision}   Pending {_inventoryModel.PendingActionCount}/32";
+			_inventoryStatusLabel.Text = string.IsNullOrEmpty(_craftStatusText)
+				? inventoryStatus
+				: $"{inventoryStatus}   {_craftStatusText}";
 		}
+	}
+
+	private void RequestConcreteCraft()
+	{
+		if (_client?.IsConnected != true)
+			return;
+		uint actionId = _nextCraftActionId++;
+		if (_nextCraftActionId == 0)
+			_nextCraftActionId = 1;
+		_craftStatusText = "Crafting...";
+		_client.Send(new CraftRequestPacket { ActionId = actionId, RecipeId = 1 }, true, GetClientTime());
+		RefreshInventoryUI();
+	}
+
+	private void HandleCraftResult(CraftResultPacket packet)
+	{
+		_craftStatusText = packet.Accepted ? "Concrete crafted" : $"Craft rejected ({packet.Reason})";
+		RefreshInventoryUI();
 	}
 
 	private void UpdateInventoryUI()

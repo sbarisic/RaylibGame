@@ -28,14 +28,6 @@ namespace Voxelgine.Graphics
 			int x = (int)MathF.Floor(origin.X);
 			int y = (int)MathF.Floor(origin.Y);
 			int z = (int)MathF.Floor(origin.Z);
-			if (UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z))
-				return false;
-			if (IsSolid(x, y, z))
-			{
-				hit = new VoxelRaycastHit(x, y, z, origin, Vector3.Zero, 0f);
-				return true;
-			}
-
 			int stepX = Math.Sign(direction.X);
 			int stepY = Math.Sign(direction.Y);
 			int stepZ = Math.Sign(direction.Z);
@@ -46,10 +38,18 @@ namespace Voxelgine.Graphics
 			float nextY = InitialBoundaryDistance(origin.Y, direction.Y, y, stepY);
 			float nextZ = InitialBoundaryDistance(origin.Z, direction.Z, z, stepZ);
 
-			while (true)
+			float cellEntryDistance = 0;
+			while (cellEntryDistance <= maximumDistance)
 			{
+				if (UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z))
+					return false;
+				if (TryRaycastBlockShape(x, y, z, origin, direction, cellEntryDistance, maximumDistance, out float shapeDistance, out Vector3 shapeNormal))
+				{
+					hit = new VoxelRaycastHit(x, y, z, origin + direction * shapeDistance, shapeNormal, shapeDistance);
+					return true;
+				}
+
 				float distance;
-				Vector3 normal;
 				if (nextX <= nextY && nextX <= nextZ)
 				{
 					distance = nextX;
@@ -57,7 +57,6 @@ namespace Voxelgine.Graphics
 						return false;
 					x += stepX;
 					nextX += deltaX;
-					normal = new Vector3(-stepX, 0f, 0f);
 				}
 				else if (nextY <= nextZ)
 				{
@@ -66,7 +65,6 @@ namespace Voxelgine.Graphics
 						return false;
 					y += stepY;
 					nextY += deltaY;
-					normal = new Vector3(0f, -stepY, 0f);
 				}
 				else
 				{
@@ -75,17 +73,67 @@ namespace Voxelgine.Graphics
 						return false;
 					z += stepZ;
 					nextZ += deltaZ;
-					normal = new Vector3(0f, 0f, -stepZ);
 				}
-
-				if (UnknownColumnsAreBoundaries && !IsWorldColumnResident(x, z))
-					return false;
-				if (IsSolid(x, y, z))
-				{
-					hit = new VoxelRaycastHit(x, y, z, origin + direction * distance, normal, distance);
-					return true;
-				}
+				cellEntryDistance = distance;
 			}
+			return false;
+		}
+
+		private bool TryRaycastBlockShape(
+			int x, int y, int z, Vector3 origin, Vector3 direction,
+			float minimumDistance, float maximumDistance,
+			out float distance, out Vector3 normal)
+		{
+			distance = float.PositiveInfinity;
+			normal = Vector3.Zero;
+			BlockValue value = GetBlockValue(x, y, z);
+			foreach (AABB local in BlockShapeCatalog.GetCollisionBoxes(value))
+			{
+				AABB world = local.Offset(new Vector3(x, y, z));
+				if (!TryIntersectRayAabb(origin, direction, world, out float candidate, out Vector3 candidateNormal) ||
+					candidate + 1e-5f < minimumDistance || candidate > maximumDistance || candidate >= distance)
+					continue;
+				distance = candidate;
+				normal = candidateNormal;
+			}
+			return !float.IsPositiveInfinity(distance);
+		}
+
+		private static bool TryIntersectRayAabb(
+			Vector3 origin, Vector3 direction, AABB bounds,
+			out float distance, out Vector3 normal)
+		{
+			float near = float.NegativeInfinity;
+			float far = float.PositiveInfinity;
+			normal = Vector3.Zero;
+			for (int axis = 0; axis < 3; axis++)
+			{
+				float originAxis = axis == 0 ? origin.X : axis == 1 ? origin.Y : origin.Z;
+				float directionAxis = axis == 0 ? direction.X : axis == 1 ? direction.Y : direction.Z;
+				float minimum = axis == 0 ? bounds.Min.X : axis == 1 ? bounds.Min.Y : bounds.Min.Z;
+				float maximum = axis == 0 ? bounds.Max.X : axis == 1 ? bounds.Max.Y : bounds.Max.Z;
+				if (MathF.Abs(directionAxis) < 1e-8f)
+				{
+					if (originAxis < minimum || originAxis > maximum) { distance = 0; return false; }
+					continue;
+				}
+				float first = (minimum - originAxis) / directionAxis;
+				float second = (maximum - originAxis) / directionAxis;
+				float axisNear = MathF.Min(first, second);
+				float axisFar = MathF.Max(first, second);
+				if (axisNear > near)
+				{
+					near = axisNear;
+					float sign = first < second ? -1 : 1;
+					normal = axis == 0 ? new Vector3(sign, 0, 0) : axis == 1 ? new Vector3(0, sign, 0) : new Vector3(0, 0, sign);
+				}
+				far = MathF.Min(far, axisFar);
+				if (near > far) { distance = 0; return false; }
+			}
+			if (far < 0) { distance = 0; return false; }
+			if (near < 0) { distance = 0; normal = Vector3.Zero; return true; }
+			distance = near;
+			return true;
 		}
 
 		private static bool IsFinite(Vector3 value) =>

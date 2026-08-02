@@ -234,6 +234,7 @@ namespace Voxelgine.States
 			_gui.AddControl(_playerListPanel);
 
 			CreateInventoryUI(screenW, screenH);
+			CreateContainerUI(screenW, screenH);
 
 			// Death overlay — full-screen red tint with centered text
 			_deathOverlayPanel = new Panel

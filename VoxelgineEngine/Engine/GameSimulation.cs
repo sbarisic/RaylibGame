@@ -1,5 +1,6 @@
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Engine
 {
@@ -22,6 +23,11 @@ namespace Voxelgine.Engine
 
 		/// <summary>Manages all non-player entities.</summary>
 		public EntityManager Entities { get; }
+
+		public WorldObjectStore WorldObjects { get; }
+		public FurnitureStore Furniture { get; }
+		public PersistentEntityIdAllocator PersistentEntityIds { get; }
+		public GeneratedTombstoneStore Tombstones { get; }
 
 		/// <summary>Day/night cycle time and lighting.</summary>
 		public DayNightCycle DayNight { get; }
@@ -47,6 +53,10 @@ namespace Voxelgine.Engine
 			Players = new PlayerManager();
 			Entities = new EntityManager(eng);
 			Map = new ChunkMap();
+			WorldObjects = new WorldObjectStore();
+			PersistentEntityIds = new PersistentEntityIdAllocator();
+			Furniture = new FurnitureStore(PersistentEntityIds);
+			Tombstones = new GeneratedTombstoneStore();
 			PhysicsWorld = new PhysicsWorld(Map, Entities);
 		}
 

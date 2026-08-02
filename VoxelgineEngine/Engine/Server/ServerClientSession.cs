@@ -44,6 +44,7 @@ public sealed class ServerClientSession
 	public HashSet<long> ConsumedItemUseChannels { get; } = new();
 	public List<PendingItemUseRequest> PendingItemUses { get; } = new(32);
 	public float LastWeaponFireTime { get; set; } = float.NegativeInfinity;
+	public ContainerViewerSession ContainerSession { get; set; }
 
 	public void ClearTransientState()
 	{
@@ -55,6 +56,8 @@ public sealed class ServerClientSession
 		PendingItemUses.Clear();
 	}
 }
+
+public sealed record ContainerViewerSession(ulong SessionId, PersistentFurnitureKey ContainerKey, long Generation);
 
 public readonly record struct PendingItemUseRequest(
 	uint ActionId,

@@ -25,6 +25,14 @@ public static class ClientItemPresentationCatalog
 			return new(item, "data/textures/items/gun.png", ViewModelAssetKind.Gun, DroppedItemPresentationKind.IconQuad);
 		if (item == ItemIds.Hammer)
 			return new(item, "data/textures/items/hammer.png", ViewModelAssetKind.Hammer, DroppedItemPresentationKind.IconQuad);
+		if (item == ItemIds.Bed)
+			return new(item, "data/textures/blocks/bedrock.png", ViewModelAssetKind.None, DroppedItemPresentationKind.IconQuad);
+		if (item == ItemIds.ItemBasket)
+			return new(item, "data/models/barrel/barrel_tex.png", ViewModelAssetKind.None, DroppedItemPresentationKind.IconQuad);
+		if (item == ItemIds.WheatSeeds)
+			return new(item, "data/textures/blocks/wheat_stage0.png", ViewModelAssetKind.None, DroppedItemPresentationKind.IconQuad);
+		if (item == ItemIds.Wheat)
+			return new(item, "data/textures/blocks/wheat_stage7.png", ViewModelAssetKind.None, DroppedItemPresentationKind.IconQuad);
 
 		ItemDefinition definition = ItemCatalog.Get(item);
 		BlockType block = definition.PlacesBlock ?? BlockType.None;

@@ -1,4 +1,6 @@
 using System.Numerics;
+using Voxelgine.Graphics;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Engine.Server;
 
@@ -20,6 +22,24 @@ public partial class ServerLoop
 
 		var drop = new VEntItemDrop();
 		drop.SetStack(policy.Drop);
+		drop.SetPosition(position);
+		drop.SetVelocity(new Vector3(0, 2, 0));
+		drop.PickupDelayTicks = VEntItemDrop.DefaultPickupDelayTicks;
+		drop.ExpiryServerTick = _server.ServerTick + VEntItemDrop.DefaultLifetimeTicks;
+		SpawnEntityAndBroadcast(drop);
+	}
+
+	private void OnPlantLostSupport(WorldPlantRecord plant)
+	{
+		if(plant.Key.Kind==PersistentWorldObjectKeyKind.Generated)_simulation.Tombstones.Add(GeneratedObjectKind.WorldObject,plant.Key.GeneratedMarkerId);
+		SpawnItemDrop(new ItemStack(ItemIds.WheatSeeds, 1), new Vector3(plant.Position.X + 0.5f, plant.Position.Y + 0.25f, plant.Position.Z + 0.5f));
+	}
+
+	private void SpawnItemDrop(ItemStack stack, Vector3 position)
+	{
+		if (stack.IsEmpty) return;
+		var drop = new VEntItemDrop();
+		drop.SetStack(stack);
 		drop.SetPosition(position);
 		drop.SetVelocity(new Vector3(0, 2, 0));
 		drop.PickupDelayTicks = VEntItemDrop.DefaultPickupDelayTicks;

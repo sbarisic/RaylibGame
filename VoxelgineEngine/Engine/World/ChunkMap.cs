@@ -20,6 +20,10 @@ namespace Voxelgine.Graphics
 		private readonly Dictionary<ChunkColumnCoordinate, HashSet<BlockCoordinate>> _columnInfrastructure = new();
 		private int _nonEmptyFogVoxelCount;
 		private int _bulkWorldMutationDepth;
+		private Dictionary<ChunkColumnCoordinate, long> _activeBlockBatchRevisions;
+		private List<BlockChange> _deferredBlockBatchChanges;
+		private HashSet<Vector3> _activeBlockBatchDirtyChunks;
+		private HashSet<Vector3> _activeBlockBatchLightingOrigins;
 
 		// Preserve the legacy server's lighting-work horizon. The headless process
 		// has no camera, so its stable observation origin is the world origin.
@@ -27,6 +31,7 @@ namespace Voxelgine.Graphics
 		private static readonly Vector3 LightingObservationOrigin = Vector3.Zero;
 
 		public event Action<BlockChange> BlockChanged;
+		public event Action<IReadOnlyList<BlockChange>> BlockBatchChanged;
 		public event Action<FogChange> FogChanged;
 		public event Action<ChunkColumnSnapshot> ColumnLoaded;
 		public event Action<ChunkColumnCoordinate> ColumnReplacing;
@@ -170,10 +175,10 @@ namespace Voxelgine.Graphics
 			for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex++)
 			{
 				KeyValuePair<Vector3, Chunk> entry = chunks[chunkIndex];
-				BlockType[] blocks = new BlockType[ChunkSnapshot.BlockCount];
+				BlockValue[] blocks = new BlockValue[ChunkSnapshot.BlockCount];
 				FogVoxel[] fog = new FogVoxel[ChunkSnapshot.BlockCount];
 				for (int blockIndex = 0; blockIndex < blocks.Length; blockIndex++)
-					blocks[blockIndex] = entry.Value.Blocks[blockIndex].Type;
+					blocks[blockIndex] = entry.Value.Blocks[blockIndex].Value;
 				entry.Value.CopyFogTo(fog);
 
 				snapshots[chunkIndex] = new ChunkSnapshot(
@@ -347,6 +352,7 @@ namespace Voxelgine.Graphics
 
 		public void SetPlacedBlock(int x, int y, int z, PlacedBlock block)
 		{
+			BlockValue newValue = block.Value;
 			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
 
 			int localX = (int)blockPosition.X;
@@ -389,7 +395,9 @@ namespace Voxelgine.Graphics
 
 			for (int index = 0; index < affectedCount; index++)
 			{
-				if (Chunks.TryGetValue(affectedChunks[index], out Chunk affectedChunk))
+				if (_activeBlockBatchDirtyChunks != null)
+					_activeBlockBatchDirtyChunks.Add(affectedChunks[index]);
+				else if (Chunks.TryGetValue(affectedChunks[index], out Chunk affectedChunk))
 					affectedChunk.MarkDirty();
 			}
 
@@ -406,15 +414,22 @@ namespace Voxelgine.Graphics
 			}
 
 			Chunks.TryGetValue(chunkIndex, out Chunk targetChunk);
-			BlockType oldType = targetChunk.GetBlock(localX, localY, localZ).Type;
+			BlockValue oldValue = targetChunk.GetBlock(localX, localY, localZ).Value;
+			BlockType oldType = oldValue.Type;
+			bool valueChanged = oldValue != newValue;
 			bool typeChanged = oldType != block.Type;
 			BlockChange change = default;
-			if (typeChanged)
+			if (valueChanged)
 			{
-				TrackInfrastructureBlock(new BlockCoordinate(x, y, z), block.Type);
+				if (typeChanged)
+					TrackInfrastructureBlock(new BlockCoordinate(x, y, z), block.Type);
 				long columnRevision = IncrementColumnRevision((int)chunkIndex.X, (int)chunkIndex.Z);
-				change = new BlockChange(x, y, z, oldType, block.Type, columnRevision);
-				if (_bulkWorldMutationDepth == 0)
+				change = new BlockChange(x, y, z, oldValue, newValue, columnRevision);
+				if (_activeBlockBatchRevisions != null)
+				{
+					_deferredBlockBatchChanges.Add(change);
+				}
+				else if (_bulkWorldMutationDepth == 0)
 				{
 					_blockChangeLog.Add(change);
 					_worldMutationLog.Add(WorldMutation.FromBlock(change));
@@ -423,26 +438,31 @@ namespace Voxelgine.Graphics
 
 			targetChunk.SetBlock(localX, localY, localZ, block);
 
-			if (typeChanged && _bulkWorldMutationDepth == 0)
+			if (valueChanged && _bulkWorldMutationDepth == 0 && _activeBlockBatchRevisions == null)
 			{
 				BlockChanged?.Invoke(change);
-				if (oldType != BlockType.None)
+				if (typeChanged && oldType != BlockType.None)
 					OnBlockRemoved?.Invoke(this, x, y, z, oldType);
-				if (block.Type != BlockType.None)
+				if (typeChanged && block.Type != BlockType.None)
 					OnBlockPlaced?.Invoke(this, x, y, z, block.Type);
 			}
 
-			if (typeChanged && oldType != BlockType.None && block.Type == BlockType.None &&
+			if (_activeBlockBatchRevisions == null && typeChanged && oldType != BlockType.None && block.Type == BlockType.None &&
 				y < int.MaxValue && GetBlock(x, y + 1, z) == BlockType.Foliage)
 			{
 				SetBlock(x, y + 1, z, BlockType.None);
 			}
 
-			bool needsLightingUpdate = BlockInfo.EmitsLight(block.Type) ||
+			bool needsLightingUpdate = valueChanged && (BlockInfo.EmitsLight(block.Type) ||
 				!BlockInfo.IsRendered(block.Type) ||
-				BlockInfo.IsOpaque(block.Type);
+				BlockInfo.IsOpaque(block.Type));
 			if (!needsLightingUpdate)
 				return;
+			if (_activeBlockBatchLightingOrigins != null)
+			{
+				_activeBlockBatchLightingOrigins.Add(chunkIndex);
+				return;
+			}
 
 			const int lightRangeInChunks = 1;
 			float halfChunk = Chunk.ChunkSize * 0.5f;
@@ -499,13 +519,24 @@ namespace Voxelgine.Graphics
 		}
 
 		public void SetBlock(int x, int y, int z, BlockType type) =>
-			SetPlacedBlock(x, y, z, new PlacedBlock(type));
+			SetBlock(x, y, z, new BlockValue(type));
+
+		public void SetBlock(int x, int y, int z, BlockValue value) =>
+			SetPlacedBlock(x, y, z, new PlacedBlock(value));
 
 		public bool TryApplyReplicatedBlockChange(
 			int x,
 			int y,
 			int z,
 			BlockType type,
+			long expectedColumnRevision) =>
+			TryApplyReplicatedBlockChange(x, y, z, new BlockValue(type), expectedColumnRevision);
+
+		public bool TryApplyReplicatedBlockChange(
+			int x,
+			int y,
+			int z,
+			BlockValue value,
 			long expectedColumnRevision)
 		{
 			TranslateChunkPos(x, y, z, out Vector3 chunkIndex, out Vector3 blockPosition);
@@ -519,22 +550,24 @@ namespace Voxelgine.Graphics
 			int localX = (int)blockPosition.X;
 			int localY = (int)blockPosition.Y;
 			int localZ = (int)blockPosition.Z;
-			BlockType oldType = targetChunk.GetBlock(localX, localY, localZ).Type;
-			if (expectedColumnRevision == currentRevision && oldType == type)
+			BlockValue oldValue = targetChunk.GetBlock(localX, localY, localZ).Value;
+			BlockType oldType = oldValue.Type;
+			if (expectedColumnRevision == currentRevision && oldValue == value)
 				return true;
-			if (expectedColumnRevision != currentRevision + 1 || oldType == type)
+			if (expectedColumnRevision != currentRevision + 1 || oldValue == value)
 				return false;
 
-			targetChunk.SetBlock(localX, localY, localZ, new PlacedBlock(type));
-			TrackInfrastructureBlock(new BlockCoordinate(x, y, z), type);
+			targetChunk.SetBlock(localX, localY, localZ, new PlacedBlock(value));
+			if (oldType != value.Type)
+				TrackInfrastructureBlock(new BlockCoordinate(x, y, z), value.Type);
 			targetChunk.MarkDirty();
 			_columnRevisions[column] = expectedColumnRevision;
-			BlockChange change = new(x, y, z, oldType, type, expectedColumnRevision);
+			BlockChange change = new(x, y, z, oldValue, value, expectedColumnRevision);
 			BlockChanged?.Invoke(change);
-			if (oldType != BlockType.None)
+			if (oldType != value.Type && oldType != BlockType.None)
 				OnBlockRemoved?.Invoke(this, x, y, z, oldType);
-			if (type != BlockType.None)
-				OnBlockPlaced?.Invoke(this, x, y, z, type);
+			if (oldType != value.Type && value.Type != BlockType.None)
+				OnBlockPlaced?.Invoke(this, x, y, z, value.Type);
 			return true;
 		}
 
@@ -619,7 +652,10 @@ namespace Voxelgine.Graphics
 		}
 
 		public BlockType GetBlock(int x, int y, int z) =>
-			GetPlacedBlock(x, y, z, out _).Type;
+			GetBlockValue(x, y, z).Type;
+
+		public BlockValue GetBlockValue(int x, int y, int z) =>
+			GetPlacedBlock(x, y, z, out _).Value;
 
 		public BlockType GetBlock(Vector3 position) =>
 			GetBlock(

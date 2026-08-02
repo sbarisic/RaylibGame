@@ -43,6 +43,9 @@ public enum StructureMarkerKind : byte
 	ConduitConnector,
 	ShaftConnector,
 	Effect,
+	Bed,
+	ItemBasket,
+	Plant,
 }
 
 public enum StructureConnectorKind : byte
@@ -277,7 +280,28 @@ internal static class StructureBlueprintLoader
 			string data = item.TryGetProperty("data", out JsonElement dataElement) ? dataElement.GetRawText() : string.Empty;
 			result.Add(new StructureMarker(id, kind, position, expected, data));
 		}
-		return result.OrderBy(static marker => marker.Id, StringComparer.Ordinal).ToArray();
+		StructureMarker[] markers=result.OrderBy(static marker => marker.Id,StringComparer.Ordinal).ToArray();
+		ValidatePhaseOneMarkers(markers,size,cells,palette,path);return markers;
+	}
+
+	private static void ValidatePhaseOneMarkers(StructureMarker[] markers,BlockCoordinate size,char[] cells,Dictionary<char,BlockType> palette,string path)
+	{
+		HashSet<BlockCoordinate> occupied=new();Dictionary<string,int> npcTags=new(StringComparer.Ordinal);
+		foreach(StructureMarker npc in markers.Where(static marker=>marker.Kind==StructureMarkerKind.NpcSpawn))if(!string.IsNullOrWhiteSpace(npc.Data)){try{using JsonDocument doc=JsonDocument.Parse(npc.Data);if(doc.RootElement.TryGetProperty("tag",out JsonElement tag)){string value=tag.GetString();if(string.IsNullOrWhiteSpace(value))throw Invalid(path,$"NPC marker '{npc.Id}' tag is invalid");npcTags[value]=npcTags.GetValueOrDefault(value)+1;}}catch(JsonException exception){throw Invalid(path,$"NPC marker '{npc.Id}' data is invalid: {exception.Message}");}}
+		foreach(StructureMarker marker in markers)
+		{
+			try
+			{
+				if(marker.Kind==StructureMarkerKind.ItemBasket){BasketMarkerData basket=PhaseOneMarkerSchemas.ParseBasket(marker.Data);RequireEmpty(marker.Position,marker.Id);RequireSupport(marker.Position-new BlockCoordinate(0,1,0),marker.Id);Add(marker.Position,marker.Id);}
+				else if(marker.Kind==StructureMarkerKind.Bed){BedMarkerData bed=PhaseOneMarkerSchemas.ParseBed(marker.Data);BlockCoordinate head=marker.Position+VEntBed.FacingOffset(bed.Facing);RequireEmpty(marker.Position,marker.Id);RequireEmpty(head,marker.Id);RequireSupport(marker.Position-new BlockCoordinate(0,1,0),marker.Id);RequireSupport(head-new BlockCoordinate(0,1,0),marker.Id);Add(marker.Position,marker.Id);Add(head,marker.Id);if(bed.NpcAssignmentTag!=null&&npcTags.GetValueOrDefault(bed.NpcAssignmentTag)!=1)throw new InvalidDataException($"bed assignment tag '{bed.NpcAssignmentTag}' does not resolve uniquely");}
+				else if(marker.Kind==StructureMarkerKind.Plant){PlantMarkerData plant=PhaseOneMarkerSchemas.ParsePlant(marker.Data);if(marker.Position!=plant.Support+new BlockCoordinate(0,1,0))throw new InvalidDataException("plant position must be directly above explicit support");RequireEmpty(marker.Position,marker.Id);if(!Inside(plant.Support,size)||!TryCell(plant.Support,out BlockType support)||support is not(BlockType.DryFarmland or BlockType.WetFarmland))throw new InvalidDataException("plant support must be authored farmland");Add(marker.Position,marker.Id);}
+			}
+			catch(InvalidDataException exception){throw Invalid(path,$"marker '{marker.Id}' is invalid: {exception.Message}");}
+		}
+		void Add(BlockCoordinate cell,string id){if(!occupied.Add(cell))throw new InvalidDataException($"marker '{id}' overlaps another object");}
+		void RequireEmpty(BlockCoordinate cell,string id){if(!Inside(cell,size)||TryCell(cell,out _))throw new InvalidDataException($"marker '{id}' cell is not empty");}
+		void RequireSupport(BlockCoordinate cell,string id){if(!Inside(cell,size)||!TryCell(cell,out BlockType block)||!BlockInfo.IsSolid(block))throw new InvalidDataException($"marker '{id}' has no authored support");}
+		bool TryCell(BlockCoordinate cell,out BlockType block){char symbol=cells[(cell.Y*size.Z+cell.Z)*size.X+cell.X];return palette.TryGetValue(symbol,out block);}
 	}
 
 	private static StructureConnector[] ReadConnectors(

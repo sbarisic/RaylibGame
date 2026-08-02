@@ -45,6 +45,7 @@ public partial class MPClientGameState
 	private void BeginWorldStream(WorldStreamBeginPacket packet)
 	{
 		CancelWorldLoad();
+		_objectAssemblies.Clear();
 		DisposeFishGfxVoxelScene();
 		_simulation?.LocalPlayer?.Dispose();
 
@@ -129,6 +130,7 @@ public partial class MPClientGameState
 	private void CancelWorldLoad()
 	{
 		_worldStream?.Cancel();
+		_objectAssemblies.Clear();
 	}
 
 	private void OnPreparedRenderColumnApplied(int x, int z, long revision)

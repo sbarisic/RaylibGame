@@ -1,4 +1,5 @@
 using System.Numerics;
+using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server;
 
@@ -140,6 +141,11 @@ public partial class ServerLoop
 		{
 			return (false, ItemUseRejectionReason.ItemMismatch);
 		}
+		byte authoritativeState = BlockShapeCatalog.IsStair(placedBlock)
+			? BlockShapeCatalog.GetNormalStairState(command.InteractionDirection)
+			: (byte)0;
+		if (packet.BlockState != authoritativeState)
+			return (false, ItemUseRejectionReason.InvalidTarget);
 
 		if (!_simulation.Map.TryRaycast(command.InteractionOrigin, command.InteractionDirection, 20, out VoxelRaycastHit hit))
 			return (false, ItemUseRejectionReason.InvalidTarget);
@@ -151,15 +157,16 @@ public partial class ServerLoop
 			return (false, ItemUseRejectionReason.InvalidTarget);
 		if (_simulation.Map.GetBlock(targetX, targetY, targetZ) != BlockType.None)
 			return (false, ItemUseRejectionReason.WorldConflict);
-		AABB targetBounds = new(
-			new Vector3(targetX, targetY, targetZ),
-			Vector3.One);
-		if (_sessions.Values.Any(candidate =>
-				candidate.IsGameplayActive &&
-				candidate.Player.BBox.Overlaps(targetBounds)) ||
-			_simulation.Entities.GetAllEntities().Any(entity =>
-				entity.PhysicsProperties.BlocksPlayers &&
-				entity.WorldBounds.Overlaps(targetBounds)))
+		BlockValue placedValue = new(placedBlock, authoritativeState);
+		Vector3 targetOffset = new(targetX, targetY, targetZ);
+		if (BlockShapeCatalog.GetCollisionBoxes(placedValue).Any(localBounds =>
+		{
+			AABB targetBounds = localBounds.Offset(targetOffset);
+			return _sessions.Values.Any(candidate =>
+				candidate.IsGameplayActive && candidate.Player.BBox.Overlaps(targetBounds)) ||
+				_simulation.Entities.GetAllEntities().Any(entity =>
+					entity.PhysicsProperties.BlocksPlayers && entity.WorldBounds.Overlaps(targetBounds));
+		}))
 		{
 			return (false, ItemUseRejectionReason.CollisionBlocked);
 		}
@@ -171,7 +178,7 @@ public partial class ServerLoop
 		if (!consumption.IsValid)
 			return (false, ItemUseRejectionReason.ItemMismatch);
 
-		_simulation.Map.SetBlock(targetX, targetY, targetZ, placedBlock);
+		_simulation.Map.SetBlock(targetX, targetY, targetZ, placedValue);
 		if (!session.Inventory.ApplyPreparedConsumption(consumption))
 			throw new InvalidOperationException("Prepared inventory consumption changed during serialized item use.");
 

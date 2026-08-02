@@ -8,6 +8,10 @@ public static class ItemIds
 {
 	public static readonly ItemId Gun = new(1000);
 	public static readonly ItemId Hammer = new(1001);
+	public static readonly ItemId Bed = new(1002);
+	public static readonly ItemId ItemBasket = new(1003);
+	public static readonly ItemId WheatSeeds = new(1004);
+	public static readonly ItemId Wheat = new(1005);
 
 	public static ItemId FromBlock(BlockType block)
 	{
@@ -52,6 +56,10 @@ public static class ItemCatalog
 
 		AddItem(items, new ItemDefinition(ItemIds.Gun, "Gun", 1, null, ToolCapabilities.FireWeapon));
 		AddItem(items, new ItemDefinition(ItemIds.Hammer, "Hammer", 1, null, ToolCapabilities.BreakBlocks));
+		AddItem(items, new ItemDefinition(ItemIds.Bed, "Bed", 1, null, ToolCapabilities.None));
+		AddItem(items, new ItemDefinition(ItemIds.ItemBasket, "Item Basket", 1, null, ToolCapabilities.None));
+		AddItem(items, new ItemDefinition(ItemIds.WheatSeeds, "Wheat Seeds", 64, null, ToolCapabilities.None));
+		AddItem(items, new ItemDefinition(ItemIds.Wheat, "Wheat", 64, null, ToolCapabilities.None));
 
 		Validate(items, blocks);
 		Items = items;

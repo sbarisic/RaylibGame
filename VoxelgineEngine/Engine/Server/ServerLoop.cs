@@ -66,6 +66,7 @@ namespace Voxelgine.Engine.Server
 
 		private readonly NetServer _server;
 		private readonly WorldStreamManager _worldStream;
+		private readonly WorldObjectStreamManager _worldObjectStream;
 		private readonly IFishLogging _logging;
 		private readonly IFishEngineRunner _eng;
 		private readonly LerpManager _lerpManager;
@@ -74,6 +75,10 @@ namespace Voxelgine.Engine.Server
 		private WorldArchivePayloadCache _archivePayloadCache;
 		private InfrastructureMachineService _infrastructure;
 		private HabitatProgressionService _progression;
+		private FarmingService _farming;
+		private NpcLifeService _npcLife;
+		private NpcLifeRecord[] _loadedNpcLife = Array.Empty<NpcLifeRecord>();
+		private readonly InventoryTransactionService _inventoryTransactions = new();
 		private PersistedMachineIntent[] _loadedMachineIntents = Array.Empty<PersistedMachineIntent>();
 		private HabitatMilestone _loadedMilestone;
 
@@ -173,7 +178,9 @@ namespace Voxelgine.Engine.Server
 #endif
 			_simulation = new GameSimulation(_eng);
 			_simulation.Entities.PlayerTouchedEntity += OnPlayerTouchedEntity;
+			_simulation.Map.BlockChanged += OnFurnitureSupportChanged;
 			_worldStream = new WorldStreamManager(_server, _simulation.Map, _logging);
+			_worldObjectStream = new WorldObjectStreamManager(_server, _worldStream, _simulation.WorldObjects, _logging, () => CurrentTime);
 
 			_server.OnClientConnected += OnClientConnected;
 			_server.OnClientDisconnected += OnClientDisconnected;
@@ -221,6 +228,9 @@ namespace Voxelgine.Engine.Server
 						using (FileStream archiveStream = File.OpenRead(_mapFile))
 							archive = WorldArchive.Read(archiveStream, cancellationToken);
 						_simulation.Map.ReplaceAllColumns(archive.Columns);
+						_simulation.WorldObjects.Restore(archive.WorldObjects);
+						_simulation.Furniture.Restore(archive.Furniture);
+						_simulation.Tombstones.Restore(archive.Tombstones);
 						_simulation.Map.RestoreGeneratedFeatures(archive.Metadata.GeneratedFeatures);
 						_archivePayloadCache = archive.PayloadCache;
 						_worldStream.SetArchivePayloadCache(_archivePayloadCache);
@@ -230,6 +240,9 @@ namespace Voxelgine.Engine.Server
 						_npcSpawnPos = archive.Metadata.NpcSpawn;
 						_loadedMachineIntents = archive.Metadata.MachineIntents ?? Array.Empty<PersistedMachineIntent>();
 						_loadedMilestone = archive.Metadata.Milestone;
+						_loadedNpcLife = archive.NpcLife.ToArray();
+						foreach(NpcLifeRecord life in _loadedNpcLife)if(life.NpcId.Kind==StableNpcIdKind.Persistent)_simulation.PersistentEntityIds.Observe(life.NpcId.PersistentEntityId);
+						_simulation.DayNight.RestoreAbsoluteGameTime(archive.Metadata.AbsoluteGameHours);
 						generated = false;
 						_logging.Log(
 							GameLogLevel.Info,
@@ -277,10 +290,19 @@ namespace Voxelgine.Engine.Server
 				_infrastructure.RestoreRequestedStates(_loadedMachineIntents.Select(static intent => (intent.Key, intent.RequestedEnabled)));
 				_progression.RestoreMilestone(_loadedMilestone);
 				_logging.Log(GameLogLevel.Info, "Progression", $"restore milestone={_progression.Milestone} durationMs={progressionTimer.Elapsed.TotalMilliseconds:F1}");
+				_farming = new FarmingService(_simulation.Map, _simulation.WorldObjects);
+				_farming.RebuildIndex();
+				_farming.PlantLostSupport += OnPlantLostSupport;
+				RestoreGeneratedPhaseOneMarkers();
+				_npcLife = new NpcLifeService(_simulation.Furniture, () => _simulation.Entities.GetAllEntities().OfType<VEntBed>(), _simulation.DayNight.AbsoluteGameHours);
+				_npcLife.Restore(_loadedNpcLife, _simulation.DayNight.AbsoluteGameHours);
 
 				// Spawn server-side entities
 				Stopwatch entityTimer = Stopwatch.StartNew();
 				SpawnEntities();
+				ApplyGeneratedBedAssignments();
+				foreach ((StableNpcId npcId, PersistentFurnitureKey missingBed) in _npcLife.RepairAssignments())
+					_logging.Log(GameLogLevel.Warning,"NpcLife",$"cleared missing bed assignment npc={npcId} bed={missingBed}");
 				_logging.Log(GameLogLevel.Info, "Entities", $"initial-spawn durationMs={entityTimer.Elapsed.TotalMilliseconds:F1}");
 
 				cancellationToken.ThrowIfCancellationRequested();
@@ -384,6 +406,7 @@ namespace Voxelgine.Engine.Server
 
 			// 6. Update day/night cycle
 			_simulation.DayNight.Update(dt);
+			_npcLife?.Update(_simulation.DayNight.AbsoluteGameHours,_simulation.DayNight.TimeOfDay,totalTime);
 
 			// 7. Broadcast time sync periodically
 			BroadcastTimeSync(totalTime);
@@ -398,6 +421,7 @@ namespace Voxelgine.Engine.Server
 			ProcessItemDrops();
 			_infrastructure?.Update(maximumNetworks: 4);
 			_progression?.Update(_server.ServerTick);
+			_farming?.Update(dt);
 
 			// 10. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
@@ -512,8 +536,13 @@ namespace Voxelgine.Engine.Server
 							_infrastructure?.CaptureRequestedStates()
 								.Select(static state => new PersistedMachineIntent(state.Key, state.RequestedEnabled))
 								.ToArray() ?? Array.Empty<PersistedMachineIntent>(),
-							_progression?.Milestone ?? HabitatMilestone.None),
-						_archivePayloadCache);
+							_progression?.Milestone ?? HabitatMilestone.None,
+							_simulation.DayNight.AbsoluteGameHours),
+						_archivePayloadCache,
+						worldObjects: _simulation.WorldObjects.GetAll(),
+						furniture: _simulation.Entities.GetAllEntities().Where(static entity=>entity is VEntItemBasket or VEntBed).Select(static entity=>entity is VEntItemBasket basket?basket.CaptureRecord():((VEntBed)entity).CaptureRecord()).ToArray(),
+						npcLife: _npcLife?.Capture(),
+						tombstones: _simulation.Tombstones.GetAll());
 					fileStream.Flush(flushToDisk: true);
 				}
 				File.Move(temporaryPath, _mapFile, overwrite: true);
@@ -584,11 +613,14 @@ namespace Voxelgine.Engine.Server
 				return;
 
 			_disposed = true;
+			if (_farming != null) _farming.PlantLostSupport -= OnPlantLostSupport;
+			_farming?.Dispose();
 			_progression?.Dispose();
 			if (_infrastructure != null)
 				_infrastructure.StateChanged -= BroadcastInfrastructureState;
 			_infrastructure?.Dispose();
 			Stop();
+			_worldObjectStream.Dispose();
 			_server.Dispose();
 			(_logging as IDisposable)?.Dispose();
 			_stopSource.Dispose();

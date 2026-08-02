@@ -75,6 +75,38 @@ public sealed class ChunkMapObservationTests
 		Assert.Equal(BlockType.None, map.GetBlock(-1, -16, -17));
 	}
 
+	[Theory]
+	[InlineData(4)]
+	[InlineData(15)]
+	public void RemovingSupportRemovesFoliageAboveAndEmitsOrderedChanges(int supportY)
+	{
+		ChunkMap map = new();
+		map.SetBlock(3, supportY, 5, BlockType.Dirt);
+		map.SetBlock(3, supportY + 1, 5, BlockType.Foliage);
+		map.ClearPendingChanges();
+
+		map.SetBlock(3, supportY, 5, BlockType.None);
+
+		Assert.Equal(BlockType.None, map.GetBlock(3, supportY, 5));
+		Assert.Equal(BlockType.None, map.GetBlock(3, supportY + 1, 5));
+		Assert.Collection(
+			map.GetPendingChanges(),
+			change => AssertChange(change, 3, supportY, 5, BlockType.Dirt, BlockType.None),
+			change => AssertChange(change, 3, supportY + 1, 5, BlockType.Foliage, BlockType.None));
+	}
+
+	[Fact]
+	public void RemovingSupportDoesNotRemoveTerrainBlockAbove()
+	{
+		ChunkMap map = new();
+		map.SetBlock(3, 4, 5, BlockType.Dirt);
+		map.SetBlock(3, 5, 5, BlockType.Grass);
+
+		map.SetBlock(3, 4, 5, BlockType.None);
+
+		Assert.Equal(BlockType.Grass, map.GetBlock(3, 5, 5));
+	}
+
 	[Fact]
 	public void FogSpatialCaptureCopiesOnlyIntersectingNonEmptyChunks()
 	{

@@ -9,7 +9,7 @@ public sealed class BlockTypeContractTests
 	public void PersistedBlockIdsRemainStable()
 	{
 		BlockType[] values = Enum.GetValues<BlockType>();
-		Assert.Equal(23, values.Length);
+		Assert.Equal(33, values.Length);
 		for (int index = 0; index < values.Length; index++)
 			Assert.Equal(index, (int)values[index]);
 	}

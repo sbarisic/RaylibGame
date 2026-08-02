@@ -87,6 +87,12 @@ public partial class ServerLoop
 				continue;
 
 			SendInventoryState(target, 0, true);
+			_server.Broadcast(new SoundEventPacket
+			{
+				EventType = (byte)SoundEventType.ItemPickup,
+				Position = drop.Position + Vector3.UnitY * (drop.Size.Y * 0.5f),
+				SourcePlayerId = target.Player.PlayerId,
+			}, false, CurrentTime);
 			if (insertion.Remainder.IsEmpty)
 				RemoveDrop(drop);
 			else
@@ -102,20 +108,26 @@ public partial class ServerLoop
 
 	private ServerClientSession FindDropPickupPlayer(VEntItemDrop drop)
 	{
-		float maximumDistanceSquared = DropPickupRadius * DropPickupRadius;
 		return _sessions.Values
 			.Where(session => session.IsGameplayActive &&
 				(!drop.IsProtected || drop.ProtectedOwnerSessionValue == session.SessionId.Value))
 			.Select(session => new
 			{
 				Session = session,
-				DistanceSquared = Vector3.DistanceSquared(session.Player.Position, drop.Position),
+				DistanceSquared = GetDropPickupDistanceSquared(session.Player, drop),
 			})
-			.Where(candidate => candidate.DistanceSquared <= maximumDistanceSquared)
+			.Where(candidate => candidate.DistanceSquared <= DropPickupRadius * DropPickupRadius)
 			.OrderBy(candidate => candidate.DistanceSquared)
 			.ThenBy(candidate => candidate.Session.Player.PlayerId)
 			.Select(candidate => candidate.Session)
 			.FirstOrDefault();
+	}
+
+	internal static float GetDropPickupDistanceSquared(Player player, VEntItemDrop drop)
+	{
+		ArgumentNullException.ThrowIfNull(player);
+		ArgumentNullException.ThrowIfNull(drop);
+		return Vector3.DistanceSquared(player.FeetPosition, drop.Position);
 	}
 
 	private void MergeItemDrops()

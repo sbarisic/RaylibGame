@@ -57,7 +57,9 @@ public sealed class WorldArchiveTests
 		archive.Position = 0;
 		ChunkColumnSnapshot random = WorldArchive.ReadColumn(archive, 2, 3);
 
-		Assert.Equal(metadata, all.Metadata);
+		Assert.Equal(metadata.WorldSeed, all.Metadata.WorldSeed);
+		Assert.Equal(metadata.PlayerSpawn, all.Metadata.PlayerSpawn);
+		Assert.Empty(all.Metadata.GeneratedFeatures.Sites);
 		Assert.Equal(2, all.Columns.Count);
 		Assert.Equal(BlockType.Water, random.Chunks[0].Blocks[0]);
 	}

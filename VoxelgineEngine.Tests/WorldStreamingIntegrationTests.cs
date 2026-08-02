@@ -10,6 +10,52 @@ namespace VoxelgineEngine.Tests;
 public sealed class WorldStreamingIntegrationTests
 {
 	[Fact]
+	public void NewInterestReplacesStaleOrdinaryQueueAndPrioritizesNewFocus()
+	{
+		ChunkMap map = new();
+		for (int x = 0; x <= 31; x++)
+		{
+			map.ApplyColumn(new ChunkColumnSnapshot(
+				x,
+				0,
+				1,
+				new[] { CreateSolidChunk(x, 0) }));
+		}
+
+		using NetServer server = new();
+		WorldStreamManager stream = new(server, map, null);
+		const int playerId = 7;
+		stream.Begin(playerId, new Vector3(8, 24, 8), 1234, 0);
+		int streamId = stream.GetStreamId(playerId);
+
+		stream.HandleInterest(playerId, new ChunkInterestPacket
+		{
+			StreamId = streamId,
+			CenterX = 128,
+			CenterZ = 8,
+			RadiusBlocks = 80,
+		});
+		ChunkColumnCoordinate[] first = stream.GetQueuedOrdinaryColumns(playerId);
+		Assert.NotEmpty(first);
+
+		stream.HandleInterest(playerId, new ChunkInterestPacket
+		{
+			StreamId = streamId,
+			CenterX = 384,
+			CenterZ = 8,
+			RadiusBlocks = 80,
+		});
+		ChunkColumnCoordinate[] reprioritized = stream.GetQueuedOrdinaryColumns(playerId);
+
+		Assert.NotEmpty(reprioritized);
+		Assert.DoesNotContain(reprioritized, first.Contains);
+		float[] distances = reprioritized
+			.Select(coordinate => ColumnDistanceSquared(coordinate.X, coordinate.Z, new Vector3(384, 24, 8)))
+			.ToArray();
+		Assert.Equal(distances.OrderBy(static distance => distance), distances);
+	}
+
+	[Fact]
 	public void LossFreeLoopback_StreamsBootstrapWithinBoundedWindowsAndSettlesReliability()
 	{
 		ChunkMap map = CreateWorld();
@@ -204,6 +250,12 @@ public sealed class WorldStreamingIntegrationTests
 			}
 		}
 		return map;
+	}
+
+	private static ChunkSnapshot CreateSolidChunk(int x, int z)
+	{
+		BlockType[] blocks = Enumerable.Repeat(BlockType.Stone, ChunkSnapshot.BlockCount).ToArray();
+		return new ChunkSnapshot(x, 0, z, blocks);
 	}
 
 	private static int ReserveUdpPort()

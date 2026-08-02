@@ -52,6 +52,25 @@ public sealed class DeferredColumnAcknowledgementTests
 		Assert.False(acknowledgements.TryDequeueReady(out _));
 	}
 
+	[Fact]
+	public void ExplicitColumnResyncAcceptsAnAlreadyAcknowledgedRevisionAgain()
+	{
+		DeferredColumnAcknowledgements acknowledgements = new();
+		WorldColumnPacket original = CreatePacket(3, 41, 27, 1);
+		Assert.True(acknowledgements.RegisterReceived(original));
+		Assert.True(acknowledgements.MarkReady(3, 41, 27, 1));
+		Assert.True(acknowledgements.TryDequeueReady(out _));
+
+		Assert.Equal(1, acknowledgements.ForgetColumn(3, 41, 27));
+		WorldColumnPacket resync = CreatePacket(3, 41, 27, 1);
+
+		Assert.True(acknowledgements.RegisterReceived(resync));
+		Assert.False(acknowledgements.TryDequeueReady(out _));
+		Assert.True(acknowledgements.MarkReady(3, 41, 27, 1));
+		Assert.True(acknowledgements.TryDequeueReady(out WorldColumnPacket reapplied));
+		Assert.Same(resync, reapplied);
+	}
+
 	private static WorldColumnPacket CreatePacket(
 		int streamId,
 		int x,

@@ -31,6 +31,16 @@ public enum BlockType : ushort
 	Torch = 20,
 	Foliage = 21,
 	Gravel = 22,
+	SteelFrame = 23,
+	MachineCasing = 24,
+	PowerCell = 25,
+	PowerConduit = 26,
+	ControlTerminal = 27,
+	LogicCore = 28,
+	RelayEmitter = 29,
+	GravityCoil = 30,
+	LinearActuator = 31,
+	FabricatorCore = 32,
 }
 
 /// <summary>Stable inventory icon identifiers.</summary>

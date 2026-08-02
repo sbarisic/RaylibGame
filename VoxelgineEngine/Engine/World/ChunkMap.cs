@@ -1,5 +1,6 @@
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Graphics
 {
@@ -15,6 +16,8 @@ namespace Voxelgine.Graphics
 		private readonly Dictionary<ChunkColumnCoordinate, long> _columnRevisions = new();
 		private readonly Dictionary<ChunkColumnCoordinate, List<Vector3>> _columnChunks = new();
 		private readonly HashSet<Vector3> _fogChunks = new();
+		private readonly Dictionary<BlockCoordinate, BlockType> _infrastructureBlocks = new();
+		private readonly Dictionary<ChunkColumnCoordinate, HashSet<BlockCoordinate>> _columnInfrastructure = new();
 		private int _nonEmptyFogVoxelCount;
 		private int _bulkWorldMutationDepth;
 
@@ -26,6 +29,7 @@ namespace Voxelgine.Graphics
 		public event Action<BlockChange> BlockChanged;
 		public event Action<FogChange> FogChanged;
 		public event Action<ChunkColumnSnapshot> ColumnLoaded;
+		public event Action<ChunkColumnCoordinate> ColumnReplacing;
 		public event Action<ChunkColumnCoordinate> ColumnCommitted;
 		public event Action WorldReset;
 		public event Action<ChunkMap, int, int, int, BlockType> OnBlockPlaced;
@@ -52,6 +56,55 @@ namespace Voxelgine.Graphics
 		public int ColumnCount => _columnRevisions.Count;
 
 		public int NonEmptyFogVoxelCount => _nonEmptyFogVoxelCount;
+
+		public WorldFeaturePlan GeneratedFeatures { get; private set; } = WorldFeaturePlan.Empty;
+
+		public IReadOnlyList<StructurePlanningDiagnostic> GenerationDiagnostics { get; private set; } =
+			Array.Empty<StructurePlanningDiagnostic>();
+
+		public StructureGenerationTimings StructureGenerationTimings { get; private set; }
+
+		internal void PublishGeneratedFeatures(WorldFeatureGenerationResult result)
+		{
+			GeneratedFeatures = result?.Plan ?? WorldFeaturePlan.Empty;
+			GenerationDiagnostics = result?.Diagnostics ?? Array.Empty<StructurePlanningDiagnostic>();
+		}
+
+		internal void PublishStructureGenerationTimings(StructureGenerationTimings timings) =>
+			StructureGenerationTimings = timings;
+
+		public IReadOnlyList<KeyValuePair<BlockCoordinate, BlockType>> GetInfrastructureBlocks() =>
+			_infrastructureBlocks.OrderBy(static entry => entry.Key).ToArray();
+
+		public int InfrastructureBlockCount => _infrastructureBlocks.Count;
+
+		internal void TrackInfrastructureBlock(BlockCoordinate coordinate, BlockType block)
+		{
+			if (!InfrastructureBlockCatalog.TryGet(block, out _))
+			{
+				if (_infrastructureBlocks.Remove(coordinate))
+				{
+					ChunkColumnCoordinate oldColumn = new(Utils.FloorDiv(coordinate.X, Chunk.ChunkSize), Utils.FloorDiv(coordinate.Z, Chunk.ChunkSize));
+					if (_columnInfrastructure.TryGetValue(oldColumn, out HashSet<BlockCoordinate> oldEntries))
+						oldEntries.Remove(coordinate);
+				}
+				return;
+			}
+			_infrastructureBlocks[coordinate] = block;
+			ChunkColumnCoordinate column = new(Utils.FloorDiv(coordinate.X, Chunk.ChunkSize), Utils.FloorDiv(coordinate.Z, Chunk.ChunkSize));
+			if (!_columnInfrastructure.TryGetValue(column, out HashSet<BlockCoordinate> entries))
+			{
+				entries = new HashSet<BlockCoordinate>();
+				_columnInfrastructure.Add(column, entries);
+			}
+			entries.Add(coordinate);
+		}
+
+		public void RestoreGeneratedFeatures(WorldFeaturePlan plan)
+		{
+			GeneratedFeatures = plan ?? WorldFeaturePlan.Empty;
+			GenerationDiagnostics = Array.Empty<StructurePlanningDiagnostic>();
+		}
 
 		public void CaptureFogChunks(
 			in FogChunkBounds bounds,
@@ -358,6 +411,7 @@ namespace Voxelgine.Graphics
 			BlockChange change = default;
 			if (typeChanged)
 			{
+				TrackInfrastructureBlock(new BlockCoordinate(x, y, z), block.Type);
 				long columnRevision = IncrementColumnRevision((int)chunkIndex.X, (int)chunkIndex.Z);
 				change = new BlockChange(x, y, z, oldType, block.Type, columnRevision);
 				if (_bulkWorldMutationDepth == 0)
@@ -376,6 +430,12 @@ namespace Voxelgine.Graphics
 					OnBlockRemoved?.Invoke(this, x, y, z, oldType);
 				if (block.Type != BlockType.None)
 					OnBlockPlaced?.Invoke(this, x, y, z, block.Type);
+			}
+
+			if (typeChanged && oldType != BlockType.None && block.Type == BlockType.None &&
+				y < int.MaxValue && GetBlock(x, y + 1, z) == BlockType.Foliage)
+			{
+				SetBlock(x, y + 1, z, BlockType.None);
 			}
 
 			bool needsLightingUpdate = BlockInfo.EmitsLight(block.Type) ||
@@ -466,6 +526,7 @@ namespace Voxelgine.Graphics
 				return false;
 
 			targetChunk.SetBlock(localX, localY, localZ, new PlacedBlock(type));
+			TrackInfrastructureBlock(new BlockCoordinate(x, y, z), type);
 			targetChunk.MarkDirty();
 			_columnRevisions[column] = expectedColumnRevision;
 			BlockChange change = new(x, y, z, oldType, type, expectedColumnRevision);

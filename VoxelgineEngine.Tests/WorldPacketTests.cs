@@ -105,4 +105,22 @@ public sealed class WorldPacketTests
 			ushort.MaxValue,
 			Assert.IsType<DebugPlaceBlockRequestPacket>(Packet.Deserialize(debugPlacement.Serialize())).BlockType);
 	}
+
+	[Fact]
+	public void ItemPickupSoundPacketRoundTripsPositionAndSource()
+	{
+		SoundEventPacket source = new()
+		{
+			EventType = (byte)SoundEventType.ItemPickup,
+			Position = new Vector3(3.5f, 4.25f, -8.5f),
+			SourcePlayerId = 17,
+		};
+
+		SoundEventPacket decoded = Assert.IsType<SoundEventPacket>(
+			Packet.Deserialize(source.Serialize()));
+
+		Assert.Equal((byte)SoundEventType.ItemPickup, decoded.EventType);
+		Assert.Equal(source.Position, decoded.Position);
+		Assert.Equal(source.SourcePlayerId, decoded.SourcePlayerId);
+	}
 }

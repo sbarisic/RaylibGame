@@ -77,6 +77,16 @@ public sealed class AIRunnerTests
 	}
 
 	[Fact]
+	public void StuckHandlerHasRecoveryCooldown()
+	{
+		AIStep handler = Assert.Single(AIPrograms.FunkyBehavior(), step =>
+			step.Instruction == AIInstruction.EventHandler
+			&& (AIEvent)(int)step.Param == AIEvent.OnStuck);
+
+		Assert.Equal(15f, handler.Param2);
+	}
+
+	[Fact]
 	public void HandlerSpecificCooldownSuppressesEarlyReentry()
 	{
 		TestLogging logging = new();

@@ -53,6 +53,14 @@ public unsafe partial class MPClientGameState
 	private bool _hasPreviousFishCameraState;
 	private bool _rendererProfilingEnabled;
 	private float _nextRendererProfileLogTime;
+	private float _meshSchedulerStallSince;
+	private float _nextMeshSchedulerStallLogTime;
+	private bool _hasReplicatedBlockChange;
+	private int _lastReplicatedBlockX;
+	private int _lastReplicatedBlockY;
+	private int _lastReplicatedBlockZ;
+	private long _lastReplicatedBlockRevision;
+	private float _lastReplicatedBlockChangeTime;
 	private float _nextHitchLogTime;
 	private string _pendingHitchLog;
 	private GameCameraState _profilingPreviousCamera;
@@ -254,6 +262,7 @@ public unsafe partial class MPClientGameState
 		ConfigureVoxelEnvironment(_fishVoxelScene, _simulation.DayNight, player.Position);
 		_fishVoxelScene.Update(_fishWorldCamera);
 		VoxelRendererFrameDiagnostics rendererDiagnostics = _fishVoxelScene.FrameDiagnostics;
+		LogMeshSchedulerStallIfNeeded(timing.TotalTime, rendererDiagnostics);
 		Eng.ChunkDrawCalls = rendererDiagnostics.DriverDrawCalls;
 		UpdateFrameTimeline(timing, rendererDiagnostics);
 
@@ -332,6 +341,105 @@ public unsafe partial class MPClientGameState
 		UpdateRemoteInterpolation(timing.TotalTime, timing.DeltaTime);
 		UpdateEntityInterpolation(timing.TotalTime);
 		UpdateFishGfxEntityAdapters(timing.DeltaTime);
+	}
+
+	private void RecordReplicatedBlockChange(BlockChangePacket change)
+	{
+		_hasReplicatedBlockChange = true;
+		_lastReplicatedBlockX = change.X;
+		_lastReplicatedBlockY = change.Y;
+		_lastReplicatedBlockZ = change.Z;
+		_lastReplicatedBlockRevision = change.ColumnRevision;
+		_lastReplicatedBlockChangeTime = GetClientTime();
+	}
+
+	private void LogMeshSchedulerStallIfNeeded(
+		float currentTime,
+		in VoxelRendererFrameDiagnostics diagnostics)
+	{
+		VoxelRendererWorkload workload = diagnostics.Workload;
+		bool idleWithDirtyWork = workload.DirtyMeshes != 0
+			&& workload.InFlightMeshes == 0
+			&& workload.CompletedMeshes == 0
+			&& workload.PendingUploadJobs == 0
+			&& diagnostics.ScheduledMeshes == 0
+			&& _fishVoxelScene.LightingPendingCount == 0;
+		if (!idleWithDirtyWork)
+		{
+			_meshSchedulerStallSince = 0;
+			return;
+		}
+
+		if (_meshSchedulerStallSince == 0)
+		{
+			_meshSchedulerStallSince = currentTime;
+			return;
+		}
+
+		if (currentTime - _meshSchedulerStallSince < 2
+			|| currentTime < _nextMeshSchedulerStallLogTime)
+		{
+			return;
+		}
+
+		ChunkCoordinate focus = ChunkCoordinate.FromWorld(
+			(int)MathF.Floor(_simulation.LocalPlayer.Position.X),
+			(int)MathF.Floor(_simulation.LocalPlayer.Position.Y),
+			(int)MathF.Floor(_simulation.LocalPlayer.Position.Z),
+			out _, out _, out _);
+		int nearbyMissing = 0;
+		int nearbyWaitingForLighting = 0;
+		int nearbyMeshing = 0;
+		int nearbyResident = 0;
+		int nearbyEmpty = 0;
+		for (int z = focus.Z - 1; z <= focus.Z + 1; z++)
+		for (int x = focus.X - 1; x <= focus.X + 1; x++)
+		for (int y = focus.Y; y >= focus.Y - 3; y--)
+		{
+			if (!_simulation.Map.IsChunkResident(x, y, z))
+				continue;
+			switch (_fishVoxelScene.GetPresentationState(new ChunkCoordinate(x, y, z)))
+			{
+				case VoxelPresentationState.Missing: nearbyMissing++; break;
+				case VoxelPresentationState.WaitingForLighting: nearbyWaitingForLighting++; break;
+				case VoxelPresentationState.Meshing: nearbyMeshing++; break;
+				case VoxelPresentationState.Resident: nearbyResident++; break;
+				case VoxelPresentationState.EmptyComplete: nearbyEmpty++; break;
+			}
+		}
+
+		ChunkCoordinate lastEditChunk = default;
+		VoxelPresentationState lastEditState = VoxelPresentationState.Missing;
+		bool lastEditDomainResident = false;
+		bool lastEditRenderResident = false;
+		if (_hasReplicatedBlockChange)
+		{
+			lastEditChunk = ChunkCoordinate.FromWorld(
+				_lastReplicatedBlockX,
+				_lastReplicatedBlockY,
+				_lastReplicatedBlockZ,
+				out _, out _, out _);
+			lastEditDomainResident = _simulation.Map.IsChunkResident(
+				lastEditChunk.X, lastEditChunk.Y, lastEditChunk.Z);
+			lastEditRenderResident = _fishVoxelScene.World.TryGetChunk(lastEditChunk, out _);
+			lastEditState = _fishVoxelScene.GetPresentationState(lastEditChunk);
+		}
+
+		if (nearbyMeshing == 0 && (!_hasReplicatedBlockChange
+			|| lastEditState is VoxelPresentationState.Resident or VoxelPresentationState.EmptyComplete))
+		{
+			return;
+		}
+
+		_nextMeshSchedulerStallLogTime = currentTime + 2;
+		_logging.Log(
+			GameLogLevel.Warning,
+			"VoxelRenderer",
+			$"mesh-scheduler-stall duration={currentTime - _meshSchedulerStallSince:F2}s dirty={workload.DirtyMeshes} scheduled={diagnostics.ScheduledMeshes} "
+			+ $"focus={focus} nearby=missing:{nearbyMissing},lighting:{nearbyWaitingForLighting},meshing:{nearbyMeshing},resident:{nearbyResident},empty:{nearbyEmpty} "
+			+ $"lastEdit={(_hasReplicatedBlockChange ? $"{_lastReplicatedBlockX},{_lastReplicatedBlockY},{_lastReplicatedBlockZ}" : "none")} "
+			+ $"lastEditChunk={lastEditChunk} revision={_lastReplicatedBlockRevision} age={currentTime - _lastReplicatedBlockChangeTime:F2}s "
+			+ $"lastEditDomain={lastEditDomainResident} lastEditRender={lastEditRenderResident} lastEditState={lastEditState}");
 	}
 
 	private readonly record struct ActorLightCache(

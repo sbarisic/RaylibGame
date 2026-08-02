@@ -132,6 +132,10 @@ namespace Voxelgine.States
 					HandleItemUseResult(itemUseResult);
 					break;
 
+				case InfrastructureStatePacket infrastructureState:
+					HandleInfrastructureState(infrastructureState);
+					break;
+
 				case SoundEventPacket soundEvent:
 					HandleSoundEvent(soundEvent);
 					break;
@@ -253,17 +257,15 @@ namespace Voxelgine.States
 			{
 				int columnX = (int)Math.Floor((double)blockChange.X / Chunk.ChunkSize);
 				int columnZ = (int)Math.Floor((double)blockChange.Z / Chunk.ChunkSize);
-				_logging.Log(
-					GameLogLevel.Warning,
-					"WorldStream",
-					$"revision-gap column={columnX},{columnZ} expected={blockChange.ColumnRevision} local={_simulation.Map.GetColumnRevision(columnX, columnZ)}");
-				_client.Send(new WorldColumnResyncRequestPacket
-				{
-					StreamId = WorldStreamId,
-					X = columnX,
-					Z = columnZ,
-					Revision = _simulation.Map.GetColumnRevision(columnX, columnZ),
-				}, true, GetClientTime());
+				_worldStream?.RequestFreshColumn(
+					columnX,
+					columnZ,
+					_simulation.Map.GetColumnRevision(columnX, columnZ),
+					$"block-revision-gap-expected-{blockChange.ColumnRevision}");
+			}
+			else
+			{
+				RecordReplicatedBlockChange(blockChange);
 			}
 		}
 
@@ -314,18 +316,11 @@ namespace Voxelgine.States
 			int columnX = (int)Math.Floor((double)worldX / Chunk.ChunkSize);
 			int columnZ = (int)Math.Floor((double)worldZ / Chunk.ChunkSize);
 			long localRevision = _simulation.Map.GetColumnRevision(columnX, columnZ);
-			_logging.Log(
-				GameLogLevel.Warning,
-				"WorldStream",
-				$"revision-gap column={columnX},{columnZ} expected={expectedRevision} local={localRevision}"
-			);
-			_client.Send(new WorldColumnResyncRequestPacket
-			{
-				StreamId = WorldStreamId,
-				X = columnX,
-				Z = columnZ,
-				Revision = localRevision,
-			}, true, GetClientTime());
+			_worldStream?.RequestFreshColumn(
+				columnX,
+				columnZ,
+				localRevision,
+				$"revision-gap-expected-{expectedRevision}");
 		}
 
 		/// <summary>
@@ -662,10 +657,6 @@ namespace Voxelgine.States
 			if (_simulation == null || _snd == null)
 				return;
 
-			// Local player already played the sound on their end
-			if (packet.SourcePlayerId == _client.PlayerId)
-				return;
-
 			switch ((SoundEventType)packet.EventType)
 			{
 				case SoundEventType.BlockBreak:
@@ -680,6 +671,15 @@ namespace Voxelgine.States
 				case SoundEventType.BlockPlace:
 					_snd.Emit(new GameAudioEvent(
 						"block_place",
+						packet.Position,
+						Vector3.Zero,
+						packet.SourcePlayerId
+					));
+					break;
+
+				case SoundEventType.ItemPickup:
+					_snd.Emit(new GameAudioEvent(
+						"item_pickup",
 						packet.Position,
 						Vector3.Zero,
 						packet.SourcePlayerId

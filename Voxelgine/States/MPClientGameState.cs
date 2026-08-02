@@ -373,9 +373,16 @@ namespace Voxelgine.States
 				_simulation.Map.ClearPendingChanges();
 
 				_simulation.Map.Tick();
-				(_simulation.LocalPlayer as ClientPlayer)?.Tick(Window.InMgr);
-				(_simulation.LocalPlayer as ClientPlayer)?.TickGUI(Window.InMgr, _simulation.Map);
-				(_simulation.LocalPlayer as ClientPlayer)?.UpdateGUI();
+				ClientPlayer localPlayer = _simulation.LocalPlayer as ClientPlayer;
+				localPlayer?.Tick(Window.InMgr);
+				localPlayer?.TickGUI(Window.InMgr, _simulation.Map);
+				if (localPlayer != null)
+				{
+					_inventoryModel?.ApplySelection(
+						checked((byte)localPlayer.GetSelectedInventoryIndex()),
+						_client.LocalTick + 1);
+				}
+				localPlayer?.UpdateGUI();
 
 			}
 			catch (Exception ex)
@@ -626,6 +633,7 @@ namespace Voxelgine.States
 			_pendingWorldPackets.Clear();
 			_replayingPendingWorldPackets = false;
 			_entitySnapshots.Clear();
+			ClearInfrastructureStates();
 			_chatHistory.Clear();
 			_predictionReconciler.Reset();
 			_neutralInputSource.SetState(default);

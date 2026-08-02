@@ -37,6 +37,10 @@ public sealed class WorldStreamManager
 	public int StreamStallCount { get; private set; }
 	public int GetOutstandingColumnCount(int playerId) =>
 		streams.TryGetValue(playerId, out ClientStream stream) ? stream.Outstanding.Count : 0;
+	internal ChunkColumnCoordinate[] GetQueuedOrdinaryColumns(int playerId) =>
+		streams.TryGetValue(playerId, out ClientStream stream)
+			? stream.Ordinary.Select(static item => item.Coordinate).ToArray()
+			: Array.Empty<ChunkColumnCoordinate>();
 
 	public void SetArchivePayloadCache(WorldArchivePayloadCache payloadCache)
 	{
@@ -221,11 +225,10 @@ public sealed class WorldStreamManager
 		HashSet<ChunkColumnCoordinate> alreadyQueued = stream.Applied.Keys
 			.Concat(stream.Outstanding.Keys)
 			.Concat(stream.Bootstrap.Select(static item => item.Coordinate))
-			.Concat(stream.Ordinary.Select(static item => item.Coordinate))
 			.ToHashSet();
 
-		foreach (ColumnWork work in SelectColumns(focus, radius, WorldColumnStreamKind.Ordinary, alreadyQueued))
-			stream.Ordinary.Enqueue(work);
+		stream.Ordinary = new Queue<ColumnWork>(
+			SelectColumns(focus, radius, WorldColumnStreamKind.Ordinary, alreadyQueued));
 	}
 
 	public bool HandleReady(int playerId, ClientWorldReadyPacket packet)

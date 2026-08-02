@@ -8,6 +8,8 @@ namespace Voxelgine.Engine
 {
 	public partial class VEntNPC
 	{
+		private bool _stuckEventRaised;
+
 		public void InitPathfinding(ChunkMap map)
 		{
 			_map = map;
@@ -38,6 +40,7 @@ namespace Voxelgine.Engine
 			_isUnstuckWandering = false;
 			_hasOriginalTarget = false;
 			_triedJumpingToUnstuck = false;
+			_stuckEventRaised = false;
 
 			return _pathFollower.SetTarget(Position, target);
 		}
@@ -50,6 +53,7 @@ namespace Voxelgine.Engine
 			_pathFollower?.ClearPath();
 			_isUnstuckWandering = false;
 			_hasOriginalTarget = false;
+			_stuckEventRaised = false;
 		}
 
 		/// <summary>
@@ -113,6 +117,7 @@ namespace Voxelgine.Engine
 					else
 					{
 						// Making progress
+						_stuckEventRaised = false;
 						if (_isUnstuckWandering)
 						{
 							// Successfully unstuck - return to original target
@@ -245,7 +250,11 @@ namespace Voxelgine.Engine
 		/// </summary>
 		private void HandleStuckRecovery(bool isGrounded)
 		{
-			_aiRunner?.RaiseEvent(AIEvent.OnStuck, NetworkId);
+			if (!_stuckEventRaised)
+			{
+				_stuckEventRaised = true;
+				_aiRunner?.RaiseEvent(AIEvent.OnStuck, NetworkId);
+			}
 
 			// First, try recalculating the path from current (possibly pushed-out) position
 			if (!_triedJumpingToUnstuck && _pathFollower.HasTarget)

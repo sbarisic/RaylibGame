@@ -6,6 +6,7 @@ public enum SoundEventType : byte
 {
 	BlockBreak,
 	BlockPlace,
+	ItemPickup,
 }
 public sealed class SoundEventPacket : Packet
 {

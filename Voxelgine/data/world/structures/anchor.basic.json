@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "markerDataVersion": 1,
+  "id": "anchor.basic",
+  "role": "GravityAnchor",
+  "critical": true,
+  "size": [9, 5, 9],
+  "anchor": [4, 0, 4],
+  "rotations": [0, 90, 180, 270],
+  "palette": { "s": "SteelFrame", "c": "MachineCasing", "p": "PowerCell", "l": "LogicCore", "t": "ControlTerminal", "g": "GravityCoil", "w": "PowerConduit" },
+  "layers": [
+    ["sssssssss", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "sssssssss"],
+    ["ssss_ssss", "s_______s", "s_p___p_s", "s__g_g__s", "w___t___w", "s__g_g__s", "s_p_l_p_s", "s___l___s", "sssssssss"],
+    ["ssss_ssss", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "sssssssss"],
+    ["sssssssss", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "sssssssss"],
+    ["sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss"]
+  ],
+  "markers": [
+    { "id": "anchor_function", "kind": "MachineFunction", "position": [3, 1, 3], "expectedBlock": "GravityCoil" },
+    { "id": "anchor_effect", "kind": "Effect", "position": [4, 2, 4], "data": { "effect": "gravity_field" } }
+  ],
+  "connectors": [
+    { "id": "road", "kind": "Road", "position": [4, 1, 0], "direction": [0, 0, -1] },
+    { "id": "power_west", "kind": "Conduit", "position": [0, 1, 4], "direction": [-1, 0, 0] },
+    { "id": "power_east", "kind": "Conduit", "position": [8, 1, 4], "direction": [1, 0, 0] }
+  ],
+  "fogVolumes": []
+}

@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Voxelgine.Engine;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Graphics
 {
@@ -27,11 +28,27 @@ namespace Voxelgine.Graphics
 			});
 		}
 
+		public void GenerateFloatingIsland(
+			int Width,
+			int Length,
+			StructureBlueprintCatalog structures,
+			int Seed = 666,
+			CancellationToken cancellationToken = default)
+		{
+			ArgumentNullException.ThrowIfNull(structures);
+			ExecuteWorldReset(() =>
+			{
+				GenerateFloatingIslandCore(Width, Length, Seed, cancellationToken, structures);
+				InitializeColumnRevisions();
+			});
+		}
+
 		private void GenerateFloatingIslandCore(
 			int Width,
 			int Length,
 			int Seed,
-			CancellationToken cancellationToken)
+			CancellationToken cancellationToken,
+			StructureBlueprintCatalog structures = null)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			Noise.Seed = Seed;
@@ -67,6 +84,10 @@ namespace Voxelgine.Graphics
 				cancellationToken
 			);
 
+			WorldFeatureGenerationResult generatedFeatures = structures == null
+				? null
+				: WorldStructurePlanner.Plan(structures, surfaceHeight, Width, Length, Seed);
+
 			// Step 4 — Water bodies (ponds with sand shoreline)
 			PlaceWaterBodies(
 				chunkGrid,
@@ -79,17 +100,23 @@ namespace Voxelgine.Graphics
 				cancellationToken
 			);
 
-			// Step 5 — Roads (plank paths between points of interest)
-			GenerateRoads(
-				chunkGrid,
-				surfaceHeight,
-				Width,
-				Length,
-				WorldHeight,
-				CS,
-				Seed,
-				cancellationToken
-			);
+			// Step 5 — Authored sites and deterministic connector routes.
+			if (generatedFeatures != null)
+			{
+				System.Diagnostics.Stopwatch stampTimer = System.Diagnostics.Stopwatch.StartNew();
+				WorldStructureStamper.Stamp(this, chunkGrid, structures, generatedFeatures.Plan,
+					Width, WorldHeight, Length, CS, cancellationToken);
+				PublishGeneratedFeatures(generatedFeatures);
+				PublishStructureGenerationTimings(new StructureGenerationTimings(
+					generatedFeatures.SitePlanningDuration,
+					generatedFeatures.RouteDuration,
+					stampTimer.Elapsed));
+			}
+			else
+			{
+				GenerateRoads(chunkGrid, surfaceHeight, Width, Length, WorldHeight, CS, Seed, cancellationToken);
+				PublishGeneratedFeatures(null);
+			}
 
 			// Step 6 — Trees (on remaining grass)
 			PlaceTrees(
@@ -100,6 +127,7 @@ namespace Voxelgine.Graphics
 				WorldHeight,
 				CS,
 				Seed,
+				generatedFeatures?.Plan,
 				cancellationToken
 			);
 
@@ -112,6 +140,7 @@ namespace Voxelgine.Graphics
 				WorldHeight,
 				CS,
 				Seed,
+				generatedFeatures?.Plan,
 				cancellationToken
 			);
 
@@ -575,6 +604,7 @@ namespace Voxelgine.Graphics
 			int worldHeight,
 			int cs,
 			int seed,
+			WorldFeaturePlan generatedFeatures,
 			CancellationToken cancellationToken)
 		{
 			Random shapeRandom = CreateGenerationRandom(seed, TreeShapeRandomSalt);
@@ -593,6 +623,8 @@ namespace Voxelgine.Graphics
 				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
 				{
+					if (IsInsideFeatureReservation(generatedFeatures, x, z))
+						continue;
 					int surfY = surfaceHeight[x * length + z];
 					if (surfY < 0 || surfY + 12 >= gridHeight)
 						continue;
@@ -675,6 +707,7 @@ namespace Voxelgine.Graphics
 			int worldHeight,
 			int cs,
 			int seed,
+			WorldFeaturePlan generatedFeatures,
 			CancellationToken cancellationToken)
 		{
 			int gridHeight = chunkGrid.GetLength(1) * cs;
@@ -688,6 +721,8 @@ namespace Voxelgine.Graphics
 				cancellationToken.ThrowIfCancellationRequested();
 				for (int z = EdgeMargin; z < length - EdgeMargin; z++)
 				{
+					if (IsInsideFeatureReservation(generatedFeatures, x, z))
+						continue;
 					int surfY = surfaceHeight[x * length + z];
 					if (surfY < 0 || surfY + 1 >= gridHeight)
 						continue;
@@ -809,6 +844,18 @@ namespace Voxelgine.Graphics
 					acceptedCenters.Add((x, z));
 				}
 			}
+		}
+
+		private static bool IsInsideFeatureReservation(WorldFeaturePlan plan, int x, int z)
+		{
+			if (plan == null)
+				return false;
+			foreach (PlannedSite site in plan.Sites)
+			{
+				if (site.Reservation.ContainsHorizontal(x, z))
+					return true;
+			}
+			return false;
 		}
 	}
 }

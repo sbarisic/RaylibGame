@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.Graphics;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Engine.Server
 {
@@ -264,6 +266,10 @@ namespace Voxelgine.Engine.Server
 					CmdSpeak(connection, args);
 					break;
 
+				case "machine":
+					CmdMachine(connection, args);
+					break;
+
 #if DEBUG
 				case "give":
 					CmdGive(connection, args);
@@ -272,12 +278,56 @@ namespace Voxelgine.Engine.Server
 				case "fog":
 					CmdFog(connection, args);
 					break;
+
+				case "structure":
+					CmdStructure(connection, args);
+					break;
 #endif
 
 				default:
-					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>.");
+					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>, /machine <on|off>.");
 					break;
 			}
+		}
+
+		private void CmdMachine(NetConnection connection, string arguments)
+		{
+			if (_infrastructure == null || !_sessions.TryGetValue(connection.PlayerId, out ServerClientSession session))
+			{
+				SendServerMessageTo(connection.PlayerId, "Infrastructure is not available.");
+				return;
+			}
+			bool enabled;
+			if (string.Equals(arguments, "on", StringComparison.OrdinalIgnoreCase)) enabled = true;
+			else if (string.Equals(arguments, "off", StringComparison.OrdinalIgnoreCase)) enabled = false;
+			else
+			{
+				SendServerMessageTo(connection.PlayerId, "Usage: /machine <on|off> while standing near a function block.");
+				return;
+			}
+
+			Vector3 playerPosition = session.Player.Position;
+			InfrastructureMachineSnapshot? nearest = _infrastructure.Machines
+				.Select(static value => (InfrastructureMachineSnapshot?)value)
+				.Where(value => Vector3.DistanceSquared(playerPosition,
+					new Vector3(value.Value.Key.FunctionCoordinate.X + 0.5f, value.Value.Key.FunctionCoordinate.Y + 0.5f, value.Value.Key.FunctionCoordinate.Z + 0.5f)) <= 64f)
+				.OrderBy(value => value.Value.GeneratedMarker == null ? 1 : 0)
+				.ThenBy(value => Vector3.DistanceSquared(playerPosition,
+					new Vector3(value.Value.Key.FunctionCoordinate.X + 0.5f, value.Value.Key.FunctionCoordinate.Y + 0.5f, value.Value.Key.FunctionCoordinate.Z + 0.5f)))
+				.FirstOrDefault();
+			if (nearest == null)
+			{
+				SendServerMessageTo(connection.PlayerId, "No infrastructure function is within eight blocks.");
+				return;
+			}
+			if (enabled && nearest.Value.Key.Function == InfrastructureFunctionKind.GravityAnchor && _progression?.GravityAnchorUnlocked != true)
+			{
+				SendServerMessageTo(connection.PlayerId, "The gravity anchor is locked until all three story relays are active.");
+				return;
+			}
+
+			_infrastructure.SetRequestedEnabled(nearest.Value.Key, enabled);
+			SendServerMessageTo(connection.PlayerId, $"{nearest.Value.Key.Function} requested state: {(enabled ? "enabled" : "disabled")}.");
 		}
 
 		/// <summary>

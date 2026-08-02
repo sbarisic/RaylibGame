@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "markerDataVersion": 1,
+  "id": "relay.basic",
+  "role": "Relay",
+  "critical": true,
+  "size": [7, 6, 7],
+  "anchor": [3, 0, 3],
+  "rotations": [0, 90, 180, 270],
+  "palette": { "s": "SteelFrame", "c": "MachineCasing", "p": "PowerCell", "l": "LogicCore", "t": "ControlTerminal", "r": "RelayEmitter", "w": "PowerConduit" },
+  "layers": [
+    ["sssssss", "scccccs", "scccccs", "scccccs", "scccccs", "scccccs", "sssssss"],
+    ["sss_sss", "s_____s", "s_p_p_s", "w__t__w", "s__l__s", "s_____s", "sssssss"],
+    ["sss_sss", "s_____s", "s_____s", "s__r__s", "s_____s", "s_____s", "sssssss"],
+    ["sssssss", "s_____s", "s_____s", "s__s__s", "s_____s", "s_____s", "sssssss"],
+    ["sssssss", "s_____s", "s_____s", "s__s__s", "s_____s", "s_____s", "sssssss"],
+    ["sssssss", "sssssss", "sssssss", "sssssss", "sssssss", "sssssss", "sssssss"]
+  ],
+  "markers": [
+    { "id": "relay_function", "kind": "MachineFunction", "position": [3, 2, 3], "expectedBlock": "RelayEmitter" },
+    { "id": "relay_effect", "kind": "Effect", "position": [3, 5, 3], "data": { "effect": "relay_beam" } }
+  ],
+  "connectors": [
+    { "id": "road", "kind": "Road", "position": [3, 1, 0], "direction": [0, 0, -1] },
+    { "id": "power_west", "kind": "Conduit", "position": [0, 1, 3], "direction": [-1, 0, 0] },
+    { "id": "power_east", "kind": "Conduit", "position": [6, 1, 3], "direction": [1, 0, 0] }
+  ],
+  "fogVolumes": []
+}

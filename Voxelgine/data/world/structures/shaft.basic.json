@@ -1,0 +1,31 @@
+{
+  "formatVersion": 1,
+  "markerDataVersion": 1,
+  "id": "shaft.basic",
+  "role": "Shaft",
+  "critical": true,
+  "size": [5, 8, 5],
+  "anchor": [2, 0, 2],
+  "rotations": [0, 90, 180, 270],
+  "palette": { "s": "SteelFrame", "c": "MachineCasing", "a": "LinearActuator", "l": "LogicCore", "t": "ControlTerminal", "p": "PowerCell", "w": "PowerConduit" },
+  "layers": [
+    ["sssss", "scccs", "scccs", "scccs", "sssss"],
+    ["ss_ss", "s___s", "wst_w", "s___s", "sssss"],
+    ["ss_ss", "ssa_s", "s___s", "ssa_s", "sssss"],
+    ["ss_ss", "s___s", "ssl_s", "s___s", "sssss"],
+    ["ss_ss", "s___s", "s___s", "s___s", "sssss"],
+    ["ss_ss", "s___s", "s___s", "s___s", "sssss"],
+    ["ss_ss", "ssp_s", "s___s", "ssp_s", "sssss"],
+    ["ss_ss", "ss_ss", "ss_ss", "ss_ss", "sssss"]
+  ],
+  "markers": [
+    { "id": "transit_function", "kind": "MachineFunction", "position": [2, 2, 1], "expectedBlock": "LinearActuator" },
+    { "id": "shaft", "kind": "ShaftConnector", "position": [2, 7, 2] }
+  ],
+  "connectors": [
+    { "id": "road", "kind": "Road", "position": [2, 1, 0], "direction": [0, 0, -1] },
+    { "id": "power_west", "kind": "Conduit", "position": [0, 1, 2], "direction": [-1, 0, 0] },
+    { "id": "vertical", "kind": "Shaft", "position": [2, 7, 2], "direction": [0, 1, 0] }
+  ],
+  "fogVolumes": []
+}

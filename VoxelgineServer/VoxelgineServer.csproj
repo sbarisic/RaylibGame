@@ -11,4 +11,12 @@
   <ItemGroup>
     <ProjectReference Include="..\VoxelgineEngine\VoxelgineEngine.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Voxelgine\data\world\structures\**\*.json">
+      <Link>data\world\structures\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

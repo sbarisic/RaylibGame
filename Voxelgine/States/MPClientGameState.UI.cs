@@ -474,6 +474,16 @@ namespace Voxelgine.States
 				_netStatsInfoLabel.WriteLine($"  Prepare: {diagnostics.MeshUploadPreparationMilliseconds:F2} ms / {diagnostics.MeshUploadStorageGrowths} growths");
 				var workload = diagnostics.Workload;
 				_netStatsInfoLabel.WriteLine($"Mesh work: {workload.DirtyMeshes} dirty / {workload.InFlightMeshes} running / {workload.CompletedMeshes} ready / {workload.PendingUploadJobs} upload");
+				if (_hasReplicatedBlockChange)
+				{
+					FishGfx.Voxels.ChunkCoordinate editChunk = FishGfx.Voxels.ChunkCoordinate.FromWorld(
+						_lastReplicatedBlockX,
+						_lastReplicatedBlockY,
+						_lastReplicatedBlockZ,
+						out _, out _, out _);
+					_netStatsInfoLabel.WriteLine(
+						$"Last edit: {editChunk} r{_lastReplicatedBlockRevision} {_fishVoxelScene.GetPresentationState(editChunk)}");
+				}
 				_netStatsInfoLabel.WriteLine($"Ready data: {workload.PendingUploadBytes / (1024.0 * 1024.0):F1} MiB; lighting {_fishVoxelScene.LightingPendingCount}");
 				_netStatsInfoLabel.WriteLine($"Backpressure: {workload.IsBackpressured}");
 				_netStatsInfoLabel.WriteLine($"  Jobs: {diagnostics.CompletedUploadJobs} done / {diagnostics.DiscardedUploadJobs} discarded, oldest {diagnostics.OldestMeshUploadJobAgeSeconds:F2} s");

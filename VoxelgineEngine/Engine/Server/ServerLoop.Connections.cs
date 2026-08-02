@@ -77,6 +77,7 @@ public partial class ServerLoop
 			_server.SendTo(playerId, BuildEntitySpawnPacket(entity), true, CurrentTime);
 			_server.SendTo(playerId, BuildEntitySnapshotPacket(entity), true, CurrentTime);
 		}
+		SendInfrastructureStateTo(playerId);
 
 		_simulation.Players.AddPlayer(playerId, player);
 		session.IsGameplayActive = true;

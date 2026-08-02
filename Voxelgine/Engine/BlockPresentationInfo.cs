@@ -12,7 +12,9 @@ internal static class BlockPresentationInfo
 		out Vector2 uvPosition
 	)
 	{
-		int blockId = BlockInfo.GetBlockID(blockType, faceNormal);
+		int blockId = MachineBlockTextureCatalog.TryGet(blockType, out MachineBlockTextureDefinition definition)
+			? definition.Faces.GetTile(faceNormal)
+			: BlockInfo.GetBlockID(blockType, faceNormal);
 		int blockX = blockId % Chunk.AtlasSize;
 		int blockY = blockId / Chunk.AtlasSize;
 		uvSize = new Vector2(1f / Chunk.AtlasSize);

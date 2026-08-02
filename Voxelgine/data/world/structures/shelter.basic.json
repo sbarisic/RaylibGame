@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "markerDataVersion": 1,
+  "id": "shelter.basic",
+  "role": "Shelter",
+  "critical": true,
+  "size": [9, 5, 9],
+  "anchor": [4, 0, 4],
+  "rotations": [0, 90, 180, 270],
+  "palette": { "s": "SteelFrame", "c": "MachineCasing", "p": "PowerCell", "t": "ControlTerminal" },
+  "layers": [
+    ["sssssssss", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "scccccccs", "sssssssss"],
+    ["ssss_ssss", "s_______s", "s_______s", "s_______s", "s___t___s", "s_______s", "s_______s", "s_______s", "sssssssss"],
+    ["ssss_ssss", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "s_______s", "sssssssss"],
+    ["sssssssss", "s_______s", "s_______s", "s_______s", "s___p___s", "s_______s", "s_______s", "s_______s", "sssssssss"],
+    ["sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss", "sssssssss"]
+  ],
+  "markers": [
+    { "id": "player_spawn", "kind": "PlayerSpawn", "position": [4, 1, 3] },
+    { "id": "npc_spawn", "kind": "NpcSpawn", "position": [5, 1, 5] },
+    { "id": "front_door", "kind": "Door", "position": [4, 1, 0] },
+    { "id": "shelter_loot", "kind": "Loot", "position": [2, 1, 6] }
+  ],
+  "connectors": [
+    { "id": "road", "kind": "Road", "position": [4, 1, 0], "direction": [0, 0, -1] },
+    { "id": "power", "kind": "Conduit", "position": [0, 1, 4], "direction": [-1, 0, 0] }
+  ],
+  "fogVolumes": []
+}

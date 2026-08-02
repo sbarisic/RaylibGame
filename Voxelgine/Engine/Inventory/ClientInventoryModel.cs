@@ -83,9 +83,11 @@ public sealed class ClientInventoryModel
 	{
 		if (slot >= PlayerInventory.HotbarSlotCount || commandTick < SelectionCommandTick)
 			return;
+		bool selectionChanged = SelectedHotbarSlot != slot;
 		SelectedHotbarSlot = slot;
 		SelectionCommandTick = commandTick;
-		Changed?.Invoke();
+		if (selectionChanged)
+			Changed?.Invoke();
 	}
 
 	public void Clear()

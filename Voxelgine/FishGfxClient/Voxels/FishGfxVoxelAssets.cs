@@ -229,6 +229,21 @@ internal sealed class FishGfxVoxelAssets
 				models: models.Foliage,
 				light: new VoxelMaterialLightSettings(1)));
 		Add(BlockType.Gravel, Opaque("Gravel", 21));
+		foreach (MachineBlockTextureDefinition definition in MachineBlockTextureCatalog.All)
+		{
+			BlockFaceTextureTiles faces = definition.Faces;
+			Add(
+				definition.Block,
+				Opaque(
+					definition.DisplayName,
+					new VoxelFaceTiles(
+						faces.PositiveX,
+						faces.NegativeX,
+						faces.PositiveY,
+						faces.NegativeY,
+						faces.PositiveZ,
+						faces.NegativeZ)));
+		}
 
 		foreach (BlockType blockType in Enum.GetValues<BlockType>())
 		{
@@ -262,10 +277,18 @@ internal sealed class FishGfxVoxelAssets
 		int tile,
 		VoxelMaterialLightSettings? light = null)
 	{
+		return Opaque(name, new VoxelFaceTiles(tile), light);
+	}
+
+	private static VoxelMaterial Opaque(
+		string name,
+		VoxelFaceTiles tiles,
+		VoxelMaterialLightSettings? light = null)
+	{
 		return new VoxelMaterial(
 			name,
 			VoxelRenderMode.Opaque,
-			new VoxelFaceTiles(tile),
+			tiles,
 			light: light);
 	}
 

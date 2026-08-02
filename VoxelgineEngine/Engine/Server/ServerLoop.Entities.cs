@@ -3,6 +3,7 @@ using System.Numerics;
 
 using Voxelgine.Engine.AI;
 using Voxelgine.Engine.DI;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Engine.Server
 {
@@ -13,24 +14,61 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private void SpawnEntities()
 		{
-			// The client presentation layer resolves this model and texture.
+			PlannedMarker[] npcMarkers = _simulation.Map.GeneratedFeatures.Markers
+				.Where(static marker => marker.Kind == StructureMarkerKind.NpcSpawn)
+				.OrderBy(static marker => marker.Id.Site)
+				.ThenBy(static marker => marker.Id.BlueprintMarkerId, StringComparer.Ordinal)
+				.ToArray();
+			if (npcMarkers.Length == 0)
+				SpawnNpc(_npcSpawnPos);
+			else
+				foreach (PlannedMarker marker in npcMarkers)
+					SpawnNpc(new Vector3(marker.Position.X + 0.5f, marker.Position.Y, marker.Position.Z + 0.5f));
+
+			PlannedMarker[] doorMarkers = _simulation.Map.GeneratedFeatures.Markers
+				.Where(static marker => marker.Kind == StructureMarkerKind.Door)
+				.OrderBy(static marker => marker.Id.Site)
+				.ThenBy(static marker => marker.Id.BlueprintMarkerId, StringComparer.Ordinal)
+				.ToArray();
+			if (doorMarkers.Length == 0)
+				SpawnDoor(PlayerSpawnPosition + new Vector3(4, 0, 0));
+			else
+				foreach (PlannedMarker marker in doorMarkers)
+					SpawnDoor(
+						new Vector3(marker.Position.X + 0.5f, marker.Position.Y, marker.Position.Z + 0.5f),
+						GetDoorFacing(_simulation.Map.GeneratedFeatures, marker));
+
+			_logging.ServerWriteLine($"Spawned {_simulation.Entities.GetEntityCount()} entities.");
+		}
+
+		private void SpawnNpc(Vector3 position)
+		{
 			var npc = new VEntNPC();
 			npc.SetSize(new Vector3(0.9f, 1.8f, 0.9f));
-			npc.SetPosition(_npcSpawnPos);
+			npc.SetPosition(position);
 			npc.SetModelName("npc/humanoid.json");
 			npc.SetTextureName(VEntNPC.AvailableTextures[Random.Shared.Next(VEntNPC.AvailableTextures.Length)]);
 			_simulation.Entities.Spawn(_simulation, npc);
 			npc.InitPathfinding(_simulation.Map);
 			npc.SetAIProgram(AIPrograms.FunkyBehavior());
+		}
 
-			// Spawn door entity near player spawn
+		private void SpawnDoor(Vector3 position, Vector3? facing = null)
+		{
 			var door = new VEntSlidingDoor();
 			door.SetModelName("door/door.json");
-			door.Initialize(PlayerSpawnPosition + new Vector3(4, 0, 0), new Vector3(1.0f, 2.0f, 0.125f));
-			door.FacingDirection = Vector3.UnitZ;
+			door.Initialize(position, new Vector3(1.0f, 2.0f, 0.125f));
+			door.FacingDirection = facing ?? Vector3.UnitZ;
 			_simulation.Entities.Spawn(_simulation, door);
+		}
 
-			_logging.ServerWriteLine($"Spawned {_simulation.Entities.GetEntityCount()} entities.");
+		internal static Vector3 GetDoorFacing(WorldFeaturePlan features, PlannedMarker marker)
+		{
+			PlannedSite site = features.Sites.FirstOrDefault(candidate => candidate.Id == marker.Id.Site);
+			if (site == null)
+				return Vector3.UnitZ;
+			BlockCoordinate direction = WorldStructurePlanner.RotateDirection(new BlockCoordinate(0, 0, 1), site.Rotation);
+			return new Vector3(direction.X, direction.Y, direction.Z);
 		}
 
 		/// <summary>

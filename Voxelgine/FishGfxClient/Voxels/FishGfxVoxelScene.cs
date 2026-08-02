@@ -256,24 +256,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private void UpdateStreamingBackpressure()
 	{
 		VoxelRendererWorkload workload = Renderer.Workload;
-		int lightingPending = Lighting.PendingCount;
-		if (streamingBackpressured)
-		{
-			if (!workload.IsBackpressured
-				&& workload.DirtyMeshes <= 128
-				&& lightingPending <= 65_536)
-			{
-				streamingBackpressured = false;
-			}
-			return;
-		}
-
-		if (workload.IsBackpressured
-			|| workload.DirtyMeshes >= 256
-			|| lightingPending >= 262_144)
-		{
-			streamingBackpressured = true;
-		}
+		streamingBackpressured = StreamingBackpressurePolicy.Update(
+			streamingBackpressured,
+			workload,
+			Lighting.PendingCount);
 	}
 
 	public void Enqueue(RenderQueue queue, Camera camera)

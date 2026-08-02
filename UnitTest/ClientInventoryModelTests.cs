@@ -85,6 +85,42 @@ public sealed class ClientInventoryModelTests
 		Assert.Equal(1, model.PendingActionCount);
 	}
 
+	[Fact]
+	public void PredictedHotbarSelectionIgnoresOlderServerSelection()
+	{
+		ClientInventoryModel model = CreateModel(ItemStack.Empty);
+		int changed = 0;
+		model.Changed += () => changed++;
+
+		model.ApplySelection(1, 101);
+		model.Apply(CreateState(
+			revision: 2,
+			acknowledgement: 0,
+			accepted: true,
+			slot0: ItemStack.Empty,
+			selectedHotbarSlot: 0,
+			selectionCommandTick: 100));
+
+		Assert.Equal(1, model.SelectedHotbarSlot);
+		Assert.Equal(101, model.SelectionCommandTick);
+		Assert.Equal(2, changed);
+	}
+
+	[Fact]
+	public void RepeatingPredictedSelectionAdvancesTickWithoutRefreshingPresentation()
+	{
+		ClientInventoryModel model = CreateModel(ItemStack.Empty);
+		int changed = 0;
+		model.Changed += () => changed++;
+
+		model.ApplySelection(1, 101);
+		model.ApplySelection(1, 102);
+
+		Assert.Equal(1, model.SelectedHotbarSlot);
+		Assert.Equal(102, model.SelectionCommandTick);
+		Assert.Equal(1, changed);
+	}
+
 	private static ClientInventoryModel CreateModel(ItemStack slot0)
 	{
 		ClientInventoryModel model = new();
@@ -98,7 +134,9 @@ public sealed class ClientInventoryModelTests
 		bool accepted,
 		ItemStack slot0,
 		ItemStack cursor = default,
-		int origin = PlayerInventory.NoCursorOrigin)
+		int origin = PlayerInventory.NoCursorOrigin,
+		byte selectedHotbarSlot = 0,
+		int selectionCommandTick = 0)
 	{
 		ItemStack[] slots = new ItemStack[PlayerInventory.SlotCount];
 		slots[0] = slot0;
@@ -107,8 +145,8 @@ public sealed class ClientInventoryModelTests
 			AcknowledgedActionId = acknowledgement,
 			ActionAccepted = accepted,
 			Revision = revision,
-			SelectedHotbarSlot = 0,
-			SelectionCommandTick = 0,
+			SelectedHotbarSlot = selectedHotbarSlot,
+			SelectionCommandTick = selectionCommandTick,
 			Cursor = cursor,
 			CursorOriginSlot = origin == PlayerInventory.NoCursorOrigin
 				? InventoryStatePacket.NoCursorOrigin

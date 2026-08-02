@@ -22,6 +22,9 @@ internal sealed partial class ClientWorldStream : IDisposable
 	private const int GameplayColumnApplyLimit = 2;
 	private const double GameplayColumnApplyBudgetMilliseconds = 2;
 	private const float InterestRefreshSeconds = 0.5f;
+	private const float IntegrityCheckSeconds = 0.25f;
+	private const float IntegrityRepairGraceSeconds = 0.75f;
+	private const float IntegrityRepairRetrySeconds = 2f;
 
 	private readonly IFishLogging logging;
 	private readonly Func<NetClient> getClient;
@@ -38,6 +41,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 	private readonly HashSet<ChunkColumnCoordinate> appliedHaloColumns = new();
 	private readonly HashSet<ChunkColumnCoordinate> receivedOrdinaryColumns = new();
 	private readonly HashSet<ChunkColumnCoordinate> appliedOrdinaryColumns = new();
+	private readonly HashSet<ChunkColumnCoordinate> requestedResyncColumns = new();
 	private readonly Dictionary<ChunkColumnCoordinate, ChunkCoordinate[]> coreColumnChunks = new();
 	private readonly Dictionary<ChunkColumnCoordinate, ChunkCoordinate[]> haloColumnChunks = new();
 	private readonly HashSet<ChunkCoordinate> coreChunks = new();
@@ -61,6 +65,10 @@ internal sealed partial class ClientWorldStream : IDisposable
 	private int lastInterestChunkX = int.MinValue;
 	private int lastInterestChunkZ = int.MinValue;
 	private int lastInterestRadius;
+	private float nextIntegrityCheckTime;
+	private float integritySuspectSince;
+	private float nextIntegrityRepairTime;
+	private ClientColumnIntegrityResult integritySuspect;
 	private int generation;
 	private bool disposed;
 
@@ -128,6 +136,13 @@ internal sealed partial class ClientWorldStream : IDisposable
 			return;
 
 		ChunkColumnCoordinate coordinate = new(packet.X, packet.Z);
+		if (requestedResyncColumns.Contains(coordinate))
+		{
+			logging.Log(
+				GameLogLevel.Info,
+				"WorldStream",
+				$"resync-received streamId={packet.StreamId} column={packet.X},{packet.Z} revision={packet.Revision} bytes={packet.Payload.Length}");
+		}
 		switch (packet.Kind)
 		{
 			case WorldColumnStreamKind.BootstrapCore:
@@ -195,20 +210,56 @@ internal sealed partial class ClientWorldStream : IDisposable
 		if (!initialized)
 			TrySendReady();
 		else
+		{
 			SendInterest(force: false);
+			RepairFocusedColumnIfNeeded(simulation);
+		}
 	}
 
 	internal void MarkRenderColumnApplied(int x, int z, long revision)
 	{
 		acknowledgements.MarkReady(StreamId, x, z, revision);
+		ChunkColumnCoordinate coordinate = new(x, z);
+		if (requestedResyncColumns.Remove(coordinate))
+		{
+			logging.Log(
+				GameLogLevel.Info,
+				"WorldStream",
+				$"resync-applied streamId={StreamId} column={x},{z} revision={revision}");
+		}
+	}
+
+	internal void RequestFreshColumn(
+		int columnX,
+		int columnZ,
+		long clientRevision,
+		string trigger)
+	{
+		if (StreamId == 0 || getClient() == null)
+			return;
+		ChunkColumnCoordinate coordinate = new(columnX, columnZ);
+		if (!requestedResyncColumns.Add(coordinate))
+			return;
+
+		int forgotten = acknowledgements.ForgetColumn(StreamId, columnX, columnZ);
+		float now = getTime();
+		logging.Log(
+			GameLogLevel.Warning,
+			"WorldStream",
+			$"resync-request trigger={trigger} streamId={StreamId} column={columnX},{columnZ} clientRevision={clientRevision} forgottenAcks={forgotten}");
+		getClient().Send(new WorldColumnResyncRequestPacket
+		{
+			StreamId = StreamId,
+			X = columnX,
+			Z = columnZ,
+			Revision = clientRevision,
+		}, true, now);
 	}
 
 	internal void SendInterest(bool force)
 	{
 		NetClient client = getClient();
 		if (client == null || StreamId == 0)
-			return;
-		if (!force && CalculateBackpressure())
 			return;
 
 		Vector3 interestFocus = getSimulation()?.LocalPlayer?.Position ?? focus;
@@ -273,6 +324,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 		appliedHaloColumns.Clear();
 		receivedOrdinaryColumns.Clear();
 		appliedOrdinaryColumns.Clear();
+		requestedResyncColumns.Clear();
 		coreColumnChunks.Clear();
 		haloColumnChunks.Clear();
 		coreChunks.Clear();
@@ -287,6 +339,10 @@ internal sealed partial class ClientWorldStream : IDisposable
 		lastInterestChunkX = int.MinValue;
 		lastInterestChunkZ = int.MinValue;
 		lastInterestRadius = 0;
+		nextIntegrityCheckTime = 0;
+		integritySuspectSince = 0;
+		nextIntegrityRepairTime = 0;
+		integritySuspect = default;
 	}
 
 	public void Dispose()
@@ -394,18 +450,17 @@ internal sealed partial class ClientWorldStream : IDisposable
 		ChunkColumnCoordinate coordinate = new(packet.X, packet.Z);
 		receivedCoreColumns.Remove(coordinate);
 		receivedHaloColumns.Remove(coordinate);
+		requestedResyncColumns.Remove(coordinate);
 		logging.Log(
 			GameLogLevel.Warning,
 			"WorldStream",
 			$"column-decode-failed streamId={packet.StreamId} column={packet.X},{packet.Z} revision={packet.Revision}",
 			exception);
-		getClient().Send(new WorldColumnResyncRequestPacket
-		{
-			StreamId = packet.StreamId,
-			X = packet.X,
-			Z = packet.Z,
-			Revision = packet.Revision,
-		}, true, getTime());
+		RequestFreshColumn(
+			packet.X,
+			packet.Z,
+			packet.Revision,
+			"decode-failed");
 	}
 
 	private void FlushAcknowledgements()
@@ -425,6 +480,60 @@ internal sealed partial class ClientWorldStream : IDisposable
 				Revision = packet.Revision,
 			}, true, now);
 		}
+	}
+
+	private void RepairFocusedColumnIfNeeded(GameSimulation simulation)
+	{
+		float now = getTime();
+		if (now < nextIntegrityCheckTime)
+			return;
+		nextIntegrityCheckTime = now + IntegrityCheckSeconds;
+
+		FishGfxVoxelScene scene = getScene();
+		if (scene == null)
+			return;
+
+		Vector3 position = simulation.LocalPlayer.Position;
+		ClientColumnIntegrityResult inspected = ClientColumnIntegrity.Inspect(
+			simulation.Map,
+			position,
+			coordinate => scene.World.TryGetChunk(coordinate, out _));
+		if (inspected.Problem == ClientColumnIntegrityProblem.MissingRenderChunk &&
+			scene.PendingPreparedColumnCount != 0)
+		{
+			integritySuspect = default;
+			integritySuspectSince = 0;
+			return;
+		}
+		if (inspected.IsHealthy)
+		{
+			integritySuspect = default;
+			integritySuspectSince = 0;
+			return;
+		}
+
+		if (inspected != integritySuspect)
+		{
+			integritySuspect = inspected;
+			integritySuspectSince = now;
+			return;
+		}
+
+		if (now - integritySuspectSince < IntegrityRepairGraceSeconds ||
+			now < nextIntegrityRepairTime)
+		{
+			return;
+		}
+
+		nextIntegrityRepairTime = now + IntegrityRepairRetrySeconds;
+		long revision = simulation.Map.GetColumnRevision(
+			inspected.Column.X,
+			inspected.Column.Z);
+		RequestFreshColumn(
+			inspected.Column.X,
+			inspected.Column.Z,
+			revision,
+			$"focus-{inspected.Problem}-chunkY-{inspected.ChunkY}-position-{position}");
 	}
 
 	private bool CalculateBackpressure()

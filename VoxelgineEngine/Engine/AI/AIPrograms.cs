@@ -197,7 +197,7 @@ namespace Voxelgine.Engine.AI
 			new(AIInstruction.Goto, 0),                                         // 34
 
 			// OnStuck: complain
-			AIStep.Handler(AIEvent.OnStuck),                                    // 35
+			AIStep.Handler(AIEvent.OnStuck, 15f),                               // 35
 			AIStep.AsyncSpeakText("I'm stuck!", 2f),                            // 36
 			new(AIInstruction.Goto, 0),                                         // 37
 

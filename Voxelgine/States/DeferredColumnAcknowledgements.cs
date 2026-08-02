@@ -40,6 +40,16 @@ internal sealed class DeferredColumnAcknowledgements
 	internal bool Forget(int streamId, int x, int z, long revision) =>
 		entries.Remove(new Key(streamId, x, z, revision));
 
+	internal int ForgetColumn(int streamId, int x, int z)
+	{
+		Key[] matches = entries.Keys
+			.Where(key => key.StreamId == streamId && key.X == x && key.Z == z)
+			.ToArray();
+		foreach (Key key in matches)
+			entries.Remove(key);
+		return matches.Length;
+	}
+
 	internal bool TryDequeueReady(out WorldColumnPacket packet)
 	{
 		while (ready.TryDequeue(out Key key))

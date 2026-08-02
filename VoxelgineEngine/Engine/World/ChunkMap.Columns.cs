@@ -1,5 +1,6 @@
 using System.Numerics;
 using Voxelgine.Engine;
+using Voxelgine.Engine.World.Structures;
 
 namespace Voxelgine.Graphics
 {
@@ -100,6 +101,8 @@ namespace Voxelgine.Graphics
 				_columnRevisions.Clear();
 				_columnChunks.Clear();
 				_fogChunks.Clear();
+				_infrastructureBlocks.Clear();
+				_columnInfrastructure.Clear();
 				_nonEmptyFogVoxelCount = 0;
 				foreach (ChunkColumnSnapshot column in columns)
 					ApplyColumnCore(column);
@@ -110,6 +113,7 @@ namespace Voxelgine.Graphics
 		{
 			ChunkColumnCoordinate columnCoordinate = new(column.X, column.Z);
 			List<(Vector3 Coordinate, Chunk Chunk)> replacement = new(column.Chunks.Count);
+			List<(BlockCoordinate Coordinate, BlockType Block)> infrastructure = new();
 			HashSet<Vector3> coordinates = new();
 			foreach (ChunkSnapshot snapshot in column.Chunks)
 			{
@@ -126,13 +130,22 @@ namespace Voxelgine.Graphics
 				{
 					BlockType type = blocks[index];
 					chunk.Blocks[index] = new PlacedBlock(type);
+					if (InfrastructureBlockCatalog.TryGet(type, out _))
+					{
+						int localX = index % Chunk.ChunkSize;
+						int yz = index / Chunk.ChunkSize;
+						int localY = yz % Chunk.ChunkSize;
+						int localZ = yz / Chunk.ChunkSize;
+						infrastructure.Add((new BlockCoordinate(snapshot.ChunkX * Chunk.ChunkSize + localX,
+							snapshot.ChunkY * Chunk.ChunkSize + localY, snapshot.ChunkZ * Chunk.ChunkSize + localZ), type));
+					}
 				}
 				chunk.SetNonAirBlockCount(snapshot.NonAirBlockCount);
 				chunk.ReplaceFog(snapshot.FogMemory.Span, snapshot.NonEmptyFogCount);
 				replacement.Add((coordinate, chunk));
 			}
 
-			CommitColumnReplacement(columnCoordinate, Math.Max(1, column.Revision), replacement);
+			CommitColumnReplacement(columnCoordinate, Math.Max(1, column.Revision), replacement, infrastructure);
 		}
 
 		private void ApplyPreparedColumnCore(
@@ -143,6 +156,7 @@ namespace Voxelgine.Graphics
 		{
 			ChunkColumnCoordinate columnCoordinate = new(columnX, columnZ);
 			List<(Vector3 Coordinate, Chunk Chunk)> replacement = new(preparedChunks.Length);
+			List<(BlockCoordinate Coordinate, BlockType Block)> infrastructure = new();
 			HashSet<Vector3> coordinates = new();
 			foreach (PreparedChunk prepared in preparedChunks)
 			{
@@ -162,9 +176,19 @@ namespace Voxelgine.Graphics
 					prepared.NonEmptyFogCount
 				);
 				replacement.Add((coordinate, chunk));
+				for (int index = 0; index < prepared.Blocks.Length; index++)
+				{
+					BlockType type = prepared.Blocks[index].Type;
+					if (!InfrastructureBlockCatalog.TryGet(type, out _)) continue;
+					int localX = index % Chunk.ChunkSize;
+					int yz = index / Chunk.ChunkSize;
+					infrastructure.Add((new BlockCoordinate(columnX * Chunk.ChunkSize + localX,
+						prepared.ChunkY * Chunk.ChunkSize + yz % Chunk.ChunkSize,
+						columnZ * Chunk.ChunkSize + yz / Chunk.ChunkSize), type));
+				}
 			}
 
-			CommitColumnReplacement(columnCoordinate, Math.Max(1, revision), replacement);
+			CommitColumnReplacement(columnCoordinate, Math.Max(1, revision), replacement, infrastructure);
 		}
 
 		private static void ValidatePreparedChunk(PreparedChunk prepared)
@@ -184,8 +208,10 @@ namespace Voxelgine.Graphics
 		private void CommitColumnReplacement(
 			ChunkColumnCoordinate columnCoordinate,
 			long revision,
-			List<(Vector3 Coordinate, Chunk Chunk)> replacement)
+			List<(Vector3 Coordinate, Chunk Chunk)> replacement,
+			List<(BlockCoordinate Coordinate, BlockType Block)> infrastructure)
 		{
+			ColumnReplacing?.Invoke(columnCoordinate);
 			RemoveColumnStorage(columnCoordinate);
 			List<Vector3> inserted = new(replacement.Count);
 			foreach ((Vector3 coordinate, Chunk chunk) in replacement)
@@ -197,10 +223,14 @@ namespace Voxelgine.Graphics
 
 			_columnChunks[columnCoordinate] = inserted;
 			_columnRevisions[columnCoordinate] = revision;
+			foreach ((BlockCoordinate coordinate, BlockType block) in infrastructure)
+				TrackInfrastructureBlock(coordinate, block);
 		}
 
 		private void RemoveColumnStorage(ChunkColumnCoordinate columnCoordinate)
 		{
+			if (_columnInfrastructure.Remove(columnCoordinate, out HashSet<BlockCoordinate> infrastructure))
+				foreach (BlockCoordinate coordinate in infrastructure) _infrastructureBlocks.Remove(coordinate);
 			if (!_columnChunks.Remove(columnCoordinate, out List<Vector3> existing))
 				return;
 
@@ -274,4 +304,3 @@ namespace Voxelgine.Graphics
 
 	}
 }
-

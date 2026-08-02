@@ -3,6 +3,7 @@ using System.IO;
 using System.Numerics;
 using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
+using Voxelgine.Engine.World.Structures;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server
@@ -71,6 +72,10 @@ namespace Voxelgine.Engine.Server
 		private GameSimulation _simulation;
 		private int _worldSeed;
 		private WorldArchivePayloadCache _archivePayloadCache;
+		private InfrastructureMachineService _infrastructure;
+		private HabitatProgressionService _progression;
+		private PersistedMachineIntent[] _loadedMachineIntents = Array.Empty<PersistedMachineIntent>();
+		private HabitatMilestone _loadedMilestone;
 
 		/// <summary>
 		/// Interval in seconds between <see cref="DayTimeSyncPacket"/> broadcasts.
@@ -216,12 +221,15 @@ namespace Voxelgine.Engine.Server
 						using (FileStream archiveStream = File.OpenRead(_mapFile))
 							archive = WorldArchive.Read(archiveStream, cancellationToken);
 						_simulation.Map.ReplaceAllColumns(archive.Columns);
+						_simulation.Map.RestoreGeneratedFeatures(archive.Metadata.GeneratedFeatures);
 						_archivePayloadCache = archive.PayloadCache;
 						_worldStream.SetArchivePayloadCache(_archivePayloadCache);
 						_worldSeed = archive.Metadata.WorldSeed;
 						PlayerSpawnPosition = archive.Metadata.PlayerSpawn;
 						_pickupSpawnPos = archive.Metadata.PickupSpawn;
 						_npcSpawnPos = archive.Metadata.NpcSpawn;
+						_loadedMachineIntents = archive.Metadata.MachineIntents ?? Array.Empty<PersistedMachineIntent>();
+						_loadedMilestone = archive.Metadata.Milestone;
 						generated = false;
 						_logging.Log(
 							GameLogLevel.Info,
@@ -233,13 +241,20 @@ namespace Voxelgine.Engine.Server
 				if (generated)
 				{
 					_logging.Log(GameLogLevel.Info, "Generation", $"begin seed={worldSeed} size={DefaultWorldWidth}x{DefaultWorldLength}");
+					string structureDirectory = Path.Combine(AppContext.BaseDirectory, "data", "world", "structures");
+					Stopwatch structureTimer = Stopwatch.StartNew();
+					StructureBlueprintCatalog structureCatalog = StructureBlueprintCatalog.LoadDirectory(structureDirectory);
 					_simulation.Map.GenerateFloatingIsland(
 						DefaultWorldWidth,
 						DefaultWorldLength,
+						structureCatalog,
 						worldSeed,
 						cancellationToken);
+					StructureGenerationTimings timings = _simulation.Map.StructureGenerationTimings;
+					_logging.Log(GameLogLevel.Info, "Generation",
+						$"structures sites={_simulation.Map.GeneratedFeatures.Sites.Count} routes={_simulation.Map.GeneratedFeatures.Routes.Count} blueprints={structureCatalog.Blueprints.Count} planningMs={timings.SitePlanning.TotalMilliseconds:F1} routesMs={timings.Routes.TotalMilliseconds:F1} stampingMs={timings.Stamping.TotalMilliseconds:F1} worldTotalMs={structureTimer.Elapsed.TotalMilliseconds:F1}");
 					_simulation.Map.ClearPendingChanges();
-					FindAndSetSpawnPoints(cancellationToken);
+					ApplyGeneratedSpawnPoints(cancellationToken);
 					SaveWorld();
 				}
 				else if (!IsSpawnPositionValid(PlayerSpawnPosition) ||
@@ -253,8 +268,20 @@ namespace Voxelgine.Engine.Server
 
 				_logging.ServerWriteLine($"Starting server on port {port} (max {NetServer.MaxPlayers} players)...");
 
+				Stopwatch infrastructureTimer = Stopwatch.StartNew();
+				_infrastructure = new InfrastructureMachineService(_simulation.Map, _simulation.Map.GeneratedFeatures, _logging);
+				_infrastructure.StateChanged += BroadcastInfrastructureState;
+				_logging.Log(GameLogLevel.Info, "Infrastructure", $"index-ready blocks={_simulation.Map.InfrastructureBlockCount} machines={_infrastructure.Machines.Count} durationMs={infrastructureTimer.Elapsed.TotalMilliseconds:F1}");
+				Stopwatch progressionTimer = Stopwatch.StartNew();
+				_progression = new HabitatProgressionService(_simulation.Map, _simulation.Map.GeneratedFeatures, _infrastructure, _logging);
+				_infrastructure.RestoreRequestedStates(_loadedMachineIntents.Select(static intent => (intent.Key, intent.RequestedEnabled)));
+				_progression.RestoreMilestone(_loadedMilestone);
+				_logging.Log(GameLogLevel.Info, "Progression", $"restore milestone={_progression.Milestone} durationMs={progressionTimer.Elapsed.TotalMilliseconds:F1}");
+
 				// Spawn server-side entities
+				Stopwatch entityTimer = Stopwatch.StartNew();
 				SpawnEntities();
+				_logging.Log(GameLogLevel.Info, "Entities", $"initial-spawn durationMs={entityTimer.Elapsed.TotalMilliseconds:F1}");
 
 				cancellationToken.ThrowIfCancellationRequested();
 				_server.WorldSeed = _worldSeed;
@@ -369,6 +396,8 @@ namespace Voxelgine.Engine.Server
 			// 9. Kill and remove NPCs which fell out of the world
 			RemoveFallenNpcs();
 			ProcessItemDrops();
+			_infrastructure?.Update(maximumNetworks: 4);
+			_progression?.Update(_server.ServerTick);
 
 			// 10. Broadcast authoritative player positions to all clients
 			BroadcastPlayerSnapshots(totalTime);
@@ -474,7 +503,16 @@ namespace Voxelgine.Engine.Server
 					_archivePayloadCache = WorldArchive.Write(
 						fileStream,
 						_simulation.Map,
-						new WorldArchiveMetadata(_worldSeed, PlayerSpawnPosition, _pickupSpawnPos, _npcSpawnPos),
+						new WorldArchiveMetadata(
+							_worldSeed,
+							PlayerSpawnPosition,
+							_pickupSpawnPos,
+							_npcSpawnPos,
+							_simulation.Map.GeneratedFeatures,
+							_infrastructure?.CaptureRequestedStates()
+								.Select(static state => new PersistedMachineIntent(state.Key, state.RequestedEnabled))
+								.ToArray() ?? Array.Empty<PersistedMachineIntent>(),
+							_progression?.Milestone ?? HabitatMilestone.None),
 						_archivePayloadCache);
 					fileStream.Flush(flushToDisk: true);
 				}
@@ -520,12 +558,36 @@ namespace Voxelgine.Engine.Server
 			_logging.ServerWriteLine($"Spawn points: Player={PlayerSpawnPosition}, Pickup={_pickupSpawnPos}, NPC={_npcSpawnPos} ({spawnPoints.Count} found)");
 		}
 
+		private void ApplyGeneratedSpawnPoints(CancellationToken cancellationToken)
+		{
+			PlannedMarker? player = _simulation.Map.GeneratedFeatures.FindFirstMarker(StructureMarkerKind.PlayerSpawn);
+			PlannedMarker? npc = _simulation.Map.GeneratedFeatures.FindFirstMarker(StructureMarkerKind.NpcSpawn);
+			PlannedMarker? loot = _simulation.Map.GeneratedFeatures.FindFirstMarker(StructureMarkerKind.Loot);
+			if (player == null)
+			{
+				FindAndSetSpawnPoints(cancellationToken);
+				return;
+			}
+
+			PlayerSpawnPosition = ToSpawn(player.Value.Position);
+			_npcSpawnPos = npc == null ? PlayerSpawnPosition + new Vector3(2, 0, 2) : ToSpawn(npc.Value.Position);
+			_pickupSpawnPos = loot == null ? PlayerSpawnPosition : ToSpawn(loot.Value.Position);
+			_logging.ServerWriteLine($"Generated spawn points: Player={PlayerSpawnPosition}, Pickup={_pickupSpawnPos}, NPC={_npcSpawnPos}");
+		}
+
+		private static Vector3 ToSpawn(BlockCoordinate coordinate) =>
+			new(coordinate.X + 0.5f, coordinate.Y, coordinate.Z + 0.5f);
+
 		public void Dispose()
 		{
 			if (_disposed)
 				return;
 
 			_disposed = true;
+			_progression?.Dispose();
+			if (_infrastructure != null)
+				_infrastructure.StateChanged -= BroadcastInfrastructureState;
+			_infrastructure?.Dispose();
 			Stop();
 			_server.Dispose();
 			(_logging as IDisposable)?.Dispose();

@@ -180,16 +180,18 @@ internal sealed class VoxelPaintStroke
 	private readonly AtlasEditingSession session;
 	private readonly AtlasHeightStore heights;
 	private readonly bool invalidateHeight;
+	private readonly int brushSize;
 	private readonly Dictionary<(string Document, int X, int Y), AtlasPixelDelta> deltas = new();
 	private VoxelPaintHit previous;
 	private bool hasPrevious;
 
 	internal VoxelPaintStroke(AtlasEditingSession session, AtlasHeightStore heights = null,
-		bool invalidateHeight = false)
+		bool invalidateHeight = false, int brushSize = 1)
 	{
 		this.session = session ?? throw new ArgumentNullException(nameof(session));
 		this.heights = heights;
 		this.invalidateHeight = invalidateHeight;
+		this.brushSize = VoxelBrushFootprint.ValidateSize(brushSize);
 	}
 
 	internal bool Paint(VoxelPaintHit hit, AtlasPixel color)
@@ -200,11 +202,11 @@ internal sealed class VoxelPaintStroke
 		if (hasPrevious && CanInterpolate(previous, hit))
 		{
 			foreach ((int x, int y) in TraverseLine(previous.DocumentX, previous.DocumentY, hit.DocumentX, hit.DocumentY))
-				changed |= PaintPixel(hit.Target.Document, x, y, color);
+				changed |= PaintFootprint(hit.Target, x, y, color);
 		}
 		else
 		{
-			changed = PaintPixel(hit.Target.Document, hit.DocumentX, hit.DocumentY, color);
+			changed = PaintFootprint(hit.Target, hit.DocumentX, hit.DocumentY, color);
 		}
 		previous = hit;
 		hasPrevious = true;
@@ -222,6 +224,18 @@ internal sealed class VoxelPaintStroke
 			: new[] { new AtlasHeightCacheChange(before.Key, before, null) };
 		session.History.Commit(deltas.Values, cacheChanges);
 		return true;
+	}
+
+	private bool PaintFootprint(AtlasPaintTarget target, int centerX, int centerY, AtlasPixel color)
+	{
+		bool changed = false;
+		foreach ((int x, int y) in VoxelBrushFootprint.Enumerate(
+			centerX, centerY, brushSize,
+			target.X, target.Y, target.X + target.Width, target.Y + target.Height))
+		{
+			changed |= PaintPixel(target.Document, x, y, color);
+		}
+		return changed;
 	}
 
 	private bool PaintPixel(AtlasImageDocument document, int x, int y, AtlasPixel color)
@@ -267,6 +281,7 @@ internal sealed class VoxelHeightPaintStroke
 {
 	private readonly AtlasEditingSession session;
 	private readonly AtlasHeightStore heights;
+	private readonly int brushSize;
 	private readonly Dictionary<(string Document, int X, int Y), AtlasPixelDelta> normalDeltas = new();
 	private readonly Dictionary<(int X, int Y), (byte Previous, byte Current)> heightDeltas = new();
 	private AtlasPaintTarget target;
@@ -275,10 +290,12 @@ internal sealed class VoxelHeightPaintStroke
 	private VoxelPaintHit previous;
 	private bool hasPrevious;
 
-	internal VoxelHeightPaintStroke(AtlasEditingSession session, AtlasHeightStore heights)
+	internal VoxelHeightPaintStroke(AtlasEditingSession session, AtlasHeightStore heights,
+		int brushSize = 1)
 	{
 		this.session = session ?? throw new ArgumentNullException(nameof(session));
 		this.heights = heights ?? throw new ArgumentNullException(nameof(heights));
+		this.brushSize = VoxelBrushFootprint.ValidateSize(brushSize);
 	}
 
 	internal bool Paint(VoxelPaintHit hit, byte value)
@@ -298,11 +315,11 @@ internal sealed class VoxelHeightPaintStroke
 		if (hasPrevious && CanInterpolate(previous, hit))
 		{
 			foreach ((int x, int y) in TraverseLine(previous.LocalX, previous.LocalY, hit.LocalX, hit.LocalY))
-				changed |= PaintPixel(x, y, value);
+				changed |= PaintFootprint(x, y, value);
 		}
 		else
 		{
-			changed = PaintPixel(hit.LocalX, hit.LocalY, value);
+			changed = PaintFootprint(hit.LocalX, hit.LocalY, value);
 		}
 		previous = hit;
 		hasPrevious = true;
@@ -313,11 +330,37 @@ internal sealed class VoxelHeightPaintStroke
 	{
 		if (field == null || heightDeltas.Count == 0)
 			return false;
+		var affected = new HashSet<(int X, int Y)>();
+		foreach ((int x, int y) in heightDeltas.Keys)
+		{
+			for (int offsetY = -1; offsetY <= 1; offsetY++)
+			for (int offsetX = -1; offsetX <= 1; offsetX++)
+				affected.Add((x + offsetX, y + offsetY));
+		}
+		foreach (AtlasPixelDelta delta in heights.RegenerateNormals(target, field, affected))
+		{
+			var key = (delta.DocumentKey, delta.X, delta.Y);
+			if (normalDeltas.TryGetValue(key, out AtlasPixelDelta current))
+				normalDeltas[key] = current with { Current = delta.Current };
+			else
+				normalDeltas[key] = delta;
+		}
 		session.History.Commit(normalDeltas.Values, new[]
 		{
 			new AtlasHeightCacheChange(field.Key, before, field.Snapshot()),
 		});
 		return true;
+	}
+
+	private bool PaintFootprint(int centerX, int centerY, byte value)
+	{
+		bool changed = false;
+		foreach ((int x, int y) in VoxelBrushFootprint.Enumerate(
+			centerX, centerY, brushSize, 0, 0, target.Width, target.Height))
+		{
+			changed |= PaintPixel(x, y, value);
+		}
+		return changed;
 	}
 
 	private bool PaintPixel(int x, int y, byte value)
@@ -331,18 +374,6 @@ internal sealed class VoxelHeightPaintStroke
 		else
 			heightDeltas[(x, y)] = (previousValue, value);
 
-		IEnumerable<(int X, int Y)> affected =
-			from offsetY in Enumerable.Range(-1, 3)
-			from offsetX in Enumerable.Range(-1, 3)
-			select (x + offsetX, y + offsetY);
-		foreach (AtlasPixelDelta delta in heights.RegenerateNormals(target, field, affected))
-		{
-			var key = (delta.DocumentKey, delta.X, delta.Y);
-			if (normalDeltas.TryGetValue(key, out AtlasPixelDelta current))
-				normalDeltas[key] = current with { Current = delta.Current };
-			else
-				normalDeltas[key] = delta;
-		}
 		return true;
 	}
 
@@ -366,6 +397,35 @@ internal sealed class VoxelHeightPaintStroke
 			int doubled = error * 2;
 			if (doubled >= dy) { error += dy; x0 += sx; }
 			if (doubled <= dx) { error += dx; y0 += sy; }
+		}
+	}
+}
+
+internal static class VoxelBrushFootprint
+{
+	internal const int MinimumSize = 1;
+	internal const int MaximumSize = 3;
+
+	internal static int ValidateSize(int size)
+	{
+		if (size is < MinimumSize or > MaximumSize)
+			throw new ArgumentOutOfRangeException(nameof(size), size, "Brush size must be 1, 2, or 3 texels.");
+		return size;
+	}
+
+	internal static IEnumerable<(int X, int Y)> Enumerate(
+		int centerX, int centerY, int size,
+		int minimumX, int minimumY, int maximumXExclusive, int maximumYExclusive)
+	{
+		ValidateSize(size);
+		int startX = centerX - size / 2;
+		int startY = centerY - size / 2;
+		for (int y = startY; y < startY + size; y++)
+		for (int x = startX; x < startX + size; x++)
+		{
+			if (x >= minimumX && x < maximumXExclusive
+				&& y >= minimumY && y < maximumYExclusive)
+				yield return (x, y);
 		}
 	}
 }

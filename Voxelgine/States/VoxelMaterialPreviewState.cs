@@ -43,6 +43,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private VoxelMaterialPaintGeometry paintGeometry;
 	private AtlasPaintLayer selectedLayer = AtlasPaintLayer.BaseColor;
 	private AtlasPixel selectedColor = new(0x47, 0xc8, 0xe8, 0xff);
+	private int brushSize = 1;
 	private VoxelPaintHit hoverHit;
 	private AtlasPaintTarget? lastNormalTarget;
 	private bool hasHoverHit;
@@ -117,6 +118,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			SelectPaintLayer,
 			SelectNormalPaintMode,
 			SetPaintColor,
+			SetBrushSize,
 			SetNormalStrength,
 			BeginNormalStrengthEdit,
 			EndNormalStrengthEdit,
@@ -270,35 +272,35 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			if (Window.InMgr.IsInputPressed(InputKey.Click_Left))
 			{
 				if (selectedLayer == AtlasPaintLayer.Normal && normalPaintMode == NormalPaintMode.Height)
-					activeHeightStroke = new VoxelHeightPaintStroke(editingSession, heightStore);
+					activeHeightStroke = new VoxelHeightPaintStroke(editingSession, heightStore, brushSize);
 				else
 					activeStroke = new VoxelPaintStroke(editingSession, heightStore,
-						selectedLayer == AtlasPaintLayer.Normal);
+						selectedLayer == AtlasPaintLayer.Normal, brushSize);
 			}
 			if (activeStroke != null && Window.InMgr.IsInputDown(InputKey.Click_Left)
 				&& activeStroke.Paint(hoverHit, EncodeSelectedColor()))
 			{
-				materialPreviewDirty = visualizationPreviewDirty = true;
 				inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
 			}
 			if (activeHeightStroke != null && Window.InMgr.IsInputDown(InputKey.Click_Left)
 				&& activeHeightStroke.Paint(hoverHit, selectedColor.R))
 			{
-				materialPreviewDirty = visualizationPreviewDirty = true;
 				inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
 			}
 		}
 		if (activeStroke != null && Window.InMgr.IsInputReleased(InputKey.Click_Left))
 		{
-			activeStroke.Commit();
+			bool changed = activeStroke.Commit();
 			activeStroke = null;
-			materialPreviewDirty = visualizationPreviewDirty = true;
+			if (changed)
+				materialPreviewDirty = visualizationPreviewDirty = true;
 		}
 		if (activeHeightStroke != null && Window.InMgr.IsInputReleased(InputKey.Click_Left))
 		{
-			activeHeightStroke.Commit();
+			bool changed = activeHeightStroke.Commit();
 			activeHeightStroke = null;
-			materialPreviewDirty = visualizationPreviewDirty = true;
+			if (changed)
+				materialPreviewDirty = visualizationPreviewDirty = true;
 		}
 
 		if (!overControls)
@@ -433,16 +435,19 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		}
 
 		selectedBlock = blockType;
+		bool committedStroke = false;
 		if (activeStroke != null)
 		{
-			activeStroke.Commit();
+			committedStroke |= activeStroke.Commit();
 			activeStroke = null;
 		}
 		if (activeHeightStroke != null)
 		{
-			activeHeightStroke.Commit();
+			committedStroke |= activeHeightStroke.Commit();
 			activeHeightStroke = null;
 		}
+		if (committedStroke)
+			materialPreviewDirty = true;
 		map.SetBlock(0, 0, 0, selectedBlock);
 		paintGeometry = voxelScene.GetMaterialPaintGeometry(new BlockValue(selectedBlock));
 		visualizationPreviewDirty = true;
@@ -611,6 +616,12 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	}
 
 	internal void SetPaintColor(AtlasPixel color) => selectedColor = color;
+
+	internal void SetBrushSize(int size)
+	{
+		brushSize = VoxelBrushFootprint.ValidateSize(size);
+		inspector.SetBrushSize(brushSize);
+	}
 
 	internal void SetNormalStrength(float strength)
 	{

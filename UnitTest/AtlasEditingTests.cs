@@ -66,6 +66,52 @@ public sealed class AtlasEditingTests
 		Assert.Equal(new AtlasPixel(50, 60, 70, 80), target.Get(0, 0));
 	}
 
+	[Theory]
+	[InlineData(1, 1)]
+	[InlineData(2, 4)]
+	[InlineData(3, 9)]
+	public void BrushSizePaintsExpectedSquareFootprint(int brushSize, int expectedPixels)
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		AtlasPaintTarget target = session.GetTarget(BlockType.Stone, AtlasPaintLayer.BaseColor, 0);
+		AtlasPixel color = new(17, 31, 47, 113);
+		var hit = new VoxelPaintHit(1, default, default, VoxelFace.PositiveY,
+			0, default, 0, target, 12, 12);
+		var stroke = new VoxelPaintStroke(session, brushSize: brushSize);
+
+		Assert.True(stroke.Paint(hit, color));
+		Assert.Equal(expectedPixels,
+			Enumerable.Range(0, target.Height)
+				.SelectMany(y => Enumerable.Range(0, target.Width).Select(x => target.Get(x, y)))
+				.Count(pixel => pixel == color));
+		Assert.True(stroke.Commit());
+	}
+
+	[Fact]
+	public void HeightStrokeDefersNormalGenerationUntilCommit()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		var heights = new AtlasHeightStore();
+		AtlasPaintTarget target = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		AtlasPixel[] normalBefore = Enumerable.Range(0, target.Height)
+			.SelectMany(y => Enumerable.Range(0, target.Width).Select(x => target.Get(x, y)))
+			.ToArray();
+		var hit = new VoxelPaintHit(1, default, default, VoxelFace.PositiveY,
+			0, default, 0, target, 12, 12);
+		var stroke = new VoxelHeightPaintStroke(session, heights, brushSize: 3);
+
+		Assert.True(stroke.Paint(hit, 255));
+		Assert.Equal(normalBefore, Enumerable.Range(0, target.Height)
+			.SelectMany(y => Enumerable.Range(0, target.Width).Select(x => target.Get(x, y)))
+			.ToArray());
+		Assert.True(stroke.Commit());
+		Assert.NotEqual(normalBefore, Enumerable.Range(0, target.Height)
+			.SelectMany(y => Enumerable.Range(0, target.Width).Select(x => target.Get(x, y)))
+			.ToArray());
+	}
+
 	[Fact]
 	public void GuardedSaveWritesOnlyInjectedRootsAndDetectsLaterConflict()
 	{

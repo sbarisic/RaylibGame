@@ -53,6 +53,7 @@ internal sealed class VoxelMaterialInspector
 	private readonly Button backButton;
 	private readonly Button vectorModeButton;
 	private readonly Button heightModeButton;
+	private readonly Dictionary<int, Button> brushSizeButtons = new();
 	private readonly Panel lightingCard;
 	private AtlasPaintLayer selectedLayer;
 	private NormalPaintMode normalPaintMode;
@@ -77,6 +78,7 @@ internal sealed class VoxelMaterialInspector
 		Action<AtlasPaintLayer> selectLayer,
 		Action<NormalPaintMode> selectNormalMode,
 		Action<AtlasPixel> setPaintColor,
+		Action<int> selectBrushSize,
 		Action<float> setNormalStrength,
 		Action beginNormalStrength,
 		Action endNormalStrength,
@@ -279,7 +281,7 @@ internal sealed class VoxelMaterialInspector
 		atlasCard.AddChild(reloadStatus);
 		centralStack.AddChild(atlasCard);
 
-		Panel interactionCard = CardPanel(288);
+		Panel interactionCard = CardPanel(350);
 		interactionCard.AddChild(PositionedLabel("3D brush", 10, 8, Accent));
 		hoverStatus = PositionedLabel("Hover the block to select a texel", 10, 32, Primary);
 		viewportStatus = PositionedLabel(string.Empty, 10, 70, Muted);
@@ -289,11 +291,23 @@ internal sealed class VoxelMaterialInspector
 		interactionCard.AddChild(hoverStatus);
 		interactionCard.AddChild(viewportStatus);
 		interactionCard.AddChild(paintStatus);
-		interactionCard.AddChild(PositionedLabel("Shared tile usage", 10, 122, Accent));
+		interactionCard.AddChild(PositionedLabel("Brush size", 10, 122, Accent));
+		for (int size = VoxelBrushFootprint.MinimumSize; size <= VoxelBrushFootprint.MaximumSize; size++)
+		{
+			int captured = size;
+			Button button = FooterButton($"voxel_material_brush_{size}", $"{size} x {size}",
+				size == 1 ? Accent : Background, size == 1 ? Background : Primary,
+				() => { SetBrushSize(captured); selectBrushSize(captured); });
+			button.Position = new Vector2(10 + (size - 1) * 98, 146);
+			button.Size = new Vector2(90, 28);
+			interactionCard.AddChild(button);
+			brushSizeButtons.Add(size, button);
+		}
+		interactionCard.AddChild(PositionedLabel("Shared tile usage", 10, 184, Accent));
 		sharedUsageList = new ListBox
 		{
 			ID = "voxel_material_shared_usage",
-			Position = new Vector2(10, 146),
+			Position = new Vector2(10, 208),
 			Size = new Vector2(300, 132),
 			CustomItemHeight = 22,
 			Color = Background,
@@ -331,6 +345,7 @@ internal sealed class VoxelMaterialInspector
 		UpdateHeader();
 		SetSelectedLayer(AtlasPaintLayer.BaseColor);
 		SetNormalPaintMode(NormalPaintMode.Vector);
+		SetBrushSize(1);
 		SetPaintModeVisual(true);
 		SetSelectedColor(selectedColor);
 	}
@@ -368,6 +383,12 @@ internal sealed class VoxelMaterialInspector
 		}
 		swatches.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 108);
 		sharedUsageList.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 132);
+		float brushButtonWidth = Math.Max(0, (centralStack.Size.X - 32) / 3);
+		foreach ((int size, Button button) in brushSizeButtons)
+		{
+			button.Position = new Vector2(10 + (size - 1) * (brushButtonWidth + 6), 146);
+			button.Size = new Vector2(brushButtonWidth, 28);
+		}
 		AutomaticLightCheckBox.Size = new Vector2(20, 20);
 		materialInfo.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 126);
 		Control reload = centralStack.Children.SelectMany(child => child.Children)
@@ -494,6 +515,17 @@ internal sealed class VoxelMaterialInspector
 		finally
 		{
 			updatingPicker = false;
+		}
+	}
+
+	internal void SetBrushSize(int size)
+	{
+		VoxelBrushFootprint.ValidateSize(size);
+		foreach ((int value, Button button) in brushSizeButtons)
+		{
+			bool selected = value == size;
+			button.Color = selected ? Accent : Background;
+			button.SetColorOverride("Text", selected ? Background : Primary);
 		}
 	}
 

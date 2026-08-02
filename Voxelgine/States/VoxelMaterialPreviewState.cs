@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Buffers.Binary;
 using System.Numerics;
+using System.Security.Cryptography;
 using FishGfx.Graphics;
 using FishGfx.Voxels;
 using FishUI;
@@ -33,7 +34,23 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private readonly Camera camera = new();
 	private readonly VoxelMaterialInspectorModel inspectorModel;
 	private readonly VoxelMaterialInspector inspector;
+	private readonly AtlasEditingSession editingSession;
+	private readonly AtlasSaveService saveService;
+	private readonly EditorSurfaceTextureLease editorTextureLease;
+	private readonly AtlasReverseUsageCatalog reverseUsage;
 	private BlockType selectedBlock = DefaultBlockType;
+	private VoxelMaterialPaintGeometry paintGeometry;
+	private AtlasPaintLayer selectedLayer = AtlasPaintLayer.BaseColor;
+	private AtlasPixel selectedColor = new(0x47, 0xc8, 0xe8, 0xff);
+	private VoxelPaintHit hoverHit;
+	private bool hasHoverHit;
+	private VoxelPaintStroke activeStroke;
+	private bool paintMode = true;
+	private bool previewDirty;
+	private bool saveConflict;
+	private IDisposable saveReloadSuppression;
+	private bool awaitingSavedReload;
+	private float releaseSuppressionAt = float.PositiveInfinity;
 	private float cameraYaw = 35;
 	private float cameraElevation = 20;
 	private float cameraDistance = 4;
@@ -45,6 +62,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private bool automaticLightRotation;
 	private bool automaticValidation;
 	private bool automaticReloadSucceeded;
+	private Dictionary<string, byte[]> automaticSourceHashes;
 	private Task<FishUIDebugSnapshot> automaticCapture;
 	private int automaticFrame;
 	private bool disposed;
@@ -66,18 +84,36 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			fogQuality: VolumetricFogQuality.Off
 		);
 		voxelScene.Renderer.FogSettings = VoxelFogSettings.Disabled;
+		AtlasAssetPaths assetPaths = AtlasAssetPaths.Resolve(
+			engine.AsClient().AssetSourceRoot,
+			Path.Combine(AppContext.BaseDirectory, "data"),
+			Environment.CurrentDirectory,
+			AppContext.BaseDirectory);
+		editingSession = new AtlasEditingSession(assetPaths);
+		saveService = new AtlasSaveService(assetPaths, editingSession.Documents.Values);
+		editorTextureLease = voxelScene.AcquireEditorSurfaceTextureOverride();
+		reverseUsage = new AtlasReverseUsageCatalog(voxelScene.GetMaterialPreviewInfo);
+		paintGeometry = voxelScene.GetMaterialPaintGeometry(new BlockValue(selectedBlock));
 		fishWindow.Assets.ReloadCompleted += OnAssetReloadCompleted;
 		inspectorModel = new VoxelMaterialInspectorModel(selectedBlock);
 		inspector = new VoxelMaterialInspector(
 			inspectorModel,
+			editingSession,
 			SelectBlock,
 			value => lightAzimuth = value,
 			value => lightElevation = value,
 			value => directIntensity = value,
 			value => ambientIntensity = value,
 			value => automaticLightRotation = value,
+			SelectPaintLayer,
+			SetPaintColor,
+			SetPaintMode,
+			() => SavePaint(),
+			DiscardPaint,
+			UndoPaint,
+			RedoPaint,
 			RequestAtlasReload,
-			() => Client.RequestState(ClientStateKind.MainMenu));
+			RequestBack);
 		inspector.UpdateLayout(window.Width, window.Height);
 		gui.AddControl(inspector.Root);
 		UpdateMaterialInfo();
@@ -97,6 +133,13 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	internal void EnableAutomaticValidation()
 	{
 		automaticValidation = true;
+		automaticSourceHashes = editingSession.Paths.SourceRoot == null
+			? new Dictionary<string, byte[]>()
+			: editingSession.Documents.Values
+				.Select(document => Path.Combine(editingSession.Paths.SourceRoot, document.RelativePath))
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.ToDictionary(static path => path, static path => SHA256.HashData(File.ReadAllBytes(path)),
+					StringComparer.OrdinalIgnoreCase);
 	}
 
 	internal void ValidateAutomaticSnapshotBundle()
@@ -127,6 +170,9 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		foreach (string artifact in new[] { "snapshot.json", "recent-events.json", "interaction-summary.txt", "screenshot.png", "overlay.png" })
 			if (!File.Exists(Path.Combine(directory, artifact)))
 				throw new InvalidOperationException($"FishUI snapshot bundle is missing '{artifact}'.");
+		foreach ((string path, byte[] expected) in automaticSourceHashes)
+			if (!SHA256.HashData(File.ReadAllBytes(path)).AsSpan().SequenceEqual(expected))
+				throw new InvalidOperationException($"Automatic Material Lab validation modified source asset '{path}' before Save.");
 	}
 
 	public override void SwapTo()
@@ -144,9 +190,14 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 
 	public override void Tick(float gameTime)
 	{
+		if (!automaticValidation && editingSession.IsDirty && fishWindow.RenderWindow.IsCloseRequested)
+		{
+			fishWindow.RenderWindow.IsCloseRequested = false;
+			inspector.SetEditStatus("Unsaved changes: Save or Discard before closing the application");
+		}
 		if (Window.InMgr.IsInputPressed(InputKey.Esc))
 		{
-			Client.RequestState(ClientStateKind.MainMenu);
+			RequestBack();
 		}
 	}
 
@@ -159,13 +210,56 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		RunAutomaticValidationStep();
 		inspector.UpdateLayout(Window.Width, Window.Height);
+		ConfigureCamera();
 		Vector2 mouse = Window.InMgr.GetMousePos();
 		bool overControls = inspector.Contains(mouse);
-		if (!overControls && Window.InMgr.IsInputDown(InputKey.Click_Left))
+		bool orbiting = !overControls && (
+			Window.InMgr.IsInputDown(InputKey.Click_Middle)
+			|| Window.InMgr.IsInputDown(InputKey.Click_Left) && (!paintMode || Window.InMgr.IsInputDown(InputKey.Alt)));
+		if (orbiting)
 		{
 			Vector2 delta = mouse - lastMousePosition;
 			cameraYaw = WrapDegrees(cameraYaw + delta.X * 0.35f);
 			cameraElevation = Math.Clamp(cameraElevation - delta.Y * 0.25f, -85, 85);
+		}
+
+		hasHoverHit = !overControls && VoxelMaterialPicker.TryPick(
+			camera,
+			mouse,
+			new Vector2(Window.Width, Window.Height),
+			fishWindow.RenderWindow.FramebufferSize,
+			paintGeometry,
+			editingSession,
+			selectedLayer,
+			out hoverHit);
+		if (automaticValidation && automaticFrame >= 80 && selectedBlock == BlockType.Test
+			&& hasHoverHit && hoverHit.TextureLayer != 8)
+		{
+			throw new InvalidOperationException($"Test preview picked unexpected atlas tile {hoverHit.TextureLayer}.");
+		}
+		if (hasHoverHit)
+			inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
+		if (hasHoverHit && paintMode && !Window.InMgr.IsInputDown(InputKey.Alt))
+		{
+			if (Window.InMgr.IsInputPressed(InputKey.Click_Right))
+			{
+				selectedColor = hoverHit.Target.Get(hoverHit.LocalX, hoverHit.LocalY);
+				inspector.SetSelectedColor(selectedColor);
+			}
+			if (Window.InMgr.IsInputPressed(InputKey.Click_Left))
+				activeStroke = new VoxelPaintStroke(editingSession);
+			if (activeStroke != null && Window.InMgr.IsInputDown(InputKey.Click_Left)
+				&& activeStroke.Paint(hoverHit, EncodeSelectedColor()))
+			{
+				previewDirty = true;
+				inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
+			}
+		}
+		if (activeStroke != null && Window.InMgr.IsInputReleased(InputKey.Click_Left))
+		{
+			activeStroke.Commit();
+			activeStroke = null;
+			previewDirty = true;
 		}
 
 		if (!overControls)
@@ -184,10 +278,17 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			inspector.LightAzimuthSlider.Value = lightAzimuth;
 		}
 
-		ConfigureCamera();
 		ConfigureLighting();
+		if (previewDirty)
+			RebuildEditorSurfaceTextures();
 		voxelScene.Update(camera);
 		gui.Update(timing.DeltaTime, timing.TotalTime);
+		if (timing.TotalTime >= releaseSuppressionAt)
+		{
+			releaseSuppressionAt = float.PositiveInfinity;
+			saveReloadSuppression?.Dispose();
+			saveReloadSuppression = null;
+		}
 	}
 
 	public override GameStateRenderSettings GetRenderSettings(Vector2 framebufferSize)
@@ -235,6 +336,17 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			new FishGfx.Vertex3(Vector3.Zero, red),
 			new FishGfx.Vertex3(new Vector3(1.5f, 0, 0), red)
 		);
+
+		if (hasHoverHit)
+		{
+			FishGfx.Color marker = FishGfx.ColorSpace.SrgbToLinearColor(
+				hoverHit.Editable ? new FishGfx.Color(71, 200, 232) : new FishGfx.Color(255, 171, 64));
+			Vector3 center = hoverHit.Position + hoverHit.Normal * 0.008f;
+			const float radius = 0.035f;
+			pass.DrawLine(new FishGfx.Vertex3(center - Vector3.UnitX * radius, marker), new FishGfx.Vertex3(center + Vector3.UnitX * radius, marker));
+			pass.DrawLine(new FishGfx.Vertex3(center - Vector3.UnitY * radius, marker), new FishGfx.Vertex3(center + Vector3.UnitY * radius, marker));
+			pass.DrawLine(new FishGfx.Vertex3(center - Vector3.UnitZ * radius, marker), new FishGfx.Vertex3(center + Vector3.UnitZ * radius, marker));
+		}
 		pass.DrawLine(
 			new FishGfx.Vertex3(Vector3.Zero, green),
 			new FishGfx.Vertex3(new Vector3(0, 1.5f, 0), green)
@@ -259,6 +371,8 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 
 		disposed = true;
 		fishWindow.Assets.ReloadCompleted -= OnAssetReloadCompleted;
+		saveReloadSuppression?.Dispose();
+		editorTextureLease.Dispose();
 		renderQueue.Clear();
 		voxelScene.Dispose();
 		gui.Dispose();
@@ -277,7 +391,13 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		}
 
 		selectedBlock = blockType;
+		if (activeStroke != null)
+		{
+			activeStroke.Commit();
+			activeStroke = null;
+		}
 		map.SetBlock(0, 0, 0, selectedBlock);
+		paintGeometry = voxelScene.GetMaterialPaintGeometry(new BlockValue(selectedBlock));
 		inspector.Select(blockType);
 		UpdateMaterialInfo();
 	}
@@ -332,6 +452,11 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 
 	private void RequestAtlasReload()
 	{
+		if (editingSession.IsDirty)
+		{
+			inspector.SetReloadStatus("Unsaved changes: Save or Discard before Reload");
+			return;
+		}
 		inspector.SetReloadStatus(voxelScene.RequestSurfaceTextureReload()
 			? "Queued"
 			: "Failed - surface texture asset is unavailable");
@@ -354,6 +479,146 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		{
 			automaticReloadSucceeded = result.Succeeded;
 		}
+		if (awaitingSavedReload)
+		{
+			awaitingSavedReload = false;
+			if (result.Succeeded)
+			{
+				editorTextureLease.Clear();
+				releaseSuppressionAt = Client.TotalTime + 0.2f;
+			}
+			else
+			{
+				inspector.SetReloadStatus($"Saved, but reload failed; editor preview retained: {result.Message}");
+				releaseSuppressionAt = Client.TotalTime + 0.2f;
+			}
+		}
+	}
+
+	private void RebuildEditorSurfaceTextures()
+	{
+		previewDirty = false;
+		try
+		{
+			using AtlasTextureSnapshot snapshot = editingSession.CreateTextureSnapshot();
+			OwnedVoxelSurfaceTextureSet textures = voxelScene.CreateEditorSurfaceTextures(
+				snapshot.BaseColor, snapshot.Normal, snapshot.Specular, snapshot.Roughness);
+			editorTextureLease.QueueReplacement(textures);
+			inspector.SetEditStatus(editingSession.IsDirty ? "Unsaved preview" : "Preview synchronized");
+		}
+		catch (Exception exception)
+		{
+			inspector.SetEditStatus($"Preview rebuild failed; last valid preview retained: {exception.Message}");
+		}
+	}
+
+	private AtlasPixel EncodeSelectedColor()
+	{
+		return selectedLayer switch
+		{
+			AtlasPaintLayer.BaseColor => selectedColor,
+			AtlasPaintLayer.Normal => AtlasPixel.Normal(
+				selectedColor.R / 255f * 2 - 1,
+				selectedColor.G / 255f * 2 - 1),
+			AtlasPaintLayer.Specular or AtlasPaintLayer.Roughness => AtlasPixel.Scalar(selectedColor.R),
+			_ => throw new ArgumentOutOfRangeException(),
+		};
+	}
+
+	internal void SelectPaintLayer(AtlasPaintLayer layer)
+	{
+		selectedLayer = layer;
+		inspector.SetSelectedLayer(layer);
+	}
+
+	internal void SetPaintColor(AtlasPixel color) => selectedColor = color;
+
+	internal void SetPaintMode(bool enabled) => paintMode = enabled;
+
+	internal void UndoPaint()
+	{
+		if (editingSession.History.Undo(editingSession.Documents))
+			previewDirty = true;
+	}
+
+	internal void RedoPaint()
+	{
+		if (editingSession.History.Redo(editingSession.Documents))
+			previewDirty = true;
+	}
+
+	internal void DiscardPaint()
+	{
+		try
+		{
+			editingSession.Discard();
+			editorTextureLease.Clear();
+			previewDirty = false;
+			saveConflict = false;
+			voxelScene.RequestSurfaceTextureReload();
+			inspector.SetEditStatus("Changes discarded; authoritative assets reloaded");
+		}
+		catch (Exception exception)
+		{
+			inspector.SetEditStatus($"Discard failed; working preview retained: {exception.Message}");
+		}
+	}
+
+	internal void SavePaint(bool overwriteConflicts = false)
+	{
+		overwriteConflicts |= saveConflict;
+		saveConflict = false;
+		if (editingSession.IsReadOnly)
+		{
+			inspector.SetEditStatus("Read-only: provide --asset-source-root <Voxelgine/data>");
+			return;
+		}
+		saveReloadSuppression?.Dispose();
+		saveReloadSuppression = fishWindow.Assets.AcquireReloadSuppression(FishGfxVoxelScene.SurfaceTextureAssetId);
+		fishWindow.Assets.ClearQueuedReloads(FishGfxVoxelScene.SurfaceTextureAssetId);
+		AtlasSaveResult result;
+		try
+		{
+			result = saveService.Save(editingSession.BuildSaveDocuments(), overwriteConflicts);
+		}
+		catch (Exception exception)
+		{
+			saveReloadSuppression.Dispose();
+			saveReloadSuppression = null;
+			inspector.SetEditStatus($"Save failed before replacement: {exception.Message}");
+			return;
+		}
+		if (result.Status == AtlasSaveStatus.Conflict)
+		{
+			saveConflict = true;
+			inspector.SetEditStatus(result.Message + " Press Save again to explicitly Overwrite, or Discard to Reload External.");
+		}
+		else
+		{
+			inspector.SetEditStatus(result.Message);
+		}
+		if (!result.Succeeded)
+		{
+			saveReloadSuppression.Dispose();
+			saveReloadSuppression = null;
+			return;
+		}
+		awaitingSavedReload = voxelScene.RequestSurfaceTextureReload();
+		if (!awaitingSavedReload)
+		{
+			inspector.SetEditStatus("Saved, but the explicit asset reload could not be queued; preview retained");
+			releaseSuppressionAt = Client.TotalTime + 0.2f;
+		}
+	}
+
+	private void RequestBack()
+	{
+		if (editingSession.IsDirty)
+		{
+			inspector.SetEditStatus("Unsaved changes: choose Save, Discard, or remain in Material Lab");
+			return;
+		}
+		Client.RequestState(ClientStateKind.MainMenu);
 	}
 
 	private void RunAutomaticValidationStep()
@@ -371,6 +636,37 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		if (automaticFrame == 90)
 			automaticCapture = FishUIDiagnostics.CaptureAsync(gui.UI,
 				new FishUIDebugSnapshotOptions(), FishUIDebugCaptureReason.TestFailure);
+		if (automaticFrame == 12)
+		{
+			PaintAutomaticLayerSet(BlockType.Stone, 0, 3, 5);
+			SelectBlock(BlockType.Stone);
+		}
+		if (automaticFrame == 32)
+		{
+			PaintAutomaticLayerSet(BlockType.StoneStairs, 0, 12, 9);
+			SelectBlock(BlockType.StoneStairs);
+		}
+		if (automaticFrame == 52)
+		{
+			AtlasPaintTarget barrel = editingSession.GetTarget(BlockType.Barrel, AtlasPaintLayer.BaseColor, -1);
+			barrel.Set(4, 7, new AtlasPixel(0x47, 0xc8, 0xe8, 0xff));
+			previewDirty = true;
+			SelectBlock(BlockType.Barrel);
+		}
+		if (automaticFrame == 72)
+		{
+			AtlasPaintTarget test = editingSession.GetTarget(BlockType.Test, AtlasPaintLayer.BaseColor, 8);
+			test.Set(20, 20, new AtlasPixel(0x47, 0xc8, 0xe8, 0xff));
+			previewDirty = true;
+			SelectBlock(BlockType.Test);
+		}
+		if (automaticFrame == 80 && paintGeometry.Model.Vertices.Any(static vertex => vertex.TextureLayer != 8))
+			throw new InvalidOperationException("Test preview geometry does not consistently reference atlas tile 8.");
+		if (automaticFrame == 80 && (map.GetBlock(0, 0, 0) != BlockType.Test
+			|| voxelScene.World.GetVoxel(0, 0, 0).MaterialId != voxelScene.MaterialIds[BlockType.Test]))
+		{
+			throw new InvalidOperationException("Test preview world material identity is stale.");
+		}
 
 		BlockType? blockType = automaticFrame switch
 		{
@@ -381,13 +677,26 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			50 => BlockType.Barrel,
 			60 => BlockType.Campfire,
 			70 => BlockType.Foliage,
-			80 => DefaultBlockType,
+			80 => BlockType.Test,
 			_ => null,
 		};
 		if (blockType.HasValue)
 		{
 			SelectBlock(blockType.Value);
 		}
+	}
+
+	private void PaintAutomaticLayerSet(BlockType block, int tile, int x, int y)
+	{
+		AtlasPaintTarget baseColor = editingSession.GetTarget(block, AtlasPaintLayer.BaseColor, tile);
+		AtlasPaintTarget normal = editingSession.GetTarget(block, AtlasPaintLayer.Normal, tile);
+		AtlasPaintTarget specular = editingSession.GetTarget(block, AtlasPaintLayer.Specular, tile);
+		AtlasPaintTarget roughness = editingSession.GetTarget(block, AtlasPaintLayer.Roughness, tile);
+		baseColor.Set(x, y, new AtlasPixel(0xd1, 0xa3, 0x65, 0xff));
+		normal.Set(x, y, AtlasPixel.Normal(0.25f, 0.5f));
+		specular.Set(x, y, AtlasPixel.Scalar(192));
+		roughness.Set(x, y, AtlasPixel.Scalar(64));
+		previewDirty = true;
 	}
 
 	private static float WrapDegrees(float value)

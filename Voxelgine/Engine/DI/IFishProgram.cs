@@ -12,6 +12,9 @@ public interface IClientEngineRunner : IFishEngineRunner
 
 	RuntimePaths RuntimePaths { get; }
 
+	/// <summary>Explicit Material Lab source data root, or null for bounded project discovery.</summary>
+	string AssetSourceRoot => null;
+
 	IGameWindow Window { get; }
 
 	/// <summary>The hosted server loop, or null when this client is not hosting.</summary>

@@ -16,6 +16,8 @@ internal sealed class VoxelMaterialInspector
 	private static readonly FishColor Muted = new(0x9a, 0xa8, 0xb8);
 
 	private readonly VoxelMaterialInspectorModel model;
+	private readonly AtlasEditingSession editingSession;
+	private readonly Action<AtlasPixel> setPaintColor;
 	private readonly Panel root;
 	private readonly Label header;
 	private readonly Textbox search;
@@ -24,23 +26,59 @@ internal sealed class VoxelMaterialInspector
 	private readonly ListBox blockList;
 	private readonly Label materialInfo;
 	private readonly Label reloadStatus;
+	private readonly Label paintStatus;
+	private readonly Label hoverStatus;
+	private readonly ListBox sharedUsageList;
+	private readonly Dictionary<AtlasPaintLayer, AtlasPaintTarget?> layerTargets = new();
+	private readonly Dictionary<AtlasPaintLayer, AtlasLayerThumbnail> thumbnails = new();
+	private readonly AtlasSwatchGrid swatches;
+	private readonly Slider pickerOne;
+	private readonly Slider pickerTwo;
+	private readonly Slider pickerThree;
+	private readonly Slider pickerAlpha;
+	private readonly Label pickerOneLabel;
+	private readonly Label pickerTwoLabel;
+	private readonly Label pickerThreeLabel;
+	private readonly Label pickerAlphaLabel;
+	private readonly Textbox hexColor;
+	private readonly Textbox[] rgbaFields;
+	private readonly Button saveButton;
+	private readonly Button discardButton;
+	private readonly Button undoButton;
+	private readonly Button redoButton;
 	private readonly Label footerHint;
 	private readonly Button backButton;
+	private AtlasPaintLayer selectedLayer;
+	private AtlasPixel selectedColor = new(0x47, 0xc8, 0xe8, 0xff);
+	private BlockType selectedBlock;
+	private bool updatingPicker;
+	private (BlockType Block, int Tile)? lastUsageKey;
 	internal readonly Slider LightAzimuthSlider;
 	internal readonly CheckBox AutomaticLightCheckBox;
 
 	internal VoxelMaterialInspector(
 		VoxelMaterialInspectorModel model,
+		AtlasEditingSession editingSession,
 		Action<BlockType> select,
 		Action<float> setAzimuth,
 		Action<float> setElevation,
 		Action<float> setDirect,
 		Action<float> setAmbient,
 		Action<bool> setAutomatic,
+		Action<AtlasPaintLayer> selectLayer,
+		Action<AtlasPixel> setPaintColor,
+		Action<bool> setPaintMode,
+		Action save,
+		Action discard,
+		Action undo,
+		Action redo,
 		Action reload,
 		Action back)
 	{
 		this.model = model;
+		this.editingSession = editingSession;
+		this.setPaintColor = setPaintColor;
+		selectedBlock = model.Selected;
 		root = new Panel { ID = "voxel_material_inspector", Color = Background };
 		header = Label("voxel_material_header", string.Empty, Primary);
 		search = new Textbox
@@ -87,6 +125,90 @@ internal sealed class VoxelMaterialInspector
 		infoCard.AddChild(materialInfo);
 		centralStack.AddChild(infoCard);
 
+		Panel layerCard = CardPanel(132);
+		layerCard.AddChild(PositionedLabel("Paint layers", 10, 8, Accent));
+		foreach (AtlasPaintLayer layer in Enum.GetValues<AtlasPaintLayer>())
+		{
+			layerTargets[layer] = null;
+			AtlasPaintLayer captured = layer;
+			var thumbnail = new AtlasLayerThumbnail(layer, () => layerTargets[captured], selected =>
+			{
+				SetSelectedLayer(selected);
+				selectLayer(selected);
+			});
+			thumbnail.Position = new Vector2(10 + (int)layer * 78, 34);
+			thumbnail.Size = new Vector2(70, 88);
+			layerCard.AddChild(thumbnail);
+			thumbnails.Add(layer, thumbnail);
+		}
+		centralStack.AddChild(layerCard);
+
+		Panel paintCard = CardPanel(326);
+		paintCard.AddChild(PositionedLabel("Color tools", 10, 8, Accent));
+		pickerOneLabel = PositionedLabel("Hue", 10, 34, Muted);
+		pickerTwoLabel = PositionedLabel("Saturation", 10, 80, Muted);
+		pickerThreeLabel = PositionedLabel("Value", 10, 126, Muted);
+		pickerAlphaLabel = PositionedLabel("Alpha", 10, 172, Muted);
+		paintCard.AddChild(pickerOneLabel);
+		paintCard.AddChild(pickerTwoLabel);
+		paintCard.AddChild(pickerThreeLabel);
+		paintCard.AddChild(pickerAlphaLabel);
+		pickerOne = AddPickerSlider(paintCard, "voxel_material_picker_1", 52);
+		pickerTwo = AddPickerSlider(paintCard, "voxel_material_picker_2", 98);
+		pickerThree = AddPickerSlider(paintCard, "voxel_material_picker_3", 144);
+		pickerAlpha = AddPickerSlider(paintCard, "voxel_material_picker_alpha", 190);
+		foreach (Slider slider in new[] { pickerOne, pickerTwo, pickerThree, pickerAlpha })
+			slider.OnValueChanged += (_, _) => PickerChanged();
+		rgbaFields = new Textbox[4];
+		for (int component = 0; component < rgbaFields.Length; component++)
+		{
+			int captured = component;
+			var field = new Textbox
+			{
+				ID = $"voxel_material_rgba_{component}",
+				Position = new Vector2(10 + component * 58, 224),
+				Size = new Vector2(52, 30),
+				Placeholder = "RGBA"[component].ToString(),
+				PlaceholderColor = Muted,
+				TextColorOverride = Primary,
+				Color = Background,
+			};
+			field.OnTextChanged += (_, value) => ParseComponent(captured, value);
+			paintCard.AddChild(field);
+			rgbaFields[component] = field;
+		}
+		hexColor = new Textbox
+		{
+			ID = "voxel_material_hex_color",
+			Position = new Vector2(10, 268),
+			Size = new Vector2(120, 32),
+			Text = selectedColor.Hex,
+			TextColorOverride = Primary,
+			Color = Background,
+		};
+		hexColor.OnTextChanged += (_, value) => ParseHex(value);
+		paintCard.AddChild(hexColor);
+		var paintMode = new CheckBox
+		{
+			ID = "voxel_material_paint_mode",
+			Position = new Vector2(146, 274),
+			Size = new Vector2(20),
+			IsChecked = true,
+			Color = Accent,
+		};
+		paintMode.OnCheckedChanged += (_, value) => setPaintMode(value);
+		paintCard.AddChild(paintMode);
+		paintCard.AddChild(PositionedLabel("Paint mode", 174, 274, Primary));
+		centralStack.AddChild(paintCard);
+
+		Panel swatchCard = CardPanel(154);
+		swatchCard.AddChild(PositionedLabel("Common + sampled colors", 10, 8, Accent));
+		swatches = new AtlasSwatchGrid(BuildSwatches, SetSelectedColor);
+		swatches.Position = new Vector2(10, 34);
+		swatches.Size = new Vector2(300, 108);
+		swatchCard.AddChild(swatches);
+		centralStack.AddChild(swatchCard);
+
 		Panel lightingCard = CardPanel(276);
 		lightingCard.AddChild(PositionedLabel("Lighting", 10, 8, Accent));
 		LightAzimuthSlider = AddSlider(lightingCard, "voxel_material_light_azimuth", "Azimuth", 38,
@@ -126,12 +248,37 @@ internal sealed class VoxelMaterialInspector
 		atlasCard.AddChild(reloadStatus);
 		centralStack.AddChild(atlasCard);
 
+		Panel interactionCard = CardPanel(264);
+		interactionCard.AddChild(PositionedLabel("3D brush", 10, 8, Accent));
+		hoverStatus = PositionedLabel("Hover the block to select a texel", 10, 32, Primary);
+		paintStatus = PositionedLabel(editingSession.IsReadOnly
+			? "Read-only: use --asset-source-root <Voxelgine/data>"
+			: "Ready", 10, 70, editingSession.IsReadOnly ? new FishColor(0xff, 0xab, 0x40) : Muted);
+		interactionCard.AddChild(hoverStatus);
+		interactionCard.AddChild(paintStatus);
+		interactionCard.AddChild(PositionedLabel("Shared tile usage", 10, 98, Accent));
+		sharedUsageList = new ListBox
+		{
+			ID = "voxel_material_shared_usage",
+			Position = new Vector2(10, 122),
+			Size = new Vector2(300, 132),
+			CustomItemHeight = 22,
+			Color = Background,
+			CustomItemRenderer = DrawBlockRow,
+		};
+		interactionCard.AddChild(sharedUsageList);
+		centralStack.AddChild(interactionCard);
+
 		central.AddChild(centralStack);
 		root.AddChild(header);
 		root.AddChild(search);
 		root.AddChild(central);
 		footerHint = Label("voxel_material_footer_hint",
-			"Drag outside to orbit  •  Wheel to zoom\nCtrl+Shift+F12 creates a debug snapshot", Muted);
+			"Paint L-drag  •  Sample R-click  •  Orbit Alt+L/M\nWheel zoom  •  Ctrl+Shift+F12 snapshot", Muted);
+		saveButton = FooterButton("voxel_material_save", "Save", Accent, Background, save);
+		discardButton = FooterButton("voxel_material_discard", "Discard", Card, Primary, discard);
+		undoButton = FooterButton("voxel_material_undo", "Undo", Card, Primary, undo);
+		redoButton = FooterButton("voxel_material_redo", "Redo", Card, Primary, redo);
 		backButton = new Button
 		{
 			ID = "voxel_material_back",
@@ -141,10 +288,16 @@ internal sealed class VoxelMaterialInspector
 		backButton.SetColorOverride("Text", Primary);
 		backButton.OnButtonPressed += (_, _, _) => back();
 		root.AddChild(footerHint);
+		root.AddChild(saveButton);
+		root.AddChild(discardButton);
+		root.AddChild(undoButton);
+		root.AddChild(redoButton);
 		root.AddChild(backButton);
 
 		RebuildList(string.Empty);
 		UpdateHeader();
+		SetSelectedLayer(AtlasPaintLayer.BaseColor);
+		SetSelectedColor(selectedColor);
 	}
 
 	internal Control Root => root;
@@ -172,21 +325,39 @@ internal sealed class VoxelMaterialInspector
 			card.Size = new Vector2(centralStack.Size.X, card.Size.Y);
 		foreach (Slider slider in centralStack.Children.SelectMany(child => child.Children).OfType<Slider>())
 			slider.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), slider.Size.Y);
+		float thumbnailWidth = Math.Max(24, (centralStack.Size.X - 20 - 24) / 4);
+		foreach ((AtlasPaintLayer layer, AtlasLayerThumbnail thumbnail) in thumbnails)
+		{
+			thumbnail.Position = new Vector2(10 + (int)layer * (thumbnailWidth + 8), 34);
+			thumbnail.Size = new Vector2(thumbnailWidth, 88);
+		}
+		swatches.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 108);
+		sharedUsageList.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 132);
 		AutomaticLightCheckBox.Size = new Vector2(20, 20);
 		materialInfo.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 126);
 		Control reload = centralStack.Children.SelectMany(child => child.Children)
 			.First(child => child.ID == "voxel_material_reload_atlases");
 		reload.Size = new Vector2(Math.Max(0, centralStack.Size.X - 20), 34);
 
-		float footerY = Math.Max(0, Layout.Size.Y - 76);
+		float footerY = Math.Max(0, Layout.Size.Y - 126);
 		footerHint.Position = new Vector2(12, footerY);
-		footerHint.Size = new Vector2(contentWidth, 32);
-		backButton.Position = new Vector2(12, footerY + 36);
-		backButton.Size = new Vector2(contentWidth, 34);
+		footerHint.Size = new Vector2(contentWidth, 38);
+		float actionY = footerY + 42;
+		float buttonWidth = Math.Max(0, (contentWidth - 18) / 4);
+		Button[] actions = { saveButton, discardButton, undoButton, redoButton };
+		for (int index = 0; index < actions.Length; index++)
+		{
+			actions[index].Position = new Vector2(12 + index * (buttonWidth + 6), actionY);
+			actions[index].Size = new Vector2(buttonWidth, 32);
+		}
+		backButton.Position = new Vector2(12, actionY + 38);
+		backButton.Size = new Vector2(contentWidth, 32);
 	}
 
 	internal void UpdateMaterialInfo(VoxelMaterialPreviewInfo info)
 	{
+		selectedBlock = info.BlockType;
+		lastUsageKey = null;
 		var tiles = info.AtlasTiles;
 		materialInfo.Text =
 			$"Material identity  {(int)info.BlockType}: {info.Name}\n" +
@@ -195,9 +366,80 @@ internal sealed class VoxelMaterialInspector
 			$"Surface maps  {(info.SurfaceMapsEnabled ? "Enabled" : "Disabled")}\n" +
 			$"Faces +X/-X/+Y/-Y/+Z/-Z\n" +
 			$"{tiles.PositiveX} / {tiles.NegativeX} / {tiles.PositiveY} / {tiles.NegativeY} / {tiles.PositiveZ} / {tiles.NegativeZ}";
+		int defaultTile = info.IsCustomModel ? -1 : tiles.PositiveY;
+		foreach (AtlasPaintLayer layer in Enum.GetValues<AtlasPaintLayer>())
+			layerTargets[layer] = editingSession.GetTarget(info.BlockType, layer, defaultTile);
 	}
 
 	internal void SetReloadStatus(string value) => reloadStatus.Text = value;
+
+	internal void SetEditStatus(string value) => paintStatus.Text = value;
+
+	internal void RefreshPaintData(
+		VoxelPaintHit hit,
+		AtlasPaintLayer layer,
+		IReadOnlyList<string> sharedUsage)
+	{
+		foreach (AtlasPaintLayer paintLayer in Enum.GetValues<AtlasPaintLayer>())
+			layerTargets[paintLayer] = editingSession.GetTarget(selectedBlock, paintLayer, hit.TextureLayer);
+		string target = hit.Target.CustomDefinition == null
+			? $"tile {hit.TextureLayer}"
+			: hit.Target.CustomDefinition.RelativePath;
+		hoverStatus.Text =
+			$"{hit.Face}  •  {target}  •  {layer}  •  pixel {hit.LocalX},{hit.LocalY}\n" +
+			(hit.Editable ? $"Affects {sharedUsage.Count} mapped face/state uses" : "Read-only surface-map region");
+		if (lastUsageKey != (selectedBlock, hit.TextureLayer))
+		{
+			lastUsageKey = (selectedBlock, hit.TextureLayer);
+			sharedUsageList.Items.Clear();
+			foreach (string usage in sharedUsage)
+				sharedUsageList.AddItem(new ListBoxItem(usage));
+		}
+	}
+
+	internal void SetSelectedLayer(AtlasPaintLayer layer)
+	{
+		selectedLayer = layer;
+		foreach ((AtlasPaintLayer key, AtlasLayerThumbnail thumbnail) in thumbnails)
+			thumbnail.Selected = key == layer;
+		ConfigurePickerForLayer();
+	}
+
+	internal void SetSelectedColor(AtlasPixel color)
+	{
+		selectedColor = color;
+		setPaintColor(color);
+		updatingPicker = true;
+		try
+		{
+			hexColor.Text = color.Hex;
+			rgbaFields[0].Text = color.R.ToString(System.Globalization.CultureInfo.InvariantCulture);
+			rgbaFields[1].Text = color.G.ToString(System.Globalization.CultureInfo.InvariantCulture);
+			rgbaFields[2].Text = color.B.ToString(System.Globalization.CultureInfo.InvariantCulture);
+			rgbaFields[3].Text = color.A.ToString(System.Globalization.CultureInfo.InvariantCulture);
+			if (selectedLayer == AtlasPaintLayer.BaseColor)
+			{
+				(float hue, float saturation, float value) = RgbToHsv(color);
+				pickerOne.Value = hue;
+				pickerTwo.Value = saturation;
+				pickerThree.Value = value;
+				pickerAlpha.Value = color.A;
+			}
+			else if (selectedLayer == AtlasPaintLayer.Normal)
+			{
+				pickerOne.Value = color.R / 255f * 2 - 1;
+				pickerTwo.Value = color.G / 255f * 2 - 1;
+			}
+			else
+			{
+				pickerOne.Value = color.R;
+			}
+		}
+		finally
+		{
+			updatingPicker = false;
+		}
+	}
 
 	internal void Select(BlockType type)
 	{
@@ -267,6 +509,170 @@ internal sealed class VoxelMaterialInspector
 		slider.OnValueChanged += (_, newValue) => changed(newValue);
 		parent.AddChild(slider);
 		return slider;
+	}
+
+	private static Slider AddPickerSlider(Panel parent, string id, float y)
+	{
+		var slider = new Slider
+		{
+			ID = id,
+			Position = new Vector2(10, y),
+			Size = new Vector2(280, 24),
+			MinValue = 0,
+			MaxValue = 1,
+			Step = 0.01f,
+			TrackColor = Background,
+			FillColor = Accent,
+			ThumbColor = Primary,
+			LabelColor = Primary,
+			UseThemeColors = false,
+			ShowValueLabel = true,
+			ValueLabelFormat = "0.00",
+		};
+		parent.AddChild(slider);
+		return slider;
+	}
+
+	private static Button FooterButton(
+		string id,
+		string text,
+		FishColor color,
+		FishColor textColor,
+		Action action)
+	{
+		var button = new Button { ID = id, Text = text, Color = color };
+		button.SetColorOverride("Text", textColor);
+		button.OnButtonPressed += (_, _, _) => action();
+		return button;
+	}
+
+	private void ConfigurePickerForLayer()
+	{
+		if (pickerOne == null)
+			return;
+		updatingPicker = true;
+		try
+		{
+			bool baseColor = selectedLayer == AtlasPaintLayer.BaseColor;
+			bool normal = selectedLayer == AtlasPaintLayer.Normal;
+			pickerOneLabel.Text = baseColor ? "Hue" : normal ? "Normal X" : "Value";
+			pickerTwoLabel.Text = baseColor ? "Saturation" : "Normal Y";
+			pickerThreeLabel.Text = "Value";
+			pickerAlphaLabel.Text = "Alpha";
+			pickerTwo.Visible = pickerTwoLabel.Visible = baseColor || normal;
+			pickerThree.Visible = pickerThreeLabel.Visible = baseColor;
+			pickerAlpha.Visible = pickerAlphaLabel.Visible = baseColor;
+			pickerOne.MinValue = normal ? -1 : 0;
+			pickerOne.MaxValue = baseColor ? 360 : normal ? 1 : 255;
+			pickerOne.Step = baseColor ? 1 : normal ? 0.01f : 1;
+			pickerTwo.MinValue = normal ? -1 : 0;
+			pickerTwo.MaxValue = 1;
+			pickerTwo.Step = 0.01f;
+			pickerThree.MinValue = 0;
+			pickerThree.MaxValue = 1;
+			pickerThree.Step = 0.01f;
+			pickerAlpha.MinValue = 0;
+			pickerAlpha.MaxValue = 255;
+			pickerAlpha.Step = 1;
+		}
+		finally
+		{
+			updatingPicker = false;
+		}
+		SetSelectedColor(selectedColor);
+	}
+
+	private void PickerChanged()
+	{
+		if (updatingPicker)
+			return;
+		AtlasPixel color = selectedLayer switch
+		{
+			AtlasPaintLayer.BaseColor => HsvToRgb(
+				pickerOne.Value, pickerTwo.Value, pickerThree.Value, (byte)Math.Clamp((int)pickerAlpha.Value, 0, 255)),
+			AtlasPaintLayer.Normal => AtlasPixel.Normal(pickerOne.Value, pickerTwo.Value),
+			AtlasPaintLayer.Specular or AtlasPaintLayer.Roughness =>
+				AtlasPixel.Scalar((byte)Math.Clamp((int)pickerOne.Value, 0, 255)),
+			_ => throw new ArgumentOutOfRangeException(),
+		};
+		SetSelectedColor(color);
+	}
+
+	private void ParseHex(string value)
+	{
+		if (updatingPicker || value?.Length != 9 || value[0] != '#'
+			|| !uint.TryParse(value.AsSpan(1), System.Globalization.NumberStyles.HexNumber,
+				System.Globalization.CultureInfo.InvariantCulture, out uint parsed))
+			return;
+		SetSelectedColor(new AtlasPixel(
+			(byte)(parsed >> 24), (byte)(parsed >> 16), (byte)(parsed >> 8), (byte)parsed));
+	}
+
+	private void ParseComponent(int component, string value)
+	{
+		if (updatingPicker || !byte.TryParse(value, out byte parsed))
+			return;
+		AtlasPixel color = component switch
+		{
+			0 => selectedColor with { R = parsed },
+			1 => selectedColor with { G = parsed },
+			2 => selectedColor with { B = parsed },
+			3 => selectedColor with { A = parsed },
+			_ => throw new ArgumentOutOfRangeException(nameof(component)),
+		};
+		SetSelectedColor(color);
+	}
+
+	private IReadOnlyList<AtlasPixel> BuildSwatches()
+	{
+		AtlasPixel[] fixedColors =
+		{
+			new(0x00,0x00,0x00,0x00), new(0x11,0x13,0x18,0xff), new(0x24,0x28,0x32,0xff), new(0x3f,0x46,0x52,0xff),
+			new(0x69,0x73,0x82,0xff), new(0x9a,0xa8,0xb8,0xff), new(0xd7,0xe0,0xe8,0xff), new(0xff,0xff,0xff,0xff),
+			new(0x3a,0x24,0x18,0xff), new(0x6b,0x42,0x26,0xff), new(0x9b,0x69,0x38,0xff), new(0xd1,0xa3,0x65,0xff),
+			new(0x17,0x35,0x1f,0xff), new(0x2f,0x64,0x34,0xff), new(0x57,0x93,0x44,0xff), new(0x47,0xc8,0xe8,0xff),
+		};
+		AtlasPaintTarget? target = layerTargets.GetValueOrDefault(selectedLayer);
+		if (!target.HasValue)
+			return fixedColors;
+		return fixedColors.Concat(target.Value.Document.GetFrequentColors(
+			target.Value.X, target.Value.Y, target.Value.Width, target.Value.Height, 16)).ToArray();
+	}
+
+	private static (float Hue, float Saturation, float Value) RgbToHsv(AtlasPixel color)
+	{
+		float r = color.R / 255f;
+		float g = color.G / 255f;
+		float b = color.B / 255f;
+		float maximum = Math.Max(r, Math.Max(g, b));
+		float minimum = Math.Min(r, Math.Min(g, b));
+		float delta = maximum - minimum;
+		float hue = delta == 0 ? 0
+			: maximum == r ? 60 * (((g - b) / delta) % 6)
+			: maximum == g ? 60 * ((b - r) / delta + 2)
+			: 60 * ((r - g) / delta + 4);
+		if (hue < 0) hue += 360;
+		return (hue, maximum == 0 ? 0 : delta / maximum, maximum);
+	}
+
+	private static AtlasPixel HsvToRgb(float hue, float saturation, float value, byte alpha)
+	{
+		float chroma = value * saturation;
+		float x = chroma * (1 - MathF.Abs((hue / 60) % 2 - 1));
+		float m = value - chroma;
+		(float r, float g, float b) = hue switch
+		{
+			< 60 => (chroma, x, 0f),
+			< 120 => (x, chroma, 0f),
+			< 180 => (0f, chroma, x),
+			< 240 => (0f, x, chroma),
+			< 300 => (x, 0f, chroma),
+			_ => (chroma, 0f, x),
+		};
+		return new AtlasPixel(
+			(byte)Math.Clamp((int)MathF.Round((r + m) * 255), 0, 255),
+			(byte)Math.Clamp((int)MathF.Round((g + m) * 255), 0, 255),
+			(byte)Math.Clamp((int)MathF.Round((b + m) * 255), 0, 255), alpha);
 	}
 
 	private static void DrawBlockRow(global::FishUI.FishUI ui, ListBoxItem item, int index,

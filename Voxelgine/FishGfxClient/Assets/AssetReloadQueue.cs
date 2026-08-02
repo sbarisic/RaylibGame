@@ -66,5 +66,16 @@ internal sealed class AssetReloadQueue
 		}
 		automatic.Clear();
 	}
+
+	internal void Clear(string assetId)
+	{
+		automatic.TryRemove(assetId, out _);
+		List<string> retained = new();
+		while (manual.TryDequeue(out string queued))
+			if (!string.Equals(queued, assetId, StringComparison.OrdinalIgnoreCase))
+				retained.Add(queued);
+		foreach (string queued in retained)
+			manual.Enqueue(queued);
+	}
 }
 #endif

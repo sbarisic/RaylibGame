@@ -62,7 +62,7 @@ internal readonly record struct VoxelMaterialInspectorLayout(
 			Math.Max(0, windowWidth - Margin * 2));
 		float height = Math.Max(0, windowHeight - Margin * 2);
 		const float centralTop = 116;
-		const float footerHeight = 82;
+		const float footerHeight = 132;
 		float centralHeight = Math.Max(0, height - centralTop - footerHeight - Spacing);
 		return new VoxelMaterialInspectorLayout(
 			new Vector2(Margin, Margin),

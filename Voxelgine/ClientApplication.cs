@@ -24,6 +24,7 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 	{
 		arguments = args ?? Array.Empty<string>();
 		string dataRoot = GetOptionValue(arguments, "--data-root");
+		AssetSourceRoot = GetOptionValue(arguments, "--asset-source-root");
 		RuntimePaths = RuntimePathResolver.ResolveRuntimePaths(
 			ApplicationKind.Client,
 			dataRoot,
@@ -78,6 +79,8 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 	public IAudioSystem Audio { get; }
 
 	public RuntimePaths RuntimePaths { get; }
+
+	public string AssetSourceRoot { get; }
 
 	public IFishGfxGameWindow Window { get; }
 

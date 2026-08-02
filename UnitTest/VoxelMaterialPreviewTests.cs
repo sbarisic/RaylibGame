@@ -122,4 +122,19 @@ public sealed class VoxelMaterialPreviewTests
 		queue.DrainReady(ready);
 		Assert.Empty(ready);
 	}
+
+	[Fact]
+	public void ReloadSuppressionCanClearOnlyTheTargetAsset()
+	{
+		long timestamp = 1000;
+		var queue = new AssetReloadQueue(0, () => timestamp);
+		HashSet<string> ready = new(StringComparer.OrdinalIgnoreCase);
+		queue.QueueAutomatic("voxel.surface-textures");
+		queue.QueueManual("other");
+
+		queue.Clear("voxel.surface-textures");
+		queue.DrainReady(ready);
+
+		Assert.Equal(["other"], ready);
+	}
 }

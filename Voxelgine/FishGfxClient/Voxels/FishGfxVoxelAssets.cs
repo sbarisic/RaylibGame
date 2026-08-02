@@ -40,12 +40,14 @@ internal sealed class FishGfxVoxelAssets
 	private readonly ushort[] wheatMaterialIds;
 	private readonly AssetHandle<VoxelSurfaceAssetsResource> surfaceTextures;
 	private readonly GameAssetStore assetStore;
+	private readonly GraphicsContext graphics;
 
 	internal FishGfxVoxelAssets(GraphicsContext graphics, GameAssetStore assetStore)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		ArgumentNullException.ThrowIfNull(assetStore);
 		this.assetStore = assetStore;
+		this.graphics = graphics;
 		ModelAssets models = LoadModels();
 		(Palette, materialIds, materialValueIds, authoritativeValues, wheatMaterialIds) = CreatePalette(models);
 		surfaceTextures = assetStore.GetOrRegister(
@@ -322,20 +324,8 @@ internal sealed class FishGfxVoxelAssets
 		}
 	}
 
-	private static VoxelModel CreateStairModel(BlockValue value, int tile)
-	{
-		List<VoxelVertex> vertices = new();
-		VoxelTextureRegion region = new(
-			(tile % CubeColumns) * (AtlasSize / CubeColumns),
-			(tile / CubeColumns) * (AtlasSize / CubeRows),
-			AtlasSize / CubeColumns,
-			AtlasSize / CubeRows,
-			AtlasSize,
-			AtlasSize);
-		foreach (AABB box in BlockShapeCatalog.GetCollisionBoxes(value))
-			AppendBox(vertices, box.Min, box.Max, region);
-		return new VoxelModel(vertices);
-	}
+	private static VoxelModel CreateStairModel(BlockValue value, int tile) =>
+		StairVoxelModelBuilder.Create(value, tile);
 
 	private static VoxelModel CreatePlantModel(int tile)
 	{
@@ -351,25 +341,6 @@ internal sealed class FishGfxVoxelAssets
 			Vector2[] uv={Vector2.UnitY,Vector2.One,Vector2.UnitX,Vector2.UnitY,Vector2.UnitX,Vector2.Zero};
 			Vector3[] positions={a,b,c,a,c,d};
 			for(int index=0;index<6;index++) vertices.Add(new VoxelVertex(positions[index], Color.White, region.Map(uv[index]), normal));
-		}
-	}
-
-	private static void AppendBox(List<VoxelVertex> vertices, Vector3 min, Vector3 max, VoxelTextureRegion region)
-	{
-		AddQuad(Vector3.UnitX, new(max.X, min.Y, min.Z), new(max.X, max.Y, min.Z), new(max.X, max.Y, max.Z), new(max.X, min.Y, max.Z));
-		AddQuad(-Vector3.UnitX, new(min.X, min.Y, max.Z), new(min.X, max.Y, max.Z), new(min.X, max.Y, min.Z), new(min.X, min.Y, min.Z));
-		AddQuad(Vector3.UnitY, new(min.X, max.Y, max.Z), new(max.X, max.Y, max.Z), new(max.X, max.Y, min.Z), new(min.X, max.Y, min.Z));
-		AddQuad(-Vector3.UnitY, new(min.X, min.Y, min.Z), new(max.X, min.Y, min.Z), new(max.X, min.Y, max.Z), new(min.X, min.Y, max.Z));
-		AddQuad(Vector3.UnitZ, new(max.X, min.Y, max.Z), new(max.X, max.Y, max.Z), new(min.X, max.Y, max.Z), new(min.X, min.Y, max.Z));
-		AddQuad(-Vector3.UnitZ, new(min.X, min.Y, min.Z), new(min.X, max.Y, min.Z), new(max.X, max.Y, min.Z), new(max.X, min.Y, min.Z));
-
-		void AddQuad(Vector3 normal, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-		{
-			Vector2[] uv = { Vector2.Zero, Vector2.UnitY, Vector2.One, Vector2.UnitX };
-			Vector3[] positions = { a, b, c, a, c, d };
-			int[] uvIndices = { 0, 1, 2, 0, 2, 3 };
-			for (int index = 0; index < positions.Length; index++)
-				vertices.Add(new VoxelVertex(positions[index], Color.White, region.Map(uv[uvIndices[index]]), normal));
 		}
 	}
 
@@ -451,6 +422,28 @@ internal sealed class FishGfxVoxelAssets
 		);
 	}
 
+	internal VoxelMaterialPaintGeometry GetPaintGeometry(BlockValue value)
+	{
+		ushort materialId = GetMaterialId(value);
+		VoxelMaterial material = Palette[materialId];
+		VoxelModel model = material.Models?.Select(0, 0, 0)
+			?? StairVoxelModelBuilder.CreateCube(material.Tiles);
+		return new VoxelMaterialPaintGeometry(value, materialId, material, model);
+	}
+
+	internal OwnedVoxelSurfaceTextureSet CreateEditorSurfaceTextures(
+		Bitmap baseColor,
+		Bitmap normal,
+		Bitmap specular,
+		Bitmap roughness)
+	{
+		ArgumentNullException.ThrowIfNull(baseColor);
+		ArgumentNullException.ThrowIfNull(normal);
+		ArgumentNullException.ThrowIfNull(specular);
+		ArgumentNullException.ThrowIfNull(roughness);
+		return CreateSurfaceTextures(baseColor, normal, specular, roughness);
+	}
+
 	private VoxelSurfaceAssetsResource LoadSurfaceTextures(
 		GraphicsContext graphics
 	)
@@ -459,6 +452,16 @@ internal sealed class FishGfxVoxelAssets
 		using Bitmap normalBitmap = LoadAndValidateAtlas("atlas_normal.png");
 		using Bitmap specularBitmap = LoadAndValidateAtlas("atlas_specular.png");
 		using Bitmap roughnessBitmap = LoadAndValidateAtlas("atlas_roughness.png");
+		return new VoxelSurfaceAssetsResource(CreateSurfaceTextures(
+			baseColorBitmap, normalBitmap, specularBitmap, roughnessBitmap));
+	}
+
+	private OwnedVoxelSurfaceTextureSet CreateSurfaceTextures(
+		Bitmap baseColorBitmap,
+		Bitmap normalBitmap,
+		Bitmap specularBitmap,
+		Bitmap roughnessBitmap)
+	{
 		Texture modelAtlas = null;
 		Texture baseColor = null;
 		Texture packedSurface = null;
@@ -493,14 +496,13 @@ internal sealed class FishGfxVoxelAssets
 				CubeRows,
 				out int[] layerInfo
 			);
-			return new VoxelSurfaceAssetsResource(
+			return new OwnedVoxelSurfaceTextureSet(
 				new VoxelSurfaceTextureSet(
 					modelAtlas,
 					baseColor,
 					packedSurface,
 					layerInfo
-				)
-			);
+				));
 		}
 		catch
 		{
@@ -617,18 +619,18 @@ internal sealed class FishGfxVoxelAssets
 
 	private sealed class VoxelSurfaceAssetsResource : IDisposable
 	{
-		internal VoxelSurfaceAssetsResource(VoxelSurfaceTextureSet textures)
+		private OwnedVoxelSurfaceTextureSet owned;
+
+		internal VoxelSurfaceAssetsResource(OwnedVoxelSurfaceTextureSet owned)
 		{
-			Textures = textures ?? throw new ArgumentNullException(nameof(textures));
+			this.owned = owned ?? throw new ArgumentNullException(nameof(owned));
 		}
 
-		internal VoxelSurfaceTextureSet Textures { get; }
+		internal VoxelSurfaceTextureSet Textures => owned.Textures;
 
 		public void Dispose()
 		{
-			Textures.PackedSurface.Dispose();
-			Textures.CubeBaseColor.Dispose();
-			Textures.ModelAtlas.Dispose();
+			Interlocked.Exchange(ref owned, null)?.Dispose();
 		}
 	}
 }

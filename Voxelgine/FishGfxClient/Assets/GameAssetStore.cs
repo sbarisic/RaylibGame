@@ -14,6 +14,7 @@ public sealed class GameAssetStore : IDisposable
 	private readonly Dictionary<string, IAssetSlot> assets = new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, HashSet<string>> assetsByFile = new(StringComparer.OrdinalIgnoreCase);
 	private readonly object assetIndexLock = new();
+	private readonly Dictionary<string, int> reloadSuppressions = new(StringComparer.OrdinalIgnoreCase);
 	private readonly AssetReloadQueue reloadQueue = AssetReloadQueue.CreateDefault();
 	private readonly FileSystemWatcher watcher;
 	private int graphicsThreadId;
@@ -195,6 +196,26 @@ public sealed class GameAssetStore : IDisposable
 		return true;
 	}
 
+	internal IDisposable AcquireReloadSuppression(string assetId)
+	{
+		ThrowIfDisposed();
+		EnsureGraphicsThread();
+		ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+		if (!assets.ContainsKey(assetId))
+			throw new ArgumentException($"Asset '{assetId}' is not registered.", nameof(assetId));
+		lock (assetIndexLock)
+			reloadSuppressions[assetId] = reloadSuppressions.GetValueOrDefault(assetId) + 1;
+		reloadQueue.Clear(assetId);
+		return new ReloadSuppressionLease(this, assetId);
+	}
+
+	internal void ClearQueuedReloads(string assetId)
+	{
+		ThrowIfDisposed();
+		EnsureGraphicsThread();
+		reloadQueue.Clear(assetId);
+	}
+
 	public void Dispose()
 	{
 		if (disposed)
@@ -215,6 +236,8 @@ public sealed class GameAssetStore : IDisposable
 			assetsByFile.Clear();
 		}
 		reloadQueue.Clear();
+		lock (assetIndexLock)
+			reloadSuppressions.Clear();
 		ReloadCompleted = null;
 		disposed = true;
 	}
@@ -245,9 +268,42 @@ public sealed class GameAssetStore : IDisposable
 
 		foreach (string id in ids)
 		{
+			lock (assetIndexLock)
+				if (reloadSuppressions.ContainsKey(id))
+					continue;
 			reloadQueue.QueueAutomatic(id);
 			log(GameLogLevel.Trace, $"Debounced automatic reload id={id} path={fullPath}");
 		}
+	}
+
+	private void ReleaseReloadSuppression(string assetId)
+	{
+		if (disposed)
+			return;
+		EnsureGraphicsThread();
+		lock (assetIndexLock)
+		{
+			if (!reloadSuppressions.TryGetValue(assetId, out int count))
+				return;
+			if (count <= 1)
+				reloadSuppressions.Remove(assetId);
+			else
+				reloadSuppressions[assetId] = count - 1;
+		}
+	}
+
+	private sealed class ReloadSuppressionLease : IDisposable
+	{
+		private GameAssetStore owner;
+		private readonly string assetId;
+
+		internal ReloadSuppressionLease(GameAssetStore owner, string assetId)
+		{
+			this.owner = owner;
+			this.assetId = assetId;
+		}
+
+		public void Dispose() => Interlocked.Exchange(ref owner, null)?.ReleaseReloadSuppression(assetId);
 	}
 
 	private void NotifyReloadCompleted(AssetReloadResult result)

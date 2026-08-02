@@ -17,7 +17,9 @@ internal sealed class VoxelMaterialInspector
 
 	private readonly VoxelMaterialInspectorModel model;
 	private readonly AtlasEditingSession editingSession;
+	private readonly AtlasHeightStore heightStore;
 	private readonly Action<AtlasPixel> setPaintColor;
+	private readonly Action<float> setNormalStrength;
 	private readonly Panel root;
 	private readonly Label header;
 	private readonly Textbox search;
@@ -26,6 +28,7 @@ internal sealed class VoxelMaterialInspector
 	private readonly ListBox blockList;
 	private readonly Label materialInfo;
 	private readonly Label reloadStatus;
+	private readonly Label viewportStatus;
 	private readonly Label paintStatus;
 	private readonly Label hoverStatus;
 	private readonly ListBox sharedUsageList;
@@ -48,10 +51,15 @@ internal sealed class VoxelMaterialInspector
 	private readonly Button redoButton;
 	private readonly Label footerHint;
 	private readonly Button backButton;
+	private readonly Button vectorModeButton;
+	private readonly Button heightModeButton;
+	private readonly Panel lightingCard;
 	private AtlasPaintLayer selectedLayer;
+	private NormalPaintMode normalPaintMode;
 	private AtlasPixel selectedColor = new(0x47, 0xc8, 0xe8, 0xff);
 	private BlockType selectedBlock;
 	private bool updatingPicker;
+	private bool paintModeEnabled = true;
 	private (BlockType Block, int Tile)? lastUsageKey;
 	internal readonly Slider LightAzimuthSlider;
 	internal readonly CheckBox AutomaticLightCheckBox;
@@ -59,6 +67,7 @@ internal sealed class VoxelMaterialInspector
 	internal VoxelMaterialInspector(
 		VoxelMaterialInspectorModel model,
 		AtlasEditingSession editingSession,
+		AtlasHeightStore heightStore,
 		Action<BlockType> select,
 		Action<float> setAzimuth,
 		Action<float> setElevation,
@@ -66,7 +75,11 @@ internal sealed class VoxelMaterialInspector
 		Action<float> setAmbient,
 		Action<bool> setAutomatic,
 		Action<AtlasPaintLayer> selectLayer,
+		Action<NormalPaintMode> selectNormalMode,
 		Action<AtlasPixel> setPaintColor,
+		Action<float> setNormalStrength,
+		Action beginNormalStrength,
+		Action endNormalStrength,
 		Action<bool> setPaintMode,
 		Action save,
 		Action discard,
@@ -77,7 +90,9 @@ internal sealed class VoxelMaterialInspector
 	{
 		this.model = model;
 		this.editingSession = editingSession;
+		this.heightStore = heightStore;
 		this.setPaintColor = setPaintColor;
+		this.setNormalStrength = setNormalStrength;
 		selectedBlock = model.Selected;
 		root = new Panel { ID = "voxel_material_inspector", Color = Background };
 		header = Label("voxel_material_header", string.Empty, Primary);
@@ -125,13 +140,14 @@ internal sealed class VoxelMaterialInspector
 		infoCard.AddChild(materialInfo);
 		centralStack.AddChild(infoCard);
 
-		Panel layerCard = CardPanel(132);
+		Panel layerCard = CardPanel(166);
 		layerCard.AddChild(PositionedLabel("Paint layers", 10, 8, Accent));
 		foreach (AtlasPaintLayer layer in Enum.GetValues<AtlasPaintLayer>())
 		{
 			layerTargets[layer] = null;
 			AtlasPaintLayer captured = layer;
-			var thumbnail = new AtlasLayerThumbnail(layer, () => layerTargets[captured], selected =>
+			var thumbnail = new AtlasLayerThumbnail(layer, () => layerTargets[captured],
+				(target, x, y) => GetThumbnailPixel(captured, target, x, y), selected =>
 			{
 				SetSelectedLayer(selected);
 				selectLayer(selected);
@@ -141,6 +157,16 @@ internal sealed class VoxelMaterialInspector
 			layerCard.AddChild(thumbnail);
 			thumbnails.Add(layer, thumbnail);
 		}
+		vectorModeButton = FooterButton("voxel_normal_vector_mode", "Vector", Accent, Background,
+			() => { SetNormalPaintMode(NormalPaintMode.Vector); selectNormalMode(NormalPaintMode.Vector); });
+		vectorModeButton.Position = new Vector2(10, 128);
+		vectorModeButton.Size = new Vector2(140, 28);
+		layerCard.AddChild(vectorModeButton);
+		heightModeButton = FooterButton("voxel_normal_height_mode", "Height", Background, Primary,
+			() => { SetNormalPaintMode(NormalPaintMode.Height); selectNormalMode(NormalPaintMode.Height); });
+		heightModeButton.Position = new Vector2(158, 128);
+		heightModeButton.Size = new Vector2(140, 28);
+		layerCard.AddChild(heightModeButton);
 		centralStack.AddChild(layerCard);
 
 		Panel paintCard = CardPanel(326);
@@ -154,7 +180,8 @@ internal sealed class VoxelMaterialInspector
 		paintCard.AddChild(pickerThreeLabel);
 		paintCard.AddChild(pickerAlphaLabel);
 		pickerOne = AddPickerSlider(paintCard, "voxel_material_picker_1", 52);
-		pickerTwo = AddPickerSlider(paintCard, "voxel_material_picker_2", 98);
+		pickerTwo = AddPickerSlider(paintCard, "voxel_material_picker_2", 98,
+			beginNormalStrength, endNormalStrength);
 		pickerThree = AddPickerSlider(paintCard, "voxel_material_picker_3", 144);
 		pickerAlpha = AddPickerSlider(paintCard, "voxel_material_picker_alpha", 190);
 		foreach (Slider slider in new[] { pickerOne, pickerTwo, pickerThree, pickerAlpha })
@@ -196,7 +223,11 @@ internal sealed class VoxelMaterialInspector
 			IsChecked = true,
 			Color = Accent,
 		};
-		paintMode.OnCheckedChanged += (_, value) => setPaintMode(value);
+		paintMode.OnCheckedChanged += (_, value) =>
+		{
+			SetPaintModeVisual(value);
+			setPaintMode(value);
+		};
 		paintCard.AddChild(paintMode);
 		paintCard.AddChild(PositionedLabel("Paint mode", 174, 274, Primary));
 		centralStack.AddChild(paintCard);
@@ -209,7 +240,7 @@ internal sealed class VoxelMaterialInspector
 		swatchCard.AddChild(swatches);
 		centralStack.AddChild(swatchCard);
 
-		Panel lightingCard = CardPanel(276);
+		lightingCard = CardPanel(276);
 		lightingCard.AddChild(PositionedLabel("Lighting", 10, 8, Accent));
 		LightAzimuthSlider = AddSlider(lightingCard, "voxel_material_light_azimuth", "Azimuth", 38,
 			0, 360, 45, 1, setAzimuth);
@@ -248,19 +279,21 @@ internal sealed class VoxelMaterialInspector
 		atlasCard.AddChild(reloadStatus);
 		centralStack.AddChild(atlasCard);
 
-		Panel interactionCard = CardPanel(264);
+		Panel interactionCard = CardPanel(288);
 		interactionCard.AddChild(PositionedLabel("3D brush", 10, 8, Accent));
 		hoverStatus = PositionedLabel("Hover the block to select a texel", 10, 32, Primary);
+		viewportStatus = PositionedLabel(string.Empty, 10, 70, Muted);
 		paintStatus = PositionedLabel(editingSession.IsReadOnly
 			? "Read-only: use --asset-source-root <Voxelgine/data>"
-			: "Ready", 10, 70, editingSession.IsReadOnly ? new FishColor(0xff, 0xab, 0x40) : Muted);
+			: "Ready", 10, 94, editingSession.IsReadOnly ? new FishColor(0xff, 0xab, 0x40) : Muted);
 		interactionCard.AddChild(hoverStatus);
+		interactionCard.AddChild(viewportStatus);
 		interactionCard.AddChild(paintStatus);
-		interactionCard.AddChild(PositionedLabel("Shared tile usage", 10, 98, Accent));
+		interactionCard.AddChild(PositionedLabel("Shared tile usage", 10, 122, Accent));
 		sharedUsageList = new ListBox
 		{
 			ID = "voxel_material_shared_usage",
-			Position = new Vector2(10, 122),
+			Position = new Vector2(10, 146),
 			Size = new Vector2(300, 132),
 			CustomItemHeight = 22,
 			Color = Background,
@@ -297,6 +330,8 @@ internal sealed class VoxelMaterialInspector
 		RebuildList(string.Empty);
 		UpdateHeader();
 		SetSelectedLayer(AtlasPaintLayer.BaseColor);
+		SetNormalPaintMode(NormalPaintMode.Vector);
+		SetPaintModeVisual(true);
 		SetSelectedColor(selectedColor);
 	}
 
@@ -403,6 +438,19 @@ internal sealed class VoxelMaterialInspector
 		foreach ((AtlasPaintLayer key, AtlasLayerThumbnail thumbnail) in thumbnails)
 			thumbnail.Selected = key == layer;
 		ConfigurePickerForLayer();
+		UpdateNormalModeVisibility();
+		SetPaintModeVisual(paintModeEnabled);
+	}
+
+	internal void SetNormalPaintMode(NormalPaintMode mode)
+	{
+		normalPaintMode = mode;
+		vectorModeButton.Color = mode == NormalPaintMode.Vector ? Accent : Background;
+		heightModeButton.Color = mode == NormalPaintMode.Height ? Accent : Background;
+		vectorModeButton.SetColorOverride("Text", mode == NormalPaintMode.Vector ? Background : Primary);
+		heightModeButton.SetColorOverride("Text", mode == NormalPaintMode.Height ? Background : Primary);
+		ConfigurePickerForLayer();
+		SetPaintModeVisual(paintModeEnabled);
 	}
 
 	internal void SetSelectedColor(AtlasPixel color)
@@ -425,10 +473,18 @@ internal sealed class VoxelMaterialInspector
 				pickerThree.Value = value;
 				pickerAlpha.Value = color.A;
 			}
-			else if (selectedLayer == AtlasPaintLayer.Normal)
+			else if (selectedLayer == AtlasPaintLayer.Normal && normalPaintMode == NormalPaintMode.Vector)
 			{
 				pickerOne.Value = color.R / 255f * 2 - 1;
 				pickerTwo.Value = color.G / 255f * 2 - 1;
+			}
+			else if (selectedLayer == AtlasPaintLayer.Normal)
+			{
+				pickerOne.Value = color.R;
+				AtlasPaintTarget? target = layerTargets[AtlasPaintLayer.Normal];
+				pickerTwo.Value = target.HasValue
+					? heightStore.GetOrCreate(target.Value).Strength
+					: AtlasHeightStore.DefaultStrength;
 			}
 			else
 			{
@@ -511,24 +567,25 @@ internal sealed class VoxelMaterialInspector
 		return slider;
 	}
 
-	private static Slider AddPickerSlider(Panel parent, string id, float y)
+	private static Slider AddPickerSlider(Panel parent, string id, float y,
+		Action gestureStarted = null, Action gestureCompleted = null)
 	{
-		var slider = new Slider
-		{
-			ID = id,
-			Position = new Vector2(10, y),
-			Size = new Vector2(280, 24),
-			MinValue = 0,
-			MaxValue = 1,
-			Step = 0.01f,
-			TrackColor = Background,
-			FillColor = Accent,
-			ThumbColor = Primary,
-			LabelColor = Primary,
-			UseThemeColors = false,
-			ShowValueLabel = true,
-			ValueLabelFormat = "0.00",
-		};
+		Slider slider = gestureStarted == null && gestureCompleted == null
+			? new Slider()
+			: new GestureSlider(gestureStarted, gestureCompleted);
+		slider.ID = id;
+		slider.Position = new Vector2(10, y);
+		slider.Size = new Vector2(280, 24);
+		slider.MinValue = 0;
+		slider.MaxValue = 1;
+		slider.Step = 0.01f;
+		slider.TrackColor = Background;
+		slider.FillColor = Accent;
+		slider.ThumbColor = Primary;
+		slider.LabelColor = Primary;
+		slider.UseThemeColors = false;
+		slider.ShowValueLabel = true;
+		slider.ValueLabelFormat = "0.00";
 		parent.AddChild(slider);
 		return slider;
 	}
@@ -555,19 +612,20 @@ internal sealed class VoxelMaterialInspector
 		{
 			bool baseColor = selectedLayer == AtlasPaintLayer.BaseColor;
 			bool normal = selectedLayer == AtlasPaintLayer.Normal;
-			pickerOneLabel.Text = baseColor ? "Hue" : normal ? "Normal X" : "Value";
-			pickerTwoLabel.Text = baseColor ? "Saturation" : "Normal Y";
+			bool height = normal && normalPaintMode == NormalPaintMode.Height;
+			pickerOneLabel.Text = baseColor ? "Hue" : height ? "Height" : normal ? "Normal X" : "Value";
+			pickerTwoLabel.Text = baseColor ? "Saturation" : height ? "Normal Strength" : "Normal Y";
 			pickerThreeLabel.Text = "Value";
 			pickerAlphaLabel.Text = "Alpha";
 			pickerTwo.Visible = pickerTwoLabel.Visible = baseColor || normal;
 			pickerThree.Visible = pickerThreeLabel.Visible = baseColor;
 			pickerAlpha.Visible = pickerAlphaLabel.Visible = baseColor;
-			pickerOne.MinValue = normal ? -1 : 0;
-			pickerOne.MaxValue = baseColor ? 360 : normal ? 1 : 255;
-			pickerOne.Step = baseColor ? 1 : normal ? 0.01f : 1;
-			pickerTwo.MinValue = normal ? -1 : 0;
-			pickerTwo.MaxValue = 1;
-			pickerTwo.Step = 0.01f;
+			pickerOne.MinValue = normal && !height ? -1 : 0;
+			pickerOne.MaxValue = baseColor ? 360 : normal && !height ? 1 : 255;
+			pickerOne.Step = baseColor ? 1 : normal && !height ? 0.01f : 1;
+			pickerTwo.MinValue = height ? AtlasHeightStore.MinimumStrength : normal ? -1 : 0;
+			pickerTwo.MaxValue = height ? AtlasHeightStore.MaximumStrength : 1;
+			pickerTwo.Step = height ? 0.25f : 0.01f;
 			pickerThree.MinValue = 0;
 			pickerThree.MaxValue = 1;
 			pickerThree.Step = 0.01f;
@@ -586,16 +644,74 @@ internal sealed class VoxelMaterialInspector
 	{
 		if (updatingPicker)
 			return;
+		bool height = selectedLayer == AtlasPaintLayer.Normal
+			&& normalPaintMode == NormalPaintMode.Height;
+		float requestedStrength = pickerTwo.Value;
 		AtlasPixel color = selectedLayer switch
 		{
 			AtlasPaintLayer.BaseColor => HsvToRgb(
 				pickerOne.Value, pickerTwo.Value, pickerThree.Value, (byte)Math.Clamp((int)pickerAlpha.Value, 0, 255)),
+			AtlasPaintLayer.Normal when height => AtlasPixel.Scalar(
+				(byte)Math.Clamp((int)pickerOne.Value, 0, 255)),
 			AtlasPaintLayer.Normal => AtlasPixel.Normal(pickerOne.Value, pickerTwo.Value),
 			AtlasPaintLayer.Specular or AtlasPaintLayer.Roughness =>
 				AtlasPixel.Scalar((byte)Math.Clamp((int)pickerOne.Value, 0, 255)),
 			_ => throw new ArgumentOutOfRangeException(),
 		};
 		SetSelectedColor(color);
+		if (height)
+			setNormalStrength(requestedStrength);
+	}
+
+	private AtlasPixel GetThumbnailPixel(AtlasPaintLayer layer, AtlasPaintTarget target, int x, int y)
+	{
+		if (layer == AtlasPaintLayer.Normal && normalPaintMode == NormalPaintMode.Height)
+			return AtlasPixel.Scalar(heightStore.GetOrCreate(target).Get(x, y));
+		return target.Get(x, y);
+	}
+
+	private void UpdateNormalModeVisibility()
+	{
+		bool visible = selectedLayer == AtlasPaintLayer.Normal;
+		vectorModeButton.Visible = visible;
+		heightModeButton.Visible = visible;
+	}
+
+	private void SetPaintModeVisual(bool enabled)
+	{
+		paintModeEnabled = enabled;
+		lightingCard.Disabled = enabled;
+		viewportStatus.Text = enabled
+			? $"Viewport: {(selectedLayer == AtlasPaintLayer.Normal ? $"Normal {normalPaintMode}" : selectedLayer)} (unlit)"
+			: "Viewport: Material";
+	}
+
+	private sealed class GestureSlider : Slider
+	{
+		private readonly Action started;
+		private readonly Action completed;
+
+		internal GestureSlider(Action started, Action completed)
+		{
+			this.started = started;
+			this.completed = completed;
+		}
+
+		public override void HandleMousePress(global::FishUI.FishUI ui, FishInputState input,
+			FishMouseButton button, Vector2 position)
+		{
+			if (button == FishMouseButton.Left && !Disabled)
+				started?.Invoke();
+			base.HandleMousePress(ui, input, button, position);
+		}
+
+		public override void HandleMouseRelease(global::FishUI.FishUI ui, FishInputState input,
+			FishMouseButton button, Vector2 position)
+		{
+			base.HandleMouseRelease(ui, input, button, position);
+			if (button == FishMouseButton.Left)
+				completed?.Invoke();
+		}
 	}
 
 	private void ParseHex(string value)
@@ -635,6 +751,20 @@ internal sealed class VoxelMaterialInspector
 		AtlasPaintTarget? target = layerTargets.GetValueOrDefault(selectedLayer);
 		if (!target.HasValue)
 			return fixedColors;
+		if (selectedLayer == AtlasPaintLayer.Normal && normalPaintMode == NormalPaintMode.Height)
+		{
+			AtlasHeightField field = heightStore.GetOrCreate(target.Value);
+			AtlasPixel[] grayscale = Enumerable.Range(0, 16)
+				.Select(index => AtlasPixel.Scalar((byte)(index * 17)))
+				.ToArray();
+			IEnumerable<AtlasPixel> frequent = field.Pixels.ToArray()
+				.GroupBy(static value => value)
+				.OrderByDescending(static group => group.Count())
+				.ThenBy(static group => group.Key)
+				.Take(16)
+				.Select(group => AtlasPixel.Scalar(group.Key));
+			return grayscale.Concat(frequent).ToArray();
+		}
 		return fixedColors.Concat(target.Value.Document.GetFrequentColors(
 			target.Value.X, target.Value.Y, target.Value.Width, target.Value.Height, 16)).ToArray();
 	}

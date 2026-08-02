@@ -33,13 +33,17 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private byte minimumAmbientLight;
 	private int resetPending;
 	private bool streamingBackpressured;
-	private PendingEditorSurfaceTextures pendingEditorTextures;
-	private OwnedVoxelSurfaceTextureSet activeEditorTextures;
+	private PendingEditorSurfaceTextures pendingEditorMaterialTextures;
+	private PendingEditorSurfaceTextures pendingEditorVisualizationTextures;
+	private OwnedVoxelSurfaceTextureSet activeEditorMaterialTextures;
+	private OwnedVoxelSurfaceTextureSet activeEditorVisualizationTextures;
 	private readonly Queue<RetiredEditorSurfaceTextures> retiredEditorTextures = new();
 	private long editorLeaseId;
-	private long editorGeneration;
+	private long editorMaterialGeneration;
+	private long editorVisualizationGeneration;
 	private long editorFrame;
 	private bool clearEditorOverride;
+	private bool useEditorVisualization;
 	private PreparedColumnApplication currentPreparedColumn;
 	private bool disposed;
 
@@ -174,7 +178,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 		editorLeaseId = DateTime.UtcNow.Ticks ^ Environment.TickCount64;
 		if (editorLeaseId == 0)
 			editorLeaseId = 1;
-		editorGeneration = 0;
+		editorMaterialGeneration = 0;
+		editorVisualizationGeneration = 0;
 		return new EditorSurfaceTextureLease(this, editorLeaseId);
 	}
 
@@ -445,12 +450,16 @@ public sealed class FishGfxVoxelScene : IDisposable
 			prepared.Dispose();
 		currentPreparedColumn?.Dispose();
 		currentPreparedColumn = null;
-		pendingEditorTextures?.Textures.Dispose();
-		pendingEditorTextures = null;
+		pendingEditorMaterialTextures?.Textures.Dispose();
+		pendingEditorVisualizationTextures?.Textures.Dispose();
+		pendingEditorMaterialTextures = null;
+		pendingEditorVisualizationTextures = null;
 		FogVolume.Dispose();
 		Renderer.Dispose();
-		activeEditorTextures?.Dispose();
-		activeEditorTextures = null;
+		activeEditorMaterialTextures?.Dispose();
+		activeEditorVisualizationTextures?.Dispose();
+		activeEditorMaterialTextures = null;
+		activeEditorVisualizationTextures = null;
 		while (retiredEditorTextures.TryDequeue(out RetiredEditorSurfaceTextures retired))
 			retired.Textures.Dispose();
 		Lighting.Dispose();
@@ -458,34 +467,58 @@ public sealed class FishGfxVoxelScene : IDisposable
 
 	private void SynchronizeAtlas()
 	{
-		VoxelSurfaceTextureSet current = activeEditorTextures?.Textures ?? assets.SurfaceTextures;
+		OwnedVoxelSurfaceTextureSet editor = useEditorVisualization
+			? activeEditorVisualizationTextures ?? activeEditorMaterialTextures
+			: activeEditorMaterialTextures;
+		VoxelSurfaceTextureSet current = editor?.Textures ?? assets.SurfaceTextures;
 		if (!ReferenceEquals(Renderer.SurfaceTextures, current))
 		{
 			Renderer.SetSurfaceTextures(current);
 		}
+		Renderer.PresentationMode = useEditorVisualization && activeEditorVisualizationTextures != null
+			? VoxelRendererPresentationMode.UnlitTexture
+			: VoxelRendererPresentationMode.Material;
 	}
 
-	internal void QueueEditorSurfaceTextures(long leaseId, long generation, OwnedVoxelSurfaceTextureSet textures)
+	internal void QueueEditorSurfaceTextures(long leaseId, EditorSurfaceTextureKind kind,
+		long generation, OwnedVoxelSurfaceTextureSet textures)
 	{
 		ArgumentNullException.ThrowIfNull(textures);
 		ThrowIfDisposed();
-		if (leaseId != editorLeaseId || generation <= editorGeneration
-			|| pendingEditorTextures != null && generation <= pendingEditorTextures.Generation)
+		long appliedGeneration = kind == EditorSurfaceTextureKind.Material
+			? editorMaterialGeneration : editorVisualizationGeneration;
+		PendingEditorSurfaceTextures pending = kind == EditorSurfaceTextureKind.Material
+			? pendingEditorMaterialTextures : pendingEditorVisualizationTextures;
+		if (leaseId != editorLeaseId || generation <= appliedGeneration
+			|| pending != null && generation <= pending.Generation)
 		{
 			textures.Dispose();
 			return;
 		}
-		pendingEditorTextures?.Textures.Dispose();
-		pendingEditorTextures = new PendingEditorSurfaceTextures(leaseId, generation, textures);
+		pending?.Textures.Dispose();
+		PendingEditorSurfaceTextures replacement = new(leaseId, kind, generation, textures);
+		if (kind == EditorSurfaceTextureKind.Material)
+			pendingEditorMaterialTextures = replacement;
+		else
+			pendingEditorVisualizationTextures = replacement;
 		clearEditorOverride = false;
+	}
+
+	internal void SetEditorTexturePresentation(long leaseId, bool visualization)
+	{
+		if (disposed || leaseId != editorLeaseId)
+			return;
+		useEditorVisualization = visualization;
 	}
 
 	internal void ClearEditorSurfaceTextures(long leaseId, bool releaseLease)
 	{
 		if (disposed || leaseId != editorLeaseId)
 			return;
-		pendingEditorTextures?.Textures.Dispose();
-		pendingEditorTextures = null;
+		pendingEditorMaterialTextures?.Textures.Dispose();
+		pendingEditorVisualizationTextures?.Textures.Dispose();
+		pendingEditorMaterialTextures = null;
+		pendingEditorVisualizationTextures = null;
 		clearEditorOverride = true;
 		if (releaseLease)
 			editorLeaseId = -Math.Abs(editorLeaseId);
@@ -503,31 +536,43 @@ public sealed class FishGfxVoxelScene : IDisposable
 		if (clearEditorOverride)
 		{
 			clearEditorOverride = false;
-			if (activeEditorTextures != null)
-			{
-				Renderer.SetSurfaceTextures(assets.SurfaceTextures);
-				retiredEditorTextures.Enqueue(new RetiredEditorSurfaceTextures(editorFrame + 1, activeEditorTextures));
-				activeEditorTextures = null;
-			}
+			Renderer.SetSurfaceTextures(assets.SurfaceTextures);
+			Renderer.PresentationMode = VoxelRendererPresentationMode.Material;
+			if (activeEditorMaterialTextures != null)
+				retiredEditorTextures.Enqueue(new RetiredEditorSurfaceTextures(editorFrame + 1, activeEditorMaterialTextures));
+			if (activeEditorVisualizationTextures != null)
+				retiredEditorTextures.Enqueue(new RetiredEditorSurfaceTextures(editorFrame + 1, activeEditorVisualizationTextures));
+			activeEditorMaterialTextures = null;
+			activeEditorVisualizationTextures = null;
+			useEditorVisualization = false;
 			if (editorLeaseId < 0)
 			{
 				editorLeaseId = 0;
-				editorGeneration = 0;
+				editorMaterialGeneration = 0;
+				editorVisualizationGeneration = 0;
 			}
 		}
 
-		PendingEditorSurfaceTextures pending = pendingEditorTextures;
-		pendingEditorTextures = null;
-		if (pending == null || pending.LeaseId != editorLeaseId)
+		ApplyPendingEditorTextures(ref pendingEditorMaterialTextures,
+			ref activeEditorMaterialTextures, ref editorMaterialGeneration);
+		ApplyPendingEditorTextures(ref pendingEditorVisualizationTextures,
+			ref activeEditorVisualizationTextures, ref editorVisualizationGeneration);
+		SynchronizeAtlas();
+	}
+
+	private void ApplyPendingEditorTextures(ref PendingEditorSurfaceTextures pending,
+		ref OwnedVoxelSurfaceTextureSet active, ref long generation)
+	{
+		PendingEditorSurfaceTextures replacement = pending;
+		pending = null;
+		if (replacement == null || replacement.LeaseId != editorLeaseId)
 		{
-			pending?.Textures.Dispose();
+			replacement?.Textures.Dispose();
 			return;
 		}
-
-		OwnedVoxelSurfaceTextureSet previous = activeEditorTextures;
-		activeEditorTextures = pending.Textures;
-		editorGeneration = pending.Generation;
-		Renderer.SetSurfaceTextures(activeEditorTextures.Textures);
+		OwnedVoxelSurfaceTextureSet previous = active;
+		active = replacement.Textures;
+		generation = replacement.Generation;
 		if (previous != null)
 			retiredEditorTextures.Enqueue(new RetiredEditorSurfaceTextures(editorFrame + 1, previous));
 	}

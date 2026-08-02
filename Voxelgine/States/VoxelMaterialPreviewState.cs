@@ -36,6 +36,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private readonly VoxelMaterialInspector inspector;
 	private readonly AtlasEditingSession editingSession;
 	private readonly AtlasSaveService saveService;
+	private readonly AtlasHeightStore heightStore = new();
 	private readonly EditorSurfaceTextureLease editorTextureLease;
 	private readonly AtlasReverseUsageCatalog reverseUsage;
 	private BlockType selectedBlock = DefaultBlockType;
@@ -43,10 +44,14 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private AtlasPaintLayer selectedLayer = AtlasPaintLayer.BaseColor;
 	private AtlasPixel selectedColor = new(0x47, 0xc8, 0xe8, 0xff);
 	private VoxelPaintHit hoverHit;
+	private AtlasPaintTarget? lastNormalTarget;
 	private bool hasHoverHit;
 	private VoxelPaintStroke activeStroke;
+	private VoxelHeightPaintStroke activeHeightStroke;
 	private bool paintMode = true;
-	private bool previewDirty;
+	private NormalPaintMode normalPaintMode;
+	private bool materialPreviewDirty = true;
+	private bool visualizationPreviewDirty = true;
 	private bool saveConflict;
 	private IDisposable saveReloadSuppression;
 	private bool awaitingSavedReload;
@@ -66,6 +71,9 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	private Task<FishUIDebugSnapshot> automaticCapture;
 	private int automaticFrame;
 	private bool disposed;
+	private AtlasHeightCacheSnapshot strengthEditBefore;
+	private AtlasPaintTarget? strengthEditTarget;
+	private readonly Dictionary<(string Document, int X, int Y), AtlasPixelDelta> strengthEditDeltas = new();
 
 	public VoxelMaterialPreviewState(IGameWindow window, IFishEngineRunner engine)
 		: base(window, engine)
@@ -99,6 +107,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		inspector = new VoxelMaterialInspector(
 			inspectorModel,
 			editingSession,
+			heightStore,
 			SelectBlock,
 			value => lightAzimuth = value,
 			value => lightElevation = value,
@@ -106,7 +115,11 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			value => ambientIntensity = value,
 			value => automaticLightRotation = value,
 			SelectPaintLayer,
+			SelectNormalPaintMode,
 			SetPaintColor,
+			SetNormalStrength,
+			BeginNormalStrengthEdit,
+			EndNormalStrengthEdit,
 			SetPaintMode,
 			() => SavePaint(),
 			DiscardPaint,
@@ -238,20 +251,40 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			throw new InvalidOperationException($"Test preview picked unexpected atlas tile {hoverHit.TextureLayer}.");
 		}
 		if (hasHoverHit)
+		{
+			if (selectedLayer == AtlasPaintLayer.Normal)
+				lastNormalTarget = hoverHit.Target;
 			inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
+		}
 		if (hasHoverHit && paintMode && !Window.InMgr.IsInputDown(InputKey.Alt))
 		{
 			if (Window.InMgr.IsInputPressed(InputKey.Click_Right))
 			{
-				selectedColor = hoverHit.Target.Get(hoverHit.LocalX, hoverHit.LocalY);
+				selectedColor = selectedLayer == AtlasPaintLayer.Normal
+					&& normalPaintMode == NormalPaintMode.Height
+					? AtlasPixel.Scalar(heightStore.GetOrCreate(hoverHit.Target)
+						.Get(hoverHit.LocalX, hoverHit.LocalY))
+					: hoverHit.Target.Get(hoverHit.LocalX, hoverHit.LocalY);
 				inspector.SetSelectedColor(selectedColor);
 			}
 			if (Window.InMgr.IsInputPressed(InputKey.Click_Left))
-				activeStroke = new VoxelPaintStroke(editingSession);
+			{
+				if (selectedLayer == AtlasPaintLayer.Normal && normalPaintMode == NormalPaintMode.Height)
+					activeHeightStroke = new VoxelHeightPaintStroke(editingSession, heightStore);
+				else
+					activeStroke = new VoxelPaintStroke(editingSession, heightStore,
+						selectedLayer == AtlasPaintLayer.Normal);
+			}
 			if (activeStroke != null && Window.InMgr.IsInputDown(InputKey.Click_Left)
 				&& activeStroke.Paint(hoverHit, EncodeSelectedColor()))
 			{
-				previewDirty = true;
+				materialPreviewDirty = visualizationPreviewDirty = true;
+				inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
+			}
+			if (activeHeightStroke != null && Window.InMgr.IsInputDown(InputKey.Click_Left)
+				&& activeHeightStroke.Paint(hoverHit, selectedColor.R))
+			{
+				materialPreviewDirty = visualizationPreviewDirty = true;
 				inspector.RefreshPaintData(hoverHit, selectedLayer, reverseUsage.Get(hoverHit.TextureLayer));
 			}
 		}
@@ -259,7 +292,13 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		{
 			activeStroke.Commit();
 			activeStroke = null;
-			previewDirty = true;
+			materialPreviewDirty = visualizationPreviewDirty = true;
+		}
+		if (activeHeightStroke != null && Window.InMgr.IsInputReleased(InputKey.Click_Left))
+		{
+			activeHeightStroke.Commit();
+			activeHeightStroke = null;
+			materialPreviewDirty = visualizationPreviewDirty = true;
 		}
 
 		if (!overControls)
@@ -272,15 +311,18 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		}
 		lastMousePosition = mouse;
 
-		if (automaticLightRotation)
+		if (automaticLightRotation && !paintMode)
 		{
 			lightAzimuth = WrapDegrees(lightAzimuth + 30 * timing.DeltaTime);
 			inspector.LightAzimuthSlider.Value = lightAzimuth;
 		}
 
 		ConfigureLighting();
-		if (previewDirty)
-			RebuildEditorSurfaceTextures();
+		if (materialPreviewDirty)
+			RebuildEditorMaterialTextures();
+		if (visualizationPreviewDirty)
+			RebuildEditorVisualizationTextures();
+		editorTextureLease.UseVisualization(paintMode);
 		voxelScene.Update(camera);
 		gui.Update(timing.DeltaTime, timing.TotalTime);
 		if (timing.TotalTime >= releaseSuppressionAt)
@@ -396,8 +438,14 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 			activeStroke.Commit();
 			activeStroke = null;
 		}
+		if (activeHeightStroke != null)
+		{
+			activeHeightStroke.Commit();
+			activeHeightStroke = null;
+		}
 		map.SetBlock(0, 0, 0, selectedBlock);
 		paintGeometry = voxelScene.GetMaterialPaintGeometry(new BlockValue(selectedBlock));
+		visualizationPreviewDirty = true;
 		inspector.Select(blockType);
 		UpdateMaterialInfo();
 	}
@@ -495,20 +543,43 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		}
 	}
 
-	private void RebuildEditorSurfaceTextures()
+	private void RebuildEditorMaterialTextures()
 	{
-		previewDirty = false;
+		materialPreviewDirty = false;
 		try
 		{
 			using AtlasTextureSnapshot snapshot = editingSession.CreateTextureSnapshot();
 			OwnedVoxelSurfaceTextureSet textures = voxelScene.CreateEditorSurfaceTextures(
 				snapshot.BaseColor, snapshot.Normal, snapshot.Specular, snapshot.Roughness);
-			editorTextureLease.QueueReplacement(textures);
+			editorTextureLease.QueueMaterialReplacement(textures);
 			inspector.SetEditStatus(editingSession.IsDirty ? "Unsaved preview" : "Preview synchronized");
 		}
 		catch (Exception exception)
 		{
 			inspector.SetEditStatus($"Preview rebuild failed; last valid preview retained: {exception.Message}");
+		}
+	}
+
+	private void RebuildEditorVisualizationTextures()
+	{
+		visualizationPreviewDirty = false;
+		try
+		{
+			IReadOnlyList<AtlasPaintTarget> visibleNormalTargets = paintGeometry.Model.Vertices
+				.Select(static vertex => vertex.TextureLayer)
+				.Distinct()
+				.Select(layer => editingSession.GetTarget(selectedBlock, AtlasPaintLayer.Normal, layer))
+				.DistinctBy(AtlasHeightStore.Key)
+				.ToArray();
+			using AtlasTextureSnapshot snapshot = editingSession.CreateVisualizationSnapshot(
+				selectedLayer, normalPaintMode, visibleNormalTargets, heightStore);
+			OwnedVoxelSurfaceTextureSet textures = voxelScene.CreateEditorSurfaceTextures(
+				snapshot.BaseColor, snapshot.Normal, snapshot.Specular, snapshot.Roughness);
+			editorTextureLease.QueueVisualizationReplacement(textures);
+		}
+		catch (Exception exception)
+		{
+			inspector.SetEditStatus($"Layer visualization failed; last valid preview retained: {exception.Message}");
 		}
 	}
 
@@ -529,22 +600,96 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 	{
 		selectedLayer = layer;
 		inspector.SetSelectedLayer(layer);
+		visualizationPreviewDirty = true;
+	}
+
+	internal void SelectNormalPaintMode(NormalPaintMode mode)
+	{
+		normalPaintMode = mode;
+		inspector.SetNormalPaintMode(mode);
+		visualizationPreviewDirty = true;
 	}
 
 	internal void SetPaintColor(AtlasPixel color) => selectedColor = color;
 
-	internal void SetPaintMode(bool enabled) => paintMode = enabled;
+	internal void SetNormalStrength(float strength)
+	{
+		if (selectedLayer != AtlasPaintLayer.Normal || normalPaintMode != NormalPaintMode.Height
+			|| !lastNormalTarget.HasValue)
+			return;
+		AtlasPaintTarget target = lastNormalTarget.Value;
+		AtlasHeightField field = heightStore.GetOrCreate(target);
+		strength = Math.Clamp(strength, AtlasHeightStore.MinimumStrength, AtlasHeightStore.MaximumStrength);
+		if (MathF.Abs(field.Strength - strength) < 0.0001f)
+			return;
+		AtlasHeightCacheSnapshot before = field.Snapshot();
+		field.Strength = strength;
+		IReadOnlyList<AtlasPixelDelta> deltas = heightStore.RegenerateAllNormals(target, field);
+		if (strengthEditTarget.HasValue && AtlasHeightStore.Key(strengthEditTarget.Value) == field.Key)
+		{
+			foreach (AtlasPixelDelta delta in deltas)
+			{
+				var key = (delta.DocumentKey, delta.X, delta.Y);
+				if (strengthEditDeltas.TryGetValue(key, out AtlasPixelDelta existing))
+					strengthEditDeltas[key] = existing with { Current = delta.Current };
+				else
+					strengthEditDeltas[key] = delta;
+			}
+		}
+		else
+		{
+			editingSession.History.Commit(deltas, new[]
+			{
+				new AtlasHeightCacheChange(field.Key, before, field.Snapshot()),
+			});
+		}
+		materialPreviewDirty = visualizationPreviewDirty = true;
+	}
+
+	internal void BeginNormalStrengthEdit()
+	{
+		if (selectedLayer != AtlasPaintLayer.Normal || normalPaintMode != NormalPaintMode.Height
+			|| !lastNormalTarget.HasValue || strengthEditTarget.HasValue)
+			return;
+		strengthEditTarget = lastNormalTarget;
+		strengthEditBefore = heightStore.GetOrCreate(strengthEditTarget.Value).Snapshot();
+		strengthEditDeltas.Clear();
+	}
+
+	internal void EndNormalStrengthEdit()
+	{
+		if (!strengthEditTarget.HasValue || strengthEditBefore == null)
+			return;
+		AtlasPaintTarget target = strengthEditTarget.Value;
+		AtlasHeightField field = heightStore.GetOrCreate(target);
+		if (strengthEditDeltas.Count > 0 || MathF.Abs(field.Strength - strengthEditBefore.Strength) > 0.0001f)
+		{
+			editingSession.History.Commit(strengthEditDeltas.Values, new[]
+			{
+				new AtlasHeightCacheChange(field.Key, strengthEditBefore, field.Snapshot()),
+			});
+		}
+		strengthEditTarget = null;
+		strengthEditBefore = null;
+		strengthEditDeltas.Clear();
+	}
+
+	internal void SetPaintMode(bool enabled)
+	{
+		paintMode = enabled;
+		editorTextureLease.UseVisualization(enabled);
+	}
 
 	internal void UndoPaint()
 	{
-		if (editingSession.History.Undo(editingSession.Documents))
-			previewDirty = true;
+		if (editingSession.History.Undo(editingSession.Documents, heightStore))
+			materialPreviewDirty = visualizationPreviewDirty = true;
 	}
 
 	internal void RedoPaint()
 	{
-		if (editingSession.History.Redo(editingSession.Documents))
-			previewDirty = true;
+		if (editingSession.History.Redo(editingSession.Documents, heightStore))
+			materialPreviewDirty = visualizationPreviewDirty = true;
 	}
 
 	internal void DiscardPaint()
@@ -552,8 +697,9 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		try
 		{
 			editingSession.Discard();
+			heightStore.Clear();
 			editorTextureLease.Clear();
-			previewDirty = false;
+			materialPreviewDirty = visualizationPreviewDirty = true;
 			saveConflict = false;
 			voxelScene.RequestSurfaceTextureReload();
 			inspector.SetEditStatus("Changes discarded; authoritative assets reloaded");
@@ -640,24 +786,37 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		{
 			PaintAutomaticLayerSet(BlockType.Stone, 0, 3, 5);
 			SelectBlock(BlockType.Stone);
+			SelectPaintLayer(AtlasPaintLayer.Normal);
+			SelectNormalPaintMode(NormalPaintMode.Height);
 		}
 		if (automaticFrame == 32)
 		{
 			PaintAutomaticLayerSet(BlockType.StoneStairs, 0, 12, 9);
 			SelectBlock(BlockType.StoneStairs);
 		}
+		if (automaticFrame == 42)
+			SetPaintMode(false);
+		if (automaticFrame == 44)
+		{
+			if (voxelScene.Renderer.PresentationMode != VoxelRendererPresentationMode.Material)
+				throw new InvalidOperationException("Material Lab did not restore material presentation mode.");
+			SetPaintMode(true);
+		}
+		if (automaticFrame == 46
+			&& voxelScene.Renderer.PresentationMode != VoxelRendererPresentationMode.UnlitTexture)
+			throw new InvalidOperationException("Material Lab did not restore unlit layer presentation mode.");
 		if (automaticFrame == 52)
 		{
 			AtlasPaintTarget barrel = editingSession.GetTarget(BlockType.Barrel, AtlasPaintLayer.BaseColor, -1);
 			barrel.Set(4, 7, new AtlasPixel(0x47, 0xc8, 0xe8, 0xff));
-			previewDirty = true;
+			materialPreviewDirty = visualizationPreviewDirty = true;
 			SelectBlock(BlockType.Barrel);
 		}
 		if (automaticFrame == 72)
 		{
 			AtlasPaintTarget test = editingSession.GetTarget(BlockType.Test, AtlasPaintLayer.BaseColor, 8);
 			test.Set(20, 20, new AtlasPixel(0x47, 0xc8, 0xe8, 0xff));
-			previewDirty = true;
+			materialPreviewDirty = visualizationPreviewDirty = true;
 			SelectBlock(BlockType.Test);
 		}
 		if (automaticFrame == 80 && paintGeometry.Model.Vertices.Any(static vertex => vertex.TextureLayer != 8))
@@ -694,9 +853,15 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		AtlasPaintTarget roughness = editingSession.GetTarget(block, AtlasPaintLayer.Roughness, tile);
 		baseColor.Set(x, y, new AtlasPixel(0xd1, 0xa3, 0x65, 0xff));
 		normal.Set(x, y, AtlasPixel.Normal(0.25f, 0.5f));
+		AtlasHeightField height = heightStore.GetOrCreate(normal);
+		height.Set(x, y, 224);
+		heightStore.RegenerateNormals(normal, height,
+			from offsetY in Enumerable.Range(-1, 3)
+			from offsetX in Enumerable.Range(-1, 3)
+			select (x + offsetX, y + offsetY));
 		specular.Set(x, y, AtlasPixel.Scalar(192));
 		roughness.Set(x, y, AtlasPixel.Scalar(64));
-		previewDirty = true;
+		materialPreviewDirty = visualizationPreviewDirty = true;
 	}
 
 	private static float WrapDegrees(float value)

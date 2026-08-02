@@ -243,13 +243,14 @@ internal readonly record struct AtlasPixelDelta(
 internal sealed class AtlasStrokeHistory
 {
 	private const int Capacity = 100;
-	private readonly List<IReadOnlyList<AtlasPixelDelta>> undo = new();
-	private readonly List<IReadOnlyList<AtlasPixelDelta>> redo = new();
+	private readonly List<AtlasHistoryTransaction> undo = new();
+	private readonly List<AtlasHistoryTransaction> redo = new();
 
 	internal bool CanUndo => undo.Count > 0;
 	internal bool CanRedo => redo.Count > 0;
 
-	internal void Commit(IEnumerable<AtlasPixelDelta> deltas)
+	internal void Commit(IEnumerable<AtlasPixelDelta> deltas,
+		IEnumerable<AtlasHeightCacheChange> heightChanges = null)
 	{
 		IReadOnlyList<AtlasPixelDelta> stroke = deltas
 			.GroupBy(static delta => (delta.DocumentKey, delta.X, delta.Y))
@@ -261,19 +262,27 @@ internal sealed class AtlasStrokeHistory
 				group.Last().Current))
 			.Where(static delta => delta.Previous != delta.Current)
 			.ToArray();
-		if (stroke.Count == 0)
+		IReadOnlyList<AtlasHeightCacheChange> caches = heightChanges?.ToArray()
+			?? Array.Empty<AtlasHeightCacheChange>();
+		if (stroke.Count == 0 && caches.Count == 0)
 			return;
-		undo.Add(stroke);
+		undo.Add(new AtlasHistoryTransaction(stroke, caches));
 		if (undo.Count > Capacity)
 			undo.RemoveAt(0);
 		redo.Clear();
 	}
 
 	internal bool Undo(IReadOnlyDictionary<string, AtlasImageDocument> documents) =>
-		Transfer(undo, redo, documents, usePrevious: true);
+		Transfer(undo, redo, documents, null, usePrevious: true);
+
+	internal bool Undo(IReadOnlyDictionary<string, AtlasImageDocument> documents,
+		AtlasHeightStore heights) => Transfer(undo, redo, documents, heights, usePrevious: true);
 
 	internal bool Redo(IReadOnlyDictionary<string, AtlasImageDocument> documents) =>
-		Transfer(redo, undo, documents, usePrevious: false);
+		Transfer(redo, undo, documents, null, usePrevious: false);
+
+	internal bool Redo(IReadOnlyDictionary<string, AtlasImageDocument> documents,
+		AtlasHeightStore heights) => Transfer(redo, undo, documents, heights, usePrevious: false);
 
 	internal void Clear()
 	{
@@ -282,21 +291,29 @@ internal sealed class AtlasStrokeHistory
 	}
 
 	private static bool Transfer(
-		List<IReadOnlyList<AtlasPixelDelta>> source,
-		List<IReadOnlyList<AtlasPixelDelta>> destination,
+		List<AtlasHistoryTransaction> source,
+		List<AtlasHistoryTransaction> destination,
 		IReadOnlyDictionary<string, AtlasImageDocument> documents,
+		AtlasHeightStore heights,
 		bool usePrevious)
 	{
 		if (source.Count == 0)
 			return false;
-		IReadOnlyList<AtlasPixelDelta> stroke = source[^1];
+		AtlasHistoryTransaction transaction = source[^1];
 		source.RemoveAt(source.Count - 1);
-		foreach (AtlasPixelDelta delta in stroke)
+		foreach (AtlasPixelDelta delta in transaction.Pixels)
 			documents[delta.DocumentKey].RestorePixel(delta.X, delta.Y, usePrevious ? delta.Previous : delta.Current);
-		destination.Add(stroke);
+		if (heights != null)
+			foreach (AtlasHeightCacheChange change in transaction.HeightCaches)
+				heights.Restore(change.Key, usePrevious ? change.Before : change.After);
+		destination.Add(transaction);
 		return true;
 	}
 }
+
+internal sealed record AtlasHistoryTransaction(
+	IReadOnlyList<AtlasPixelDelta> Pixels,
+	IReadOnlyList<AtlasHeightCacheChange> HeightCaches);
 
 internal sealed class AtlasEditingSession
 {
@@ -372,14 +389,63 @@ internal sealed class AtlasEditingSession
 
 	internal AtlasTextureSnapshot CreateTextureSnapshot()
 	{
-		Bitmap baseColor = atlases[AtlasPaintLayer.BaseColor].CreateBitmap();
-		foreach ((BlockType block, CustomDocumentDefinition definition) in CustomDocuments)
-		{
-			using Bitmap source = customBase[block].CreateBitmap();
-			AtlasBitmapCodec.DrawWithBorder(baseColor, source, definition.X, definition.Y);
-		}
+		Bitmap baseColor = CreateComposedBaseColor();
 		return new AtlasTextureSnapshot(
 			baseColor,
+			atlases[AtlasPaintLayer.Normal].CreateBitmap(),
+			atlases[AtlasPaintLayer.Specular].CreateBitmap(),
+			atlases[AtlasPaintLayer.Roughness].CreateBitmap());
+	}
+
+	internal AtlasTextureSnapshot CreateVisualizationSnapshot(
+		AtlasPaintLayer layer,
+		NormalPaintMode normalMode,
+		IEnumerable<AtlasPaintTarget> visibleNormalTargets,
+		AtlasHeightStore heights)
+	{
+		using Bitmap composedBase = CreateComposedBaseColor();
+		Bitmap visualization;
+		if (layer == AtlasPaintLayer.BaseColor)
+		{
+			visualization = (Bitmap)composedBase.Clone();
+		}
+		else
+		{
+			byte[] basePixels = AtlasBitmapCodec.Read(composedBase);
+			byte[] pixels;
+			if (layer == AtlasPaintLayer.Normal && normalMode == NormalPaintMode.Height)
+			{
+				pixels = new byte[basePixels.Length];
+				for (int index = 0; index < pixels.Length; index += 4)
+					pixels[index] = pixels[index + 1] = pixels[index + 2] = 128;
+				foreach (AtlasPaintTarget target in visibleNormalTargets
+					.DistinctBy(AtlasHeightStore.Key))
+				{
+					AtlasHeightField field = heights.GetOrCreate(target);
+					for (int y = 0; y < target.Height; y++)
+					for (int x = 0; x < target.Width; x++)
+					{
+						int offset = ((target.Y + y) * AtlasSize + target.X + x) * 4;
+						byte value = field.Get(x, y);
+						pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = value;
+					}
+				}
+			}
+			else
+			{
+				using Bitmap source = atlases[layer].CreateBitmap();
+				pixels = AtlasBitmapCodec.Read(source);
+				if (layer is AtlasPaintLayer.Specular or AtlasPaintLayer.Roughness)
+					for (int index = 0; index < pixels.Length; index += 4)
+						pixels[index + 1] = pixels[index + 2] = pixels[index];
+			}
+			for (int index = 0; index < pixels.Length; index += 4)
+				pixels[index + 3] = basePixels[index + 3];
+			visualization = AtlasBitmapCodec.Create(AtlasSize, AtlasSize, pixels);
+		}
+
+		return new AtlasTextureSnapshot(
+			visualization,
 			atlases[AtlasPaintLayer.Normal].CreateBitmap(),
 			atlases[AtlasPaintLayer.Specular].CreateBitmap(),
 			atlases[AtlasPaintLayer.Roughness].CreateBitmap());
@@ -391,9 +457,10 @@ internal sealed class AtlasEditingSession
 			return Array.Empty<AtlasSaveDocument>();
 		List<AtlasSaveDocument> result = new();
 		using AtlasTextureSnapshot snapshot = CreateTextureSnapshot();
+		bool customBaseDirty = customBase.Values.Any(static value => value.IsDirty);
 		foreach ((AtlasPaintLayer layer, AtlasImageDocument document) in atlases)
 		{
-			if (!document.IsDirty && layer != AtlasPaintLayer.BaseColor && !customBase.Values.Any(static value => value.IsDirty))
+			if (!document.IsDirty && !(layer == AtlasPaintLayer.BaseColor && customBaseDirty))
 				continue;
 			Bitmap bitmap = layer switch
 			{
@@ -415,6 +482,17 @@ internal sealed class AtlasEditingSession
 		foreach (AtlasImageDocument document in documents.Values)
 			document.Reload();
 		History.Clear();
+	}
+
+	private Bitmap CreateComposedBaseColor()
+	{
+		Bitmap baseColor = atlases[AtlasPaintLayer.BaseColor].CreateBitmap();
+		foreach ((BlockType block, CustomDocumentDefinition definition) in CustomDocuments)
+		{
+			using Bitmap source = customBase[block].CreateBitmap();
+			AtlasBitmapCodec.DrawWithBorder(baseColor, source, definition.X, definition.Y);
+		}
+		return baseColor;
 	}
 
 	private static void ValidateAtlas(AtlasImageDocument document)

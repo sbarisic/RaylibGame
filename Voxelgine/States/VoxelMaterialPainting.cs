@@ -178,13 +178,18 @@ internal static class VoxelMaterialPicker
 internal sealed class VoxelPaintStroke
 {
 	private readonly AtlasEditingSession session;
+	private readonly AtlasHeightStore heights;
+	private readonly bool invalidateHeight;
 	private readonly Dictionary<(string Document, int X, int Y), AtlasPixelDelta> deltas = new();
 	private VoxelPaintHit previous;
 	private bool hasPrevious;
 
-	internal VoxelPaintStroke(AtlasEditingSession session)
+	internal VoxelPaintStroke(AtlasEditingSession session, AtlasHeightStore heights = null,
+		bool invalidateHeight = false)
 	{
 		this.session = session ?? throw new ArgumentNullException(nameof(session));
+		this.heights = heights;
+		this.invalidateHeight = invalidateHeight;
 	}
 
 	internal bool Paint(VoxelPaintHit hit, AtlasPixel color)
@@ -210,7 +215,12 @@ internal sealed class VoxelPaintStroke
 	{
 		if (deltas.Count == 0)
 			return false;
-		session.History.Commit(deltas.Values);
+		AtlasHeightCacheSnapshot before = invalidateHeight && hasPrevious
+			? heights?.Remove(previous.Target) : null;
+		IEnumerable<AtlasHeightCacheChange> cacheChanges = before == null
+			? null
+			: new[] { new AtlasHeightCacheChange(before.Key, before, null) };
+		session.History.Commit(deltas.Values, cacheChanges);
 		return true;
 	}
 
@@ -231,6 +241,113 @@ internal sealed class VoxelPaintStroke
 		ReferenceEquals(left.Target.Document, right.Target.Document)
 		&& left.Target.X == right.Target.X && left.Target.Y == right.Target.Y
 		&& left.Target.Width == right.Target.Width && left.Target.Height == right.Target.Height
+		&& left.Face == right.Face && left.TextureLayer == right.TextureLayer
+		&& left.TriangleIndex == right.TriangleIndex;
+
+	private static IEnumerable<(int X, int Y)> TraverseLine(int x0, int y0, int x1, int y1)
+	{
+		int dx = Math.Abs(x1 - x0);
+		int sx = x0 < x1 ? 1 : -1;
+		int dy = -Math.Abs(y1 - y0);
+		int sy = y0 < y1 ? 1 : -1;
+		int error = dx + dy;
+		while (true)
+		{
+			yield return (x0, y0);
+			if (x0 == x1 && y0 == y1)
+				yield break;
+			int doubled = error * 2;
+			if (doubled >= dy) { error += dy; x0 += sx; }
+			if (doubled <= dx) { error += dx; y0 += sy; }
+		}
+	}
+}
+
+internal sealed class VoxelHeightPaintStroke
+{
+	private readonly AtlasEditingSession session;
+	private readonly AtlasHeightStore heights;
+	private readonly Dictionary<(string Document, int X, int Y), AtlasPixelDelta> normalDeltas = new();
+	private readonly Dictionary<(int X, int Y), (byte Previous, byte Current)> heightDeltas = new();
+	private AtlasPaintTarget target;
+	private AtlasHeightField field;
+	private AtlasHeightCacheSnapshot before;
+	private VoxelPaintHit previous;
+	private bool hasPrevious;
+
+	internal VoxelHeightPaintStroke(AtlasEditingSession session, AtlasHeightStore heights)
+	{
+		this.session = session ?? throw new ArgumentNullException(nameof(session));
+		this.heights = heights ?? throw new ArgumentNullException(nameof(heights));
+	}
+
+	internal bool Paint(VoxelPaintHit hit, byte value)
+	{
+		if (!hit.Editable)
+			return false;
+		if (field == null)
+		{
+			target = hit.Target;
+			field = heights.GetOrCreate(target);
+			before = field.Snapshot();
+		}
+		if (AtlasHeightStore.Key(hit.Target) != field.Key)
+			return false;
+
+		bool changed = false;
+		if (hasPrevious && CanInterpolate(previous, hit))
+		{
+			foreach ((int x, int y) in TraverseLine(previous.LocalX, previous.LocalY, hit.LocalX, hit.LocalY))
+				changed |= PaintPixel(x, y, value);
+		}
+		else
+		{
+			changed = PaintPixel(hit.LocalX, hit.LocalY, value);
+		}
+		previous = hit;
+		hasPrevious = true;
+		return changed;
+	}
+
+	internal bool Commit()
+	{
+		if (field == null || heightDeltas.Count == 0)
+			return false;
+		session.History.Commit(normalDeltas.Values, new[]
+		{
+			new AtlasHeightCacheChange(field.Key, before, field.Snapshot()),
+		});
+		return true;
+	}
+
+	private bool PaintPixel(int x, int y, byte value)
+	{
+		byte previousValue = field.Get(x, y);
+		if (previousValue == value)
+			return false;
+		field.Set(x, y, value);
+		if (heightDeltas.TryGetValue((x, y), out var existing))
+			heightDeltas[(x, y)] = (existing.Previous, value);
+		else
+			heightDeltas[(x, y)] = (previousValue, value);
+
+		IEnumerable<(int X, int Y)> affected =
+			from offsetY in Enumerable.Range(-1, 3)
+			from offsetX in Enumerable.Range(-1, 3)
+			select (x + offsetX, y + offsetY);
+		foreach (AtlasPixelDelta delta in heights.RegenerateNormals(target, field, affected))
+		{
+			var key = (delta.DocumentKey, delta.X, delta.Y);
+			if (normalDeltas.TryGetValue(key, out AtlasPixelDelta current))
+				normalDeltas[key] = current with { Current = delta.Current };
+			else
+				normalDeltas[key] = delta;
+		}
+		return true;
+	}
+
+	private static bool CanInterpolate(VoxelPaintHit left, VoxelPaintHit right) =>
+		AtlasHeightStore.Key(left.Target) == AtlasHeightStore.Key(right.Target)
 		&& left.Face == right.Face && left.TextureLayer == right.TextureLayer
 		&& left.TriangleIndex == right.TriangleIndex;
 

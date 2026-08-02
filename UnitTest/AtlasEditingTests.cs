@@ -157,6 +157,129 @@ public sealed class AtlasEditingTests
 			geometry, session, AtlasPaintLayer.BaseColor, out _));
 	}
 
+	[Fact]
+	public void FlatNormalRegionReconstructsUniformMidHeight()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		AtlasPaintTarget normal = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		var heights = new AtlasHeightStore();
+
+		AtlasHeightField field = heights.GetOrCreate(normal);
+
+		Assert.All(field.Pixels.ToArray(), value => Assert.Equal((byte)128, value));
+		Assert.Equal(AtlasHeightStore.DefaultStrength, field.Strength);
+	}
+
+	[Fact]
+	public void HeightNormalsUseNormalizedDifferencesAndStayInsideTargetTile()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		AtlasPaintTarget normal = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		AtlasPaintTarget adjacent = session.GetTarget(BlockType.Dirt, AtlasPaintLayer.Normal, 1);
+		AtlasPixel adjacentBefore = adjacent.Get(0, 12);
+		var heights = new AtlasHeightStore();
+		AtlasHeightField field = heights.GetOrCreate(normal);
+		for (int y = 0; y < normal.Height; y++)
+		for (int x = 0; x < normal.Width; x++)
+			field.Set(x, y, (byte)Math.Round(x * 255.0 / (normal.Width - 1)));
+
+		heights.RegenerateAllNormals(normal, field);
+		AtlasPixel center = normal.Get(16, 16);
+
+		Assert.True(center.R < 128, $"Expected a negative tangent X normal, got R={center.R}.");
+		Assert.InRange(center.G, (byte)127, (byte)129);
+		Assert.Equal(adjacentBefore, adjacent.Get(0, 12));
+	}
+
+	[Fact]
+	public void VectorStrokeInvalidationIsChronologicallyUndoable()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		var heights = new AtlasHeightStore();
+		AtlasPaintTarget target = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		AtlasHeightField originalField = heights.GetOrCreate(target);
+		originalField.Set(4, 4, 211);
+		var hit = new VoxelPaintHit(1, default, default, VoxelFace.PositiveY,
+			0, default, 0, target, 4, 4);
+		var vectorStroke = new VoxelPaintStroke(session, heights, invalidateHeight: true);
+
+		Assert.True(vectorStroke.Paint(hit, AtlasPixel.Normal(0.5f, 0.25f)));
+		Assert.True(vectorStroke.Commit());
+		Assert.False(heights.TryGet(target, out _));
+
+		Assert.True(session.History.Undo(session.Documents, heights));
+		Assert.True(heights.TryGet(target, out AtlasHeightField restored));
+		Assert.Equal((byte)211, restored.Get(4, 4));
+		Assert.True(session.History.Redo(session.Documents, heights));
+		Assert.False(heights.TryGet(target, out _));
+	}
+
+	[Fact]
+	public void VisualizationUsesBaseColorAlphaForEverySurfaceLayer()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		AtlasPaintTarget baseColor = session.GetTarget(BlockType.Stone, AtlasPaintLayer.BaseColor, 0);
+		baseColor.Set(3, 7, new AtlasPixel(10, 20, 30, 37));
+		var heights = new AtlasHeightStore();
+
+		using AtlasTextureSnapshot snapshot = session.CreateVisualizationSnapshot(
+			AtlasPaintLayer.Specular, NormalPaintMode.Vector, Array.Empty<AtlasPaintTarget>(), heights);
+
+		Assert.Equal(37, snapshot.BaseColor.GetPixel(3, 7).A);
+		Assert.Equal(snapshot.BaseColor.GetPixel(3, 7).R, snapshot.BaseColor.GetPixel(3, 7).G);
+		Assert.Equal(snapshot.BaseColor.GetPixel(3, 7).R, snapshot.BaseColor.GetPixel(3, 7).B);
+	}
+
+	[Fact]
+	public void HeightOnlyEditProducesOnlyNormalSaveDocument()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		var heights = new AtlasHeightStore();
+		AtlasPaintTarget target = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		AtlasHeightField field = heights.GetOrCreate(target);
+		field.Set(10, 10, 255);
+		heights.RegenerateNormals(target, field, new[] { (10, 10), (9, 10), (11, 10), (10, 9), (10, 11) });
+
+		using SaveDocumentList documents = new(session.BuildSaveDocuments());
+
+		AtlasSaveDocument document = Assert.Single(documents.Items);
+		Assert.Equal("textures/atlas_normal.png", document.Document.RelativePath);
+	}
+
+	[Fact]
+	public void SavedNormalsReconstructDeterministicApproximateHeight()
+	{
+		using TestAtlasRoots roots = new();
+		var session = new AtlasEditingSession(new AtlasAssetPaths(roots.Source, roots.Runtime));
+		AtlasPaintTarget target = session.GetTarget(BlockType.Stone, AtlasPaintLayer.Normal, 0);
+		var sourceStore = new AtlasHeightStore();
+		AtlasHeightField source = sourceStore.GetOrCreate(target);
+		for (int y = 0; y < target.Height; y++)
+		for (int x = 0; x < target.Width; x++)
+			source.Set(x, y, (byte)(64 + x * 128 / (target.Width - 1)));
+		sourceStore.RegenerateAllNormals(target, source);
+
+		AtlasHeightField first = new AtlasHeightStore().GetOrCreate(target);
+		AtlasHeightField second = new AtlasHeightStore().GetOrCreate(target);
+		Assert.Equal(first.Pixels.ToArray(), second.Pixels.ToArray());
+		double sourceMean = source.Pixels.ToArray().Average(static value => (double)value);
+		double reconstructedMean = first.Pixels.ToArray().Average(static value => (double)value);
+		double squaredError = source.Pixels.ToArray()
+			.Zip(first.Pixels.ToArray(), (expected, actual) =>
+			{
+				double error = (expected - sourceMean) - (actual - reconstructedMean);
+				return error * error;
+			})
+			.Average();
+		Assert.True(Math.Sqrt(squaredError) < 13,
+			$"Reconstructed height RMSE was {Math.Sqrt(squaredError):0.###}.");
+	}
+
 	private sealed class TestAtlasRoots : IDisposable
 	{
 		internal TestAtlasRoots()
@@ -200,6 +323,17 @@ public sealed class AtlasEditingTests
 			Directory.CreateDirectory(path);
 			using Bitmap bitmap = new(width, height);
 			bitmap.Save(Path.Combine(path, name), ImageFormat.Png);
+		}
+	}
+
+	private sealed class SaveDocumentList : IDisposable
+	{
+		internal SaveDocumentList(IReadOnlyList<AtlasSaveDocument> items) => Items = items;
+		internal IReadOnlyList<AtlasSaveDocument> Items { get; }
+		public void Dispose()
+		{
+			foreach (AtlasSaveDocument item in Items)
+				item.Dispose();
 		}
 	}
 }

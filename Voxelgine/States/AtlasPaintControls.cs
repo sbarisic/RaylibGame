@@ -8,13 +8,16 @@ namespace Voxelgine.States;
 internal sealed class AtlasLayerThumbnail : Control
 {
 	private readonly Func<AtlasPaintTarget?> getTarget;
+	private readonly Func<AtlasPaintTarget, int, int, AtlasPixel> getPixel;
 	private readonly Action<AtlasPaintLayer> select;
 
 	internal AtlasLayerThumbnail(AtlasPaintLayer layer, Func<AtlasPaintTarget?> getTarget,
+		Func<AtlasPaintTarget, int, int, AtlasPixel> getPixel,
 		Action<AtlasPaintLayer> select)
 	{
 		Layer = layer;
 		this.getTarget = getTarget;
+		this.getPixel = getPixel;
 		this.select = select;
 	}
 
@@ -45,7 +48,7 @@ internal sealed class AtlasLayerThumbnail : Control
 			for (int y = 0; y < target.Height; y++)
 			for (int x = 0; x < target.Width; x++)
 			{
-				AtlasPixel pixel = target.Get(x, y);
+				AtlasPixel pixel = getPixel(target, x, y);
 				if (Layer == AtlasPaintLayer.BaseColor && pixel.A < byte.MaxValue)
 				{
 					FishColor checker = ((x + y) & 1) == 0

@@ -27,9 +27,7 @@ internal sealed class OwnedVoxelSurfaceTextureSet : IDisposable
 		VoxelSurfaceTextureSet current = Interlocked.Exchange(ref textures, null);
 		if (current == null)
 			return;
-		current.PackedSurface.Dispose();
-		current.CubeBaseColor.Dispose();
-		current.ModelAtlas.Dispose();
+		current.DisposeTexturesWhenUnused();
 	}
 }
 #endif

@@ -76,11 +76,19 @@ public sealed class FishUIManager : IDisposable
 				logging.Log(GameLogLevel.Error, "FishUI", "Failed to load theme.", exception);
 			}
 		}
+
+		DeveloperConsole = CreateDeveloperConsole();
+		DeveloperConsole.WriteLine("Aurora Falls developer console ready. Type 'help' for commands.");
+		UI.AddControl(DeveloperConsole);
 	}
 
 	public global::FishUI.FishUI UI { get; }
 
 	public FishUISettings Settings { get; }
+
+	public GameConsole DeveloperConsole { get; }
+
+	public bool IsDeveloperConsoleOpen => DeveloperConsole.IsOpen;
 
 	public int Width => UI.Width;
 
@@ -141,7 +149,16 @@ public sealed class FishUIManager : IDisposable
 	public void Clear()
 	{
 		UI.RemoveAllControls();
+		UI.AddControl(DeveloperConsole);
 	}
+
+	internal static GameConsole CreateDeveloperConsole() => new()
+	{
+		ID = "developer_console",
+		ToggleKey = FishKey.Grave,
+		ToggleModifiers = FishKeyModifiers.None,
+		HeightRatio = 0.5f,
+	};
 
 	public T FindControl<T>(string id) where T : Control
 	{

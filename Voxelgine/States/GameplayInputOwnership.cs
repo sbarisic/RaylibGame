@@ -6,6 +6,7 @@ internal enum GameplayInputMode
 	DebugMenu,
 	Chat,
 	Inventory,
+	DeveloperConsole,
 }
 
 /// <summary>
@@ -13,6 +14,8 @@ internal enum GameplayInputMode
 /// </summary>
 internal sealed class GameplayInputOwnership
 {
+	private GameplayInputMode modeBeforeDeveloperConsole = GameplayInputMode.Gameplay;
+
 	public GameplayInputMode Mode { get; private set; } = GameplayInputMode.Gameplay;
 
 	public bool IsStateActive { get; private set; }
@@ -46,7 +49,7 @@ internal sealed class GameplayInputOwnership
 
 	public bool ToggleDebugMenu()
 	{
-		if (Mode is GameplayInputMode.Chat or GameplayInputMode.Inventory)
+		if (Mode is GameplayInputMode.Chat or GameplayInputMode.Inventory or GameplayInputMode.DeveloperConsole)
 		{
 			return false;
 		}
@@ -66,6 +69,26 @@ internal sealed class GameplayInputOwnership
 		return true;
 	}
 
+	public bool SetDeveloperConsoleOpen(bool open)
+	{
+		if (open)
+		{
+			if (Mode == GameplayInputMode.DeveloperConsole)
+				return false;
+			modeBeforeDeveloperConsole = Mode;
+			Mode = GameplayInputMode.DeveloperConsole;
+			return true;
+		}
+
+		if (Mode != GameplayInputMode.DeveloperConsole)
+			return false;
+		Mode = modeBeforeDeveloperConsole == GameplayInputMode.DeveloperConsole
+			? GameplayInputMode.Gameplay
+			: modeBeforeDeveloperConsole;
+		modeBeforeDeveloperConsole = GameplayInputMode.Gameplay;
+		return true;
+	}
+
 	public void CloseOverlay()
 	{
 		Mode = GameplayInputMode.Gameplay;
@@ -74,5 +97,6 @@ internal sealed class GameplayInputOwnership
 	public void ResetMode()
 	{
 		Mode = GameplayInputMode.Gameplay;
+		modeBeforeDeveloperConsole = GameplayInputMode.Gameplay;
 	}
 }

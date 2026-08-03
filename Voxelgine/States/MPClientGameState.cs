@@ -250,6 +250,7 @@ namespace Voxelgine.States
 			if (!_connectionLost
 				&& !_initialized
 				&& (_client != null || !string.IsNullOrEmpty(_errorText))
+				&& _inputOwnership.Mode != GameplayInputMode.DeveloperConsole
 				&& Window.InMgr.IsInputPressed(InputKey.Esc))
 			{
 				DisconnectAndReturn("Returning to menu");
@@ -267,6 +268,15 @@ namespace Voxelgine.States
 				_client?.Tick(currentTime);
 				UpdateWorldStream();
 				ExpireWorldObjectAssemblies(currentTime);
+
+				if (_inputOwnership.Mode == GameplayInputMode.DeveloperConsole)
+				{
+					if (_initialized)
+						TickWorldWithoutGameplayInput();
+					else
+						_statusText = _worldStream?.Status ?? _statusText;
+					return;
+				}
 
 				// Handle connection lost overlay input
 				if (_connectionLost)
@@ -537,6 +547,18 @@ namespace Voxelgine.States
 			if (_simulation?.LocalPlayer is Player player)
 				player.CursorDisabled = captureCursor;
 			SetCursorCaptured(captureCursor);
+		}
+
+		private void SynchronizeDeveloperConsoleInput()
+		{
+			if (_gui is null || !_inputOwnership.SetDeveloperConsoleOpen(_gui.IsDeveloperConsoleOpen))
+				return;
+			ApplyInputOwnership();
+			_logging.Log(
+				GameLogLevel.Debug,
+				"Input",
+				$"mode={_inputOwnership.Mode} cursor={(_inputOwnership.CursorCaptured ? "captured" : "visible")} reason=developer-console"
+			);
 		}
 
 		private void TickWorldWithoutGameplayInput()

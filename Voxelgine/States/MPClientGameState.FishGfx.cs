@@ -676,6 +676,7 @@ public unsafe partial class MPClientGameState
 		}
 
 		_gui?.Update(timing.DeltaTime, timing.TotalTime);
+		SynchronizeDeveloperConsoleInput();
 	}
 
 	private static GameCameraState CreateCameraState(Player player)

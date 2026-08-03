@@ -75,10 +75,34 @@ public sealed unsafe class MPClientGameStateTests
 		Assert.False(ownership.CursorCaptured);
 	}
 
+	[Fact]
+	public void DeveloperConsoleTemporarilyOwnsInputAndRestoresPreviousMode()
+	{
+		GameplayInputOwnership ownership = new();
+		ownership.Activate();
+
+		Assert.True(ownership.SetDeveloperConsoleOpen(true));
+		Assert.Equal(GameplayInputMode.DeveloperConsole, ownership.Mode);
+		Assert.True(ownership.GameplayInputSuppressed);
+		Assert.False(ownership.CursorCaptured);
+		Assert.False(ownership.OpenChat());
+		Assert.False(ownership.OpenInventory());
+		Assert.False(ownership.ToggleDebugMenu());
+		Assert.True(ownership.SetDeveloperConsoleOpen(false));
+		Assert.Equal(GameplayInputMode.Gameplay, ownership.Mode);
+		Assert.True(ownership.CursorCaptured);
+
+		Assert.True(ownership.OpenChat());
+		Assert.True(ownership.SetDeveloperConsoleOpen(true));
+		Assert.True(ownership.SetDeveloperConsoleOpen(false));
+		Assert.Equal(GameplayInputMode.Chat, ownership.Mode);
+	}
+
 	[Theory]
 	[InlineData((int)GameplayInputMode.Chat)]
 	[InlineData((int)GameplayInputMode.DebugMenu)]
 	[InlineData((int)GameplayInputMode.Inventory)]
+	[InlineData((int)GameplayInputMode.DeveloperConsole)]
 	public void UiModesProduceNeutralNetworkAndPredictionInput(int modeValue)
 	{
 		GameplayInputMode mode = (GameplayInputMode)modeValue;

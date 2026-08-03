@@ -54,8 +54,13 @@ public static class WorldPlanRendering
 	public static byte[] RenderFeatures(WorldPlan plan)
 	{
 		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
+		foreach (PlannedVillageArea village in plan.Villages)
+			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
+			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++) Write(rgba, PixelIndex(plan, x, z), 0xD884C6D8);
 		foreach (PlannedWorldRoute route in plan.Routes)
-			foreach (PlanPoint3 cell in route.Cells) Write(rgba, PixelIndex(plan, cell.X, cell.Z), route.Kind == WorldFeatureKind.Road ? 0xB27B42FF : 0xB858E8FF);
+			foreach (PlanPoint3 cell in route.Cells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, route.Kind == WorldFeatureKind.Road ? 0xB27B42FF : 0xB858E8FF, route.Kind == WorldFeatureKind.Road ? 1 : 0);
+		foreach (PlannedVillageArea village in plan.Villages)
+			foreach (PlanPoint3 cell in village.AccessRoadCells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, 0xB27B42FF, 1);
 		foreach (PlannedWorldSite site in plan.Sites)
 		{
 			uint color = site.Role switch { WorldStructureRole.Shelter => 0x4DC8FFFF, WorldStructureRole.Relay => 0xE7D84BFF, WorldStructureRole.GravityAnchor => 0xE65C5CFF, WorldStructureRole.Shaft => 0xFFFFFFE0, _ => 0x9A72D9FF };
@@ -63,6 +68,16 @@ public static class WorldPlanRendering
 				for (int z = Math.Max(0, site.Reservation.MinimumZ); z <= Math.Min(plan.Length - 1, site.Reservation.MaximumZ); z++) Write(rgba, PixelIndex(plan, x, z), color);
 		}
 		return rgba;
+	}
+
+	private static void WriteFeatureCell(WorldPlan plan, byte[] pixels, int x, int z, uint color, int radius)
+	{
+		for (int offsetX = -radius; offsetX <= radius; offsetX++)
+		for (int offsetZ = -radius; offsetZ <= radius; offsetZ++)
+		{
+			int targetX = x + offsetX, targetZ = z + offsetZ;
+			if ((uint)targetX < (uint)plan.Width && (uint)targetZ < (uint)plan.Length) Write(pixels, PixelIndex(plan, targetX, targetZ), color);
+		}
 	}
 
 	public static byte[] RenderCombined(WorldPlan plan, CancellationToken cancellationToken = default)

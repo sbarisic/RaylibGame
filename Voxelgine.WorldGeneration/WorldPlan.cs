@@ -84,11 +84,17 @@ public sealed record PlannedPond(int WaterLevel, PlanPoint3[] Cells);
 
 public sealed record PlannedTree(int X, int Z, int SurfaceY, byte Variant);
 
+public sealed record PlannedVillageArea(
+	string Id,
+	PlanBounds Reservation,
+	byte SurfaceY,
+	PlanPoint3[] AccessRoadCells);
+
 public sealed class WorldPlan
 {
 	public const int CurrentFormatVersion = 1;
-	public const int CurrentGeneratorVersion = 1;
-	public const int CurrentMaterializerVersion = 1;
+	public const int CurrentGeneratorVersion = 2;
+	public const int CurrentMaterializerVersion = 2;
 
 	private readonly byte[] heights;
 	private readonly byte[] biomes;
@@ -104,6 +110,7 @@ public sealed class WorldPlan
 		IEnumerable<PlannedPond>? ponds = null,
 		IEnumerable<PlannedWorldSite>? sites = null,
 		IEnumerable<PlannedWorldRoute>? routes = null,
+		IEnumerable<PlannedVillageArea>? villages = null,
 		string structureCatalogHash = "")
 	{
 		Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -118,6 +125,7 @@ public sealed class WorldPlan
 		Ponds = (ponds ?? []).Select(static pond => pond with { Cells = pond.Cells.ToArray() }).ToArray();
 		Sites = (sites ?? []).ToArray();
 		Routes = (routes ?? []).Select(static route => route with { Cells = route.Cells.ToArray() }).ToArray();
+		Villages = (villages ?? []).Select(static village => village with { AccessRoadCells = village.AccessRoadCells.ToArray() }).ToArray();
 		StructureCatalogHash = structureCatalogHash ?? string.Empty;
 		Validate();
 	}
@@ -134,6 +142,7 @@ public sealed class WorldPlan
 	public IReadOnlyList<PlannedPond> Ponds { get; }
 	public IReadOnlyList<PlannedWorldSite> Sites { get; }
 	public IReadOnlyList<PlannedWorldRoute> Routes { get; }
+	public IReadOnlyList<PlannedVillageArea> Villages { get; }
 	public string StructureCatalogHash { get; }
 
 	public int Index(int x, int z)
@@ -181,6 +190,36 @@ public sealed class WorldPlan
 		if (Routes.Select(route => route.Id).Distinct(StringComparer.Ordinal).Count() != Routes.Count
 			|| Routes.Any(route => !siteIds.Contains(route.SourceSite) || !siteIds.Contains(route.DestinationSite)))
 			throw new InvalidDataException("World-plan routes require unique IDs and resolved sites.");
+		HashSet<PlanPoint> mainRoadCells = Routes.Where(route => route.Kind == WorldFeatureKind.Road)
+			.SelectMany(route => route.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
+		HashSet<string> villageIds = [];
+		List<PlanBounds> villageBounds = [];
+		foreach (PlannedVillageArea village in Villages)
+		{
+			if (string.IsNullOrWhiteSpace(village.Id) || !villageIds.Add(village.Id)
+				|| village.Reservation.MinimumX < 0 || village.Reservation.MinimumZ < 0
+				|| village.Reservation.MaximumX >= Width || village.Reservation.MaximumZ >= Length
+				|| village.Reservation.MaximumX - village.Reservation.MinimumX + 1 < 16
+				|| village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1 < 16
+				|| villageBounds.Any(bounds => bounds.Intersects(village.Reservation)))
+				throw new InvalidDataException("World-plan village reservations are invalid.");
+			int minimumHeight = int.MaxValue, maximumHeight = int.MinValue;
+			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
+			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++)
+			{
+				if (!IsLand(x, z)) throw new InvalidDataException($"Village '{village.Id}' leaves the island.");
+				int height = GetHeight(x, z); minimumHeight = Math.Min(minimumHeight, height); maximumHeight = Math.Max(maximumHeight, height);
+			}
+			if (maximumHeight - minimumHeight > 1 || village.SurfaceY < minimumHeight || village.SurfaceY > maximumHeight
+				|| village.AccessRoadCells.Length == 0
+				|| !village.Reservation.Contains(village.AccessRoadCells[0].X, village.AccessRoadCells[0].Z)
+				|| !mainRoadCells.Contains(new(village.AccessRoadCells[^1].X, village.AccessRoadCells[^1].Z))
+				|| village.AccessRoadCells.Any(cell => (uint)cell.X >= (uint)Width || (uint)cell.Z >= (uint)Length
+					|| !IsLand(cell.X, cell.Z) || cell.Y != GetHeight(cell.X, cell.Z))
+				|| village.AccessRoadCells.Zip(village.AccessRoadCells.Skip(1)).Any(pair => Math.Abs(pair.First.X - pair.Second.X) + Math.Abs(pair.First.Z - pair.Second.Z) != 1))
+				throw new InvalidDataException($"Village '{village.Id}' is not a connected flat reservation.");
+			villageBounds.Add(village.Reservation);
+		}
 		HashSet<PlanPoint> acceptedPondCells = [];
 		foreach (PlannedPond pond in Ponds)
 		{
@@ -193,5 +232,31 @@ public sealed class WorldPlan
 		}
 		if (StructureCatalogHash.Length != 0 && (StructureCatalogHash.Length != 64 || !StructureCatalogHash.All(Uri.IsHexDigit)))
 			throw new InvalidDataException("World-plan structure catalog hash is malformed.");
+		ValidateTreeExclusions();
+	}
+
+	private void ValidateTreeExclusions()
+	{
+		HashSet<PlanPoint> excluded = Ponds.SelectMany(pond => pond.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
+		foreach (PlannedWorldSite site in Sites)
+			for (int x = site.Reservation.MinimumX; x <= site.Reservation.MaximumX; x++)
+			for (int z = site.Reservation.MinimumZ; z <= site.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
+		foreach (PlannedWorldRoute route in Routes)
+			foreach (PlanPoint3 cell in route.Cells) AddRoadWidth(excluded, cell.X, cell.Z);
+		foreach (PlannedVillageArea village in Villages)
+		{
+			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
+			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
+			foreach (PlanPoint3 cell in village.AccessRoadCells) AddRoadWidth(excluded, cell.X, cell.Z);
+		}
+		foreach (PlanPoint point in excluded)
+			if ((uint)point.X < (uint)Width && (uint)point.Z < (uint)Length && GetTreeDensity(point.X, point.Z) != 0)
+				throw new InvalidDataException($"Tree density overlaps a reserved feature at ({point.X}, {point.Z}).");
+	}
+
+	private static void AddRoadWidth(HashSet<PlanPoint> cells, int x, int z)
+	{
+		for (int offsetX = -1; offsetX <= 1; offsetX++)
+		for (int offsetZ = -1; offsetZ <= 1; offsetZ++) cells.Add(new(x + offsetX, z + offsetZ));
 	}
 }

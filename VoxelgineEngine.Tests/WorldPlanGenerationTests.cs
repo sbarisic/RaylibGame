@@ -11,9 +11,9 @@ public sealed class WorldPlanGenerationTests
 	{
 		WorldPlan first = WorldPlanGenerator.Generate(new(123456, 96, 80, 64));
 		WorldPlan second = WorldPlanGenerator.Generate(new(123456, 96, 80, 64));
-		Assert.Equal("51E2B300F32337B3971F20E5CDC88DA8AC73E09B1A5A3299996ED9825EA056A1", Hash(first.Heights.Span));
-		Assert.Equal("6FE5B792B210A2392B011A71410547557EA37051046635AD2B37C740D01F10FA", Hash(first.Biomes.Span));
-		Assert.Equal("D81C946A320E2285B77D982B1F6747FA6DFC308E4D8E843AA67252D64AC15623", Hash(first.TreeDensity.Span));
+		Assert.Equal("29B6BBA6CF0E3B6CD8BAA8403E7993495E314585DB15BA8E3EDDC9EEED3E9A0C", Hash(first.Heights.Span));
+		Assert.Equal("859AB7B58FF1867AD6EF253952498E185E18FF4163C0643FAC015B17D88130B5", Hash(first.Biomes.Span));
+		Assert.Equal("576FB73BFB7214330382E4EAB304953221B0303C9B89E3ED6BBB16110EB0D11A", Hash(first.TreeDensity.Span));
 		Assert.Equal(Hash(first.Heights.Span), Hash(second.Heights.Span));
 		Assert.Equal(Hash(first.Biomes.Span), Hash(second.Biomes.Span));
 		Assert.Equal(Hash(first.TreeDensity.Span), Hash(second.TreeDensity.Span));
@@ -49,12 +49,7 @@ public sealed class WorldPlanGenerationTests
 	[Fact]
 	public void StructureNetworksUseDeterministicLandRoutes()
 	{
-		StructureTemplateDescriptor[] templates = Enum.GetValues<WorldStructureRole>().Select(role => new StructureTemplateDescriptor(
-			role.ToString().ToLowerInvariant(), role, 3, 3, 1, 1, [0, 90, 180, 270],
-			[
-				new("road", WorldFeatureKind.Road, 1, 1, 0, 1),
-				new("conduit", WorldFeatureKind.Conduit, 1, 1, 1, 0),
-			])).ToArray();
+		StructureTemplateDescriptor[] templates = CreateTemplates();
 		foreach (int seed in new[] { 5, 77, 9001, -4123 })
 		{
 			WorldGenerationSettings settings = new(seed, 256, 256, 64);
@@ -67,6 +62,75 @@ public sealed class WorldPlanGenerationTests
 			Assert.NotEmpty(first.Routes);
 			Assert.All(first.Routes, route => Assert.All(route.Cells, cell => Assert.True(first.IsLand(cell.X, cell.Z))));
 			Assert.Equal(first.Routes.Select(RouteSignature), second.Routes.Select(RouteSignature));
+		}
+	}
+
+	[Fact]
+	public void TerrainHasCentralMountainAndBroadFlatOuterRing()
+	{
+		WorldPlan plan = WorldPlanGenerator.Generate(new(8142, 512, 512, 64));
+		int centerX = plan.Width / 2, centerZ = plan.Length / 2;
+		Assert.Equal(62, plan.GetHeight(centerX, centerZ));
+		int outerMaximum = 0, outerMinimum = int.MaxValue, outerCells = 0;
+		for (int x = 0; x < plan.Width; x++)
+		for (int z = 0; z < plan.Length; z++)
+		{
+			double nx = (x - (plan.Width - 1) * 0.5) / (plan.Width * 0.5);
+			double nz = (z - (plan.Length - 1) * 0.5) / (plan.Length * 0.5);
+			double radius = Math.Sqrt(nx * nx + nz * nz);
+			if (!plan.IsLand(x, z) || radius is < 0.25 or > 0.78) continue;
+			int height = plan.GetHeight(x, z); outerMinimum = Math.Min(outerMinimum, height); outerMaximum = Math.Max(outerMaximum, height); outerCells++;
+		}
+		Assert.True(outerCells > plan.Width * plan.Length / 3);
+		Assert.True(outerMaximum <= 33, $"Outer plateau reached {outerMaximum}.");
+		Assert.True(outerMaximum - outerMinimum <= 6, $"Outer plateau range was {outerMinimum}..{outerMaximum}.");
+	}
+
+	[Fact]
+	public void VillagesAreLargeFlatConnectedAndExcludedFromTreeDensity()
+	{
+		WorldPlan plan = WorldPlanGenerator.Generate(new(93217, 640, 640, 64), CreateTemplates(), new string('c', 64));
+		Assert.Equal(2, plan.Villages.Count);
+		HashSet<PlanPoint> road = plan.Routes.Where(route => route.Kind == WorldFeatureKind.Road)
+			.SelectMany(route => route.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
+		foreach (PlannedVillageArea village in plan.Villages)
+		{
+			Assert.True(village.Reservation.MaximumX - village.Reservation.MinimumX + 1 >= 40);
+			Assert.True(village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1 >= 40);
+			Assert.Contains(new PlanPoint(village.AccessRoadCells[^1].X, village.AccessRoadCells[^1].Z), road);
+			int minimum = int.MaxValue, maximum = int.MinValue;
+			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
+			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++)
+			{
+				int height = plan.GetHeight(x, z); minimum = Math.Min(minimum, height); maximum = Math.Max(maximum, height);
+				Assert.Equal(0, plan.GetTreeDensity(x, z));
+			}
+			Assert.True(maximum - minimum <= 1);
+		}
+		foreach (PlannedWorldRoute route in plan.Routes)
+		foreach (PlanPoint3 cell in route.Cells)
+		for (int dx = -1; dx <= 1; dx++)
+		for (int dz = -1; dz <= 1; dz++)
+			if ((uint)(cell.X + dx) < (uint)plan.Width && (uint)(cell.Z + dz) < (uint)plan.Length)
+				Assert.Equal(0, plan.GetTreeDensity(cell.X + dx, cell.Z + dz));
+	}
+
+	[Fact]
+	public void MaterializerStampsThreeBlockWideRoads()
+	{
+		Voxelgine.Engine.World.Structures.StructureBlueprintCatalog catalog = Voxelgine.Engine.World.Structures.StructureBlueprintCatalog.LoadDirectory(
+			Path.Combine(AppContext.BaseDirectory, "data", "world", "structures"));
+		WorldPlan plan = Voxelgine.Graphics.WorldPlanMaterializer.GeneratePlan(256, 256, 1776, catalog);
+		Voxelgine.Graphics.ChunkMap map = new();
+		Voxelgine.Graphics.WorldPlanMaterializer.MaterializeAtomically(map, plan, catalog);
+		PlanPoint3 center = plan.Routes.Where(route => route.Kind == WorldFeatureKind.Road).SelectMany(route => route.Cells)
+			.First(cell => Enumerable.Range(-1, 3).All(dx => Enumerable.Range(-1, 3).All(dz =>
+				(uint)(cell.X + dx) < (uint)plan.Width && (uint)(cell.Z + dz) < (uint)plan.Length && plan.IsLand(cell.X + dx, cell.Z + dz))));
+		for (int dx = -1; dx <= 1; dx++)
+		for (int dz = -1; dz <= 1; dz++)
+		{
+			int x = center.X + dx, z = center.Z + dz, y = plan.GetHeight(x, z);
+			Assert.Equal(Voxelgine.Engine.BlockType.Gravel, map.GetBlock(x, y, z));
 		}
 	}
 
@@ -172,4 +236,10 @@ public sealed class WorldPlanGenerationTests
 
 	private static string Hash(ReadOnlySpan<byte> bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 	private static string RouteSignature(PlannedWorldRoute route) => $"{route.Id}|{route.Kind}|{route.SourceSite}|{route.DestinationSite}|{string.Join(';', route.Cells)}";
+	private static StructureTemplateDescriptor[] CreateTemplates() => Enum.GetValues<WorldStructureRole>().Select(role => new StructureTemplateDescriptor(
+		role.ToString().ToLowerInvariant(), role, 3, 3, 1, 1, [0, 90, 180, 270],
+		[
+			new("road", WorldFeatureKind.Road, 1, 1, 0, 1),
+			new("conduit", WorldFeatureKind.Conduit, 1, 1, 1, 0),
+		])).ToArray();
 }

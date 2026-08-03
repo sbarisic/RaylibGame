@@ -95,8 +95,28 @@ internal sealed class WorldPlanVoxelBuilder
 		foreach (PlannedRoute route in features.Routes) foreach (BlockCoordinate cell in route.Cells)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			SetBlock(cell.X, cell.Y, cell.Z, route.Kind == StructureConnectorKind.Conduit ? BlockType.PowerConduit : BlockType.Gravel);
-			if (route.Kind == StructureConnectorKind.Road) { SetBlock(cell.X, cell.Y + 1, cell.Z, BlockType.None); SetBlock(cell.X, cell.Y + 2, cell.Z, BlockType.None); }
+			if (route.Kind == StructureConnectorKind.Conduit) SetBlock(cell.X, cell.Y, cell.Z, BlockType.PowerConduit);
+			else StampRoadCell(cell.X, cell.Z);
+		}
+		foreach (PlannedVillageArea village in plan.Villages)
+		foreach (PlanPoint3 cell in village.AccessRoadCells)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			StampRoadCell(cell.X, cell.Z);
+		}
+	}
+
+	private void StampRoadCell(int centerX, int centerZ)
+	{
+		for (int offsetX = -1; offsetX <= 1; offsetX++)
+		for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
+		{
+			int x = centerX + offsetX, z = centerZ + offsetZ;
+			if ((uint)x >= (uint)plan.Width || (uint)z >= (uint)plan.Length || !plan.IsLand(x, z)) continue;
+			int y = plan.GetHeight(x, z);
+			SetBlock(x, y, z, BlockType.Gravel);
+			SetBlock(x, y + 1, z, BlockType.None);
+			SetBlock(x, y + 2, z, BlockType.None);
 		}
 	}
 

@@ -41,12 +41,15 @@ public static class WorldPlanGenerator
 		PlannedPond[] ponds = PlanPonds(settings, terrain, heights, mask, cancellationToken);
 		progress?.Report(new("Biomes", 0.42));
 		ClassifyBiomes(settings, moisture, heights, mask, ponds, biomes, cancellationToken);
-		GenerateTreeDensity(settings, vegetation, heights, biomes, density, cancellationToken);
-		progress?.Report(new("Structures", 0.6));
+		progress?.Report(new("Structures", 0.55));
 		(PlannedWorldSite[] sites, PlannedWorldRoute[] routes) = PlanFeatures(
 			settings, structures, heights, mask, ponds, cancellationToken);
+		progress?.Report(new("Villages", 0.72));
+		PlannedVillageArea[] villages = PlanVillages(settings, heights, mask, ponds, sites, routes, cancellationToken);
+		progress?.Report(new("Tree density", 0.84));
+		GenerateTreeDensity(settings, vegetation, biomes, density, ponds, sites, routes, villages, cancellationToken);
 		progress?.Report(new("Validation", 0.9));
-		WorldPlan plan = new(settings, heights, biomes, density, mask, ponds, sites, routes, structureCatalogHash);
+		WorldPlan plan = new(settings, heights, biomes, density, mask, ponds, sites, routes, villages, structureCatalogHash);
 		_ = DeriveTrees(plan, cancellationToken);
 		progress?.Report(new("Complete", 1));
 		return plan;
@@ -119,10 +122,14 @@ public static class WorldPlanGenerator
 				double distance = Math.Sqrt(nx * nx + nz * nz);
 				double coast = noise.Fractal2D(x * 0.0065, z * 0.0065, 4) * 0.18;
 				if (distance > 0.93 + coast) continue;
-				double hills = noise.Fractal2D(x * 0.012, z * 0.012, 5);
-				double detail = noise.Fractal2D(x * 0.045 + 17, z * 0.045 - 23, 3);
-				int surface = (int)Math.Round(settings.WorldHeight * 0.58 + hills * 8 + detail * 2 - Math.Max(0, distance - 0.7) * 14);
+				double plateauNoise = Math.Round(noise.Fractal2D(x * 0.0025 + 17, z * 0.0025 - 23, 3) * 2);
+				double mountainT = Math.Clamp((0.22 - distance) / 0.22, 0, 1);
+				double mountain = 28 * mountainT * mountainT * (3 - 2 * mountainT);
+				double centerDetail = noise.Fractal2D(x * 0.028 + 41, z * 0.028 - 37, 3) * (0.35 + mountainT * 1.4);
+				double coastDrop = Math.Max(0, distance - 0.88) / 0.12 * 4;
+				int surface = (int)Math.Round(settings.WorldHeight * 0.47 + plateauNoise + mountain + centerDetail - coastDrop);
 				surface = Math.Clamp(surface, 5, settings.WorldHeight - 2);
+				if (Math.Abs(x - centerX) <= 0.5 && Math.Abs(z - centerZ) <= 0.5) surface = settings.WorldHeight - 2;
 				heights[index] = (byte)surface;
 				mask[index] = 255;
 			}
@@ -212,14 +219,25 @@ public static class WorldPlanGenerator
 		}
 	}
 
-	private static void GenerateTreeDensity(WorldGenerationSettings settings, SeededNoise noise, byte[] heights, byte[] biomes, byte[] density, CancellationToken token)
+	private static void GenerateTreeDensity(
+		WorldGenerationSettings settings,
+		SeededNoise noise,
+		byte[] biomes,
+		byte[] density,
+		PlannedPond[] ponds,
+		PlannedWorldSite[] sites,
+		PlannedWorldRoute[] routes,
+		PlannedVillageArea[] villages,
+		CancellationToken token)
 	{
+		HashSet<PlanPoint> excluded = BuildFeatureExclusions(ponds, sites, routes, villages);
 		for (int x = 0; x < settings.Width; x++)
 		{
 			token.ThrowIfCancellationRequested();
 			for (int z = 0; z < settings.Length; z++)
 			{
 				int index = x * settings.Length + z;
+				if (excluded.Contains(new(x, z))) continue;
 				WorldBiome biome = (WorldBiome)biomes[index];
 				int baseline = biome switch { WorldBiome.Forest => 185, WorldBiome.Grassland => 38, WorldBiome.Wetland => 20, _ => 0 };
 				if (baseline == 0) continue;
@@ -227,6 +245,59 @@ public static class WorldPlanGenerator
 				density[index] = (byte)Math.Clamp(baseline + variation, 1, 255);
 			}
 		}
+	}
+
+	private static PlannedVillageArea[] PlanVillages(
+		WorldGenerationSettings settings,
+		byte[] heights,
+		byte[] mask,
+		PlannedPond[] ponds,
+		PlannedWorldSite[] sites,
+		PlannedWorldRoute[] routes,
+		CancellationToken token)
+	{
+		PlanPoint3[] roadCells = routes.Where(route => route.Kind == WorldFeatureKind.Road).SelectMany(route => route.Cells).Distinct().ToArray();
+		if (roadCells.Length == 0) return [];
+		int minimumDimension = Math.Min(settings.Width, settings.Length);
+		int desired = Math.Clamp(minimumDimension / 320, 1, 3);
+		int size = Math.Clamp(minimumDimension / 16, 24, 48);
+		int half = size / 2;
+		HashSet<PlanPoint> pondCells = ponds.SelectMany(pond => pond.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
+		SeededNoise picker = new(settings.Seed ^ 0x71A11A6E);
+		List<PlannedVillageArea> villages = [];
+		for (int ordinal = 0; ordinal < desired; ordinal++)
+		{
+			bool accepted = false;
+			for (int attempt = 0; attempt < 8192 && !accepted; attempt++)
+			{
+				token.ThrowIfCancellationRequested();
+				uint hash = picker.Hash(ordinal * 8191 + attempt, ordinal, 0xB117A6E);
+				int x = half + 4 + (int)(hash % (uint)Math.Max(1, settings.Width - size - 8));
+				int z = half + 4 + (int)((hash >> 12) % (uint)Math.Max(1, settings.Length - size - 8));
+				double nx = (x - (settings.Width - 1) * 0.5) / Math.Max(1, settings.Width * 0.5);
+				double nz = (z - (settings.Length - 1) * 0.5) / Math.Max(1, settings.Length * 0.5);
+				double radial = Math.Sqrt(nx * nx + nz * nz);
+				if (radial is < 0.28 or > 0.78) continue;
+				PlanBounds bounds = new(x - half, z - half, x - half + size - 1, z - half + size - 1);
+				if (sites.Any(site => site.Reservation.Intersects(bounds)) || villages.Any(village => village.Reservation.Intersects(bounds))) continue;
+				int minimum = int.MaxValue, maximum = int.MinValue; long total = 0; bool valid = true;
+				for (int bx = bounds.MinimumX; bx <= bounds.MaximumX && valid; bx++)
+				for (int bz = bounds.MinimumZ; bz <= bounds.MaximumZ; bz++)
+				{
+					int index = bx * settings.Length + bz;
+					if (mask[index] == 0 || pondCells.Contains(new(bx, bz))) { valid = false; break; }
+					int height = heights[index]; minimum = Math.Min(minimum, height); maximum = Math.Max(maximum, height); total += height;
+				}
+				if (!valid || maximum - minimum > 1) continue;
+				PlanPoint start = new(x, z);
+				PlanPoint3 nearest = roadCells.OrderBy(cell => SquaredDistance(cell.X, cell.Z, x, z)).ThenBy(cell => cell.X).ThenBy(cell => cell.Z).First();
+				PlanPoint3[] access = FindLandRoute(start, new(nearest.X, nearest.Z), settings, heights, mask);
+				if (access.Length == 0) continue;
+				byte surface = (byte)Math.Clamp((int)Math.Round(total / (double)(size * size)), minimum, maximum);
+				villages.Add(new($"village-{ordinal + 1:D2}", bounds, surface, access)); accepted = true;
+			}
+		}
+		return villages.ToArray();
 	}
 
 	private static (PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes) PlanFeatures(WorldGenerationSettings settings, IReadOnlyList<StructureTemplateDescriptor> templates, byte[] heights, byte[] mask, PlannedPond[] ponds, CancellationToken token)
@@ -405,13 +476,29 @@ public static class WorldPlanGenerator
 
 	private static HashSet<PlanPoint> BuildExclusions(WorldPlan plan)
 	{
-		HashSet<PlanPoint> excluded = plan.Ponds.SelectMany(p => p.Cells).Select(c => new PlanPoint(c.X, c.Z)).ToHashSet();
-		foreach (PlannedWorldSite site in plan.Sites)
+		return BuildFeatureExclusions(plan.Ponds, plan.Sites, plan.Routes, plan.Villages);
+	}
+
+	private static HashSet<PlanPoint> BuildFeatureExclusions(
+		IEnumerable<PlannedPond> ponds,
+		IEnumerable<PlannedWorldSite> sites,
+		IEnumerable<PlannedWorldRoute> routes,
+		IEnumerable<PlannedVillageArea> villages)
+	{
+		HashSet<PlanPoint> excluded = ponds.SelectMany(p => p.Cells).Select(c => new PlanPoint(c.X, c.Z)).ToHashSet();
+		foreach (PlannedWorldSite site in sites)
 			for (int x = site.Reservation.MinimumX; x <= site.Reservation.MaximumX; x++)
 				for (int z = site.Reservation.MinimumZ; z <= site.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
-		foreach (PlannedWorldRoute route in plan.Routes)
+		foreach (PlannedWorldRoute route in routes)
 			foreach (PlanPoint3 cell in route.Cells)
 				for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) excluded.Add(new(cell.X + dx, cell.Z + dz));
+		foreach (PlannedVillageArea village in villages)
+		{
+			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
+			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
+			foreach (PlanPoint3 cell in village.AccessRoadCells)
+				for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) excluded.Add(new(cell.X + dx, cell.Z + dz));
+		}
 		return excluded;
 	}
 

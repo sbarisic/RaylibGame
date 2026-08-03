@@ -83,7 +83,7 @@ public static class WorldPlanBundle
 			byte[] tree = decoded["tree-density.png"]; if (tree[pixel] != tree[pixel + 1] || tree[pixel] != tree[pixel + 2] || tree[pixel + 3] != 255) throw new InvalidDataException("tree-density.png is not canonical grayscale RGBA.");
 			density[index] = tree[pixel];
 		}
-		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.StructureCatalogHash);
+		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages, manifest.StructureCatalogHash);
 		if (!decoded["features.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderFeatures(plan))) throw new InvalidDataException("features.png does not match manifest feature records.");
 		if (!decoded["combined.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderCombined(plan, cancellationToken))) throw new InvalidDataException("combined.png does not match the semantic plan.");
 		return plan;
@@ -115,10 +115,10 @@ public static class WorldPlanBundle
 	private sealed record BundleManifest(
 		int FormatVersion, int GeneratorVersion, int MaterializerVersion, WorldGenerationSettings Settings,
 		Dictionary<WorldBiome, uint> BiomePalette, string StructureCatalogHash, PlannedPond[] Ponds,
-		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, Dictionary<string, string> LayerChecksums)
+		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, PlannedVillageArea[] Villages, Dictionary<string, string> LayerChecksums)
 	{
 		internal static BundleManifest From(WorldPlan plan, Dictionary<string, string> checksums) => new(
 			WorldPlan.CurrentFormatVersion, WorldPlan.CurrentGeneratorVersion, WorldPlan.CurrentMaterializerVersion, plan.Settings,
-			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.Ponds.ToArray(), plan.Sites.ToArray(), plan.Routes.ToArray(), checksums);
+			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.Ponds.ToArray(), plan.Sites.ToArray(), plan.Routes.ToArray(), plan.Villages.ToArray(), checksums);
 	}
 }

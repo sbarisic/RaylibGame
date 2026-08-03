@@ -88,6 +88,10 @@ namespace Voxelgine.Engine.Server
 							HandleChatMessage(connection, chatMsg);
 							break;
 
+						case ConsoleCommandRequestPacket consoleCommand:
+							HandlePlayerCommand(connection, consoleCommand);
+							break;
+
 						case DebugSpawnEntityRequestPacket debugSpawn:
 							HandleDebugSpawnEntityRequest(connection, debugSpawn);
 							break;
@@ -121,13 +125,6 @@ namespace Voxelgine.Engine.Server
 
 			if (string.IsNullOrWhiteSpace(message))
 				return;
-
-			// Intercept player commands (messages starting with /)
-			if (message.StartsWith('/'))
-			{
-				HandlePlayerCommand(connection, message.Substring(1));
-				return;
-			}
 
 			_logging.ServerWriteLine($"[Chat] [{connection.PlayerId}] \"{playerName}\": {message}");
 

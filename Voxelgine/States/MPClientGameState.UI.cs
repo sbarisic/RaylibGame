@@ -322,20 +322,6 @@ namespace Voxelgine.States
 			CreateDebugMenu(screenW, screenH);
 		}
 
-		private void SendChatCommand(string message)
-		{
-			if (_client == null || !_client.IsConnected)
-				return;
-
-			var packet = new ChatMessagePacket
-			{
-				PlayerId = _client.PlayerId,
-				Message = message
-			};
-			_client.Send(packet, true, GetClientTime());
-			_chatToast?.Show($"[Command] {message}", ToastType.Info, ChatMessageDuration);
-		}
-
 		private void UpdateHUDInfo()
 		{
 			if (_hudInfoLabel == null || _simulation == null)

@@ -56,6 +56,8 @@ namespace Voxelgine.Engine
 
 		// Misc
 		ChatMessage = 0x50,
+		ConsoleCommandRequest = 0x51,
+		ConsoleCommandResult = 0x52,
 		DayTimeSync = 0x70,
 		Ping = 0x80,
 		Pong = 0x81,
@@ -267,6 +269,8 @@ namespace Voxelgine.Engine
 
 			// Misc
 			Register<ChatMessagePacket>(PacketType.ChatMessage);
+			Register<ConsoleCommandRequestPacket>(PacketType.ConsoleCommandRequest);
+			Register<ConsoleCommandResultPacket>(PacketType.ConsoleCommandResult);
 			Register<DayTimeSyncPacket>(PacketType.DayTimeSync);
 			Register<PingPacket>(PacketType.Ping);
 			Register<PongPacket>(PacketType.Pong);

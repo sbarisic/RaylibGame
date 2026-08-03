@@ -20,6 +20,9 @@ public interface IClientEngineRunner : IFishEngineRunner
 	/// <summary>The hosted server loop, or null when this client is not hosting.</summary>
 	ServerLoop HostedServer { get; }
 
+	/// <summary>Whether the active connection explicitly targets this process's hosted server.</summary>
+	bool IsCurrentConnectionHosted { get; }
+
 	bool IsMultiplayerActive { get; }
 
 	bool IsLocalPlayerSubmerged { get; }

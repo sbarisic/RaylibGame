@@ -49,6 +49,11 @@ namespace Voxelgine.States
 
 		private void OnPacketReceived(Packet packet)
 		{
+			if (packet is ConsoleCommandResultPacket earlyConsoleResult)
+			{
+				HandleConsoleCommandResult(earlyConsoleResult);
+				return;
+			}
 			switch (packet)
 			{
 				case WorldStreamBeginPacket begin:

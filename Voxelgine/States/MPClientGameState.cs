@@ -207,6 +207,7 @@ namespace Voxelgine.States
 			// Create FishUI for loading screen
 			_gui = new FishUIManager(_gameWindow, _logging, Eng.AsClient().RuntimePaths);
 			_gui.InputEnabled = _inputOwnership.UiInputEnabled;
+			RegisterDeveloperConsoleCommands();
 			CreateLoadingUI();
 
 			try
@@ -586,8 +587,7 @@ namespace Voxelgine.States
 			if (string.IsNullOrEmpty(message))
 				return;
 
-			// Send all messages (including /commands) to the server via chat.
-			// The server intercepts messages starting with / and processes them as player commands.
+			// Slash-prefixed text is ordinary chat. Commands are submitted through GameConsole.
 			if (_client != null && _client.IsConnected)
 			{
 				var packet = new ChatMessagePacket
@@ -597,8 +597,6 @@ namespace Voxelgine.States
 				};
 				_client.Send(packet, true, GetClientTime());
 
-				if (message.StartsWith('/'))
-					AppendChatEntry($"[Command] {message}", "Chat");
 			}
 		}
 
@@ -659,6 +657,7 @@ namespace Voxelgine.States
 			_itemUseController = null;
 			_inventoryModel = null;
 			_simulation = null;
+			UnregisterDeveloperConsoleCommands();
 			_gui?.Dispose();
 			_gui = null;
 			_snd = null;

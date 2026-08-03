@@ -11,14 +11,14 @@ public partial class ServerLoop
 	private readonly Dictionary<int, StructureAuthoringSelection> structureSelections = new();
 	private static readonly Regex ValidStructureId = new("^[a-z][a-z0-9._-]{0,63}$", RegexOptions.CultureInvariant);
 
-	private void CmdStructure(NetConnection connection, string arguments)
+	private void CmdStructure(NetConnection connection, string arguments, CommandOutput output)
 	{
 		if (!_sessions.TryGetValue(connection.PlayerId, out ServerClientSession session))
 			return;
 		string[] parts = arguments.Split(' ', 4, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 		if (parts.Length == 0)
 		{
-			SendServerMessageTo(connection.PlayerId, "Usage: /structure pos1|pos2|anchor|marker|export ...");
+			output.Reject("Usage: structure pos1|pos2|anchor|marker|export ...");
 			return;
 		}
 		if (!structureSelections.TryGetValue(connection.PlayerId, out StructureAuthoringSelection selection))
@@ -37,17 +37,17 @@ public partial class ServerLoop
 				if (parts.Length != 2 || !ValidStructureId.IsMatch(parts[1]))
 					throw new InvalidDataException("Export ID must match ^[a-z][a-z0-9._-]{0,63}$.");
 				string exported = ExportStructureSelection(selection, parts[1]);
-				SendServerMessageTo(connection.PlayerId, $"Exported structure blueprint to {exported}");
+				output.WriteLine($"Exported structure blueprint to {exported}");
 				return;
 			default: throw new InvalidDataException("Unknown structure authoring operation.");
 		}
-		SendServerMessageTo(connection.PlayerId, $"Structure {parts[0]} set at {position}.");
+		output.WriteLine($"Structure {parts[0]} set at {position}.");
 	}
 
 	private void AddAuthoringMarker(StructureAuthoringSelection selection, string[] parts, BlockCoordinate position)
 	{
 		if (parts.Length < 3 || !ValidStructureId.IsMatch(parts[1]) || !Enum.TryParse(parts[2], true, out StructureMarkerKind kind))
-			throw new InvalidDataException("Usage: /structure marker <id> <kind> [json-data]");
+			throw new InvalidDataException("Usage: structure marker <id> <kind> [json-data]");
 		selection.Markers.RemoveAll(marker => string.Equals(marker.Id, parts[1], StringComparison.Ordinal));
 		selection.Markers.Add(new AuthoredMarker(parts[1], kind, position, parts.Length == 4 ? parts[3] : string.Empty));
 	}

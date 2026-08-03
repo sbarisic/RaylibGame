@@ -150,6 +150,29 @@ public sealed unsafe class MPClientGameStateTests
 		Assert.True(result.KeysDown[(int)InputKey.A]);
 	}
 
+	[Fact]
+	public void DeveloperConsoleCommandsExposeHostAdministrationOnlyForOwnedHostSessions()
+	{
+		string[] remote = MPClientGameState.GetDeveloperConsoleCommands(false)
+			.Select(static command => command.Name)
+			.ToArray();
+		string[] hosted = MPClientGameState.GetDeveloperConsoleCommands(true)
+			.Select(static command => command.Name)
+			.ToArray();
+
+#if DEBUG
+		Assert.Contains("fog", remote);
+#else
+		Assert.DoesNotContain("fog", remote);
+#endif
+		Assert.DoesNotContain("save", remote);
+		Assert.Contains("save", hosted);
+		Assert.Contains("stop", hosted);
+		Assert.DoesNotContain("kick", hosted);
+		Assert.DoesNotContain("ban", hosted);
+		Assert.DoesNotContain("help", hosted);
+	}
+
 	private sealed class TestContext : IDisposable
 	{
 		public TestContext()
@@ -189,6 +212,7 @@ public sealed unsafe class MPClientGameStateTests
 		public RuntimePaths RuntimePaths { get; }
 		public IGameWindow Window { get; }
 		public ServerLoop HostedServer => null;
+		public bool IsCurrentConnectionHosted => false;
 		public bool IsMultiplayerActive => false;
 		public bool IsLocalPlayerSubmerged => false;
 		public int ChunkDrawCalls { get; set; }

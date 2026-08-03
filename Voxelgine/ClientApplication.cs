@@ -18,6 +18,7 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 	private readonly EventHandler<UnobservedTaskExceptionEventArgs> unobservedTaskHandler;
 	private readonly UnhandledExceptionEventHandler unhandledExceptionHandler;
 	private ServerApplication hostedServer;
+	private int hostedServerPort;
 	private bool disposed;
 
 	public ClientApplication(string[] args)
@@ -87,6 +88,8 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 	IGameWindow IClientEngineRunner.Window => Window;
 
 	public ServerLoop HostedServer => hostedServer?.Server;
+
+	public bool IsCurrentConnectionHosted { get; private set; }
 
 	public bool IsMultiplayerActive => stateHost.ActiveState is States.MPClientGameState { IsActive: true };
 

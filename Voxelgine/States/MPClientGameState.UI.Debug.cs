@@ -208,7 +208,7 @@ namespace Voxelgine.States
 				Text = "NPC Come Here",
 				Size = new Vector2(140, 36)
 			};
-			btnNpcComeHere.Clicked += (sender, args) => SendChatCommand("/comehere");
+			btnNpcComeHere.Clicked += (sender, args) => _gui?.DeveloperConsole.Execute("comehere", echo: true);
 			stack.AddChild(btnNpcComeHere);
 
 			var btnClose = new Button

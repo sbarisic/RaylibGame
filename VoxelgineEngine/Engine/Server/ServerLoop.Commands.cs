@@ -8,7 +8,41 @@ namespace Voxelgine.Engine.Server
 {
 	public partial class ServerLoop
 	{
-		private readonly ConcurrentQueue<string> _commandQueue = new();
+		private sealed record QueuedServerCommand(
+			string Name,
+			string Arguments,
+			Action<ConsoleCommandExecutionResult> Completion);
+
+		private sealed class CommandOutput
+		{
+			private readonly Action<string> sink;
+			private readonly List<string> lines = [];
+
+			public CommandOutput(Action<string> sink = null) => this.sink = sink;
+
+			public bool Success { get; private set; } = true;
+
+			public void WriteLine(string message)
+			{
+				string line = message ?? string.Empty;
+				if (lines.Count < ConsoleCommandCatalog.MaximumResultLines
+					&& lines.Sum(static value => value.Length) + line.Length <= ConsoleCommandCatalog.MaximumResultTextLength)
+					lines.Add(line.Length <= ConsoleCommandCatalog.MaximumResultLineLength
+						? line
+						: line[..ConsoleCommandCatalog.MaximumResultLineLength]);
+				sink?.Invoke(line);
+			}
+
+			public void Reject(string message)
+			{
+				Success = false;
+				WriteLine(message);
+			}
+
+			public ConsoleCommandExecutionResult Complete() => new(Success, lines.ToArray());
+		}
+
+		private readonly ConcurrentQueue<QueuedServerCommand> _commandQueue = new();
 
 		/// <summary>
 		/// Queues a command for execution on the next server tick.
@@ -17,8 +51,33 @@ namespace Voxelgine.Engine.Server
 		/// <param name="command">The command string to execute (e.g., "kick PlayerName").</param>
 		public void ExecuteCommand(string command)
 		{
-			if (!string.IsNullOrWhiteSpace(command))
-				_commandQueue.Enqueue(command.Trim());
+			if (string.IsNullOrWhiteSpace(command))
+				return;
+			string[] parts = command.Trim().Split(' ', 2, StringSplitOptions.TrimEntries);
+			_commandQueue.Enqueue(new QueuedServerCommand(
+				parts[0],
+				parts.Length > 1 ? parts[1] : string.Empty,
+				null));
+		}
+
+		/// <summary>Queues an explicitly parsed local-host command and reports its output.</summary>
+		public void ExecuteCommand(
+			string commandName,
+			IReadOnlyList<string> arguments,
+			Action<ConsoleCommandExecutionResult> completion)
+		{
+			ArgumentException.ThrowIfNullOrWhiteSpace(commandName);
+			ArgumentNullException.ThrowIfNull(arguments);
+			ArgumentNullException.ThrowIfNull(completion);
+			if (commandName.Length > ConsoleCommandCatalog.MaximumCommandNameLength
+				|| arguments.Count > ConsoleCommandCatalog.MaximumArgumentCount
+				|| arguments.Any(static argument => argument is null || argument.Length > ConsoleCommandCatalog.MaximumArgumentLength)
+				|| commandName.Length + arguments.Sum(static argument => argument.Length) > ConsoleCommandCatalog.MaximumCommandTextLength)
+				throw new ArgumentException("The console command exceeds the configured limits.", nameof(arguments));
+			_commandQueue.Enqueue(new QueuedServerCommand(
+				commandName,
+				string.Join(' ', arguments),
+				completion));
 		}
 
 		/// <summary>
@@ -26,120 +85,121 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private void ProcessCommands()
 		{
-			while (_commandQueue.TryDequeue(out string command))
+			while (_commandQueue.TryDequeue(out QueuedServerCommand command))
 			{
+				CommandOutput output = new(_logging.ServerWriteLine);
 				try
 				{
-					ProcessCommand(command);
+					ProcessCommand(command.Name, command.Arguments, output);
 				}
 				catch (Exception ex)
 				{
-					_logging.Log(GameLogLevel.Error, "Command", $"Failed command={command}", ex);
+					output.Reject($"Command failed: {ex.Message}");
+					_logging.Log(GameLogLevel.Error, "Command", $"Failed command={command.Name}", ex);
 				}
+				try { command.Completion?.Invoke(output.Complete()); }
+				catch (Exception ex) { _logging.Log(GameLogLevel.Error, "Command", "Command completion callback failed.", ex); }
 			}
 		}
 
-		private void ProcessCommand(string command)
+		private void ProcessCommand(string commandName, string args, CommandOutput output)
 		{
-			// Split into command name and arguments
-			string[] parts = command.Split(' ', 2, StringSplitOptions.TrimEntries);
-			string cmd = parts[0].ToLowerInvariant();
-			string args = parts.Length > 1 ? parts[1] : string.Empty;
+			string cmd = commandName.ToLowerInvariant();
 
 			switch (cmd)
 			{
 				case "kick":
-					CmdKick(args);
+					CmdKick(args, output);
 					break;
 
 				case "ban":
-					CmdBan(args);
+					CmdBan(args, output);
 					break;
 
 				case "say":
-					CmdSay(args);
+					CmdSay(args, output);
 					break;
 
 				case "time":
-					CmdTime(args);
+					CmdTime(args, output);
 					break;
 
 				case "save":
-					CmdSave();
+					CmdSave(output);
 					break;
 
 				case "quit":
 				case "stop":
-					CmdQuit();
+					CmdQuit(output);
 					break;
 
 				case "status":
-					CmdStatus();
+					CmdStatus(output);
 					break;
 
 				case "players":
-					CmdPlayers();
+					CmdPlayers(output);
 					break;
 
 				case "help":
-					CmdHelp();
+					CmdHelp(output);
 					break;
 
 				default:
-					_logging.ServerWriteLine($"[CMD] Unknown command: {cmd}. Type 'help' for a list of commands.");
+					output.Reject($"[CMD] Unknown command: {cmd}. Type 'help' for a list of commands.");
 					break;
 			}
 		}
 
-		private void CmdKick(string args)
+		private void CmdKick(string args, CommandOutput output)
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.ServerWriteLine("[CMD] Usage: kick <player name or id>");
+				output.Reject("[CMD] Usage: kick <player name or id>");
 				return;
 			}
 
 			var conn = FindConnectionByNameOrId(args);
 			if (conn == null)
 			{
-				_logging.ServerWriteLine($"[CMD] Player not found: {args}");
+				output.Reject($"[CMD] Player not found: {args}");
 				return;
 			}
 
-			_logging.ServerWriteLine($"[CMD] Kicking player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
+			output.WriteLine($"[CMD] Kicking player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
 			_server.Kick(conn.PlayerId, "Kicked by server", CurrentTime);
 		}
 
-		private void CmdBan(string args)
+		private void CmdBan(string args, CommandOutput output)
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.ServerWriteLine("[CMD] Usage: ban <player name or id>");
+				output.Reject("[CMD] Usage: ban <player name or id>");
 				return;
 			}
 
 			var conn = FindConnectionByNameOrId(args);
 			if (conn == null)
 			{
-				_logging.ServerWriteLine($"[CMD] Player not found: {args}");
+				output.Reject($"[CMD] Player not found: {args}");
 				return;
 			}
 
 			// Ban is implemented as kick with a ban message.
 			// A full ban list (persisted IP/name bans) would require additional infrastructure.
-			_logging.ServerWriteLine($"[CMD] Banning player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
+			output.WriteLine($"[CMD] Banning player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
 			_server.Kick(conn.PlayerId, "Banned by server", CurrentTime);
 		}
 
-		private void CmdSay(string message)
+		private void CmdSay(string message, CommandOutput output)
 		{
 			if (string.IsNullOrEmpty(message))
 			{
-				_logging.ServerWriteLine("[CMD] Usage: say <message>");
+				output.Reject("[CMD] Usage: say <message>");
 				return;
 			}
 
-			_logging.ServerWriteLine($"[Server] {message}");
+			output.WriteLine($"[Server] {message}");
 
 			var chatPacket = new ChatMessagePacket
 			{
@@ -149,152 +209,150 @@ namespace Voxelgine.Engine.Server
 			_server.Broadcast(chatPacket, true, CurrentTime);
 		}
 
-		private void CmdTime(string args)
+		private void CmdTime(string args, CommandOutput output)
 		{
 			if (string.IsNullOrEmpty(args))
 			{
-				_logging.ServerWriteLine($"[CMD] Current time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+				output.WriteLine($"[CMD] Current time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
 				return;
 			}
 
 			if (!float.TryParse(args, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float hours) || hours < 0 || hours >= 24)
 			{
-				_logging.ServerWriteLine("[CMD] Usage: time <hours> (0-24, e.g., 12.5 for 12:30)");
+				output.Reject("[CMD] Usage: time <hours> (0-24, e.g., 12.5 for 12:30)");
 				return;
 			}
 
 			_simulation.DayNight.SetTime(hours);
-			_logging.ServerWriteLine($"[CMD] Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+			output.WriteLine($"[CMD] Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
 
 			// Broadcast updated time to all clients immediately
 			_server.Broadcast(new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
 		}
 
-		private void CmdSave()
+		private void CmdSave(CommandOutput output)
 		{
-			_logging.ServerWriteLine("[CMD] Saving world...");
+			output.WriteLine("[CMD] Saving world...");
 			SaveWorld();
 		}
 
-		private void CmdQuit()
+		private void CmdQuit(CommandOutput output)
 		{
-			_logging.ServerWriteLine("[CMD] Server shutting down...");
+			output.WriteLine("[CMD] Server shutting down...");
 			Stop();
 		}
 
-		private void CmdStatus()
+		private void CmdStatus(CommandOutput output)
 		{
-			_logging.ServerWriteLine($"[CMD] Server status:");
-			_logging.ServerWriteLine($"  Players: {_simulation.Players.Count}/{NetServer.MaxPlayers}");
-			_logging.ServerWriteLine($"  Tick: {_server.ServerTick}");
-			_logging.ServerWriteLine($"  Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
-			_logging.ServerWriteLine($"  Entities: {_simulation.Entities.GetEntityCount()}");
-			_logging.ServerWriteLine($"  Uptime: {CurrentTime:F0}s");
+			output.WriteLine($"[CMD] Server status:");
+			output.WriteLine($"  Players: {_simulation.Players.Count}/{NetServer.MaxPlayers}");
+			output.WriteLine($"  Tick: {_server.ServerTick}");
+			output.WriteLine($"  Time: {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()})");
+			output.WriteLine($"  Entities: {_simulation.Entities.GetEntityCount()}");
+			output.WriteLine($"  Uptime: {CurrentTime:F0}s");
 		}
 
-		private void CmdPlayers()
+		private void CmdPlayers(CommandOutput output)
 		{
 			var players = _simulation.Players.GetAllPlayers().ToArray();
 			if (players.Length == 0)
 			{
-				_logging.ServerWriteLine("[CMD] No players connected.");
+				output.WriteLine("[CMD] No players connected.");
 				return;
 			}
 
-			_logging.ServerWriteLine($"[CMD] Connected players ({players.Length}/{NetServer.MaxPlayers}):");
+			output.WriteLine($"[CMD] Connected players ({players.Length}/{NetServer.MaxPlayers}):");
 			foreach (var player in players)
 			{
 				var conn = _server.GetConnection(player.PlayerId);
 				string name = conn?.PlayerName ?? "Unknown";
 				int ping = conn?.RoundTripTimeMs ?? 0;
 				string status = player.IsDead ? " [DEAD]" : "";
-				_logging.ServerWriteLine($"  [{player.PlayerId}] \"{name}\" - Pos: ({player.Position.X:F1}, {player.Position.Y:F1}, {player.Position.Z:F1}) - HP: {player.Health:F0} - Ping: {ping}ms{status}");
+				output.WriteLine($"  [{player.PlayerId}] \"{name}\" - Pos: ({player.Position.X:F1}, {player.Position.Y:F1}, {player.Position.Z:F1}) - HP: {player.Health:F0} - Ping: {ping}ms{status}");
 			}
 		}
 
-		private void CmdHelp()
+		private void CmdHelp(CommandOutput output)
 		{
-			_logging.ServerWriteLine("[CMD] Server console commands:");
-			_logging.ServerWriteLine("  kick <player>  - Kick a player by name or ID");
-			_logging.ServerWriteLine("  ban <player>   - Ban a player by name or ID");
-			_logging.ServerWriteLine("  say <message>  - Broadcast a server message to all players");
-			_logging.ServerWriteLine("  time [hours]   - Show or set time of day (0-24)");
-			_logging.ServerWriteLine("  save           - Save the world to disk");
-			_logging.ServerWriteLine("  quit / stop    - Save and shut down the server");
-			_logging.ServerWriteLine("  status         - Show server status");
-			_logging.ServerWriteLine("  players        - List connected players");
-			_logging.ServerWriteLine("  help           - Show this help message");
-			_logging.ServerWriteLine("[CMD] Player chat commands (usable by any player via /command):");
-			_logging.ServerWriteLine("  /comehere      - All NPCs navigate to your position");
-			_logging.ServerWriteLine("  /day           - Set time to noon");
-			_logging.ServerWriteLine("  /night         - Set time to midnight");
-			_logging.ServerWriteLine("  /speak <text>  - All NPCs display a speech bubble");
+			output.WriteLine("[CMD] Server console commands:");
+			output.WriteLine("  kick <player>  - Kick a player by name or ID");
+			output.WriteLine("  ban <player>   - Ban a player by name or ID");
+			output.WriteLine("  say <message>  - Broadcast a server message to all players");
+			output.WriteLine("  time [hours]   - Show or set time of day (0-24)");
+			output.WriteLine("  save           - Save the world to disk");
+			output.WriteLine("  quit / stop    - Save and shut down the server");
+			output.WriteLine("  status         - Show server status");
+			output.WriteLine("  players        - List connected players");
+			output.WriteLine("  help           - Show this help message");
+			output.WriteLine("[CMD] Player console commands:");
+			output.WriteLine("  comehere       - All NPCs navigate to your position");
+			output.WriteLine("  day            - Set time to noon");
+			output.WriteLine("  night          - Set time to midnight");
+			output.WriteLine("  speak <text>   - All NPCs display a speech bubble");
 #if DEBUG
-			_logging.ServerWriteLine("  /fog fill ...  - Fill a player-centered fog volume");
-			_logging.ServerWriteLine("  /fog clear ... - Clear a player-centered fog volume");
-			_logging.ServerWriteLine("  /give <item> [count] - Add an item to your inventory");
+			output.WriteLine("  fog fill ...   - Fill a player-centered fog volume");
+			output.WriteLine("  fog clear ...  - Clear a player-centered fog volume");
+			output.WriteLine("  give <item> [count] - Add an item to your inventory");
 #endif
 		}
 
 		/// <summary>
-		/// Processes a command sent by a player via chat (e.g., /comehere).
-		/// Player commands are separate from server console commands — any connected player can use them.
+		/// Processes an authoritative command request from a connected player.
 		/// </summary>
-		private void HandlePlayerCommand(NetConnection connection, string command)
+		private void HandlePlayerCommand(NetConnection connection, ConsoleCommandRequestPacket request)
 		{
-			string[] parts = command.Split(' ', 2, StringSplitOptions.TrimEntries);
-			string cmd = parts[0].ToLowerInvariant();
-			string args = parts.Length > 1 ? parts[1] : string.Empty;
-
-			_logging.ServerWriteLine($"[CMD] Player [{connection.PlayerId}] \"{connection.PlayerName}\" issued: /{command}");
-
-			switch (cmd)
+			CommandOutput output = new();
+			try
 			{
-				case "comehere":
-					CmdComeHere(connection);
-					break;
-
-				case "day":
-					SetTimeAndNotify(connection.PlayerId, 12f);
-					break;
-
-				case "night":
-					SetTimeAndNotify(connection.PlayerId, 0f);
-					break;
-
-				case "speak":
-					CmdSpeak(connection, args);
-					break;
-
-				case "machine":
-					CmdMachine(connection, args);
-					break;
+				if (!ConsoleCommandCatalog.TryGetPlayerCommand(request.CommandName, out ConsoleCommandDefinition definition))
+				{
+					output.Reject($"Unknown player command: {request.CommandName}.");
+				}
+				else if (!definition.AcceptsArgumentCount(request.Arguments.Length))
+				{
+					output.Reject($"Usage: {definition.Usage}");
+				}
+				else
+				{
+					string cmd = definition.Name;
+					string args = string.Join(' ', request.Arguments);
+					_logging.ServerWriteLine($"[CMD] Player [{connection.PlayerId}] \"{connection.PlayerName}\" issued: {cmd} {args}".TrimEnd());
+					switch (cmd)
+					{
+						case "comehere": CmdComeHere(connection, output); break;
+						case "day": SetTimeAndNotify(12f, output); break;
+						case "night": SetTimeAndNotify(0f, output); break;
+						case "speak": CmdSpeak(connection, args, output); break;
+						case "machine": CmdMachine(connection, args, output); break;
 
 #if DEBUG
-				case "give":
-					CmdGive(connection, args);
-					break;
-
-				case "fog":
-					CmdFog(connection, args);
-					break;
-
-				case "structure":
-					CmdStructure(connection, args);
-					break;
+						case "give": CmdGive(connection, args, output); break;
+						case "fog": CmdFog(connection, args, output); break;
+						case "structure": CmdStructure(connection, args, output); break;
 #endif
-
-				default:
-					SendServerMessageTo(connection.PlayerId, $"Unknown command: /{cmd}. Try /comehere, /day, /night, /speak <text>, /machine <on|off>.");
-					break;
+						default: output.Reject($"Unknown player command: {cmd}."); break;
+					}
+				}
 			}
+			catch (Exception exception)
+			{
+				output.Reject($"Command failed: {exception.Message}");
+				_logging.Log(GameLogLevel.Error, "Command", $"Player command failed playerId={connection.PlayerId} command={request.CommandName}", exception);
+			}
+			ConsoleCommandExecutionResult result = output.Complete();
+			_server.SendTo(connection.PlayerId, new ConsoleCommandResultPacket
+			{
+				RequestId = request.RequestId,
+				Success = result.Success,
+				Lines = result.Lines.ToArray(),
+			}, true, CurrentTime);
 		}
 
-		private void CmdMachine(NetConnection connection, string arguments)
+		private void CmdMachine(NetConnection connection, string arguments, CommandOutput output)
 		{
 			if (_infrastructure == null || !_sessions.TryGetValue(connection.PlayerId, out ServerClientSession session))
 			{
-				SendServerMessageTo(connection.PlayerId, "Infrastructure is not available.");
+				output.Reject("Infrastructure is not available.");
 				return;
 			}
 			bool enabled;
@@ -302,7 +360,7 @@ namespace Voxelgine.Engine.Server
 			else if (string.Equals(arguments, "off", StringComparison.OrdinalIgnoreCase)) enabled = false;
 			else
 			{
-				SendServerMessageTo(connection.PlayerId, "Usage: /machine <on|off> while standing near a function block.");
+				output.Reject("Usage: machine <on|off> while standing near a function block.");
 				return;
 			}
 
@@ -317,38 +375,38 @@ namespace Voxelgine.Engine.Server
 				.FirstOrDefault();
 			if (nearest == null)
 			{
-				SendServerMessageTo(connection.PlayerId, "No infrastructure function is within eight blocks.");
+				output.Reject("No infrastructure function is within eight blocks.");
 				return;
 			}
 			if (enabled && nearest.Value.Key.Function == InfrastructureFunctionKind.GravityAnchor && _progression?.GravityAnchorUnlocked != true)
 			{
-				SendServerMessageTo(connection.PlayerId, "The gravity anchor is locked until all three story relays are active.");
+				output.Reject("The gravity anchor is locked until all three story relays are active.");
 				return;
 			}
 
 			_infrastructure.SetRequestedEnabled(nearest.Value.Key, enabled);
-			SendServerMessageTo(connection.PlayerId, $"{nearest.Value.Key.Function} requested state: {(enabled ? "enabled" : "disabled")}.");
+			output.WriteLine($"{nearest.Value.Key.Function} requested state: {(enabled ? "enabled" : "disabled")}.");
 		}
 
 		/// <summary>
 		/// Sets the time of day, broadcasts the change to all clients, and notifies the requesting player.
 		/// </summary>
-		private void SetTimeAndNotify(int playerId, float hours)
+		private void SetTimeAndNotify(float hours, CommandOutput output)
 		{
 			_simulation.DayNight.SetTime(hours);
 			_server.Broadcast(new DayTimeSyncPacket { TimeOfDay = _simulation.DayNight.TimeOfDay }, true, CurrentTime);
-			SendServerMessageTo(playerId, $"Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()}).");
+			output.WriteLine($"Time set to {_simulation.DayNight.GetTimeString()} ({_simulation.DayNight.GetPeriodString()}).");
 		}
 
 		/// <summary>
 		/// Commands all NPCs in the world to navigate to the player's current position.
 		/// </summary>
-		private void CmdComeHere(NetConnection connection)
+		private void CmdComeHere(NetConnection connection, CommandOutput output)
 		{
 			var player = _simulation.Players.GetPlayer(connection.PlayerId);
 			if (player == null)
 			{
-				SendServerMessageTo(connection.PlayerId, "Could not find your player.");
+				output.Reject("Could not find your player.");
 				return;
 			}
 
@@ -362,17 +420,17 @@ namespace Voxelgine.Engine.Server
 				}
 			}
 
-			SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) navigating to your position.");
+			output.WriteLine($"{count} NPC(s) navigating to your position.");
 			}
 
 			/// <summary>
 			/// Commands all NPCs to display a speech bubble with the given text.
 			/// </summary>
-			private void CmdSpeak(NetConnection connection, string text)
+			private void CmdSpeak(NetConnection connection, string text, CommandOutput output)
 			{
 				if (string.IsNullOrWhiteSpace(text))
 				{
-					SendServerMessageTo(connection.PlayerId, "Usage: /speak <text>");
+					output.Reject("Usage: speak <text>");
 					return;
 				}
 
@@ -386,35 +444,35 @@ namespace Voxelgine.Engine.Server
 					}
 				}
 
-				SendServerMessageTo(connection.PlayerId, $"{count} NPC(s) speaking.");
+				output.WriteLine($"{count} NPC(s) speaking.");
 			}
 
 #if DEBUG
-			private void CmdGive(NetConnection connection, string arguments)
+			private void CmdGive(NetConnection connection, string arguments, CommandOutput output)
 			{
 				if (!_sessions.TryGetValue(connection.PlayerId, out ServerClientSession session))
 				{
-					SendServerMessageTo(connection.PlayerId, "No active inventory session.");
+					output.Reject("No active inventory session.");
 					return;
 				}
 
 				string[] values = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 				if (values.Length is < 1 or > 2 || !TryResolveItem(values[0], out ItemDefinition item))
 				{
-					SendServerMessageTo(connection.PlayerId, "Usage: /give <item-id|name> [count]");
+					output.Reject("Usage: give <item-id|name> [count]");
 					return;
 				}
 
 				int requested = 1;
 				if (values.Length == 2 && (!int.TryParse(values[1], out requested) || requested <= 0 || requested > 3840))
 				{
-					SendServerMessageTo(connection.PlayerId, "Count must be between 1 and 3840.");
+					output.Reject("Count must be between 1 and 3840.");
 					return;
 				}
 
 				int granted = session.Inventory.Grant(item.Id, requested);
 				SendInventoryState(session, 0, true);
-				SendServerMessageTo(connection.PlayerId, granted == requested
+				output.WriteLine(granted == requested
 					? $"Granted {granted} x {item.DisplayName}."
 					: $"Granted {granted} x {item.DisplayName}; inventory is full.");
 			}
@@ -439,13 +497,13 @@ namespace Voxelgine.Engine.Server
 				return false;
 			}
 
-			private void CmdFog(NetConnection connection, string arguments)
+			private void CmdFog(NetConnection connection, string arguments, CommandOutput output)
 			{
 				Player player = _simulation.Players.GetPlayer(connection.PlayerId);
 
 				if (player == null)
 				{
-					SendServerMessageTo(connection.PlayerId, "Could not find your player.");
+					output.Reject("Could not find your player.");
 					return;
 				}
 
@@ -457,7 +515,7 @@ namespace Voxelgine.Engine.Server
 
 				if (values.Length == 0)
 				{
-					SendFogUsage(connection.PlayerId);
+					SendFogUsage(output);
 					return;
 				}
 
@@ -473,7 +531,7 @@ namespace Voxelgine.Engine.Server
 					|| radiusZ < 0 || radiusZ > 64
 					|| height <= 0 || height > 96)
 				{
-					SendFogUsage(connection.PlayerId);
+					SendFogUsage(output);
 					return;
 				}
 
@@ -504,7 +562,7 @@ namespace Voxelgine.Engine.Server
 						|| !byte.TryParse(values[6], out byte blue)
 						|| !byte.TryParse(values[7], out byte density))
 					{
-						SendFogUsage(connection.PlayerId);
+						SendFogUsage(output);
 						return;
 					}
 
@@ -523,32 +581,16 @@ namespace Voxelgine.Engine.Server
 					);
 				}
 
-				SendServerMessageTo(
-					connection.PlayerId,
+				output.WriteLine(
 					$"Fog {values[0].ToLowerInvariant()} changed {changed} cell(s)."
 				);
 			}
 
-			private void SendFogUsage(int playerId)
+			private void SendFogUsage(CommandOutput output)
 			{
-				SendServerMessageTo(
-					playerId,
-					"Usage: /fog fill <radiusX> <height> <radiusZ> <r> <g> <b> <density> or /fog clear <radiusX> <height> <radiusZ>"
-				);
+				output.Reject("Usage: fog fill <radiusX> <height> <radiusZ> <r> <g> <b> <density> or fog clear <radiusX> <height> <radiusZ>");
 			}
 #endif
-
-			/// <summary>
-			/// Sends a server message to a specific player via chat.
-		/// </summary>
-		private void SendServerMessageTo(int playerId, string message)
-		{
-			_server.SendTo(playerId, new ChatMessagePacket
-			{
-				PlayerId = -1,
-				Message = $"[Server] {message}"
-			}, true, CurrentTime);
-		}
 
 		/// <summary>
 		/// Finds a connection by player name (case-insensitive) or player ID string.

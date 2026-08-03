@@ -56,6 +56,9 @@ internal sealed partial class ClientApplication
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(address);
 		ArgumentException.ThrowIfNullOrWhiteSpace(playerName);
+		IsCurrentConnectionHosted = hostedServer is not null
+			&& port == hostedServerPort
+			&& IsLoopbackAddress(address);
 		stateHost.Request(
 			() => CreateState(ClientStateKind.Multiplayer),
 			state => ((MPClientGameState)state).Connect(address, port, playerName));
@@ -73,6 +76,7 @@ internal sealed partial class ClientApplication
 		{
 			application.StartHosted(port, seed, forceRegenerate, worldPlanDirectory);
 			hostedServer = application;
+			hostedServerPort = port;
 			return application;
 		}
 		catch
@@ -86,7 +90,17 @@ internal sealed partial class ClientApplication
 	{
 		ServerApplication application = hostedServer;
 		hostedServer = null;
+		hostedServerPort = 0;
+		IsCurrentConnectionHosted = false;
 		application?.Dispose();
+	}
+
+	private static bool IsLoopbackAddress(string address)
+	{
+		if (string.Equals(address, "localhost", StringComparison.OrdinalIgnoreCase))
+			return true;
+		return System.Net.IPAddress.TryParse(address, out System.Net.IPAddress parsed)
+			&& System.Net.IPAddress.IsLoopback(parsed);
 	}
 
 	public void FireWeapon(Vector3 start, Vector3 direction, float maximumLength)

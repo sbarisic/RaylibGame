@@ -19,7 +19,7 @@ internal sealed class WorldPlanVoxelBuilder
 		volumeSampler = WorldPlanGenerator.CreateVolumeSampler(plan);
 	}
 
-	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, CancellationToken cancellationToken)
+	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, VillagePrefabCatalog villagePrefabs, CancellationToken cancellationToken)
 	{
 		WorldPlanVoxelBuilder builder = new(plan);
 		builder.BuildTerrain(cancellationToken);
@@ -27,9 +27,37 @@ internal sealed class WorldPlanVoxelBuilder
 		WorldFeaturePlan features = catalog is null ? WorldFeaturePlan.Empty : ConvertFeatures(plan, catalog);
 		System.Diagnostics.Stopwatch stampTimer = System.Diagnostics.Stopwatch.StartNew();
 		if (catalog is not null) builder.StampFeatures(catalog, features, cancellationToken);
+		if (villagePrefabs is not null) builder.StampVillages(villagePrefabs, cancellationToken);
 		builder.StampTrees(cancellationToken);
 		builder.StampFoliage(features, cancellationToken);
 		return new(builder.CreateColumns(), features, new(TimeSpan.Zero, TimeSpan.Zero, stampTimer.Elapsed));
+	}
+
+	private void StampVillages(VillagePrefabCatalog catalog, CancellationToken cancellationToken)
+	{
+		foreach (PlannedVillageLayout layout in plan.VillageLayouts)
+		{
+			// Roads establish the underlying surface. Authored, non-empty prefab floor cells may replace it.
+			foreach (PlanPoint3 road in layout.InternalRoadCells)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				StampRoadCell(road.X, road.Z);
+			}
+			foreach (PlannedVillageModule module in layout.Modules.OrderBy(static value => value.Floor).ThenBy(static value => value.Origin.Y))
+			{
+				VillagePrefab prefab = catalog.Get(module.PrefabId);
+				for (int y = 0; y < VillagePrefabDescriptor.Height; y++)
+				for (int z = 0; z < VillagePrefabDescriptor.Length; z++)
+				for (int x = 0; x < VillagePrefabDescriptor.Width; x++)
+				{
+					BlockCoordinate rotated = WorldStructurePlanner.Rotate(new(x, y, z),
+						new(VillagePrefabDescriptor.Width, VillagePrefabDescriptor.Height, VillagePrefabDescriptor.Length), module.Rotation);
+					BlockValue value = prefab.GetCell(x, y, z);
+					if (y == 0 && value.Type == BlockType.None) continue;
+					SetBlock(module.Origin.X + rotated.X, module.Origin.Y + rotated.Y, module.Origin.Z + rotated.Z, value.Type);
+				}
+			}
+		}
 	}
 
 	private void BuildTerrain(CancellationToken cancellationToken)

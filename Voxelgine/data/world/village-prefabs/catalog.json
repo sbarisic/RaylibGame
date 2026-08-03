@@ -1,0 +1,1235 @@
+{
+  "formatVersion": 2,
+  "width": 5,
+  "height": 5,
+  "length": 5,
+  "socketSemantics": [
+    "closed",
+    "open",
+    "road",
+    "door",
+    "wall",
+    "gate",
+    "stairs",
+    "any",
+    "defense.wall",
+    "house.hallway",
+    "roof"
+  ],
+  "modules": [
+    {
+      "id": "defense.corner",
+      "displayName": "Defense Corner",
+      "kind": "DefenseCorner",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "sockets": {
+        "NegativeZ": [],
+        "PositiveX": [
+          "defense.wall"
+        ],
+        "PositiveZ": [
+          "defense.wall"
+        ],
+        "NegativeX": [],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "StoneBrick"
+      },
+      "layers": [
+        [
+          ".....",
+          ".aaaa",
+          ".aaaa",
+          ".aaaa",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".aaaa",
+          ".aaaa",
+          ".aaaa",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".aaaa",
+          ".aaaa",
+          ".aaaa",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".aaaa",
+          ".aaaa",
+          ".aaaa",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".aaaa",
+          ".aaaa",
+          ".aaaa",
+          ".aaa."
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "defense.gate",
+      "displayName": "Defense Gate",
+      "kind": "Gate",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "road"
+        ],
+        "PositiveX": [
+          "defense.wall"
+        ],
+        "PositiveZ": [
+          "road"
+        ],
+        "NegativeX": [
+          "defense.wall"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "StoneBrick",
+        "b": "Plank"
+      },
+      "layers": [
+        [
+          ".....",
+          "a...a",
+          "a...a",
+          "a...a",
+          "....."
+        ],
+        [
+          ".....",
+          "a...a",
+          "a...a",
+          "a...a",
+          "....."
+        ],
+        [
+          ".....",
+          "a...a",
+          "a...a",
+          "a...a",
+          "....."
+        ],
+        [
+          ".....",
+          "abbba",
+          "abbba",
+          "abbba",
+          "....."
+        ],
+        [
+          ".....",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "defense.wall",
+      "displayName": "Defense Wall",
+      "kind": "DefenseWall",
+      "weight": 5,
+      "levels": "Ground",
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "sockets": {
+        "NegativeZ": [],
+        "PositiveX": [
+          "defense.wall"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "defense.wall"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "StoneBrick"
+      },
+      "layers": [
+        [
+          ".....",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ],
+        [
+          ".....",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ],
+        [
+          ".....",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ],
+        [
+          ".....",
+          "aaaaa",
+          "aaa.a",
+          "aaaaa",
+          "....."
+        ],
+        [
+          ".....",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "house.hall",
+      "displayName": "House Hall",
+      "kind": "Hallway",
+      "weight": 3,
+      "levels": "Ground, Upper",
+      "rotations": [
+        0,
+        90
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "house.hallway"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "house.hallway"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone",
+        "b": "Plank"
+      },
+      "layers": [
+        [
+          "baaab",
+          "baaab",
+          "baaab",
+          "baaab",
+          "baaab"
+        ],
+        [
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b"
+        ],
+        [
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b"
+        ],
+        [
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b",
+          "b...b"
+        ],
+        [
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb"
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "house.room",
+      "displayName": "House Room",
+      "kind": "Room",
+      "weight": 8,
+      "levels": "Ground, Upper",
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "any"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "road",
+          "door",
+          "house.hallway"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "roof"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone",
+        "b": "Plank"
+      },
+      "layers": [
+        [
+          "bbbbb",
+          "baaab",
+          "baaab",
+          "baaab",
+          "bbabb"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "b...b",
+          "b...b",
+          "bb.bb"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "b...b",
+          "b...b",
+          "bb.bb"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "b...b",
+          "b...b",
+          "bbbbb"
+        ],
+        [
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb"
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "house.stairs",
+      "displayName": "House Stairs",
+      "kind": "Stairs",
+      "weight": 1,
+      "levels": "Ground, Upper",
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "any"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "door",
+          "house.hallway"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "stairs"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone",
+        "b": "Plank",
+        "c": "StoneStairs"
+      },
+      "layers": [
+        [
+          "baaab",
+          "baaab",
+          "baaab",
+          "baaab",
+          "baaab"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "b...b",
+          "b...b",
+          "bcc.b"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "b...b",
+          "bcc.b",
+          "b...b"
+        ],
+        [
+          "bbbbb",
+          "b...b",
+          "bcc.b",
+          "b...b",
+          "b...b"
+        ],
+        [
+          "bbbbb",
+          "bccbb",
+          "b..bb",
+          "b..bb",
+          "b..bb"
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "outside",
+      "displayName": "Outside",
+      "kind": "Outside",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "any"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {},
+      "layers": [
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "road.bend",
+      "displayName": "Road Bend",
+      "kind": "Yard",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "road"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "road"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone"
+      },
+      "layers": [
+        [
+          ".aaa.",
+          "aaaa.",
+          "aaaa.",
+          "aaaa.",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "road.plaza",
+      "displayName": "Road Plaza",
+      "kind": "Plaza",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "road"
+        ],
+        "PositiveX": [
+          "road"
+        ],
+        "PositiveZ": [
+          "road"
+        ],
+        "NegativeX": [
+          "road"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone"
+      },
+      "layers": [
+        [
+          ".aaa.",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "road.straight",
+      "displayName": "Road Straight",
+      "kind": "Road",
+      "weight": 4,
+      "levels": "Ground",
+      "rotations": [
+        0,
+        90
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "road"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "road"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone"
+      },
+      "layers": [
+        [
+          ".aaa.",
+          ".aaa.",
+          ".aaa.",
+          ".aaa.",
+          ".aaa."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    },
+    {
+      "id": "road.t",
+      "displayName": "Road T",
+      "kind": "Yard",
+      "weight": 1,
+      "levels": "Ground",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "road"
+        ],
+        "PositiveX": [
+          "road"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "road"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Stone"
+      },
+      "layers": [
+        [
+          ".aaa.",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "roof.flat",
+      "displayName": "Roof Flat",
+      "kind": "Roof",
+      "weight": 1,
+      "levels": "Roof",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "any"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "roof"
+        ]
+      },
+      "palette": {
+        "a": "Stone",
+        "b": "Bricks"
+      },
+      "layers": [
+        [
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa"
+        ],
+        [
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb",
+          "bbbbb"
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "markers": []
+    },
+    {
+      "id": "yard.grass",
+      "displayName": "Yard Grass",
+      "kind": "Yard",
+      "weight": 4,
+      "levels": "Ground",
+      "rotations": [
+        0
+      ],
+      "sockets": {
+        "NegativeZ": [
+          "any"
+        ],
+        "PositiveX": [
+          "any"
+        ],
+        "PositiveZ": [
+          "any"
+        ],
+        "NegativeX": [
+          "any"
+        ],
+        "PositiveY": [
+          "any"
+        ],
+        "NegativeY": [
+          "any"
+        ]
+      },
+      "palette": {
+        "a": "Grass"
+      },
+      "layers": [
+        [
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa",
+          "aaaaa"
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ]
+      ],
+      "supportMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "loadMask": [
+        "00000",
+        "00000",
+        "00000",
+        "00000",
+        "00000"
+      ],
+      "walkableMask": [
+        "11111",
+        "11111",
+        "11111",
+        "11111",
+        "11111"
+      ],
+      "markers": []
+    }
+  ]
+}

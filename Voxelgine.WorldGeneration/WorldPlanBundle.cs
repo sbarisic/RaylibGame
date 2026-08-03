@@ -7,7 +7,7 @@ namespace Voxelgine.WorldGeneration;
 public static class WorldPlanBundle
 {
 	public const string ManifestFileName = "manifest.json";
-	private static readonly string[] LayerNames = ["height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "combined.png"];
+	private static readonly string[] LayerNames = ["height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "features-floor-2.png", "features-floor-3.png", "features-roof.png", "combined.png"];
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		WriteIndented = true,
@@ -36,7 +36,7 @@ public static class WorldPlanBundle
 			}
 			BundleManifest manifest = BundleManifest.From(plan, checksums);
 			await File.WriteAllTextAsync(Path.Combine(temporary, ManifestFileName), JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken).ConfigureAwait(false);
-			_ = await LoadAsync(temporary, plan.StructureCatalogHash, cancellationToken).ConfigureAwait(false);
+			_ = await LoadAsync(temporary, plan.StructureCatalogHash, cancellationToken, plan.VillagePrefabCatalogHash).ConfigureAwait(false);
 			Directory.Move(temporary, target);
 		}
 		catch
@@ -46,7 +46,7 @@ public static class WorldPlanBundle
 		}
 	}
 
-	public static async Task<WorldPlan> LoadAsync(string directory, string? expectedStructureCatalogHash = null, CancellationToken cancellationToken = default)
+	public static async Task<WorldPlan> LoadAsync(string directory, string? expectedStructureCatalogHash = null, CancellationToken cancellationToken = default, string? expectedVillagePrefabCatalogHash = null)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 		string root = Path.GetFullPath(directory);
@@ -54,7 +54,7 @@ public static class WorldPlanBundle
 		if (!File.Exists(manifestPath)) throw new FileNotFoundException("World-plan manifest is missing.", manifestPath);
 		BundleManifest manifest = JsonSerializer.Deserialize<BundleManifest>(await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false), JsonOptions)
 			?? throw new InvalidDataException("World-plan manifest is empty.");
-		ValidateManifest(manifest, expectedStructureCatalogHash);
+		ValidateManifest(manifest, expectedStructureCatalogHash, expectedVillagePrefabCatalogHash);
 		Dictionary<string, byte[]> decoded = new(StringComparer.Ordinal);
 		foreach (string name in LayerNames)
 		{
@@ -88,8 +88,12 @@ public static class WorldPlanBundle
 				throw new InvalidDataException("hill-mask.png is not canonical scaled grayscale RGBA.");
 			hillMask[index] = (byte)(hills[pixel] / WorldPlanRendering.HillEncodingScale);
 		}
-		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, hillMask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages, manifest.StructureCatalogHash);
+		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, hillMask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages,
+			manifest.StructureCatalogHash, manifest.VillageLayouts, manifest.VillagePrefabCatalogHash);
 		if (!decoded["features.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderFeatures(plan))) throw new InvalidDataException("features.png does not match manifest feature records.");
+		if (!decoded["features-floor-2.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderVillageFloor(plan, 1))) throw new InvalidDataException("features-floor-2.png does not match manifest feature records.");
+		if (!decoded["features-floor-3.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderVillageFloor(plan, 2))) throw new InvalidDataException("features-floor-3.png does not match manifest feature records.");
+		if (!decoded["features-roof.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderVillageFloor(plan, 3))) throw new InvalidDataException("features-roof.png does not match manifest feature records.");
 		if (!decoded["combined.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderCombined(plan, cancellationToken))) throw new InvalidDataException("combined.png does not match the semantic plan.");
 		return plan;
 	}
@@ -99,10 +103,13 @@ public static class WorldPlanBundle
 		["height.png"] = WorldPlanRendering.RenderHeight(plan), ["biome.png"] = WorldPlanRendering.RenderBiome(plan),
 		["hill-mask.png"] = WorldPlanRendering.RenderHills(plan),
 		["tree-density.png"] = WorldPlanRendering.RenderTreeDensity(plan), ["features.png"] = WorldPlanRendering.RenderFeatures(plan),
+		["features-floor-2.png"] = WorldPlanRendering.RenderVillageFloor(plan, 1),
+		["features-floor-3.png"] = WorldPlanRendering.RenderVillageFloor(plan, 2),
+		["features-roof.png"] = WorldPlanRendering.RenderVillageFloor(plan, 3),
 		["combined.png"] = WorldPlanRendering.RenderCombined(plan, token),
 	};
 
-	private static void ValidateManifest(BundleManifest manifest, string? expectedHash)
+	private static void ValidateManifest(BundleManifest manifest, string? expectedHash, string? expectedVillageHash)
 	{
 		if (manifest.FormatVersion != WorldPlan.CurrentFormatVersion) throw new NotSupportedException($"World-plan format {manifest.FormatVersion} is unsupported.");
 		if (manifest.GeneratorVersion != WorldPlan.CurrentGeneratorVersion) throw new NotSupportedException($"World-plan generator {manifest.GeneratorVersion} is unsupported.");
@@ -111,6 +118,7 @@ public static class WorldPlanBundle
 		if (manifest.LayerChecksums.Count != LayerNames.Length || LayerNames.Any(name => !manifest.LayerChecksums.ContainsKey(name))) throw new InvalidDataException("World-plan layer checksum directory is incomplete.");
 		foreach (string hash in manifest.LayerChecksums.Values) if (hash.Length != 64 || !hash.All(Uri.IsHexDigit)) throw new InvalidDataException("World-plan layer checksum is malformed.");
 		if (expectedHash is not null && !string.Equals(expectedHash, manifest.StructureCatalogHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("World-plan structure catalog hash does not match the active catalog.");
+		if (expectedVillageHash is not null && !string.Equals(expectedVillageHash, manifest.VillagePrefabCatalogHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("World-plan village prefab catalog hash does not match the active catalog.");
 		if (manifest.BiomePalette.Count != Enum.GetValues<WorldBiome>().Length || WorldPlanRendering.BiomePalette.Any(pair => !manifest.BiomePalette.TryGetValue(pair.Key, out uint color) || color != pair.Value)) throw new InvalidDataException("World-plan biome palette is invalid.");
 		HashSet<string> siteIds = manifest.Sites.Select(site => site.Id).ToHashSet(StringComparer.Ordinal);
 		if (siteIds.Count != manifest.Sites.Length || manifest.Routes.Any(route => !siteIds.Contains(route.SourceSite) || !siteIds.Contains(route.DestinationSite))) throw new InvalidDataException("World-plan features contain duplicate or unresolved site references.");
@@ -120,11 +128,11 @@ public static class WorldPlanBundle
 
 	private sealed record BundleManifest(
 		int FormatVersion, int GeneratorVersion, int MaterializerVersion, WorldGenerationSettings Settings,
-		Dictionary<WorldBiome, uint> BiomePalette, string StructureCatalogHash, PlannedPond[] Ponds,
-		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, PlannedVillageArea[] Villages, Dictionary<string, string> LayerChecksums)
+		Dictionary<WorldBiome, uint> BiomePalette, string StructureCatalogHash, string VillagePrefabCatalogHash, PlannedPond[] Ponds,
+		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, PlannedVillageArea[] Villages, PlannedVillageLayout[] VillageLayouts, Dictionary<string, string> LayerChecksums)
 	{
 		internal static BundleManifest From(WorldPlan plan, Dictionary<string, string> checksums) => new(
 			WorldPlan.CurrentFormatVersion, WorldPlan.CurrentGeneratorVersion, WorldPlan.CurrentMaterializerVersion, plan.Settings,
-			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.Ponds.ToArray(), plan.Sites.ToArray(), plan.Routes.ToArray(), plan.Villages.ToArray(), checksums);
+			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.VillagePrefabCatalogHash, plan.Ponds.ToArray(), plan.Sites.ToArray(), plan.Routes.ToArray(), plan.Villages.ToArray(), plan.VillageLayouts.ToArray(), checksums);
 	}
 }

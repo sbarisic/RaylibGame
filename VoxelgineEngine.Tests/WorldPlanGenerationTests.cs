@@ -169,8 +169,8 @@ public sealed class WorldPlanGenerationTests
 			.SelectMany(route => route.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
 		foreach (PlannedVillageArea village in plan.Villages)
 		{
-			Assert.True(village.Reservation.MaximumX - village.Reservation.MinimumX + 1 >= 40);
-			Assert.True(village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1 >= 40);
+			Assert.True(village.Reservation.MaximumX - village.Reservation.MinimumX + 1 >= 80);
+			Assert.True(village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1 >= 80);
 			int boundingArea = (village.Reservation.MaximumX - village.Reservation.MinimumX + 1)
 				* (village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1);
 			Assert.InRange(village.Footprint.Length / (double)boundingArea, 0.55, 0.90);

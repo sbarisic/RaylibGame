@@ -30,6 +30,12 @@ internal sealed partial class ClientApplication
 			state.EnableAutomaticValidation();
 			return state;
 		}
+		if (arguments.Contains("--fishgfx-auto-village-prefab-lab", StringComparer.OrdinalIgnoreCase))
+		{
+			VillagePrefabLabState state = (VillagePrefabLabState)CreateState(ClientStateKind.VillagePrefabLab);
+			state.EnableAutomaticValidation();
+			return state;
+		}
 		return CreateState(ClientStateKind.MainMenu);
 	}
 
@@ -43,6 +49,7 @@ internal sealed partial class ClientApplication
 			ClientStateKind.EffectsPreview => new EffectsPreviewState(Window, this),
 			ClientStateKind.VoxelMaterialPreview => new VoxelMaterialPreviewState(Window, this),
 			ClientStateKind.WorldPreview => new WorldPreviewState(Window, this),
+			ClientStateKind.VillagePrefabLab => new VillagePrefabLabState(Window, this),
 			_ => throw new ArgumentOutOfRangeException(nameof(state)),
 		};
 	}

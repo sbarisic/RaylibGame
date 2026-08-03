@@ -159,8 +159,9 @@ try {
             '--fishgfx-auto-transition',
             '--fishgfx-auto-npc',
             '--fishgfx-auto-effects',
-            '--fishgfx-auto-voxel-material'
-			'--fishgfx-auto-world-preview'
+			'--fishgfx-auto-voxel-material',
+			'--fishgfx-auto-world-preview',
+			'--fishgfx-auto-village-prefab-lab'
         )
         foreach ($mode in $automaticModes) {
             $safeName = $mode.TrimStart('-').Replace('-', '_')

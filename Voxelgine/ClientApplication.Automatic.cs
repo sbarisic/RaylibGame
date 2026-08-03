@@ -13,6 +13,8 @@ internal sealed partial class ClientApplication
 			return 120;
 		if (arguments.Contains("--fishgfx-auto-world-preview", StringComparer.OrdinalIgnoreCase))
 			return 30;
+		if (arguments.Contains("--fishgfx-auto-village-prefab-lab", StringComparer.OrdinalIgnoreCase))
+			return 30;
 		return arguments.Contains("--fishgfx-auto-gameplay", StringComparer.OrdinalIgnoreCase) ? 90 : 4;
 	}
 
@@ -26,6 +28,10 @@ internal sealed partial class ClientApplication
 			validatedMaterialPreview.ValidateAutomaticSnapshotBundle();
 		if (state is WorldPreviewState worldPreview)
 			worldPreview.ValidateAutomaticBundle();
+		if (state is VillagePrefabLabState prefabLab && !prefabLab.IsReady)
+			throw new InvalidOperationException("The automatic Village Prefab Lab validation did not complete.");
+		if (state is VillagePrefabLabState validatedPrefabLab)
+			validatedPrefabLab.ValidateAutomaticSnapshotBundle();
 
 		const int channelTolerance = 16;
 		const int minimumForegroundPixels = 64;

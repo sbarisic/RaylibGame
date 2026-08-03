@@ -297,7 +297,7 @@ public sealed class MainMenuOptionsTests
 		Assert.Contains("Join Game", releaseEntries);
 		Assert.DoesNotContain("Multiplayer", releaseEntries);
 		Assert.Equal(
-			["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview"],
+			["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview", "Village Prefab Lab"],
 			MainMenuStateFishUI.GetDeveloperToolEntries()
 		);
 	}

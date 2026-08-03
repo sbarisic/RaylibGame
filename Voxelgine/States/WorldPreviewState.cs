@@ -31,6 +31,7 @@ public sealed class WorldPreviewState : GameStateImpl
 	private readonly Label legend;
 	private readonly Dictionary<WorldPlanRendering.Layer, Button> layerButtons = [];
 	private readonly StructureBlueprintCatalog structureCatalog;
+	private readonly VillagePrefabCatalog villagePrefabs;
 	private CancellationTokenSource generationCancellation;
 	private Task<WorldPlan> generationTask;
 	private WorldPlan plan;
@@ -56,6 +57,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		fishWindow = window as IFishGfxGameWindow ?? throw new ArgumentException("World Preview requires FishGfx.", nameof(window));
 		runtimePaths = engine.AsClient().RuntimePaths;
 		structureCatalog = StructureBlueprintCatalog.LoadDirectory(Path.Combine(AppContext.BaseDirectory, "data", "world", "structures"));
+		villagePrefabs = VillagePrefabCatalog.Load(Path.Combine(AppContext.BaseDirectory, "data", "world", "village-prefabs", "catalog.json"));
 		gui = new FishUIManager(window, engine.Logging, runtimePaths);
 		sidebar = new Panel { ID = "world_preview_sidebar" };
 		viewport = new Panel { ID = "world_preview_viewport" };
@@ -77,7 +79,7 @@ public sealed class WorldPreviewState : GameStateImpl
 			button.ID = $"world_preview_layer_{choice.ToString().ToLowerInvariant()}";
 			layerButtons[choice] = button; sidebar.AddChild(button);
 		}
-		y += 118;
+		y += ((Enum.GetValues<WorldPlanRendering.Layer>().Length + 1) / 2) * 38 + 12;
 		Button fit = Button("Fit", new Vector2(16, y), new Vector2(106, 30), () => { zoom = 0; pan = Vector2.Zero; LayoutImage(); }); sidebar.AddChild(fit);
 		Button oneToOne = Button("1:1", new Vector2(130, y), new Vector2(106, 30), () => { zoom = 1; pan = Vector2.Zero; LayoutImage(); }); sidebar.AddChild(oneToOne);
 		Button back = Button("Back", new Vector2(244, y), new Vector2(120, 30), () => Client.RequestState(ClientStateKind.MainMenu)); sidebar.AddChild(back);
@@ -101,7 +103,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		seedInput.Text = "24681357";
 		WorldGenerationSettings settings = new(24681357, 1024, 1024, 64);
 		generationTimer = Stopwatch.StartNew();
-		plan = WorldPlanMaterializer.GeneratePlan(settings.Width, settings.Length, settings.Seed, structureCatalog);
+		plan = WorldPlanMaterializer.GeneratePlan(settings.Width, settings.Length, settings.Seed, structureCatalog, villagePrefabs: villagePrefabs);
 		status.Text = $"Generated seed {plan.Seed} with {plan.Villages.Count} villages in {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 		RefreshImage();
 		automaticBundle = Path.Combine(runtimePaths.Root, "world-plans", $"auto-{plan.Seed}-{Guid.NewGuid():N}");
@@ -114,13 +116,13 @@ public sealed class WorldPreviewState : GameStateImpl
 	{
 		if (plan is null || automaticExport is null || automaticCapture is null) throw new InvalidOperationException("Automatic World Preview did not queue bundle export and capture.");
 		automaticExport.GetAwaiter().GetResult();
-		WorldPlan loaded = WorldPlanBundle.LoadAsync(automaticBundle).GetAwaiter().GetResult();
+		WorldPlan loaded = WorldPlanBundle.LoadAsync(automaticBundle, expectedVillagePrefabCatalogHash: villagePrefabs.Hash).GetAwaiter().GetResult();
 		if (loaded.Seed != plan.Seed || loaded.Width != 1024 || loaded.Length != 1024) throw new InvalidOperationException("Automatic World Preview bundle metadata is invalid.");
 		if (loaded.Villages.Count < 6 || loaded.Villages.Any(village => village.Footprint.Any(point => loaded.GetTreeDensity(point.X, point.Z) != 0)))
 			throw new InvalidOperationException("Automatic World Preview village reservations are invalid.");
 		if (!loaded.Ponds.Any(pond => pond.Kind == HydrologyKind.Lake) || !loaded.HillMask.Span.ContainsAnyExcept((byte)0))
 			throw new InvalidOperationException("Automatic World Preview did not generate lakes and unused-space hills.");
-		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "combined.png" })
+		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "features-floor-2.png", "features-floor-3.png", "features-roof.png", "combined.png" })
 			if (!File.Exists(Path.Combine(automaticBundle, file))) throw new InvalidOperationException($"Automatic World Preview bundle is missing {file}.");
 		FishUIDebugSnapshot snapshot = automaticCapture.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
 		gui.UI.Diagnostics.WaitForPendingExportsAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
@@ -180,14 +182,14 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (!int.TryParse(seedInput.Text?.Trim(), out int seed)) { status.Text = "Seed must be a 32-bit integer."; return; }
 		StartGeneration(() => Task.Run(() => WorldPlanMaterializer.GeneratePlan(
 			1024, 1024, seed, structureCatalog, generationCancellation.Token,
-			new Progress<WorldGenerationProgress>(progressUpdates.Enqueue)), generationCancellation.Token));
+			new Progress<WorldGenerationProgress>(progressUpdates.Enqueue), villagePrefabs), generationCancellation.Token));
 	}
 
 	private void LoadBundle()
 	{
 		string path = pathInput.Text?.Trim();
 		if (string.IsNullOrWhiteSpace(path)) { status.Text = "Enter a bundle directory to load."; return; }
-		StartGeneration(() => WorldPlanBundle.LoadAsync(path, cancellationToken: generationCancellation.Token));
+		StartGeneration(() => WorldPlanBundle.LoadAsync(path, cancellationToken: generationCancellation.Token, expectedVillagePrefabCatalogHash: villagePrefabs.Hash));
 	}
 
 	private void StartGeneration(Func<Task<WorldPlan>> operation)
@@ -269,13 +271,32 @@ public sealed class WorldPreviewState : GameStateImpl
 		PlannedWorldSite site = plan.Sites.FirstOrDefault(candidate => candidate.Reservation.Contains(x, z));
 		PlannedVillageArea village = plan.Villages.FirstOrDefault(candidate => candidate.Footprint.Contains(new PlanPoint(x, z)));
 		PlannedWorldRoute route = plan.Routes.FirstOrDefault(candidate => candidate.Cells.Any(cell => Math.Abs(cell.X - x) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0) && Math.Abs(cell.Z - z) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0)));
-		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {site?.Id ?? village?.Id ?? route?.Id ?? "-"}";
+		PlannedVillageModule module = plan.VillageLayouts.SelectMany(static layout => layout.Modules)
+			.Where(candidate => candidate.Floor == LayerFloor(layer) && x >= candidate.Origin.X && x < candidate.Origin.X + 5 && z >= candidate.Origin.Z && z < candidate.Origin.Z + 5)
+			.FirstOrDefault();
+		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {module?.PrefabId ?? site?.Id ?? village?.Id ?? route?.Id ?? "-"}{(module is null ? "" : $"  C{module.ComponentId} R{module.Rotation}")}";
 	}
+
+	private static int LayerFloor(WorldPlanRendering.Layer value) => value switch
+	{
+		WorldPlanRendering.Layer.FeaturesFloor2 => 1,
+		WorldPlanRendering.Layer.FeaturesFloor3 => 2,
+		WorldPlanRendering.Layer.FeaturesRoof => 3,
+		_ => 0,
+	};
 
 	private static Button Button(string text, Vector2 position, Vector2 size, Action pressed)
 	{
 		Button button = new() { Text = text, Position = position, Size = size }; button.OnButtonPressed += (_, _, _) => pressed(); return button;
 	}
-	private static string DisplayName(WorldPlanRendering.Layer value) => value == WorldPlanRendering.Layer.TreeDensity ? "Tree Density" : value.ToString();
+	private static string DisplayName(WorldPlanRendering.Layer value) => value switch
+	{
+		WorldPlanRendering.Layer.TreeDensity => "Tree Density",
+		WorldPlanRendering.Layer.FeaturesFloor2 => "Second Floor",
+		WorldPlanRendering.Layer.FeaturesFloor3 => "Third Floor",
+		WorldPlanRendering.Layer.FeaturesRoof => "Roofs",
+		WorldPlanRendering.Layer.Features => "First Floor",
+		_ => value.ToString(),
+	};
 }
 #endif

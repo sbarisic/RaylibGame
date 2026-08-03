@@ -3,7 +3,7 @@ namespace Voxelgine.WorldGeneration;
 public static class WorldPlanRendering
 {
 	public const int HillEncodingScale = 16;
-	public enum Layer { Height, Biome, Hills, TreeDensity, Features, Combined }
+	public enum Layer { Height, Biome, Hills, TreeDensity, Features, FeaturesFloor2, FeaturesFloor3, FeaturesRoof, Combined }
 	private static readonly IReadOnlyDictionary<WorldBiome, uint> Palette = new Dictionary<WorldBiome, uint>
 	{
 		[WorldBiome.Void] = 0x00000000, [WorldBiome.Grassland] = 0x65A84FFF,
@@ -16,7 +16,9 @@ public static class WorldPlanRendering
 	public static byte[] Render(WorldPlan plan, Layer layer, CancellationToken cancellationToken = default) => layer switch
 	{
 		Layer.Height => RenderHeight(plan), Layer.Biome => RenderBiome(plan), Layer.Hills => RenderHills(plan), Layer.TreeDensity => RenderTreeDensity(plan),
-		Layer.Features => RenderFeatures(plan), Layer.Combined => RenderCombined(plan, cancellationToken),
+		Layer.Features => RenderFeatures(plan), Layer.FeaturesFloor2 => RenderVillageFloor(plan, 1),
+		Layer.FeaturesFloor3 => RenderVillageFloor(plan, 2), Layer.FeaturesRoof => RenderVillageFloor(plan, 3),
+		Layer.Combined => RenderCombined(plan, cancellationToken),
 		_ => throw new ArgumentOutOfRangeException(nameof(layer)),
 	};
 
@@ -94,6 +96,28 @@ public static class WorldPlanRendering
 			for (int x = Math.Max(0, site.Reservation.MinimumX); x <= Math.Min(plan.Width - 1, site.Reservation.MaximumX); x++)
 				for (int z = Math.Max(0, site.Reservation.MinimumZ); z <= Math.Min(plan.Length - 1, site.Reservation.MaximumZ); z++) Write(rgba, PixelIndex(plan, x, z), color);
 		}
+		Overlay(rgba, RenderVillageFloor(plan, 0));
+		return rgba;
+	}
+
+	public static byte[] RenderVillageFloor(WorldPlan plan, int floor)
+	{
+		if (floor is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(floor));
+		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
+		foreach (PlannedVillageModule module in plan.VillageLayouts.SelectMany(static layout => layout.Modules).Where(module => module.Floor == floor))
+		{
+			uint color = module.Kind switch
+			{
+				VillageModuleKind.Road => 0xB27B42FF, VillageModuleKind.Plaza => 0xC99A5BFF,
+				VillageModuleKind.Yard => 0x72A85DFF, VillageModuleKind.DefenseWall => 0x777D83FF,
+				VillageModuleKind.DefenseCorner => 0x62686EFF, VillageModuleKind.Gate => 0xE7D84BFF,
+				VillageModuleKind.Stairs => 0x52C7E8FF, VillageModuleKind.Roof => 0xB95757FF,
+				VillageModuleKind.Utility => 0xD884C6FF, _ => 0xDCA6D6FF,
+			};
+			for (int x = module.Origin.X; x < module.Origin.X + VillagePrefabDescriptor.Width && x < plan.Width; x++)
+			for (int z = module.Origin.Z; z < module.Origin.Z + VillagePrefabDescriptor.Length && z < plan.Length; z++)
+				if (x >= 0 && z >= 0) Write(rgba, PixelIndex(plan, x, z), color);
+		}
 		return rgba;
 	}
 
@@ -127,9 +151,14 @@ public static class WorldPlanRendering
 			if (water.Contains(new(x, z))) Write(rgba, pixel, 0x318DD1FF);
 		}
 		byte[] features = RenderFeatures(plan);
-		for (int i = 0; i < rgba.Length; i += 4) if (features[i + 3] != 0) features.AsSpan(i, 4).CopyTo(rgba.AsSpan(i, 4));
+		Overlay(rgba, features); Overlay(rgba, RenderVillageFloor(plan, 1)); Overlay(rgba, RenderVillageFloor(plan, 2)); Overlay(rgba, RenderVillageFloor(plan, 3));
 		foreach (PlannedTree tree in WorldPlanGenerator.DeriveTrees(plan, cancellationToken)) Write(rgba, PixelIndex(plan, tree.X, tree.Z), 0x123E22FF);
 		return rgba;
+	}
+
+	private static void Overlay(byte[] destination, byte[] source)
+	{
+		for (int i = 0; i < destination.Length; i += 4) if (source[i + 3] != 0) source.AsSpan(i, 4).CopyTo(destination.AsSpan(i, 4));
 	}
 
 	private static int PixelIndex(WorldPlan plan, int x, int z) => (z * plan.Width + x) * 4;

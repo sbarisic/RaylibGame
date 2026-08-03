@@ -256,21 +256,23 @@ namespace Voxelgine.Engine.Server
 				{
 					_logging.Log(GameLogLevel.Info, "Generation", $"begin seed={worldSeed} size={DefaultWorldWidth}x{DefaultWorldLength}");
 					string structureDirectory = Path.Combine(AppContext.BaseDirectory, "data", "world", "structures");
+					string villagePrefabPath = Path.Combine(AppContext.BaseDirectory, "data", "world", "village-prefabs", "catalog.json");
 					Stopwatch structureTimer = Stopwatch.StartNew();
 					StructureBlueprintCatalog structureCatalog = StructureBlueprintCatalog.LoadDirectory(structureDirectory);
+					VillagePrefabCatalog villagePrefabs = VillagePrefabCatalog.Load(villagePrefabPath);
 					WorldPlan worldPlan;
 					if (!string.IsNullOrWhiteSpace(worldPlanDirectory))
 					{
 						string catalogHash = WorldPlanMaterializer.ComputeCatalogHash(structureCatalog);
-						worldPlan = WorldPlanBundle.LoadAsync(worldPlanDirectory, catalogHash, cancellationToken).GetAwaiter().GetResult();
+						worldPlan = WorldPlanBundle.LoadAsync(worldPlanDirectory, catalogHash, cancellationToken, villagePrefabs.Hash).GetAwaiter().GetResult();
 						_worldSeed = worldPlan.Seed;
 						_logging.Log(GameLogLevel.Info, "Generation", $"plan-load path={Path.GetFullPath(worldPlanDirectory)} seed={worldPlan.Seed}");
 					}
 					else
 					{
-						worldPlan = WorldPlanMaterializer.GeneratePlan(DefaultWorldWidth, DefaultWorldLength, worldSeed, structureCatalog, cancellationToken);
+						worldPlan = WorldPlanMaterializer.GeneratePlan(DefaultWorldWidth, DefaultWorldLength, worldSeed, structureCatalog, cancellationToken, villagePrefabs: villagePrefabs);
 					}
-					WorldPlanMaterializer.MaterializeAtomically(_simulation.Map, worldPlan, structureCatalog, cancellationToken);
+					WorldPlanMaterializer.MaterializeAtomically(_simulation.Map, worldPlan, structureCatalog, cancellationToken, villagePrefabs);
 					PersistWorldPlanSidecar(worldPlan, cancellationToken);
 					StructureGenerationTimings timings = _simulation.Map.StructureGenerationTimings;
 					_logging.Log(GameLogLevel.Info, "Generation",

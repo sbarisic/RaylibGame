@@ -14,18 +14,20 @@ public static class WorldPlanMaterializer
 		int seed,
 		StructureBlueprintCatalog catalog,
 		CancellationToken cancellationToken = default,
-		IProgress<WorldGenerationProgress> progress = null)
+		IProgress<WorldGenerationProgress> progress = null,
+		VillagePrefabCatalog villagePrefabs = null)
 	{
 		StructureTemplateDescriptor[] descriptors = catalog is null ? [] : Describe(catalog);
 		string catalogHash = catalog is null ? string.Empty : ComputeCatalogHash(catalog);
-		return WorldPlanGenerator.Generate(new(seed, width, length, 64), descriptors, catalogHash, progress, cancellationToken);
+		return WorldPlanGenerator.Generate(new(seed, width, length, 64), descriptors, catalogHash, progress, cancellationToken, villagePrefabs?.Descriptor);
 	}
 
 	public static void MaterializeAtomically(
 		ChunkMap destination,
 		WorldPlan plan,
 		StructureBlueprintCatalog catalog,
-		CancellationToken cancellationToken = default)
+		CancellationToken cancellationToken = default,
+		VillagePrefabCatalog villagePrefabs = null)
 	{
 		ArgumentNullException.ThrowIfNull(destination); ArgumentNullException.ThrowIfNull(plan);
 		plan.Validate(); cancellationToken.ThrowIfCancellationRequested();
@@ -37,8 +39,14 @@ public static class WorldPlanMaterializer
 		}
 		else if (plan.Sites.Count != 0)
 			throw new InvalidDataException("A world plan with structures requires a structure blueprint catalog.");
+		if (plan.VillageLayouts.Count != 0)
+		{
+			if (villagePrefabs is null) throw new InvalidDataException("A world plan with village layouts requires a village prefab catalog.");
+			if (!string.Equals(plan.VillagePrefabCatalogHash, villagePrefabs.Hash, StringComparison.OrdinalIgnoreCase))
+				throw new InvalidDataException("World plan village prefab catalog does not match the active engine catalog.");
+		}
 
-		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, cancellationToken);
+		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, villagePrefabs, cancellationToken);
 		cancellationToken.ThrowIfCancellationRequested();
 		destination.ReplaceAllColumns(result.Columns);
 		destination.RestoreGeneratedFeatures(result.Features);

@@ -13,15 +13,17 @@ public static class WorldPlanGenerator
 		IReadOnlyList<StructureTemplateDescriptor>? structures = null,
 		string structureCatalogHash = "",
 		IProgress<WorldGenerationProgress>? progress = null,
-		CancellationToken cancellationToken = default) =>
-		Task.Run(() => Generate(settings, structures ?? [], structureCatalogHash, progress, cancellationToken), cancellationToken);
+		CancellationToken cancellationToken = default,
+		VillagePrefabCatalogDescriptor? villagePrefabs = null) =>
+		Task.Run(() => Generate(settings, structures ?? [], structureCatalogHash, progress, cancellationToken, villagePrefabs), cancellationToken);
 
 	public static WorldPlan Generate(
 		WorldGenerationSettings settings,
 		IReadOnlyList<StructureTemplateDescriptor>? structures = null,
 		string structureCatalogHash = "",
 		IProgress<WorldGenerationProgress>? progress = null,
-		CancellationToken cancellationToken = default)
+		CancellationToken cancellationToken = default,
+		VillagePrefabCatalogDescriptor? villagePrefabs = null)
 	{
 		ArgumentNullException.ThrowIfNull(settings);
 		settings.Validate();
@@ -50,6 +52,9 @@ public static class WorldPlanGenerator
 			settings, structures, heights, mask, hydrology, cancellationToken);
 		progress?.Report(new("Villages", 0.56));
 		PlannedVillageArea[] villages = PlanVillages(settings, heights, mask, hydrology, sites, routes, cancellationToken);
+		PlannedVillageLayout[] villageLayouts = villagePrefabs is null
+			? []
+			: VillageLayoutPlanner.Plan(settings, villages, villagePrefabs, cancellationToken);
 		progress?.Report(new("Hills", 0.68));
 		GenerateHills(settings, terrain, heights, mask, hillMask, hydrology, sites, routes, villages, cancellationToken);
 		progress?.Report(new("Biomes", 0.78));
@@ -57,7 +62,8 @@ public static class WorldPlanGenerator
 		progress?.Report(new("Tree density", 0.88));
 		GenerateTreeDensity(settings, vegetation, biomes, density, hydrology, sites, routes, villages, cancellationToken);
 		progress?.Report(new("Validation", 0.94));
-		WorldPlan plan = new(settings, heights, biomes, density, mask, hillMask, hydrology, sites, routes, villages, structureCatalogHash);
+		WorldPlan plan = new(settings, heights, biomes, density, mask, hillMask, hydrology, sites, routes, villages,
+			structureCatalogHash, villageLayouts, villagePrefabs?.Hash ?? string.Empty);
 		_ = DeriveTrees(plan, cancellationToken);
 		progress?.Report(new("Complete", 1));
 		return plan;
@@ -520,8 +526,10 @@ public static class WorldPlanGenerator
 				token.ThrowIfCancellationRequested();
 				uint hash = picker.Hash(ordinal * 8191 + attempt, ordinal, 0xB117A6E);
 				int minimumRadius = minimumDimension >= 512 ? 20 : 12;
-				int radiusX = Math.Clamp(baseDiameter / 2 + (int)(hash % 13) - 6, minimumRadius, 34);
-				int radiusZ = Math.Clamp(baseDiameter / 2 + (int)((hash >> 8) % 13) - 6, minimumRadius, 34);
+				// Village reservations are twice the previous linear size in both horizontal axes.
+				// Keep the original seeded radius variation, then scale it so the same seed retains its shape character.
+				int radiusX = Math.Clamp(baseDiameter / 2 + (int)(hash % 13) - 6, minimumRadius, 34) * 2;
+				int radiusZ = Math.Clamp(baseDiameter / 2 + (int)((hash >> 8) % 13) - 6, minimumRadius, 34) * 2;
 				int margin = (int)Math.Ceiling(Math.Max(radiusX, radiusZ) * 1.28) + 5;
 				double sector = Math.Tau / desired;
 				double angleJitter = (((hash >> 3) & 0x7FFF) / 32767d - 0.5) * sector * 0.82;

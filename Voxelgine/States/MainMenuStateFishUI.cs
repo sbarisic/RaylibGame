@@ -18,7 +18,7 @@ namespace Voxelgine.States;
 public partial class MainMenuStateFishUI : GameStateImpl
 {
 	private static readonly string[] DeveloperToolEntries =
-		["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview"];
+		["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview", "Village Prefab Lab"];
 	private readonly FishUIManager gui;
 	private readonly IFishLogging logging;
 	private readonly RuntimePaths runtimePaths;
@@ -174,7 +174,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 
 	private void CreateDeveloperWindow()
 	{
-		developerWindow = CreateModalWindow("Developer Tools", new Vector2(360, 336));
+		developerWindow = CreateModalWindow("Developer Tools", new Vector2(360, 394));
 		float width = developerWindow.GetContentSize().X - 40;
 		var npcButton = new Button
 		{
@@ -232,10 +232,24 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		};
 		developerWindow.AddChild(worldButton);
 
+		var prefabButton = new Button
+		{
+			ID = "developer_village_prefab_lab",
+			Text = DeveloperToolEntries[4],
+			Position = new Vector2(20, 252),
+			Size = new Vector2(width, 44),
+		};
+		prefabButton.OnButtonPressed += (_, _, _) =>
+		{
+			HideModal(developerWindow);
+			Client.RequestState(ClientStateKind.VillagePrefabLab);
+		};
+		developerWindow.AddChild(prefabButton);
+
 		var closeButton = new Button
 		{
 			Text = "Close",
-			Position = new Vector2(110, 252),
+			Position = new Vector2(110, 310),
 			Size = new Vector2(120, 36),
 		};
 		closeButton.OnButtonPressed += (_, _, _) => HideModal(developerWindow);

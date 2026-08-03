@@ -8,4 +8,8 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Voxelgine.WorldGeneration\Voxelgine.WorldGeneration.csproj" />
+  </ItemGroup>
+
 </Project>

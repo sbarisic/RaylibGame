@@ -138,7 +138,7 @@ public static class WorldStructurePlanner
 		return fallback;
 	}
 
-	private static PlannedSite BuildSite(
+	internal static PlannedSite BuildSite(
 		GeneratedSiteId id,
 		StructureRole role,
 		StructureBlueprint blueprint,

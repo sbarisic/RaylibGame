@@ -11,6 +11,8 @@ internal sealed partial class ClientApplication
 	{
 		if (arguments.Contains("--fishgfx-auto-voxel-material", StringComparer.OrdinalIgnoreCase))
 			return 120;
+		if (arguments.Contains("--fishgfx-auto-world-preview", StringComparer.OrdinalIgnoreCase))
+			return 30;
 		return arguments.Contains("--fishgfx-auto-gameplay", StringComparer.OrdinalIgnoreCase) ? 90 : 4;
 	}
 
@@ -22,6 +24,8 @@ internal sealed partial class ClientApplication
 			throw new InvalidOperationException("The automatic voxel material preview did not finish meshing in time.");
 		if (state is VoxelMaterialPreviewState validatedMaterialPreview)
 			validatedMaterialPreview.ValidateAutomaticSnapshotBundle();
+		if (state is WorldPreviewState worldPreview)
+			worldPreview.ValidateAutomaticBundle();
 
 		const int channelTolerance = 16;
 		const int minimumForegroundPixels = 64;

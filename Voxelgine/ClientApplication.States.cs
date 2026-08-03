@@ -24,6 +24,12 @@ internal sealed partial class ClientApplication
 			state.EnableAutomaticValidation();
 			return state;
 		}
+		if (arguments.Contains("--fishgfx-auto-world-preview", StringComparer.OrdinalIgnoreCase))
+		{
+			WorldPreviewState state = (WorldPreviewState)CreateState(ClientStateKind.WorldPreview);
+			state.EnableAutomaticValidation();
+			return state;
+		}
 		return CreateState(ClientStateKind.MainMenu);
 	}
 
@@ -36,6 +42,7 @@ internal sealed partial class ClientApplication
 			ClientStateKind.NpcPreview => new NPCPreviewState(Window, this),
 			ClientStateKind.EffectsPreview => new EffectsPreviewState(Window, this),
 			ClientStateKind.VoxelMaterialPreview => new VoxelMaterialPreviewState(Window, this),
+			ClientStateKind.WorldPreview => new WorldPreviewState(Window, this),
 			_ => throw new ArgumentOutOfRangeException(nameof(state)),
 		};
 	}
@@ -54,7 +61,7 @@ internal sealed partial class ClientApplication
 			state => ((MPClientGameState)state).Connect(address, port, playerName));
 	}
 
-	public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate)
+	public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate, string worldPlanDirectory = null)
 	{
 		StopHostedServer();
 		RuntimePaths serverPaths = RuntimePathResolver.ResolveRuntimePaths(
@@ -64,7 +71,7 @@ internal sealed partial class ClientApplication
 		ServerApplication application = new(serverPaths, Config.LogLevel);
 		try
 		{
-			application.StartHosted(port, seed, forceRegenerate);
+			application.StartHosted(port, seed, forceRegenerate, worldPlanDirectory);
 			hostedServer = application;
 			return application;
 		}

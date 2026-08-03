@@ -173,7 +173,7 @@ public sealed unsafe class MPClientGameStateTests
 
 		public void RequestState(ClientStateKind state) => Window.RouteState(null);
 		public void Connect(string address, int port, string playerName) { }
-		public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate) => throw new NotSupportedException();
+		public ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate, string worldPlanDirectory = null) => throw new NotSupportedException();
 		public void StopHostedServer() { }
 		public void FireWeapon(System.Numerics.Vector3 start, System.Numerics.Vector3 direction, float maximumLength) { }
 	}

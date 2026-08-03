@@ -160,6 +160,7 @@ try {
             '--fishgfx-auto-npc',
             '--fishgfx-auto-effects',
             '--fishgfx-auto-voxel-material'
+			'--fishgfx-auto-world-preview'
         )
         foreach ($mode in $automaticModes) {
             $safeName = $mode.TrimStart('-').Replace('-', '_')

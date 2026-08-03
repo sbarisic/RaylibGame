@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelgineServer", "Voxelgin
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelgineEngine", "VoxelgineEngine\VoxelgineEngine.csproj", "{B846228B-4758-40B0-A4A3-6B59677BFA67}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voxelgine.WorldGeneration", "Voxelgine.WorldGeneration\Voxelgine.WorldGeneration.csproj", "{A44F714D-C8F7-47ED-9A32-214871D52B80}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BenchmarkSuite1", "BenchmarkSuite1\BenchmarkSuite1.csproj", "{A20861A9-411E-6150-BF5C-69E8196E5D22}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{609F40C5-C560-40E6-76C7-691311A42DF0}"
@@ -91,6 +93,18 @@ Global
 		{B846228B-4758-40B0-A4A3-6B59677BFA67}.Release|x64.Build.0 = Release|Any CPU
 		{B846228B-4758-40B0-A4A3-6B59677BFA67}.Release|x86.ActiveCfg = Release|Any CPU
 		{B846228B-4758-40B0-A4A3-6B59677BFA67}.Release|x86.Build.0 = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|x64.Build.0 = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Debug|x86.Build.0 = Debug|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|x64.ActiveCfg = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|x64.Build.0 = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|x86.ActiveCfg = Release|Any CPU
+		{A44F714D-C8F7-47ED-9A32-214871D52B80}.Release|x86.Build.0 = Release|Any CPU
 		{A20861A9-411E-6150-BF5C-69E8196E5D22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A20861A9-411E-6150-BF5C-69E8196E5D22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A20861A9-411E-6150-BF5C-69E8196E5D22}.Debug|x64.ActiveCfg = Debug|Any CPU

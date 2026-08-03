@@ -28,7 +28,7 @@ public interface IClientEngineRunner : IFishEngineRunner
 
 	void Connect(string address, int port, string playerName);
 
-	ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate);
+	ServerApplication StartHostedServer(int port, int seed, bool forceRegenerate, string worldPlanDirectory = null);
 
 	void StopHostedServer();
 
@@ -50,4 +50,5 @@ public enum ClientStateKind
 	NpcPreview,
 	EffectsPreview,
 	VoxelMaterialPreview,
+	WorldPreview,
 }

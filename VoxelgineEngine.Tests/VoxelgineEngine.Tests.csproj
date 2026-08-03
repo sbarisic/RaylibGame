@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VoxelgineEngine\VoxelgineEngine.csproj" />
+    <ProjectReference Include="..\Voxelgine.WorldGeneration\Voxelgine.WorldGeneration.csproj" />
   </ItemGroup>
 
   <ItemGroup>

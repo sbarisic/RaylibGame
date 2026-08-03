@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Numerics;
 using Voxelgine.Engine.DI;
 using Voxelgine.Engine.Server;
+using Voxelgine.WorldGeneration;
 
 using Thread = System.Threading.Thread;
 
@@ -17,6 +18,8 @@ public partial class MainMenuStateFishUI
 	private NumericUpDown hostPortInput;
 	private Textbox hostNameInput;
 	private Textbox hostSeedInput;
+	private Textbox hostPlanInput;
+	private Button hostPlanBrowseButton;
 	private CheckBox forceNewWorldCheckBox;
 	private Label hostStatusLabel;
 	private Button hostButton;
@@ -75,7 +78,7 @@ public partial class MainMenuStateFishUI
 
 	private void CreateHostWindow()
 	{
-		hostWindow = CreateModalWindow("Host Game", new Vector2(430, 390));
+		hostWindow = CreateModalWindow("Host Game", new Vector2(430, 438));
 		hostPortInput = CreatePortInput("host_port");
 		AddDialogRow(hostWindow, 18, "Port", hostPortInput);
 
@@ -96,10 +99,30 @@ public partial class MainMenuStateFishUI
 		};
 		AddDialogRow(hostWindow, 110, "World Seed", hostSeedInput);
 
+		hostPlanInput = new Textbox
+		{
+			ID = "host_world_plan",
+			Text = string.Empty,
+			TooltipText = "Optional exported world-plan directory; disables seed generation",
+			Size = new Vector2(176, 28),
+		};
+		hostPlanInput.OnTextChanged += (_, text) => hostSeedInput.Disabled = !string.IsNullOrWhiteSpace(text) || hostedServerStartupPending;
+		AddDialogRow(hostWindow, 156, "World Plan", hostPlanInput);
+		hostPlanBrowseButton = new()
+		{
+			ID = "host_world_plan_browse",
+			Text = "Browse",
+			Position = new Vector2(337, 156),
+			Size = new Vector2(61, 28),
+			TooltipText = "Choose a world-plan manifest",
+		};
+		hostPlanBrowseButton.OnButtonPressed += (_, _, _) => ShowHostPlanPicker();
+		hostWindow.AddChild(hostPlanBrowseButton);
+
 		forceNewWorldCheckBox = new CheckBox("Force New World")
 		{
 			ID = "host_force_new_world",
-			Position = new Vector2(145, 164),
+			Position = new Vector2(145, 208),
 			Size = new Vector2(22, 22),
 			TooltipText = "Regenerate the world even when an existing save is present",
 		};
@@ -108,7 +131,7 @@ public partial class MainMenuStateFishUI
 		hostStatusLabel = new Label
 		{
 			ID = "host_status",
-			Position = new Vector2(22, 212),
+			Position = new Vector2(22, 256),
 			Size = new Vector2(376, 36),
 			Alignment = Align.Center,
 		};
@@ -118,7 +141,7 @@ public partial class MainMenuStateFishUI
 		{
 			ID = "host_submit",
 			Text = "Host",
-			Position = new Vector2(80, 272),
+			Position = new Vector2(80, 316),
 			Size = new Vector2(125, 42),
 		};
 		hostButton.OnButtonPressed += (_, _, _) => StartHostedGame();
@@ -128,11 +151,30 @@ public partial class MainMenuStateFishUI
 		{
 			ID = "host_cancel",
 			Text = "Cancel",
-			Position = new Vector2(225, 272),
+			Position = new Vector2(225, 316),
 			Size = new Vector2(125, 42),
 		};
 		cancelButton.OnButtonPressed += (_, _, _) => CancelHostedServerStartup();
 		hostWindow.AddChild(cancelButton);
+	}
+
+	private void ShowHostPlanPicker()
+	{
+		string initialDirectory = Directory.Exists(hostPlanInput.Text) ? hostPlanInput.Text : runtimePaths.Root;
+		FilePickerDialog picker = new(FilePickerMode.Open, gui.UI.FileSystem, initialDirectory, WorldPlanBundle.ManifestFileName)
+		{
+			Title = "Select World Plan",
+		};
+		picker.OnFileConfirmed += (_, selectedPath) =>
+		{
+			if (!string.Equals(Path.GetFileName(selectedPath), WorldPlanBundle.ManifestFileName, StringComparison.OrdinalIgnoreCase))
+			{
+				hostStatusLabel.Text = "Select a world-plan manifest.json file";
+				return;
+			}
+			hostPlanInput.Text = Path.GetDirectoryName(Path.GetFullPath(selectedPath)) ?? string.Empty;
+		};
+		picker.Show(gui.UI);
 	}
 
 	internal static NumericUpDown CreatePortInput(string id)
@@ -191,9 +233,19 @@ public partial class MainMenuStateFishUI
 
 	private void StartHostedGame()
 	{
+		string worldPlan = hostPlanInput.Text?.Trim() ?? string.Empty;
 		string seedText = hostSeedInput.Text?.Trim() ?? string.Empty;
 		int seed;
-		if (seedText.Length == 0)
+		if (worldPlan.Length != 0)
+		{
+			if (!Directory.Exists(worldPlan))
+			{
+				hostStatusLabel.Text = "World plan directory was not found";
+				return;
+			}
+			seed = 666;
+		}
+		else if (seedText.Length == 0)
 		{
 			seed = Random.Shared.Next();
 		}
@@ -219,7 +271,7 @@ public partial class MainMenuStateFishUI
 
 		try
 		{
-			ServerApplication server = Client.StartHostedServer(port, seed, forceNewWorld);
+			ServerApplication server = Client.StartHostedServer(port, seed, forceNewWorld, worldPlan.Length == 0 ? null : worldPlan);
 			pendingHostPort = port;
 			pendingHostPlayerName = playerName;
 			hostedServerStartupPending = true;
@@ -289,6 +341,9 @@ public partial class MainMenuStateFishUI
 		hostPortInput.Disabled = starting;
 		hostNameInput.Disabled = starting;
 		hostSeedInput.Disabled = starting;
+		hostPlanInput.Disabled = starting;
+		hostPlanBrowseButton.Disabled = starting;
+		if (!starting) hostSeedInput.Disabled = !string.IsNullOrWhiteSpace(hostPlanInput.Text);
 		forceNewWorldCheckBox.Disabled = starting;
 		hostButton.Disabled = starting;
 		hostWindow.CloseButtonEnabled = !starting;

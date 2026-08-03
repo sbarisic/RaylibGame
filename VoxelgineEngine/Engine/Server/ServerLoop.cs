@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Voxelgine.Engine.DI;
 using Voxelgine.Engine.World.Structures;
+using Voxelgine.WorldGeneration;
 using Voxelgine.Graphics;
 
 namespace Voxelgine.Engine.Server
@@ -194,7 +195,7 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		/// <param name="port">UDP port to bind.</param>
 		/// <param name="worldSeed">Seed for world generation.</param>
-		public void Start(int port, int worldSeed = 666, bool forceRegenerate = false)
+		public void Start(int port, int worldSeed = 666, bool forceRegenerate = false, string worldPlanDirectory = null)
 		{
 			if (Interlocked.Exchange(ref _startInvoked, 1) != 0)
 				throw new InvalidOperationException("A server loop can only be started once.");
@@ -257,12 +258,20 @@ namespace Voxelgine.Engine.Server
 					string structureDirectory = Path.Combine(AppContext.BaseDirectory, "data", "world", "structures");
 					Stopwatch structureTimer = Stopwatch.StartNew();
 					StructureBlueprintCatalog structureCatalog = StructureBlueprintCatalog.LoadDirectory(structureDirectory);
-					_simulation.Map.GenerateFloatingIsland(
-						DefaultWorldWidth,
-						DefaultWorldLength,
-						structureCatalog,
-						worldSeed,
-						cancellationToken);
+					WorldPlan worldPlan;
+					if (!string.IsNullOrWhiteSpace(worldPlanDirectory))
+					{
+						string catalogHash = WorldPlanMaterializer.ComputeCatalogHash(structureCatalog);
+						worldPlan = WorldPlanBundle.LoadAsync(worldPlanDirectory, catalogHash, cancellationToken).GetAwaiter().GetResult();
+						_worldSeed = worldPlan.Seed;
+						_logging.Log(GameLogLevel.Info, "Generation", $"plan-load path={Path.GetFullPath(worldPlanDirectory)} seed={worldPlan.Seed}");
+					}
+					else
+					{
+						worldPlan = WorldPlanMaterializer.GeneratePlan(DefaultWorldWidth, DefaultWorldLength, worldSeed, structureCatalog, cancellationToken);
+					}
+					WorldPlanMaterializer.MaterializeAtomically(_simulation.Map, worldPlan, structureCatalog, cancellationToken);
+					PersistWorldPlanSidecar(worldPlan, cancellationToken);
 					StructureGenerationTimings timings = _simulation.Map.StructureGenerationTimings;
 					_logging.Log(GameLogLevel.Info, "Generation",
 						$"structures sites={_simulation.Map.GeneratedFeatures.Sites.Count} routes={_simulation.Map.GeneratedFeatures.Routes.Count} blueprints={structureCatalog.Blueprints.Count} planningMs={timings.SitePlanning.TotalMilliseconds:F1} routesMs={timings.Routes.TotalMilliseconds:F1} stampingMs={timings.Stamping.TotalMilliseconds:F1} worldTotalMs={structureTimer.Elapsed.TotalMilliseconds:F1}");
@@ -511,6 +520,32 @@ namespace Voxelgine.Engine.Server
 
 		private static bool IsCommandInputDown(InputCommand command, InputKey key) =>
 			(int)key < 64 && (command.KeysBitmask & (1UL << (int)key)) != 0;
+
+		private void PersistWorldPlanSidecar(WorldPlan plan, CancellationToken cancellationToken)
+		{
+			string target = Path.Combine(_runtimePaths.WorldDirectory, "world-plan");
+			string pending = target + $".install-{Guid.NewGuid():N}";
+			string backup = target + $".previous-{Guid.NewGuid():N}";
+			bool movedExisting = false;
+			try
+			{
+				WorldPlanBundle.SaveAsync(pending, plan, cancellationToken).GetAwaiter().GetResult();
+				if (Directory.Exists(target))
+				{
+					Directory.Move(target, backup);
+					movedExisting = true;
+				}
+				Directory.Move(pending, target);
+				if (movedExisting) Directory.Delete(backup, recursive: true);
+				_logging.Log(GameLogLevel.Info, "Generation", $"plan-sidecar path={Path.GetFullPath(target)} seed={plan.Seed}");
+			}
+			catch
+			{
+				if (Directory.Exists(pending)) Directory.Delete(pending, recursive: true);
+				if (movedExisting && !Directory.Exists(target) && Directory.Exists(backup)) Directory.Move(backup, target);
+				throw;
+			}
+		}
 
 		/// <summary>
 		/// Saves the current world state to <see cref="MapFile"/>.

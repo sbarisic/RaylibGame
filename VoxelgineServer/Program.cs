@@ -4,11 +4,13 @@ namespace VoxelgineServer
 {
 	internal class Program
 	{
-		static void Main(string[] args)
+		static int Main(string[] args)
 		{
 			int port = 7777;
 			int seed = 666;
 			bool forceRegen = false;
+			bool seedExplicit = false;
+			string worldPlan = null;
 			string dataRoot = null;
 			Voxelgine.Engine.DI.GameLogLevel logLevel = Voxelgine.Engine.DI.GameLogLevel.Trace;
 
@@ -17,13 +19,26 @@ namespace VoxelgineServer
 				switch (args[i])
 				{
 					case "--port" when i + 1 < args.Length:
-						if (int.TryParse(args[++i], out int p))
-							port = p;
+						if (!int.TryParse(args[++i], out int p) || p is < 1 or > 65535)
+						{
+							Console.Error.WriteLine("Invalid --port. Use a number from 1 through 65535.");
+							return 2;
+						}
+						port = p;
 						break;
 
 					case "--seed" when i + 1 < args.Length:
-						if (int.TryParse(args[++i], out int s))
-							seed = s;
+						seedExplicit = true;
+						if (!int.TryParse(args[++i], out int s))
+						{
+							Console.Error.WriteLine("Invalid --seed. Use a 32-bit signed integer.");
+							return 2;
+						}
+						seed = s;
+						break;
+
+					case "--world-plan" when i + 1 < args.Length:
+						worldPlan = args[++i];
 						break;
 
 					case "--force-regen":
@@ -34,7 +49,7 @@ namespace VoxelgineServer
 						if (!Enum.TryParse(args[++i], true, out logLevel))
 						{
 							Console.Error.WriteLine("Invalid --log-level. Use Trace, Debug, Info, Warning, Error, or Fatal.");
-							return;
+							return 2;
 						}
 						break;
 
@@ -47,12 +62,18 @@ namespace VoxelgineServer
 						Console.WriteLine("Usage: VoxelgineServer [options]");
 						Console.WriteLine("  --port <port>   UDP port to listen on (default: 7777)");
 						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
+						Console.WriteLine("  --world-plan <directory>  Load a validated canonical world plan");
 						Console.WriteLine("  --force-regen   Force world regeneration even if save file exists");
 						Console.WriteLine("  --log-level     Minimum console.log level (default: Trace)");
 						Console.WriteLine("  --data-root     Writable world, player, and log directory");
 						Console.WriteLine("  --help          Show this help message");
-						return;
+						return 0;
 				}
+			}
+			if (seedExplicit && !string.IsNullOrWhiteSpace(worldPlan))
+			{
+				Console.Error.WriteLine("--world-plan and an explicitly supplied --seed are mutually exclusive.");
+				return 2;
 			}
 
 			Voxelgine.Engine.RuntimePaths runtimePaths = Voxelgine.Engine.RuntimePathResolver.ResolveRuntimePaths(
@@ -92,7 +113,8 @@ namespace VoxelgineServer
 			consoleThread.Start();
 
 			// Start blocks until Stop() is called
-			application.Run(port, seed, forceRegen);
+			application.Run(port, seed, forceRegen, worldPlan);
+			return 0;
 		}
 	}
 }

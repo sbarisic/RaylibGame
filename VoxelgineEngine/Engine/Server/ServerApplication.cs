@@ -19,7 +19,7 @@ public sealed class ServerApplication : IDisposable
 
 	public Exception BackgroundFailure { get; private set; }
 
-	public void StartHosted(int port, int seed, bool forceRegenerate)
+	public void StartHosted(int port, int seed, bool forceRegenerate, string worldPlanDirectory = null)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
 		if (thread != null)
@@ -29,7 +29,7 @@ public sealed class ServerApplication : IDisposable
 		{
 			try
 			{
-				server.Start(port, seed, forceRegenerate);
+				server.Start(port, seed, forceRegenerate, worldPlanDirectory);
 			}
 			catch (Exception exception)
 			{
@@ -43,10 +43,10 @@ public sealed class ServerApplication : IDisposable
 		thread.Start();
 	}
 
-	public void Run(int port, int seed, bool forceRegenerate)
+	public void Run(int port, int seed, bool forceRegenerate, string worldPlanDirectory = null)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
-		server.Start(port, seed, forceRegenerate);
+		server.Start(port, seed, forceRegenerate, worldPlanDirectory);
 	}
 
 	public void Stop()

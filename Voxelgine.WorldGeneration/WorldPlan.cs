@@ -16,6 +16,12 @@ public enum WorldFeatureKind : byte
 	Conduit,
 }
 
+public enum HydrologyKind : byte
+{
+	Pond,
+	Lake,
+}
+
 public enum WorldStructureRole : byte
 {
 	Shelter,
@@ -80,7 +86,7 @@ public sealed record PlannedWorldRoute(
 	string DestinationSite,
 	PlanPoint3[] Cells);
 
-public sealed record PlannedPond(int WaterLevel, PlanPoint3[] Cells);
+public sealed record PlannedPond(int WaterLevel, PlanPoint3[] Cells, HydrologyKind Kind = HydrologyKind.Pond);
 
 public sealed record PlannedTree(int X, int Z, int SurfaceY, byte Variant);
 
@@ -88,18 +94,20 @@ public sealed record PlannedVillageArea(
 	string Id,
 	PlanBounds Reservation,
 	byte SurfaceY,
+	PlanPoint[] Footprint,
 	PlanPoint3[] AccessRoadCells);
 
 public sealed class WorldPlan
 {
-	public const int CurrentFormatVersion = 1;
-	public const int CurrentGeneratorVersion = 2;
-	public const int CurrentMaterializerVersion = 2;
+	public const int CurrentFormatVersion = 3;
+	public const int CurrentGeneratorVersion = 8;
+	public const int CurrentMaterializerVersion = 4;
 
 	private readonly byte[] heights;
 	private readonly byte[] biomes;
 	private readonly byte[] treeDensity;
 	private readonly byte[] islandMask;
+	private readonly byte[] hillMask;
 
 	public WorldPlan(
 		WorldGenerationSettings settings,
@@ -107,6 +115,7 @@ public sealed class WorldPlan
 		ReadOnlySpan<byte> biomes,
 		ReadOnlySpan<byte> treeDensity,
 		ReadOnlySpan<byte> islandMask,
+		ReadOnlySpan<byte> hillMask,
 		IEnumerable<PlannedPond>? ponds = null,
 		IEnumerable<PlannedWorldSite>? sites = null,
 		IEnumerable<PlannedWorldRoute>? routes = null,
@@ -116,16 +125,21 @@ public sealed class WorldPlan
 		Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 		settings.Validate();
 		int count = checked(settings.Width * settings.Length);
-		if (heights.Length != count || biomes.Length != count || treeDensity.Length != count || islandMask.Length != count)
+		if (heights.Length != count || biomes.Length != count || treeDensity.Length != count || islandMask.Length != count || hillMask.Length != count)
 			throw new ArgumentException("Every world-plan raster must match the configured dimensions.");
 		this.heights = heights.ToArray();
 		this.biomes = biomes.ToArray();
 		this.treeDensity = treeDensity.ToArray();
 		this.islandMask = islandMask.ToArray();
+		this.hillMask = hillMask.ToArray();
 		Ponds = (ponds ?? []).Select(static pond => pond with { Cells = pond.Cells.ToArray() }).ToArray();
 		Sites = (sites ?? []).ToArray();
 		Routes = (routes ?? []).Select(static route => route with { Cells = route.Cells.ToArray() }).ToArray();
-		Villages = (villages ?? []).Select(static village => village with { AccessRoadCells = village.AccessRoadCells.ToArray() }).ToArray();
+		Villages = (villages ?? []).Select(static village => village with
+		{
+			Footprint = village.Footprint.ToArray(),
+			AccessRoadCells = village.AccessRoadCells.ToArray(),
+		}).ToArray();
 		StructureCatalogHash = structureCatalogHash ?? string.Empty;
 		Validate();
 	}
@@ -139,6 +153,7 @@ public sealed class WorldPlan
 	public ReadOnlyMemory<byte> Biomes => biomes;
 	public ReadOnlyMemory<byte> TreeDensity => treeDensity;
 	public ReadOnlyMemory<byte> IslandMask => islandMask;
+	public ReadOnlyMemory<byte> HillMask => hillMask;
 	public IReadOnlyList<PlannedPond> Ponds { get; }
 	public IReadOnlyList<PlannedWorldSite> Sites { get; }
 	public IReadOnlyList<PlannedWorldRoute> Routes { get; }
@@ -156,6 +171,7 @@ public sealed class WorldPlan
 	public byte GetHeight(int x, int z) => heights[Index(x, z)];
 	public WorldBiome GetBiome(int x, int z) => (WorldBiome)biomes[Index(x, z)];
 	public byte GetTreeDensity(int x, int z) => treeDensity[Index(x, z)];
+	public byte GetHillHeight(int x, int z) => hillMask[Index(x, z)];
 
 	public void Validate()
 	{
@@ -164,10 +180,12 @@ public sealed class WorldPlan
 			bool land = islandMask[index] != 0;
 			WorldBiome biome = (WorldBiome)biomes[index];
 			if (!Enum.IsDefined(biome)) throw new InvalidDataException($"Unknown biome value {biomes[index]} at raster index {index}.");
-			if (!land && (biome != WorldBiome.Void || treeDensity[index] != 0))
+			if (!land && (biome != WorldBiome.Void || treeDensity[index] != 0 || hillMask[index] != 0))
 				throw new InvalidDataException($"Void raster cell {index} contains biome or tree data.");
 			if (land && (biome == WorldBiome.Void || heights[index] >= WorldHeight))
 				throw new InvalidDataException($"Land raster cell {index} is invalid.");
+			if (hillMask[index] > 15 || hillMask[index] > heights[index])
+				throw new InvalidDataException($"Hill raster cell {index} has an invalid height contribution.");
 		}
 		foreach (PlannedWorldSite site in Sites)
 			if (string.IsNullOrWhiteSpace(site.Id) || string.IsNullOrWhiteSpace(site.TemplateId)
@@ -196,23 +214,36 @@ public sealed class WorldPlan
 		List<PlanBounds> villageBounds = [];
 		foreach (PlannedVillageArea village in Villages)
 		{
+			HashSet<PlanPoint> footprint = village.Footprint.ToHashSet();
 			if (string.IsNullOrWhiteSpace(village.Id) || !villageIds.Add(village.Id)
 				|| village.Reservation.MinimumX < 0 || village.Reservation.MinimumZ < 0
 				|| village.Reservation.MaximumX >= Width || village.Reservation.MaximumZ >= Length
 				|| village.Reservation.MaximumX - village.Reservation.MinimumX + 1 < 16
 				|| village.Reservation.MaximumZ - village.Reservation.MinimumZ + 1 < 16
+				|| footprint.Count != village.Footprint.Length || footprint.Count < 192
+				|| footprint.Any(point => !village.Reservation.Contains(point.X, point.Z))
+				|| footprint.Min(point => point.X) != village.Reservation.MinimumX
+				|| footprint.Max(point => point.X) != village.Reservation.MaximumX
+				|| footprint.Min(point => point.Z) != village.Reservation.MinimumZ
+				|| footprint.Max(point => point.Z) != village.Reservation.MaximumZ
 				|| villageBounds.Any(bounds => bounds.Intersects(village.Reservation)))
 				throw new InvalidDataException("World-plan village reservations are invalid.");
 			int minimumHeight = int.MaxValue, maximumHeight = int.MinValue;
-			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
-			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++)
+			foreach (PlanPoint point in footprint)
 			{
-				if (!IsLand(x, z)) throw new InvalidDataException($"Village '{village.Id}' leaves the island.");
-				int height = GetHeight(x, z); minimumHeight = Math.Min(minimumHeight, height); maximumHeight = Math.Max(maximumHeight, height);
+				if (!IsLand(point.X, point.Z)) throw new InvalidDataException($"Village '{village.Id}' leaves the island.");
+				int height = GetHeight(point.X, point.Z); minimumHeight = Math.Min(minimumHeight, height); maximumHeight = Math.Max(maximumHeight, height);
 			}
+			HashSet<PlanPoint> connected = [];
+			Queue<PlanPoint> pending = new();
+			pending.Enqueue(village.Footprint[0]); connected.Add(village.Footprint[0]);
+			while (pending.TryDequeue(out PlanPoint point))
+				foreach (PlanPoint neighbor in CardinalNeighbors(point))
+					if (footprint.Contains(neighbor) && connected.Add(neighbor)) pending.Enqueue(neighbor);
 			if (maximumHeight - minimumHeight > 1 || village.SurfaceY < minimumHeight || village.SurfaceY > maximumHeight
+				|| connected.Count != footprint.Count
 				|| village.AccessRoadCells.Length == 0
-				|| !village.Reservation.Contains(village.AccessRoadCells[0].X, village.AccessRoadCells[0].Z)
+				|| !footprint.Contains(new(village.AccessRoadCells[0].X, village.AccessRoadCells[0].Z))
 				|| !mainRoadCells.Contains(new(village.AccessRoadCells[^1].X, village.AccessRoadCells[^1].Z))
 				|| village.AccessRoadCells.Any(cell => (uint)cell.X >= (uint)Width || (uint)cell.Z >= (uint)Length
 					|| !IsLand(cell.X, cell.Z) || cell.Y != GetHeight(cell.X, cell.Z))
@@ -223,7 +254,8 @@ public sealed class WorldPlan
 		HashSet<PlanPoint> acceptedPondCells = [];
 		foreach (PlannedPond pond in Ponds)
 		{
-			if (pond.WaterLevel is < 0 or >= 256 || pond.Cells.Length < 24) throw new InvalidDataException("World-plan pond record is invalid.");
+			if (!Enum.IsDefined(pond.Kind) || pond.WaterLevel is < 0 or >= 256
+				|| pond.Cells.Length < (pond.Kind == HydrologyKind.Lake ? 128 : 24)) throw new InvalidDataException("World-plan hydrology record is invalid.");
 			foreach (PlanPoint3 cell in pond.Cells)
 				if ((uint)cell.X >= (uint)Width || (uint)cell.Z >= (uint)Length || !IsLand(cell.X, cell.Z)
 					|| cell.Y != GetHeight(cell.X, cell.Z) || pond.WaterLevel - cell.Y is < 1 or > 4
@@ -245,18 +277,30 @@ public sealed class WorldPlan
 			foreach (PlanPoint3 cell in route.Cells) AddRoadWidth(excluded, cell.X, cell.Z);
 		foreach (PlannedVillageArea village in Villages)
 		{
-			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
-			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
+			foreach (PlanPoint point in village.Footprint) excluded.Add(point);
 			foreach (PlanPoint3 cell in village.AccessRoadCells) AddRoadWidth(excluded, cell.X, cell.Z);
 		}
 		foreach (PlanPoint point in excluded)
-			if ((uint)point.X < (uint)Width && (uint)point.Z < (uint)Length && GetTreeDensity(point.X, point.Z) != 0)
-				throw new InvalidDataException($"Tree density overlaps a reserved feature at ({point.X}, {point.Z}).");
+			if ((uint)point.X < (uint)Width && (uint)point.Z < (uint)Length)
+			{
+				if (GetTreeDensity(point.X, point.Z) != 0)
+					throw new InvalidDataException($"Tree density overlaps a reserved feature at ({point.X}, {point.Z}).");
+				if (GetHillHeight(point.X, point.Z) != 0)
+					throw new InvalidDataException($"A generated hill overlaps a reserved feature at ({point.X}, {point.Z}).");
+			}
 	}
 
 	private static void AddRoadWidth(HashSet<PlanPoint> cells, int x, int z)
 	{
 		for (int offsetX = -1; offsetX <= 1; offsetX++)
 		for (int offsetZ = -1; offsetZ <= 1; offsetZ++) cells.Add(new(x + offsetX, z + offsetZ));
+	}
+
+	private static IEnumerable<PlanPoint> CardinalNeighbors(PlanPoint point)
+	{
+		yield return new(point.X - 1, point.Z);
+		yield return new(point.X + 1, point.Z);
+		yield return new(point.X, point.Z - 1);
+		yield return new(point.X, point.Z + 1);
 	}
 }

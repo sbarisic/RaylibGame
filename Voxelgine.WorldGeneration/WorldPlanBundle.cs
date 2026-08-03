@@ -7,7 +7,7 @@ namespace Voxelgine.WorldGeneration;
 public static class WorldPlanBundle
 {
 	public const string ManifestFileName = "manifest.json";
-	private static readonly string[] LayerNames = ["height.png", "biome.png", "tree-density.png", "features.png", "combined.png"];
+	private static readonly string[] LayerNames = ["height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "combined.png"];
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		WriteIndented = true,
@@ -70,7 +70,7 @@ public static class WorldPlanBundle
 		}
 
 		int count = checked(manifest.Settings.Width * manifest.Settings.Length);
-		byte[] heights = new byte[count], mask = new byte[count], biomes = new byte[count], density = new byte[count];
+		byte[] heights = new byte[count], mask = new byte[count], hillMask = new byte[count], biomes = new byte[count], density = new byte[count];
 		Dictionary<uint, WorldBiome> reversePalette = manifest.BiomePalette.ToDictionary(pair => pair.Value, pair => pair.Key);
 		for (int x = 0; x < manifest.Settings.Width; x++) for (int z = 0; z < manifest.Settings.Length; z++)
 		{
@@ -82,8 +82,13 @@ public static class WorldPlanBundle
 			biomes[index] = (byte)value;
 			byte[] tree = decoded["tree-density.png"]; if (tree[pixel] != tree[pixel + 1] || tree[pixel] != tree[pixel + 2] || tree[pixel + 3] != 255) throw new InvalidDataException("tree-density.png is not canonical grayscale RGBA.");
 			density[index] = tree[pixel];
+			byte[] hills = decoded["hill-mask.png"];
+			if (hills[pixel] != hills[pixel + 1] || hills[pixel] != hills[pixel + 2]
+				|| hills[pixel + 3] != mask[index] || hills[pixel] % WorldPlanRendering.HillEncodingScale != 0)
+				throw new InvalidDataException("hill-mask.png is not canonical scaled grayscale RGBA.");
+			hillMask[index] = (byte)(hills[pixel] / WorldPlanRendering.HillEncodingScale);
 		}
-		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages, manifest.StructureCatalogHash);
+		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, hillMask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages, manifest.StructureCatalogHash);
 		if (!decoded["features.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderFeatures(plan))) throw new InvalidDataException("features.png does not match manifest feature records.");
 		if (!decoded["combined.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderCombined(plan, cancellationToken))) throw new InvalidDataException("combined.png does not match the semantic plan.");
 		return plan;
@@ -92,6 +97,7 @@ public static class WorldPlanBundle
 	private static Dictionary<string, byte[]> RenderLayers(WorldPlan plan, CancellationToken token) => new(StringComparer.Ordinal)
 	{
 		["height.png"] = WorldPlanRendering.RenderHeight(plan), ["biome.png"] = WorldPlanRendering.RenderBiome(plan),
+		["hill-mask.png"] = WorldPlanRendering.RenderHills(plan),
 		["tree-density.png"] = WorldPlanRendering.RenderTreeDensity(plan), ["features.png"] = WorldPlanRendering.RenderFeatures(plan),
 		["combined.png"] = WorldPlanRendering.RenderCombined(plan, token),
 	};

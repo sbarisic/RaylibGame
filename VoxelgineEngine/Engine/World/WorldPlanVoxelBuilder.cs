@@ -44,7 +44,7 @@ internal sealed class WorldPlanVoxelBuilder
 				for (int y = 0; y <= surface; y++)
 				{
 					if (!volumeSampler.IsSolid(x, y, z)) continue;
-					SetBlock(x, y, z, y == surface ? SurfaceBlock(plan.GetBiome(x, z)) : y >= surface - 3 ? BlockType.Dirt : BlockType.Stone);
+					SetBlock(x, y, z, TerrainBlock(x, y, z, surface));
 				}
 			}
 		}
@@ -213,6 +213,33 @@ internal sealed class WorldPlanVoxelBuilder
 		int localX = x & 15, localY = y & 15, localZ = z & 15;
 		return (x >> 4, y >> 4, z >> 4, localX + Chunk.ChunkSize * (localY + Chunk.ChunkSize * localZ));
 	}
+	private BlockType TerrainBlock(int x, int y, int z, int surface)
+	{
+		WorldBiome biome = plan.GetBiome(x, z);
+		if (y == surface) return SurfaceBlock(biome);
+		int depth = surface - y;
+		if (biome == WorldBiome.Rocky) return BlockType.Stone;
+		double radial = NormalizedRadius(x, z);
+		if (biome == WorldBiome.Sand)
+		{
+			int sandDepth = 3 + (int)Math.Round(Math.Clamp((radial - 0.72) / 0.24, 0, 1) * 2);
+			return depth <= sandDepth ? BlockType.Sand : BlockType.Stone;
+		}
+
+		double mountainFade = SmoothStep(Math.Clamp((radial - 0.18) / 0.20, 0, 1));
+		double rimFade = 1 - SmoothStep(Math.Clamp((radial - 0.74) / 0.22, 0, 1));
+		int dirtDepth = Math.Clamp((int)Math.Round(2 + 12 * mountainFade * rimFade), 2, 14);
+		return depth <= dirtDepth ? BlockType.Dirt : BlockType.Stone;
+	}
+
+	private double NormalizedRadius(int x, int z)
+	{
+		double nx = (x + 0.5 - plan.Width * 0.5) / (plan.Width * 0.5);
+		double nz = (z + 0.5 - plan.Length * 0.5) / (plan.Length * 0.5);
+		return Math.Sqrt(nx * nx + nz * nz);
+	}
+
+	private static double SmoothStep(double value) => value * value * (3 - 2 * value);
 	private static BlockType SurfaceBlock(WorldBiome biome) => biome switch { WorldBiome.Sand => BlockType.Sand, WorldBiome.Rocky => BlockType.Stone, _ => BlockType.Grass };
 
 	private static WorldFeaturePlan ConvertFeatures(WorldPlan plan, StructureBlueprintCatalog catalog)

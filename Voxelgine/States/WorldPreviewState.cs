@@ -88,7 +88,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		Button export = Button("Export bundle", new Vector2(198, y + 88), new Vector2(166, 34), ExportBundle); sidebar.AddChild(export);
 		status = new Label { ID = "world_preview_status", Text = "Enter a seed and generate a plan.", Position = new Vector2(16, y + 136), Size = new Vector2(348, 64) }; sidebar.AddChild(status);
 		inspection = new Label { ID = "world_preview_inspection", Text = "X/Z: -", Position = new Vector2(16, y + 206), Size = new Vector2(348, 72) }; sidebar.AddChild(inspection);
-		legend = new Label { ID = "world_preview_legend", Text = "Biomes: Grassland  Forest  Sand\nRocky  Wetland  Void\nFeatures: roads, villages, conduits, structures, trees", Position = new Vector2(16, y + 284), Size = new Vector2(348, 72) }; sidebar.AddChild(legend);
+		legend = new Label { ID = "world_preview_legend", Text = "Biomes: Grassland  Forest  Sand\nRocky  Wetland  Void\nFeatures: hills, lakes, trees\nroads, villages, conduits, structures", Position = new Vector2(16, y + 284), Size = new Vector2(348, 88) }; sidebar.AddChild(legend);
 		gui.AddControl(sidebar); gui.AddControl(viewport);
 		Layout(); SelectLayer(layer);
 	}
@@ -116,9 +116,11 @@ public sealed class WorldPreviewState : GameStateImpl
 		automaticExport.GetAwaiter().GetResult();
 		WorldPlan loaded = WorldPlanBundle.LoadAsync(automaticBundle).GetAwaiter().GetResult();
 		if (loaded.Seed != plan.Seed || loaded.Width != 1024 || loaded.Length != 1024) throw new InvalidOperationException("Automatic World Preview bundle metadata is invalid.");
-		if (loaded.Villages.Count < 2 || loaded.Villages.Any(village => loaded.GetTreeDensity(village.Reservation.MinimumX, village.Reservation.MinimumZ) != 0))
+		if (loaded.Villages.Count < 6 || loaded.Villages.Any(village => village.Footprint.Any(point => loaded.GetTreeDensity(point.X, point.Z) != 0)))
 			throw new InvalidOperationException("Automatic World Preview village reservations are invalid.");
-		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "tree-density.png", "features.png", "combined.png" })
+		if (!loaded.Ponds.Any(pond => pond.Kind == HydrologyKind.Lake) || !loaded.HillMask.Span.ContainsAnyExcept((byte)0))
+			throw new InvalidOperationException("Automatic World Preview did not generate lakes and unused-space hills.");
+		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "combined.png" })
 			if (!File.Exists(Path.Combine(automaticBundle, file))) throw new InvalidOperationException($"Automatic World Preview bundle is missing {file}.");
 		FishUIDebugSnapshot snapshot = automaticCapture.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
 		gui.UI.Diagnostics.WaitForPendingExportsAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
@@ -203,7 +205,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (completed.IsCanceled) { status.Text = "Generation cancelled."; return; }
 		if (completed.IsFaulted) { status.Text = $"Generation failed: {completed.Exception?.GetBaseException().Message}"; return; }
 		plan = completed.Result; zoom = 0; pan = Vector2.Zero; RefreshImage();
-		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}  {plan.Villages.Count} villages  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
+		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}\n{plan.Ponds.Count(pond => pond.Kind == HydrologyKind.Lake)} lakes  {plan.Villages.Count} villages  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 	}
 
 	private void CancelGeneration()
@@ -232,7 +234,7 @@ public sealed class WorldPreviewState : GameStateImpl
 
 	private void RefreshImage()
 	{
-		byte[] png = WorldPlanRendering.EncodePng(plan, layer);
+		byte[] png = WorldPlanRendering.EncodePreviewPng(plan, layer);
 		string directory = Path.Combine(runtimePaths.Root, "world-plans", ".preview-cache"); Directory.CreateDirectory(directory);
 		string path = Path.Combine(directory, $"{plan.Seed}-{requestGeneration}-{layer}-{Guid.NewGuid():N}.png"); File.WriteAllBytes(path, png);
 		image.Image = gui.UI.Graphics.LoadImage(path); LayoutImage();
@@ -265,9 +267,9 @@ public sealed class WorldPreviewState : GameStateImpl
 		int z = Math.Clamp((int)((mouse.Y - origin.Y) / size.Y * plan.Length), 0, plan.Length - 1);
 		PlannedPond pond = plan.Ponds.FirstOrDefault(candidate => candidate.Cells.Any(cell => cell.X == x && cell.Z == z));
 		PlannedWorldSite site = plan.Sites.FirstOrDefault(candidate => candidate.Reservation.Contains(x, z));
-		PlannedVillageArea village = plan.Villages.FirstOrDefault(candidate => candidate.Reservation.Contains(x, z));
+		PlannedVillageArea village = plan.Villages.FirstOrDefault(candidate => candidate.Footprint.Contains(new PlanPoint(x, z)));
 		PlannedWorldRoute route = plan.Routes.FirstOrDefault(candidate => candidate.Cells.Any(cell => Math.Abs(cell.X - x) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0) && Math.Abs(cell.Z - z) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0)));
-		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : pond.WaterLevel)}\nfeature {site?.Id ?? village?.Id ?? route?.Id ?? "-"}";
+		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {site?.Id ?? village?.Id ?? route?.Id ?? "-"}";
 	}
 
 	private static Button Button(string text, Vector2 position, Vector2 size, Action pressed)

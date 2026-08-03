@@ -2,7 +2,8 @@ namespace Voxelgine.WorldGeneration;
 
 public static class WorldPlanRendering
 {
-	public enum Layer { Height, Biome, TreeDensity, Features, Combined }
+	public const int HillEncodingScale = 16;
+	public enum Layer { Height, Biome, Hills, TreeDensity, Features, Combined }
 	private static readonly IReadOnlyDictionary<WorldBiome, uint> Palette = new Dictionary<WorldBiome, uint>
 	{
 		[WorldBiome.Void] = 0x00000000, [WorldBiome.Grassland] = 0x65A84FFF,
@@ -14,7 +15,7 @@ public static class WorldPlanRendering
 
 	public static byte[] Render(WorldPlan plan, Layer layer, CancellationToken cancellationToken = default) => layer switch
 	{
-		Layer.Height => RenderHeight(plan), Layer.Biome => RenderBiome(plan), Layer.TreeDensity => RenderTreeDensity(plan),
+		Layer.Height => RenderHeight(plan), Layer.Biome => RenderBiome(plan), Layer.Hills => RenderHills(plan), Layer.TreeDensity => RenderTreeDensity(plan),
 		Layer.Features => RenderFeatures(plan), Layer.Combined => RenderCombined(plan, cancellationToken),
 		_ => throw new ArgumentOutOfRangeException(nameof(layer)),
 	};
@@ -22,12 +23,27 @@ public static class WorldPlanRendering
 	public static byte[] EncodePng(WorldPlan plan, Layer layer, CancellationToken cancellationToken = default) =>
 		PngRgbaCodec.Encode(plan.Width, plan.Length, Render(plan, layer, cancellationToken));
 
+	public static byte[] EncodePreviewPng(WorldPlan plan, Layer layer, CancellationToken cancellationToken = default) =>
+		PngRgbaCodec.Encode(plan.Width, plan.Length, layer == Layer.Height ? RenderHeightVisualization(plan) : Render(plan, layer, cancellationToken));
+
 	public static byte[] RenderHeight(WorldPlan plan)
 	{
 		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
 		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++)
 		{
 			int pixel = PixelIndex(plan, x, z); byte height = plan.GetHeight(x, z); bool land = plan.IsLand(x, z);
+			rgba[pixel] = rgba[pixel + 1] = rgba[pixel + 2] = height; rgba[pixel + 3] = land ? (byte)255 : (byte)0;
+		}
+		return rgba;
+	}
+
+	public static byte[] RenderHeightVisualization(WorldPlan plan)
+	{
+		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
+		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++)
+		{
+			int pixel = PixelIndex(plan, x, z); bool land = plan.IsLand(x, z);
+			byte height = land ? (byte)Math.Clamp((int)Math.Round(plan.GetHeight(x, z) * 255d / Math.Max(1, plan.WorldHeight - 1)), 0, 255) : (byte)0;
 			rgba[pixel] = rgba[pixel + 1] = rgba[pixel + 2] = height; rgba[pixel + 3] = land ? (byte)255 : (byte)0;
 		}
 		return rgba;
@@ -51,12 +67,23 @@ public static class WorldPlanRendering
 		return rgba;
 	}
 
+	public static byte[] RenderHills(WorldPlan plan)
+	{
+		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
+		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++)
+		{
+			int pixel = PixelIndex(plan, x, z); byte height = (byte)(plan.GetHillHeight(x, z) * HillEncodingScale);
+			rgba[pixel] = rgba[pixel + 1] = rgba[pixel + 2] = height;
+			rgba[pixel + 3] = plan.IsLand(x, z) ? (byte)255 : (byte)0;
+		}
+		return rgba;
+	}
+
 	public static byte[] RenderFeatures(WorldPlan plan)
 	{
 		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
 		foreach (PlannedVillageArea village in plan.Villages)
-			for (int x = village.Reservation.MinimumX; x <= village.Reservation.MaximumX; x++)
-			for (int z = village.Reservation.MinimumZ; z <= village.Reservation.MaximumZ; z++) Write(rgba, PixelIndex(plan, x, z), 0xD884C6D8);
+			foreach (PlanPoint point in village.Footprint) Write(rgba, PixelIndex(plan, point.X, point.Z), 0xD884C6D8);
 		foreach (PlannedWorldRoute route in plan.Routes)
 			foreach (PlanPoint3 cell in route.Cells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, route.Kind == WorldFeatureKind.Road ? 0xB27B42FF : 0xB858E8FF, route.Kind == WorldFeatureKind.Road ? 1 : 0);
 		foreach (PlannedVillageArea village in plan.Villages)
@@ -86,7 +113,14 @@ public static class WorldPlanRendering
 		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++)
 		{
 			if (!plan.IsLand(x, z)) continue;
-			int pixel = PixelIndex(plan, x, z); double shade = 0.72 + plan.GetHeight(x, z) / (double)Math.Max(1, plan.WorldHeight - 1) * 0.38;
+			int pixel = PixelIndex(plan, x, z);
+			int height = plan.GetHeight(x, z);
+			int west = x > 0 && plan.IsLand(x - 1, z) ? plan.GetHeight(x - 1, z) : height;
+			int east = x + 1 < plan.Width && plan.IsLand(x + 1, z) ? plan.GetHeight(x + 1, z) : height;
+			int north = z > 0 && plan.IsLand(x, z - 1) ? plan.GetHeight(x, z - 1) : height;
+			int south = z + 1 < plan.Length && plan.IsLand(x, z + 1) ? plan.GetHeight(x, z + 1) : height;
+			double relief = Math.Clamp((west - east + north - south) * 0.055, -0.22, 0.22);
+			double shade = 0.78 + height / (double)Math.Max(1, plan.WorldHeight - 1) * 0.25 + relief;
 			rgba[pixel] = (byte)Math.Clamp((int)Math.Round(rgba[pixel] * shade), 0, 255);
 			rgba[pixel + 1] = (byte)Math.Clamp((int)Math.Round(rgba[pixel + 1] * shade), 0, 255);
 			rgba[pixel + 2] = (byte)Math.Clamp((int)Math.Round(rgba[pixel + 2] * shade), 0, 255);

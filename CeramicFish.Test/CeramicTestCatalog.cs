@@ -21,13 +21,13 @@ internal static class CeramicTestCatalog
 		};
 
 	internal static CeramicFishDefinition CreateDefinition() => new(
-		"ceramic-fish-test-v1",
+		"ceramic-fish-test-v4",
 		[
 			CreatePrefab("tile-00", ["house-wall"], [".H.", "#HH", ".#."],
 				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall")),
 			CreatePrefab("tile-01", ["house-wall"], ["g.g", "HHH", "g.g"],
 				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
-			CreatePrefab("tile-02", ["house-wall"], [".#.", "H.H", ".#."],
+			CreatePrefab("tile-02", ["house-wall", "house-door"], [".#.", "H.H", ".#."],
 				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
 			CreatePrefab("tile-03", ["neutral"], ["g.g", ".g.", "g.g"]),
 			CreatePrefab("tile-04", ["road"], ["g.g", ".r.", "grg"],
@@ -47,19 +47,29 @@ internal static class CeramicTestCatalog
 				(CeramicDirection.East, "defense-wall"), (CeramicDirection.West, "defense-wall"),
 				(CeramicDirection.North, "road"), (CeramicDirection.South, "road")),
 			CreatePrefab("tile-11", ["neutral"], ["g.g", ".g.", "g.g"]),
+			CreatePrefab("tile-12", ["house-wall", "next-room-door", "room-door"],
+				[".#.", "H.H", ".#."],
+				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
+			CreatePrefab("tile-14", ["house-wall"], [".H.", "HHH", "..."],
+				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall"),
+				(CeramicDirection.West, "house-wall")),
 			CreatePrefab("empty", ["empty"], ["___", "___", "___"]),
 		],
 		[
 			new("defense-wall", new CeramicCountRange(2, 2),
 				new CeramicCountRange(1, 1), new CeramicCountRange(0, 0)),
-			new("house-wall", new CeramicCountRange(2, 2),
+			new("house-wall", new CeramicCountRange(2, 3),
 				new CeramicCountRange(1, null), new CeramicCountRange(0, 0)),
 			new("road", new CeramicCountRange(1, 3),
 				new CeramicCountRange(1, 1), new CeramicCountRange(1, 1),
 				requireEntranceReachability: true),
 		])
 	{
-		ComponentAdjacencyPolicies = [new("house-wall", "road")],
+		ComponentEntryPolicies =
+		[
+			new("house-wall", "house-door", "road", "next-room-door", "room-door",
+				new CeramicCountRange(0, 2)),
+		],
 	};
 
 	internal static CeramicGenerationRequest CreateRequest(int seed)
@@ -107,6 +117,8 @@ internal static class CeramicTestCatalog
 		if (actual.FormatVersion != expected.FormatVersion || actual.Id != expected.Id
 			|| !actual.ConnectionPolicies.SequenceEqual(expected.ConnectionPolicies)
 			|| !actual.ComponentAdjacencyPolicies.SequenceEqual(expected.ComponentAdjacencyPolicies)
+			|| !actual.ComponentTagPolicies.SequenceEqual(expected.ComponentTagPolicies)
+			|| !actual.ComponentEntryPolicies.SequenceEqual(expected.ComponentEntryPolicies)
 			|| actual.Prefabs.Count != expected.Prefabs.Count)
 			throw new InvalidDataException("The CeramicFish JSON root did not round trip correctly.");
 

@@ -22,6 +22,15 @@ internal sealed class CeramicCompiledCatalog
 			relevantTags.Add(policy.SocketType);
 		foreach (CeramicComponentAdjacencyPolicy policy in definition.ComponentAdjacencyPolicies)
 			relevantTags.Add(policy.RequiredAdjacentTag);
+		foreach (CeramicComponentTagPolicy policy in definition.ComponentTagPolicies)
+			relevantTags.Add(policy.RequiredTag);
+		foreach (CeramicComponentEntryPolicy policy in definition.ComponentEntryPolicies)
+		{
+			relevantTags.Add(policy.RootEntryTag);
+			relevantTags.Add(policy.RootAdjacentTag);
+			relevantTags.Add(policy.ParentDoorTag);
+			relevantTags.Add(policy.ChildEntryTag);
+		}
 		foreach (CeramicTagQuota quota in request.TagQuotas) relevantTags.Add(quota.Tag);
 		foreach (CeramicAnchor anchor in request.Anchors)
 			foreach (string tag in anchor.RequiredTags) relevantTags.Add(tag);
@@ -247,4 +256,3 @@ internal sealed class CeramicDeterministicRandom
 		}
 	}
 }
-

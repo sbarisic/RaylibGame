@@ -19,13 +19,25 @@ internal static class CeramicFishValidation
 		if (definition.ComponentAdjacencyPolicies is null)
 			Add("definition-adjacency-policies", "Component adjacency policies are required.",
 				"$.componentAdjacencyPolicies");
+		if (definition.ComponentTagPolicies is null)
+			Add("definition-component-tag-policies", "Component tag policies are required.",
+				"$.componentTagPolicies");
+		if (definition.ComponentEntryPolicies is null)
+			Add("definition-component-entry-policies", "Component entry policies are required.",
+				"$.componentEntryPolicies");
 		if (errors.Count != 0 && (definition.Prefabs is null || definition.ConnectionPolicies is null
-			|| definition.ComponentAdjacencyPolicies is null)) return new(errors);
+			|| definition.ComponentAdjacencyPolicies is null
+			|| definition.ComponentTagPolicies is null
+			|| definition.ComponentEntryPolicies is null)) return new(errors);
 
 		IReadOnlyList<CeramicPrefabDefinition> prefabs = definition.Prefabs!;
 		IReadOnlyList<CeramicConnectionPolicy> connectionPolicies = definition.ConnectionPolicies!;
 		IReadOnlyList<CeramicComponentAdjacencyPolicy> adjacencyPolicies =
 			definition.ComponentAdjacencyPolicies!;
+		IReadOnlyList<CeramicComponentTagPolicy> componentTagPolicies =
+			definition.ComponentTagPolicies!;
+		IReadOnlyList<CeramicComponentEntryPolicy> componentEntryPolicies =
+			definition.ComponentEntryPolicies!;
 		HashSet<string> prefabIds = new(StringComparer.Ordinal);
 		int? sizeX = null;
 		int? sizeZ = null;
@@ -128,6 +140,63 @@ internal static class CeramicFishValidation
 			if (!prefabs.Any(prefab => prefab.Tags.Contains(policy.RequiredAdjacentTag,
 				StringComparer.Ordinal)))
 				Add("adjacency-policy-tag", "The required adjacent tag is not authored.", path);
+		}
+		HashSet<(string, string)> componentTagKeys = [];
+		for (int index = 0; index < componentTagPolicies.Count; index++)
+		{
+			CeramicComponentTagPolicy? policy = componentTagPolicies[index];
+			string path = $"$.componentTagPolicies[{index}]";
+			if (policy is null || string.IsNullOrWhiteSpace(policy.ComponentSocketType)
+				|| string.IsNullOrWhiteSpace(policy.RequiredTag))
+			{
+				Add("component-tag-policy", "The component tag policy is invalid.", path);
+				continue;
+			}
+			if (!policyTypes.Contains(policy.ComponentSocketType))
+				Add("component-tag-policy-socket",
+					"The component tag policy references an unknown network.", path);
+			if (!componentTagKeys.Add((policy.ComponentSocketType, policy.RequiredTag)))
+				Add("component-tag-policy-duplicate", "The component tag policy is duplicated.", path);
+			if (!prefabs.Any(prefab => prefab.Tags.Contains(policy.RequiredTag,
+				StringComparer.Ordinal)))
+				Add("component-tag-policy-tag", "The required component tag is not authored.", path);
+			ValidateRange(policy.TagCountPerComponent, path + ".tagCountPerComponent");
+		}
+		HashSet<string> componentEntryNetworks = new(StringComparer.Ordinal);
+		for (int index = 0; index < componentEntryPolicies.Count; index++)
+		{
+			CeramicComponentEntryPolicy? policy = componentEntryPolicies[index];
+			string path = $"$.componentEntryPolicies[{index}]";
+			if (policy is null || string.IsNullOrWhiteSpace(policy.ComponentSocketType)
+				|| string.IsNullOrWhiteSpace(policy.RootEntryTag)
+				|| string.IsNullOrWhiteSpace(policy.RootAdjacentTag)
+				|| string.IsNullOrWhiteSpace(policy.ParentDoorTag)
+				|| string.IsNullOrWhiteSpace(policy.ChildEntryTag))
+			{
+				Add("component-entry-policy", "The component entry policy is invalid.", path);
+				continue;
+			}
+			if (!policyTypes.Contains(policy.ComponentSocketType))
+				Add("component-entry-policy-socket",
+					"The component entry policy references an unknown network.", path);
+			if (!componentEntryNetworks.Add(policy.ComponentSocketType))
+				Add("component-entry-policy-duplicate",
+					"Only one component entry policy is allowed per socket network.", path);
+			string[] entryTags = [policy.RootEntryTag, policy.ParentDoorTag, policy.ChildEntryTag];
+			if (entryTags.Distinct(StringComparer.Ordinal).Count() != entryTags.Length)
+				Add("component-entry-policy-tags",
+					"Root, parent-door, and child-entry tags must be distinct.", path);
+			foreach (string tag in entryTags.Append(policy.RootAdjacentTag).Distinct(StringComparer.Ordinal))
+				if (!prefabs.Any(prefab => prefab.Tags is not null
+					&& prefab.Tags.Contains(tag, StringComparer.Ordinal)))
+					Add("component-entry-policy-tag",
+						$"The component entry tag '{tag}' is not authored.", path);
+			if (!prefabs.Any(prefab => prefab.Tags is not null
+				&& prefab.Tags.Contains(policy.ParentDoorTag, StringComparer.Ordinal)
+				&& prefab.Tags.Contains(policy.ChildEntryTag, StringComparer.Ordinal)))
+				Add("component-entry-policy-shared-door",
+					"A prefab carrying both room-door tags is required for a shared partition.", path);
+			ValidateRange(policy.AdditionalRoomsPerRoot, path + ".additionalRoomsPerRoot");
 		}
 		return new(errors);
 
@@ -324,4 +393,3 @@ internal static class CeramicFishValidation
 		}
 	}
 }
-

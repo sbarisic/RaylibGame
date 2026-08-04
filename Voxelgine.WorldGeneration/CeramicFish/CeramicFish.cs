@@ -145,6 +145,20 @@ public sealed record CeramicFishDefinition
 	/// share an edge with a road-tagged cell.
 	/// </summary>
 	public IReadOnlyList<CeramicComponentAdjacencyPolicy> ComponentAdjacencyPolicies { get; init; } = [];
+
+	/// <summary>
+	/// Per-component topology tag requirements, such as exactly one house-door on each
+	/// closed house-wall component.
+	/// </summary>
+	public IReadOnlyList<CeramicComponentTagPolicy> ComponentTagPolicies { get; init; } = [];
+
+	/// <summary>
+	/// Entry rules for buildings made from closed room loops that share wall segments.
+	/// Shared partitions join the loops into one wall-network component. A building has
+	/// one exterior entry; every additional room contributes one shared doorway and one
+	/// additional independent wall cycle.
+	/// </summary>
+	public IReadOnlyList<CeramicComponentEntryPolicy> ComponentEntryPolicies { get; init; } = [];
 }
 
 /// <summary>Topology requirements for one connection-bearing socket type.</summary>
@@ -234,6 +248,30 @@ public sealed record CeramicComponentAdjacencyPolicy(
 	string ComponentSocketType,
 	string RequiredAdjacentTag,
 	int MinimumAdjacentEdgesPerComponent = 1);
+
+/// <summary>
+/// Requires every component of one socket network to declare a bounded number of cells
+/// carrying a tag. Selected-prefab tags that were not declared by topology do not count.
+/// </summary>
+public sealed record CeramicComponentTagPolicy(
+	string ComponentSocketType,
+	string RequiredTag,
+	CeramicCountRange TagCountPerComponent);
+
+/// <summary>
+/// Describes entrances for a wall-network component made from wall-sharing room loops.
+/// Each component has exactly one RootEntryTag bordering RootAdjacentTag. A shared
+/// partition door carries both ParentDoorTag and ChildEntryTag on the same topology
+/// cell. Every such door requires another independent graph cycle, proving that the
+/// adjoining closed room exists.
+/// </summary>
+public sealed record CeramicComponentEntryPolicy(
+	string ComponentSocketType,
+	string RootEntryTag,
+	string RootAdjacentTag,
+	string ParentDoorTag,
+	string ChildEntryTag,
+	CeramicCountRange AdditionalRoomsPerRoot);
 
 /// <summary>
 /// An authored village module such as a road, field, wall, house corner, or door.

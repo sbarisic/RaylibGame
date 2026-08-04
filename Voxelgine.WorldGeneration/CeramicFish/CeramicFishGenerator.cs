@@ -3,7 +3,7 @@ namespace Voxelgine.WorldGeneration;
 /// <summary>The default topology-first CeramicFish generation facade.</summary>
 public sealed class CeramicFish : ICeramicFish
 {
-	public const int CurrentGeneratorVersion = 2;
+	public const int CurrentGeneratorVersion = 6;
 
 	private readonly ICeramicTopologyPlanner topologyPlanner;
 	private readonly ICeramicPlacementSolver placementSolver;
@@ -167,6 +167,14 @@ public sealed class CeramicPlacementSolver : ICeramicPlacementSolver
 				CeramicFish.CurrentGeneratorVersion) ^ PlacementPhase);
 		Dictionary<CeramicCell, List<CeramicCellConstraint>> constraints = request.CellConstraints
 			.GroupBy(item => item.Cell).ToDictionary(group => group.Key, group => group.ToList());
+		HashSet<string> componentTags = definition.ComponentTagPolicies
+			.Select(policy => policy.RequiredTag).ToHashSet(StringComparer.Ordinal);
+		foreach (CeramicComponentEntryPolicy policy in definition.ComponentEntryPolicies)
+		{
+			componentTags.Add(policy.RootEntryTag);
+			componentTags.Add(policy.ParentDoorTag);
+			componentTags.Add(policy.ChildEntryTag);
+		}
 		long checks = 0;
 		List<CeramicPlacement> placements = new(topology.Count);
 		foreach (CeramicTopologyCell cell in topology.OrderBy(item => item.Cell.Z).ThenBy(item => item.Cell.X))
@@ -183,7 +191,9 @@ public sealed class CeramicPlacementSolver : ICeramicPlacementSolver
 							CeramicGenerationStage.Placement));
 				checks++;
 				if (!variant.Sockets.SequenceEqual(sockets, StringComparer.Ordinal)
-					|| !cell.Tags.All(variant.TagSet.Contains)) continue;
+					|| !cell.Tags.All(variant.TagSet.Contains)
+					|| componentTags.Any(tag => variant.TagSet.Contains(tag)
+						!= cell.Tags.Contains(tag, StringComparer.Ordinal))) continue;
 				if (constraints.TryGetValue(cell.Cell, out List<CeramicCellConstraint>? local)
 					&& local.Any(constraint => !CeramicSolverUtilities.Allows(constraint, variant)))
 					continue;

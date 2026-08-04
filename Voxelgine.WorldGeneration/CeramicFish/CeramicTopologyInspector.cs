@@ -149,6 +149,60 @@ internal static class CeramicTopologyInspector
 			componentsByType[policy.SocketType] = components;
 		}
 
+		foreach (CeramicComponentTagPolicy policy in definition.ComponentTagPolicies)
+		foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
+		{
+			checks += component.Count;
+			int count = component.Count(node => cells[node].Tags.Contains(policy.RequiredTag,
+				StringComparer.Ordinal));
+			if (!policy.TagCountPerComponent.Contains(count))
+				return CreateFailure(out failure, "topology-component-tag-count",
+					$"A '{policy.ComponentSocketType}' component has {count} '{policy.RequiredTag}' tags.",
+					SocketType: policy.ComponentSocketType);
+		}
+
+		foreach (CeramicComponentEntryPolicy policy in definition.ComponentEntryPolicies)
+		{
+			List<HashSet<CeramicCell>> components = componentsByType[policy.ComponentSocketType];
+			foreach (HashSet<CeramicCell> component in components)
+			{
+				CeramicCell[] rootEntries = component.Where(node => cells[node].Tags.Contains(
+					policy.RootEntryTag, StringComparer.Ordinal)).ToArray();
+				CeramicCell[] parentDoors = component.Where(node => cells[node].Tags.Contains(
+					policy.ParentDoorTag, StringComparer.Ordinal)).ToArray();
+				CeramicCell[] childEntries = component.Where(node => cells[node].Tags.Contains(
+					policy.ChildEntryTag, StringComparer.Ordinal)).ToArray();
+				checks += component.Count * 3L;
+				if (rootEntries.Length != 1)
+					return CreateFailure(out failure, "topology-component-entry-count",
+						$"A '{policy.ComponentSocketType}' building must have exactly one exterior entry.",
+						SocketType: policy.ComponentSocketType);
+				if (!AdjacentCells(rootEntries[0]).Any(neighbor => cells.TryGetValue(neighbor,
+					out CeramicTopologyCell? adjacent) && adjacent.Tags.Contains(
+						policy.RootAdjacentTag, StringComparer.Ordinal)))
+					return CreateFailure(out failure, "topology-root-entry-adjacency",
+						$"A '{policy.RootEntryTag}' entry does not border '{policy.RootAdjacentTag}'.",
+						rootEntries[0], policy.ComponentSocketType);
+				HashSet<CeramicCell> sharedDoors = parentDoors.Intersect(childEntries).ToHashSet();
+				if (sharedDoors.Count != parentDoors.Length || sharedDoors.Count != childEntries.Length
+					|| !policy.AdditionalRoomsPerRoot.Contains(sharedDoors.Count))
+					return CreateFailure(out failure, "topology-room-count",
+						$"A building has {sharedDoors.Count} shared room doors, outside the configured range.",
+						SocketType: policy.ComponentSocketType);
+
+				long directedInternalEdges = component.Sum(node => cells[node].Sockets.Count(socket =>
+					!socket.IsExternal && string.Equals(socket.SocketType,
+						policy.ComponentSocketType, StringComparison.Ordinal)));
+				long independentCycles = directedInternalEdges / 2 - component.Count + 1;
+				long requiredCycles = 1L + sharedDoors.Count;
+				if (independentCycles < requiredCycles)
+					return CreateFailure(out failure, "topology-room-loop-missing",
+						$"Paired room doors require at least {requiredCycles} independent wall cycles,"
+							+ $" but the building has {independentCycles}.",
+						SocketType: policy.ComponentSocketType);
+			}
+		}
+
 		foreach (CeramicComponentAdjacencyPolicy policy in definition.ComponentAdjacencyPolicies)
 		foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
 		{
@@ -170,6 +224,17 @@ internal static class CeramicTopologyInspector
 
 		failure = null;
 		return true;
+
+		static IEnumerable<CeramicCell> AdjacentCells(CeramicCell cell)
+		{
+			foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
+			{
+				CeramicCell neighbor;
+				try { neighbor = CeramicGeometry.Offset(cell, direction); }
+				catch (OverflowException) { continue; }
+				yield return neighbor;
+			}
+		}
 	}
 
 	private static bool CreateFailure(

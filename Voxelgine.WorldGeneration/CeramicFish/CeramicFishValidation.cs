@@ -25,10 +25,14 @@ internal static class CeramicFishValidation
 		if (definition.ComponentEntryPolicies is null)
 			Add("definition-component-entry-policies", "Component entry policies are required.",
 				"$.componentEntryPolicies");
+		if (definition.WallFeaturePolicies is null)
+			Add("definition-wall-feature-policies", "Wall feature policies are required.",
+				"$.wallFeaturePolicies");
 		if (errors.Count != 0 && (definition.Prefabs is null || definition.ConnectionPolicies is null
 			|| definition.ComponentAdjacencyPolicies is null
 			|| definition.ComponentTagPolicies is null
-			|| definition.ComponentEntryPolicies is null)) return new(errors);
+			|| definition.ComponentEntryPolicies is null
+			|| definition.WallFeaturePolicies is null)) return new(errors);
 
 		IReadOnlyList<CeramicPrefabDefinition> prefabs = definition.Prefabs!;
 		IReadOnlyList<CeramicConnectionPolicy> connectionPolicies = definition.ConnectionPolicies!;
@@ -38,6 +42,8 @@ internal static class CeramicFishValidation
 			definition.ComponentTagPolicies!;
 		IReadOnlyList<CeramicComponentEntryPolicy> componentEntryPolicies =
 			definition.ComponentEntryPolicies!;
+		IReadOnlyList<CeramicWallFeaturePolicy> wallFeaturePolicies =
+			definition.WallFeaturePolicies!;
 		HashSet<string> prefabIds = new(StringComparer.Ordinal);
 		int? sizeX = null;
 		int? sizeZ = null;
@@ -197,6 +203,34 @@ internal static class CeramicFishValidation
 				Add("component-entry-policy-shared-door",
 					"A prefab carrying both room-door tags is required for a shared partition.", path);
 			ValidateRange(policy.AdditionalRoomsPerRoot, path + ".additionalRoomsPerRoot");
+		}
+		HashSet<(string, string)> wallFeatureKeys = [];
+		for (int index = 0; index < wallFeaturePolicies.Count; index++)
+		{
+			CeramicWallFeaturePolicy? policy = wallFeaturePolicies[index];
+			string path = $"$.wallFeaturePolicies[{index}]";
+			if (policy is null || string.IsNullOrWhiteSpace(policy.ComponentSocketType)
+				|| string.IsNullOrWhiteSpace(policy.FeatureTag))
+			{
+				Add("wall-feature-policy", "The wall feature policy is invalid.", path);
+				continue;
+			}
+			if (!policyTypes.Contains(policy.ComponentSocketType))
+				Add("wall-feature-policy-socket",
+					"The wall feature policy references an unknown network.", path);
+			if (!wallFeatureKeys.Add((policy.ComponentSocketType, policy.FeatureTag)))
+				Add("wall-feature-policy-duplicate", "The wall feature policy is duplicated.", path);
+			if (!prefabs.Any(prefab => prefab.Tags is not null
+				&& prefab.Tags.Contains(policy.FeatureTag, StringComparer.Ordinal)))
+				Add("wall-feature-policy-tag", "The wall feature tag is not authored.", path);
+			if (policy.OuterWallsOnly && !componentEntryPolicies.Any(entry =>
+				entry.ComponentSocketType == policy.ComponentSocketType))
+				Add("wall-feature-policy-entry",
+					"Outer-wall-only features require a component entry policy for that network.", path);
+			if (policy.CellsPerFeature is <= 0)
+				Add("wall-feature-policy-density", "Cells per feature must be positive.",
+					path + ".cellsPerFeature");
+			ValidateRange(policy.CountPerComponent, path + ".countPerComponent");
 		}
 		return new(errors);
 

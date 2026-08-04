@@ -7,6 +7,7 @@ internal static class CeramicTestCatalog
 	internal const int GridSize = 85;
 	internal const int ImageSize = 256;
 	internal const int PrefabSize = 3;
+	private const int VillageRadius = 36;
 
 	internal static IReadOnlyDictionary<int, RgbaColor> Palette { get; } =
 		new Dictionary<int, RgbaColor>
@@ -18,6 +19,7 @@ internal static class CeramicTestCatalog
 			[4] = new(0x00, 0x00, 0x00, 0xff),
 			[5] = new(0xbf, 0x6a, 0x31, 0xff),
 			[6] = new(0xff, 0x00, 0xdc, 0xff),
+			[7] = new(0xff, 0x00, 0x00, 0xff),
 		};
 
 	internal static CeramicFishDefinition CreateDefinition() => new(
@@ -53,6 +55,8 @@ internal static class CeramicTestCatalog
 			CreatePrefab("tile-14", ["house-wall"], [".H.", "HHH", "..."],
 				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall"),
 				(CeramicDirection.West, "house-wall")),
+			CreatePrefab("tile-15", ["house-wall", "house-window"], ["g.g", "VVV", "g.g"],
+				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
 			CreatePrefab("empty", ["empty"], ["___", "___", "___"]),
 		],
 		[
@@ -70,24 +74,25 @@ internal static class CeramicTestCatalog
 			new("house-wall", "house-door", "road", "next-room-door", "room-door",
 				new CeramicCountRange(0, 2)),
 		],
+		WallFeaturePolicies =
+		[
+			new("house-wall", "house-window", new CeramicCountRange(1, 6),
+				OuterWallsOnly: true, CellsPerFeature: 12),
+		],
 	};
 
 	internal static CeramicGenerationRequest CreateRequest(int seed)
 	{
-		CeramicCell gate = new(GridSize / 2, GridSize - 1);
-		List<CeramicCell> region = new(GridSize * GridSize);
-		List<CeramicCellConstraint> constraints = new(GridSize * GridSize);
-		for (int z = 0; z < GridSize; z++)
-		for (int x = 0; x < GridSize; x++)
+		List<CeramicCell> region = CreateCircularRegion(out HashSet<CeramicCell> wall);
+		CeramicCell gate = new(GridSize / 2, GridSize / 2 + VillageRadius);
+		List<CeramicCellConstraint> constraints = new(region.Count);
+		foreach (CeramicCell cell in region)
 		{
-			CeramicCell cell = new(x, z);
-			region.Add(cell);
-			bool boundary = x == 0 || z == 0 || x == GridSize - 1 || z == GridSize - 1;
 			if (cell == gate)
 			{
 				constraints.Add(new(cell, ["defense-wall", "gate"], []));
 			}
-			else if (boundary)
+			else if (wall.Contains(cell))
 			{
 				constraints.Add(new(cell, ["defense-wall"], ["gate"]));
 			}
@@ -104,11 +109,89 @@ internal static class CeramicTestCatalog
 			CellConstraints = constraints,
 			TagQuotas =
 			[
-				new("road", MinimumCells: 434, MaximumCells: 867),
-				new("house-wall", MinimumCells: 723, MaximumCells: 1_589),
+				new("road", MinimumCells: PercentageCeiling(region.Count, 6),
+					MaximumCells: PercentageFloor(region.Count, 12)),
+				new("house-wall", MinimumCells: PercentageCeiling(region.Count, 10),
+					MaximumCells: PercentageFloor(region.Count, 22)),
 			],
 		};
 	}
+
+	private static List<CeramicCell> CreateCircularRegion(out HashSet<CeramicCell> wall)
+	{
+		CeramicCell center = new(GridSize / 2, GridSize / 2);
+		List<CeramicDirection> quadrantSteps = CreateCircleQuadrantSteps(VillageRadius);
+		HashSet<CeramicCell> wallCells = [];
+		CeramicCell cursor = new(center.X, center.Z - VillageRadius);
+		for (int quadrant = 0; quadrant < 4; quadrant++)
+		{
+			foreach (CeramicDirection step in quadrantSteps)
+			{
+				if (!wallCells.Add(cursor))
+					throw new InvalidDataException("The CeramicFish village wall crossed itself.");
+				cursor = CeramicGeometry.Offset(cursor, RotateClockwise(step, quadrant));
+			}
+		}
+		if (cursor != new CeramicCell(center.X, center.Z - VillageRadius))
+			throw new InvalidDataException("The CeramicFish village wall did not close.");
+
+		List<CeramicCell> region = [];
+		for (int z = center.Z - VillageRadius; z <= center.Z + VillageRadius; z++)
+		{
+			int minimumX = wallCells.Where(cell => cell.Z == z).Min(cell => cell.X);
+			int maximumX = wallCells.Where(cell => cell.Z == z).Max(cell => cell.X);
+			for (int x = minimumX; x <= maximumX; x++)
+				region.Add(new CeramicCell(x, z));
+		}
+
+		foreach (CeramicCell cell in wallCells)
+		{
+			int wallNeighbors = Enum.GetValues<CeramicDirection>()
+				.Count(direction => wallCells.Contains(CeramicGeometry.Offset(cell, direction)));
+			if (wallNeighbors != 2)
+				throw new InvalidDataException("The CeramicFish village wall is not a degree-two cycle.");
+		}
+		wall = wallCells;
+		return region;
+	}
+
+	private static List<CeramicDirection> CreateCircleQuadrantSteps(int radius)
+	{
+		List<CeramicDirection> steps = new(radius * 2);
+		int x = 0;
+		int z = -radius;
+		int radiusSquared = radius * radius;
+		while (x < radius || z < 0)
+		{
+			CeramicDirection step;
+			if (x == radius)
+				step = CeramicDirection.South;
+			else if (z == 0)
+				step = CeramicDirection.East;
+			else
+			{
+				int eastError = Math.Abs(((x + 1) * (x + 1)) + (z * z) - radiusSquared);
+				int southError = Math.Abs((x * x) + ((z + 1) * (z + 1)) - radiusSquared);
+				step = eastError <= southError ? CeramicDirection.East : CeramicDirection.South;
+			}
+
+			steps.Add(step);
+			if (step == CeramicDirection.East)
+				x++;
+			else
+				z++;
+		}
+		return steps;
+	}
+
+	private static CeramicDirection RotateClockwise(CeramicDirection direction, int quarterTurns) =>
+		(CeramicDirection)(((int)direction + quarterTurns) % 4);
+
+	private static int PercentageCeiling(int value, int percentage) =>
+		(value * percentage + 99) / 100;
+
+	private static int PercentageFloor(int value, int percentage) =>
+		value * percentage / 100;
 
 	internal static void VerifyRoundTrip(
 		CeramicFishDefinition expected,
@@ -119,6 +202,7 @@ internal static class CeramicTestCatalog
 			|| !actual.ComponentAdjacencyPolicies.SequenceEqual(expected.ComponentAdjacencyPolicies)
 			|| !actual.ComponentTagPolicies.SequenceEqual(expected.ComponentTagPolicies)
 			|| !actual.ComponentEntryPolicies.SequenceEqual(expected.ComponentEntryPolicies)
+			|| !actual.WallFeaturePolicies.SequenceEqual(expected.WallFeaturePolicies)
 			|| actual.Prefabs.Count != expected.Prefabs.Count)
 			throw new InvalidDataException("The CeramicFish JSON root did not round trip correctly.");
 
@@ -168,6 +252,7 @@ internal static class CeramicTestCatalog
 		'#' => 4,
 		'r' => 5,
 		'W' => 6,
+		'V' => 7,
 		_ => throw new InvalidDataException($"Unknown CeramicFish test-palette symbol '{symbol}'."),
 	};
 }

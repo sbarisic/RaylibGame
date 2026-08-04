@@ -31,6 +31,8 @@ internal sealed class CeramicCompiledCatalog
 			relevantTags.Add(policy.ParentDoorTag);
 			relevantTags.Add(policy.ChildEntryTag);
 		}
+		foreach (CeramicWallFeaturePolicy policy in definition.WallFeaturePolicies)
+			relevantTags.Add(policy.FeatureTag);
 		foreach (CeramicTagQuota quota in request.TagQuotas) relevantTags.Add(quota.Tag);
 		foreach (CeramicAnchor anchor in request.Anchors)
 			foreach (string tag in anchor.RequiredTags) relevantTags.Add(tag);

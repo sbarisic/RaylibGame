@@ -178,7 +178,7 @@ internal sealed class CeramicTopologySearch
 				if (domains[index].Any(option => catalog.Options[option].TagSet.Contains(quota.Tag)))
 					tags[index].Add(quota.Tag);
 			int taggedCount = tags.Count(set => set.Contains(quota.Tag));
-			if (taggedCount > 0 && IsRectangularRegion())
+			if (taggedCount > 0)
 				GrowOrganicNetwork(policy, quota, ref taggedCount);
 			while (taggedCount < quota.MinimumCells)
 			{
@@ -247,6 +247,9 @@ internal sealed class CeramicTopologySearch
 			CeramicComponentTagPolicy[] componentTagPolicies = definition.ComponentTagPolicies
 				.Where(item => item.ComponentSocketType == policy.SocketType)
 				.OrderBy(item => item.RequiredTag, StringComparer.Ordinal).ToArray();
+			CeramicWallFeaturePolicy[] wallFeaturePolicies = definition.WallFeaturePolicies
+				.Where(item => item.ComponentSocketType == policy.SocketType)
+				.OrderBy(item => item.FeatureTag, StringComparer.Ordinal).ToArray();
 			foreach (CeramicRectangle rectangle in rectangles)
 			{
 				if (count >= quota.MinimumCells) break;
@@ -353,10 +356,56 @@ internal sealed class CeramicTopologySearch
 					}
 					if (roomsAdded < minimumRooms) continue;
 				}
-				if (!CanRealizePlannedBuilding(plannedComponents, selectedComponentTags)) continue;
-
 				HashSet<int> buildingPerimeter = plannedComponents
 					.SelectMany(item => item.Perimeter).ToHashSet();
+				Dictionary<int, int> wallMembership = plannedComponents.SelectMany(item => item.Perimeter)
+					.GroupBy(index => index).ToDictionary(group => group.Key, group => group.Count());
+				bool featuresAvailable = true;
+				foreach (CeramicWallFeaturePolicy featurePolicy in wallFeaturePolicies)
+				{
+					int eligibleSurfaceCells = featurePolicy.OuterWallsOnly
+						? wallMembership.Count(item => item.Value == 1)
+						: buildingPerimeter.Count;
+					List<int> candidates = buildingPerimeter.Where(index =>
+						(!featurePolicy.OuterWallsOnly || wallMembership[index] == 1)
+						&& !selectedComponentTags.Any(item => item.Index == index)).Where(index =>
+					{
+						List<(int Index, string Tag)> prospectiveTags =
+							[.. selectedComponentTags, (index, featurePolicy.FeatureTag)];
+						return CanRealizePlannedBuilding(plannedComponents, prospectiveTags);
+					}).ToList();
+					random.Shuffle(candidates);
+					int minimumFeatures = featurePolicy.CountPerComponent.Minimum;
+					int maximumFeatures = Math.Min(candidates.Count,
+						featurePolicy.CountPerComponent.Maximum ?? candidates.Count);
+					int selectedCount;
+					if (featurePolicy.CellsPerFeature.HasValue)
+					{
+						int scaledCount = (eligibleSurfaceCells
+							+ featurePolicy.CellsPerFeature.Value - 1)
+							/ featurePolicy.CellsPerFeature.Value;
+						selectedCount = Math.Max(minimumFeatures, scaledCount);
+						if (featurePolicy.CountPerComponent.Maximum.HasValue)
+							selectedCount = Math.Min(selectedCount,
+								featurePolicy.CountPerComponent.Maximum.Value);
+					}
+					else
+					{
+						selectedCount = minimumFeatures;
+						if (maximumFeatures >= minimumFeatures)
+							selectedCount += random.NextInt(maximumFeatures - minimumFeatures + 1);
+					}
+					if (candidates.Count < selectedCount || maximumFeatures < minimumFeatures)
+					{
+						featuresAvailable = false;
+						break;
+					}
+					foreach (int index in candidates.Take(selectedCount))
+						selectedComponentTags.Add((index, featurePolicy.FeatureTag));
+				}
+				if (!featuresAvailable
+					|| !CanRealizePlannedBuilding(plannedComponents, selectedComponentTags)) continue;
+
 				foreach ((CeramicRectangle plannedRectangle, List<int> plannedPerimeter)
 					in plannedComponents)
 				{
@@ -623,13 +672,6 @@ internal sealed class CeramicTopologySearch
 				if (cell.Z < bottom) expected[(int)CeramicDirection.South] = socketType;
 			}
 			return expected;
-		}
-
-		bool IsRectangularRegion()
-		{
-			long width = (long)cells.Max(cell => cell.X) - cells.Min(cell => cell.X) + 1;
-			long height = (long)cells.Max(cell => cell.Z) - cells.Min(cell => cell.Z) + 1;
-			return width * height == cells.Length;
 		}
 
 		void GrowOrganicNetwork(

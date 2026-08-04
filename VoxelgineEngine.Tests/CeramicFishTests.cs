@@ -62,7 +62,7 @@ public sealed class CeramicFishTests
 	[Fact]
 	public void SmallVillageSatisfiesClosedWallsRoadReachabilityAndQuotas()
 	{
-		const int size = 12;
+		const int size = 16;
 		CeramicCell gate = new(size / 2, size - 1);
 		List<CeramicCell> region = [];
 		List<CeramicCellConstraint> constraints = [];
@@ -91,6 +91,10 @@ public sealed class CeramicFishTests
 			cell => cell.Tags.Contains("next-room-door", StringComparer.Ordinal));
 		CeramicTopologyCell roomDoor = Assert.Single(topology.Cells,
 			cell => cell.Tags.Contains("room-door", StringComparer.Ordinal));
+		CeramicTopologyCell[] windows = topology.Cells.Where(
+			cell => cell.Tags.Contains("house-window", StringComparer.Ordinal)).ToArray();
+		Assert.Single(windows);
+		CeramicTopologyCell window = windows[0];
 		Assert.Equal(parentDoor.Cell, roomDoor.Cell);
 		Assert.Equal(2, topology.Cells.Count(cell => cell.Sockets.Count(socket =>
 			string.Equals(socket.SocketType, "house-wall", StringComparison.Ordinal)) == 3));
@@ -102,6 +106,17 @@ public sealed class CeramicFishTests
 		Assert.NotNull(doorFailure);
 		Assert.True(doorFailure.Code is "topology-room-count"
 			or "topology-parent-door-pair");
+		IReadOnlyList<CeramicTopologyCell> internalWindow = topology.Cells.Select(cell =>
+			cell == window ? cell with
+			{
+				Tags = cell.Tags.Where(tag => tag != "house-window").ToArray(),
+			} : cell == roomDoor ? cell with
+			{
+				Tags = [.. cell.Tags, "house-window"],
+			} : cell).ToArray();
+		Assert.False(CeramicTopologyInspector.TryValidate(request, definition, internalWindow,
+			out var windowFailure, out _));
+		Assert.Equal("topology-wall-feature-shared", windowFailure!.Code);
 
 		CeramicGenerationResult result = new CeramicFish().Generate(request, definition);
 		Assert.True(result.Success, result.Failure?.Message);
@@ -109,6 +124,8 @@ public sealed class CeramicFishTests
 		Assert.Single(result.Placements, placement => placement.PrefabId == "house-door");
 		Assert.Single(result.Placements, placement => placement.PrefabId == "shared-room-door");
 		Assert.Equal(2, result.Placements.Count(placement => placement.PrefabId == "house-tee"));
+		Assert.Equal(windows.Length,
+			result.Placements.Count(placement => placement.PrefabId == "house-window"));
 		Assert.InRange(result.TopologyChecks, 1, request.MaxTopologyChecks);
 	}
 
@@ -147,6 +164,7 @@ public sealed class CeramicFishTests
 			Assert.Equal(expected.ComponentAdjacencyPolicies, loaded.ComponentAdjacencyPolicies);
 			Assert.Equal(expected.ComponentTagPolicies, loaded.ComponentTagPolicies);
 			Assert.Equal(expected.ComponentEntryPolicies, loaded.ComponentEntryPolicies);
+			Assert.Equal(expected.WallFeaturePolicies, loaded.WallFeaturePolicies);
 			Assert.Equal(expected.Prefabs.Select(prefab => prefab.Id),
 				loaded.Prefabs.Select(prefab => prefab.Id));
 
@@ -206,6 +224,8 @@ public sealed class CeramicFishTests
 			Prefab("house-tee", ["house-wall"],
 				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall"),
 				(CeramicDirection.West, "house-wall")),
+			Prefab("house-window", ["house-wall", "house-window"],
+				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
 			Prefab("house-corner", ["house-wall"],
 				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall")),
 		],
@@ -222,6 +242,11 @@ public sealed class CeramicFishTests
 		[
 			new("house-wall", "house-door", "road", "next-room-door", "room-door",
 				new CeramicCountRange(1, 1)),
+		],
+		WallFeaturePolicies =
+		[
+			new("house-wall", "house-window", new CeramicCountRange(1, 1),
+				OuterWallsOnly: true, CellsPerFeature: 100),
 		],
 	};
 

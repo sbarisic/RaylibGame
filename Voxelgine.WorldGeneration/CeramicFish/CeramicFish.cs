@@ -159,6 +159,12 @@ public sealed record CeramicFishDefinition
 	/// additional independent wall cycle.
 	/// </summary>
 	public IReadOnlyList<CeramicComponentEntryPolicy> ComponentEntryPolicies { get; init; } = [];
+
+	/// <summary>
+	/// Bounded feature counts on socket-network walls. Outer-wall-only features are
+	/// forbidden on the shared partitions identified by the component entry policy.
+	/// </summary>
+	public IReadOnlyList<CeramicWallFeaturePolicy> WallFeaturePolicies { get; init; } = [];
 }
 
 /// <summary>Topology requirements for one connection-bearing socket type.</summary>
@@ -272,6 +278,20 @@ public sealed record CeramicComponentEntryPolicy(
 	string ParentDoorTag,
 	string ChildEntryTag,
 	CeramicCountRange AdditionalRoomsPerRoot);
+
+/// <summary>
+/// Places a bounded number of tagged wall features on each component. When
+/// OuterWallsOnly is true, the feature may appear on the building envelope but never
+/// on a shared partition between rooms. When CellsPerFeature is set, the required
+/// count is the ceiling of eligible wall cells divided by that density, clamped to
+/// CountPerComponent. A null density retains bounded random selection.
+/// </summary>
+public sealed record CeramicWallFeaturePolicy(
+	string ComponentSocketType,
+	string FeatureTag,
+	CeramicCountRange CountPerComponent,
+	bool OuterWallsOnly = false,
+	int? CellsPerFeature = null);
 
 /// <summary>
 /// An authored village module such as a road, field, wall, house corner, or door.

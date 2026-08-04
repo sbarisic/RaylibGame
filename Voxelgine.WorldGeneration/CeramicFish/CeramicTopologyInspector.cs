@@ -189,6 +189,11 @@ internal static class CeramicTopologyInspector
 					return CreateFailure(out failure, "topology-room-count",
 						$"A building has {sharedDoors.Count} shared room doors, outside the configured range.",
 						SocketType: policy.ComponentSocketType);
+				foreach (CeramicCell sharedDoor in sharedDoors)
+					if (TraceSharedPartition(component, sharedDoor, policy.ComponentSocketType) is null)
+						return CreateFailure(out failure, "topology-shared-partition",
+							"A shared room door must lie between two three-way partition endpoints.",
+							sharedDoor, policy.ComponentSocketType);
 
 				long directedInternalEdges = component.Sum(node => cells[node].Sockets.Count(socket =>
 					!socket.IsExternal && string.Equals(socket.SocketType,
@@ -201,6 +206,54 @@ internal static class CeramicTopologyInspector
 							+ $" but the building has {independentCycles}.",
 						SocketType: policy.ComponentSocketType);
 			}
+		}
+
+		foreach (CeramicWallFeaturePolicy policy in definition.WallFeaturePolicies)
+		foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
+		{
+			CeramicCell[] features = component.Where(node => cells[node].Tags.Contains(
+				policy.FeatureTag, StringComparer.Ordinal)).ToArray();
+			checks += component.Count;
+			if (!policy.CountPerComponent.Contains(features.Length))
+				return CreateFailure(out failure, "topology-wall-feature-count",
+					$"A '{policy.ComponentSocketType}' component has {features.Length}"
+						+ $" '{policy.FeatureTag}' features, outside the configured range.",
+					SocketType: policy.ComponentSocketType);
+			HashSet<CeramicCell> sharedPartition = [];
+			if (policy.OuterWallsOnly)
+			{
+				CeramicComponentEntryPolicy entryPolicy = definition.ComponentEntryPolicies.Single(entry =>
+					entry.ComponentSocketType == policy.ComponentSocketType);
+				foreach (CeramicCell sharedDoor in component.Where(node =>
+					cells[node].Tags.Contains(entryPolicy.ParentDoorTag, StringComparer.Ordinal)
+					&& cells[node].Tags.Contains(entryPolicy.ChildEntryTag, StringComparer.Ordinal)))
+				{
+					HashSet<CeramicCell>? traced = TraceSharedPartition(component, sharedDoor,
+						policy.ComponentSocketType);
+					if (traced is not null) sharedPartition.UnionWith(traced);
+				}
+			}
+			if (policy.CellsPerFeature.HasValue)
+			{
+				int eligibleCells = component.Count - sharedPartition.Count;
+				int expectedCount = (eligibleCells + policy.CellsPerFeature.Value - 1)
+					/ policy.CellsPerFeature.Value;
+				expectedCount = Math.Max(policy.CountPerComponent.Minimum, expectedCount);
+				if (policy.CountPerComponent.Maximum.HasValue)
+					expectedCount = Math.Min(expectedCount, policy.CountPerComponent.Maximum.Value);
+				if (features.Length != expectedCount)
+					return CreateFailure(out failure, "topology-wall-feature-density",
+						$"The feature '{policy.FeatureTag}' requires {expectedCount} placements"
+							+ $" for {eligibleCells} eligible wall cells, but has {features.Length}.",
+						SocketType: policy.ComponentSocketType);
+			}
+			if (!policy.OuterWallsOnly) continue;
+			CeramicCell? invalid = features.Where(sharedPartition.Contains)
+				.Cast<CeramicCell?>().FirstOrDefault();
+			if (invalid.HasValue)
+				return CreateFailure(out failure, "topology-wall-feature-shared",
+					$"The outer-wall feature '{policy.FeatureTag}' is on a shared room partition.",
+					invalid.Value, policy.ComponentSocketType);
 		}
 
 		foreach (CeramicComponentAdjacencyPolicy policy in definition.ComponentAdjacencyPolicies)
@@ -234,6 +287,44 @@ internal static class CeramicTopologyInspector
 				catch (OverflowException) { continue; }
 				yield return neighbor;
 			}
+		}
+
+		HashSet<CeramicCell>? TraceSharedPartition(
+			HashSet<CeramicCell> component,
+			CeramicCell door,
+			string socketType)
+		{
+			CeramicDirection[] doorDirections = cells[door].Sockets.Where(socket =>
+				!socket.IsExternal && socket.SocketType == socketType)
+				.Select(socket => socket.Direction).ToArray();
+			if (doorDirections.Length != 2
+				|| CeramicGeometry.Opposite(doorDirections[0]) != doorDirections[1]) return null;
+			HashSet<CeramicCell> partition = [door];
+			foreach (CeramicDirection initialDirection in doorDirections)
+			{
+				CeramicCell current = door;
+				CeramicDirection direction = initialDirection;
+				HashSet<CeramicCell> visited = [door];
+				while (true)
+				{
+					CeramicCell next;
+					try { next = CeramicGeometry.Offset(current, direction); }
+					catch (OverflowException) { return null; }
+					if (!component.Contains(next) || !visited.Add(next)) return null;
+					partition.Add(next);
+					CeramicDirection[] directions = cells[next].Sockets.Where(socket =>
+						!socket.IsExternal && socket.SocketType == socketType)
+						.Select(socket => socket.Direction).ToArray();
+					if (directions.Length == 3) break;
+					if (directions.Length != 2) return null;
+					CeramicDirection incoming = CeramicGeometry.Opposite(direction);
+					CeramicDirection[] onward = directions.Where(candidate => candidate != incoming).ToArray();
+					if (onward.Length != 1) return null;
+					current = next;
+					direction = onward[0];
+				}
+			}
+			return partition;
 		}
 	}
 

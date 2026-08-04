@@ -3,7 +3,7 @@ namespace Voxelgine.WorldGeneration;
 /// <summary>The default topology-first CeramicFish generation facade.</summary>
 public sealed class CeramicFish : ICeramicFish
 {
-	public const int CurrentGeneratorVersion = 6;
+	public const int CurrentGeneratorVersion = 8;
 
 	private readonly ICeramicTopologyPlanner topologyPlanner;
 	private readonly ICeramicPlacementSolver placementSolver;
@@ -175,6 +175,8 @@ public sealed class CeramicPlacementSolver : ICeramicPlacementSolver
 			componentTags.Add(policy.ParentDoorTag);
 			componentTags.Add(policy.ChildEntryTag);
 		}
+		foreach (CeramicWallFeaturePolicy policy in definition.WallFeaturePolicies)
+			componentTags.Add(policy.FeatureTag);
 		long checks = 0;
 		List<CeramicPlacement> placements = new(topology.Count);
 		foreach (CeramicTopologyCell cell in topology.OrderBy(item => item.Cell.Z).ThenBy(item => item.Cell.X))

@@ -23,24 +23,44 @@ internal static class CeramicTestCatalog
 	internal static CeramicFishDefinition CreateDefinition() => new(
 		"ceramic-fish-test-v1",
 		[
-			CreatePrefab("tile-00", ["house-wall"], ".H.", "#HH", ".#."),
-			CreatePrefab("tile-01", ["house-wall"], "g.g", "HHH", "g.g"),
-			CreatePrefab("tile-02", ["house-wall"], ".#.", "H.H", ".#."),
-			CreatePrefab("tile-03", ["neutral"], "g.g", ".g.", "g.g"),
-			CreatePrefab("tile-04", ["road"], "g.g", ".r.", "grg"),
-			CreatePrefab("tile-05", ["road"], ".r.", "#r#", ".r."),
-			CreatePrefab("tile-06", ["road"], "grg", ".rr", "g.g"),
-			CreatePrefab("tile-07", ["road"], ".r.", "#rr", ".r."),
-			CreatePrefab("tile-08", ["defense-wall"], ".#.", "WWW", "WWW"),
-			CreatePrefab("tile-09", ["defense-wall"], "gWW", "WWW", "WWW"),
-			CreatePrefab("tile-10", ["defense-wall", "gate"], ".#.", "W.W", "W#W"),
-			CreatePrefab("tile-11", ["neutral"], "g.g", ".g.", "g.g"),
-			CreatePrefab("empty", ["empty"], "___", "___", "___"),
+			CreatePrefab("tile-00", ["house-wall"], [".H.", "#HH", ".#."],
+				(CeramicDirection.North, "house-wall"), (CeramicDirection.East, "house-wall")),
+			CreatePrefab("tile-01", ["house-wall"], ["g.g", "HHH", "g.g"],
+				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
+			CreatePrefab("tile-02", ["house-wall"], [".#.", "H.H", ".#."],
+				(CeramicDirection.East, "house-wall"), (CeramicDirection.West, "house-wall")),
+			CreatePrefab("tile-03", ["neutral"], ["g.g", ".g.", "g.g"]),
+			CreatePrefab("tile-04", ["road"], ["g.g", ".r.", "grg"],
+				(CeramicDirection.South, "road")),
+			CreatePrefab("tile-05", ["road"], [".r.", "#r#", ".r."],
+				(CeramicDirection.North, "road"), (CeramicDirection.South, "road")),
+			CreatePrefab("tile-06", ["road"], ["grg", ".rr", "g.g"],
+				(CeramicDirection.North, "road"), (CeramicDirection.East, "road")),
+			CreatePrefab("tile-07", ["road"], [".r.", "#rr", ".r."],
+				(CeramicDirection.North, "road"), (CeramicDirection.East, "road"),
+				(CeramicDirection.South, "road")),
+			CreatePrefab("tile-08", ["defense-wall"], [".#.", "WWW", "WWW"],
+				(CeramicDirection.East, "defense-wall"), (CeramicDirection.West, "defense-wall")),
+			CreatePrefab("tile-09", ["defense-wall"], ["gWW", "WWW", "WWW"],
+				(CeramicDirection.North, "defense-wall"), (CeramicDirection.East, "defense-wall")),
+			CreatePrefab("tile-10", ["defense-wall", "gate"], [".#.", "W.W", "W#W"],
+				(CeramicDirection.East, "defense-wall"), (CeramicDirection.West, "defense-wall"),
+				(CeramicDirection.North, "road"), (CeramicDirection.South, "road")),
+			CreatePrefab("tile-11", ["neutral"], ["g.g", ".g.", "g.g"]),
+			CreatePrefab("empty", ["empty"], ["___", "___", "___"]),
 		],
 		[
-			new("defense-wall", RequiredDegree: 2, RequiredComponentCount: 1),
-			new("house-wall", RequiredDegree: 2),
-		]);
+			new("defense-wall", new CeramicCountRange(2, 2),
+				new CeramicCountRange(1, 1), new CeramicCountRange(0, 0)),
+			new("house-wall", new CeramicCountRange(2, 2),
+				new CeramicCountRange(1, null), new CeramicCountRange(0, 0)),
+			new("road", new CeramicCountRange(1, 3),
+				new CeramicCountRange(1, 1), new CeramicCountRange(1, 1),
+				requireEntranceReachability: true),
+		])
+	{
+		ComponentAdjacencyPolicies = [new("house-wall", "road")],
+	};
 
 	internal static CeramicGenerationRequest CreateRequest(int seed)
 	{
@@ -69,9 +89,14 @@ internal static class CeramicTestCatalog
 
 		return new(region, new(gate, ["defense-wall", "gate"], "road", CeramicDirection.North), seed)
 		{
-			BoundarySocket = CeramicSocket.Closed,
+			BoundarySocket = CeramicSocket.NoConnection,
 			Entrances = [new(gate, CeramicDirection.South, "road")],
 			CellConstraints = constraints,
+			TagQuotas =
+			[
+				new("road", MinimumCells: 434, MaximumCells: 867),
+				new("house-wall", MinimumCells: 723, MaximumCells: 1_589),
+			],
 		};
 	}
 
@@ -81,6 +106,7 @@ internal static class CeramicTestCatalog
 	{
 		if (actual.FormatVersion != expected.FormatVersion || actual.Id != expected.Id
 			|| !actual.ConnectionPolicies.SequenceEqual(expected.ConnectionPolicies)
+			|| !actual.ComponentAdjacencyPolicies.SequenceEqual(expected.ComponentAdjacencyPolicies)
 			|| actual.Prefabs.Count != expected.Prefabs.Count)
 			throw new InvalidDataException("The CeramicFish JSON root did not round trip correctly.");
 
@@ -99,9 +125,10 @@ internal static class CeramicTestCatalog
 	private static CeramicPrefabDefinition CreatePrefab(
 		string id,
 		IReadOnlyList<string> tags,
-		params string[] rows)
+		IReadOnlyList<string> rows,
+		params (CeramicDirection Direction, string Type)[] connections)
 	{
-		if (rows.Length != PrefabSize || rows.Any(row => row.Length != PrefabSize))
+		if (rows.Count != PrefabSize || rows.Any(row => row.Length != PrefabSize))
 			throw new ArgumentException("CeramicFish test prefabs must be 3x3.", nameof(rows));
 		List<CeramicEntity> entities = [];
 		for (int z = 0; z < PrefabSize; z++)
@@ -110,8 +137,11 @@ internal static class CeramicTestCatalog
 			int value = Value(rows[z][x]);
 			if (value != 0) entities.Add(new(value, x, 0, z));
 		}
+		Dictionary<CeramicDirection, string> authored = connections.ToDictionary(
+			connection => connection.Direction, connection => connection.Type);
 		CeramicSocket[] sockets = Enum.GetValues<CeramicDirection>()
-			.Select(direction => new CeramicSocket(direction, CeramicSocket.Closed))
+			.Select(direction => new CeramicSocket(direction,
+				authored.GetValueOrDefault(direction, CeramicSocket.NoConnection)))
 			.ToArray();
 		return new(id, tags, PrefabSize, 1, PrefabSize, entities, sockets,
 			CeramicRotationOptions.All, Weight: 1);

@@ -37,7 +37,7 @@ internal static class Program
 		Console.WriteLine($"Saved and reloaded {loaded.Prefabs.Count} prefabs: {definitionPath}");
 
 		CeramicGenerationRequest request = CeramicTestCatalog.CreateRequest(seed);
-		ICeramicFish generator = new EmptyCeramicFish();
+		ICeramicFish generator = new Voxelgine.WorldGeneration.CeramicFish();
 		CeramicGenerationResult result = generator.Generate(request, loaded);
 
 		await CeramicImageRenderer.SaveAsync(imagePath, loaded, request, result).ConfigureAwait(false);

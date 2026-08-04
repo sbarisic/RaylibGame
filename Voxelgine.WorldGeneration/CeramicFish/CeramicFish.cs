@@ -66,21 +66,11 @@ public interface ICeramicPlacementSolver
 		CancellationToken cancellationToken = default);
 }
 
-// TODO(CeramicFish implementation): Implement topology construction before weighted
-// prefab selection. Normalize cells, prefabs, policies, and rotated variants before
-// making seeded decisions so unordered collection iteration cannot affect results.
-// Match every connection-bearing socket with an equal opposing socket or a declared entrance.
-// Report topology unsatisfiability separately from placement contradictions and budget
-// exhaustion through CeramicGenerationFailure.Stage. Retry Contradiction and per-attempt
-// BudgetExceeded results while attempts remain; stop immediately on proven Unsatisfiable.
 // Reproducibility is guaranteed only for the same canonical definition, request, and
 // ICeramicFish.GeneratorVersion.
-
-// TODO(CeramicFish integration): Wire ICeramicTopologyPlanner and
-// ICeramicPlacementSolver into a concrete ICeramicFish, then replace the console
-// harness stub and integrate the result with the production world generator. Keep the
-// 85x85 acceptance scenario out of the normal unit-test suite so it does not restore
-// the removed slow world-generation coverage.
+// TODO(CeramicFish integration): Integrate the result with the production world
+// generator. Keep the 85x85 acceptance scenario out of the normal unit-test suite so
+// it does not restore the removed slow world-generation coverage.
 
 /// <summary>
 /// Loads and saves one complete CeramicFish definition per JSON file.
@@ -224,30 +214,6 @@ public readonly record struct CeramicCountRange(
 		value >= Minimum && (!Maximum.HasValue || value <= Maximum.Value);
 }
 
-/// <summary>Stable seed derivation shared by all CeramicFish implementations.</summary>
-public static class CeramicDeterminism
-{
-	/// <summary>
-	/// Derives one retry seed by packing the request seed and attempt ordinal, mixing
-	/// in the generator version, and applying the SplitMix64 finalizer. This calculation
-	/// is part of the reproducibility contract and must not use runtime Random behavior.
-	/// </summary>
-	public static ulong DeriveAttemptSeed(int seed, int attemptOrdinal, int generatorVersion)
-	{
-		if (attemptOrdinal < 0) throw new ArgumentOutOfRangeException(nameof(attemptOrdinal));
-		if (generatorVersion <= 0) throw new ArgumentOutOfRangeException(nameof(generatorVersion));
-		unchecked
-		{
-			ulong value = ((ulong)(uint)seed << 32) | (uint)attemptOrdinal;
-			value ^= (ulong)(uint)generatorVersion * 0x9E3779B97F4A7C15UL;
-			value += 0x9E3779B97F4A7C15UL;
-			value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
-			value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
-			return value ^ (value >> 31);
-		}
-	}
-}
-
 /// <summary>
 /// Inclusive cell-count limits for one topology-declared tag in a generated region.
 /// A cell declaring multiple tags contributes once to every matching quota. Additional
@@ -268,15 +234,6 @@ public sealed record CeramicComponentAdjacencyPolicy(
 	string ComponentSocketType,
 	string RequiredAdjacentTag,
 	int MinimumAdjacentEdgesPerComponent = 1);
-
-// TODO(CeramicFish storage): Extend CeramicFishJsonStorage format-version-three
-// structural validation for
-// degree and component ranges, external-connection ranges, tag quotas, and component
-// adjacency policies when changes outside this file are allowed. Validation must reject
-// negative or inverted ranges, impossible entrance requirements, duplicate topology
-// cells, missing or duplicate topology socket directions, and non-square prefab
-// footprints. Add explicit version-one/version-two conversion only if legacy JSON must
-// be supported; the canonical domain model must not regain legacy serialized fields.
 
 /// <summary>
 /// An authored village module such as a road, field, wall, house corner, or door.
@@ -352,38 +309,6 @@ public sealed record CeramicSocket(CeramicDirection Direction, string Type)
 	public const string Closed = NoConnection;
 }
 
-/// <summary>Fixed ordinal socket compatibility for facing prefab edges.</summary>
-public static class CeramicSocketCompatibility
-{
-	/// <summary>
-	/// Returns true only when the directions oppose each other and the socket types
-	/// are equal using ordinal comparison.
-	/// </summary>
-	public static bool AreFacingSocketsCompatible(CeramicSocket first, CeramicSocket second)
-	{
-		ArgumentNullException.ThrowIfNull(first);
-		ArgumentNullException.ThrowIfNull(second);
-		return CeramicGeometry.Opposite(first.Direction) == second.Direction
-			&& string.Equals(first.Type, second.Type, StringComparison.Ordinal);
-	}
-
-	/// <summary>
-	/// Returns true when compatible facing sockets form a connection. NoConnection
-	/// faces are compatible with each other but never form a connection.
-	/// </summary>
-	public static bool CreatesConnection(CeramicSocket first, CeramicSocket second) =>
-		AreFacingSocketsCompatible(first, second)
-		&& !string.Equals(first.Type, CeramicSocket.NoConnection, StringComparison.Ordinal);
-}
-
-// TODO(CeramicFish catalog authoring): The console catalog currently uses no-connection
-// placeholders. Author these sockets before expecting generation to succeed:
-// - house: tile-00 north/east; tile-01 and tile-02 east/west
-// - road: tile-04 south; tile-05 north/south; tile-06 north/east;
-//   tile-07 north/east/south
-// - defense: tile-08 east/west; tile-09 north/east
-// - gate: defense-wall east/west and road north/south
-// - neutral and empty prefabs: no-connection on every face
 // TODO(CeramicFish compatibility): Migrate call sites outside this file from Closed to
 // NoConnection, then remove the Closed alias in a later format-breaking change.
 
@@ -608,13 +533,6 @@ public sealed record CeramicPlacementAttemptResult(
 {
 	public bool Success => Status == CeramicPlacementAttemptStatus.Success;
 }
-
-// TODO(CeramicFish topology): Future planners must enforce these graph invariants:
-// - defense-wall: one component, degree two at every participating cell, no external connection
-// - house-wall: degree two at every participating cell, closed components, and the
-//   configured adjacency to road-tagged cells
-// - road: one gate-reachable component whose cells may be endpoints, corners, or
-//   junctions and whose only external connections are explicitly declared entrances
 
 /// <summary>Terminal state of a generation request.</summary>
 public enum CeramicGenerationStatus : byte

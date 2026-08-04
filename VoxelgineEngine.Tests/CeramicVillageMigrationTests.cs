@@ -84,6 +84,13 @@ public sealed class CeramicVillageMigrationTests
 		Assert.Equal(first.Layout.GateRoadCells, second.Layout.GateRoadCells);
 		Assert.NotEmpty(first.Layout.Placements);
 		Assert.All(first.Layout.Placements, placement => Assert.Contains(catalog.Prefabs, prefab => prefab.Id == placement.PrefabId));
+		PlannedVillagePlacement[] defense = first.Layout.Placements
+			.Where(placement => catalog.Get(placement.PrefabId).Tags.Contains("defense-wall", StringComparer.Ordinal))
+			.ToArray();
+		Assert.True(defense.Max(static placement => placement.Cell.X) - defense.Min(static placement => placement.Cell.X) + 1 >= 25,
+			"The defense wall should use nearly the full 31-cell-wide preview zone.");
+		Assert.True(defense.Max(static placement => placement.Cell.Z) - defense.Min(static placement => placement.Cell.Z) + 1 >= 25,
+			"The defense wall should use nearly the full 31-cell-deep preview zone.");
 	}
 
 	[Fact]

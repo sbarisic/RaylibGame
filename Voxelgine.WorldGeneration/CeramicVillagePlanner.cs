@@ -32,7 +32,7 @@ public static class CeramicVillagePlanner
 {
 	internal const int CellSize = 3;
 	private const int CornerRun = 3;
-	private const int MinimumRectangleSize = 15;
+	private const int MinimumWallSpan = 12;
 	private const int CandidateCount = 3;
 
 	public static CeramicVillagePreviewResult PlanPreview(
@@ -120,16 +120,9 @@ public static class CeramicVillagePlanner
 		request = null!;
 		gridOrigin = default;
 		gateRoadCells = [];
-		if (grid.Active.Count == 0 || !TryFindLargestRectangle(grid, out CellRectangle largest))
+		if (grid.Active.Count == 0 || !TryBuildOuterWall(grid, candidateOrdinal,
+			out List<CeramicCell> wall))
 			return false;
-		int inset = candidateOrdinal * 2;
-		CellRectangle rectangle = new(largest.Left + inset, largest.Top + inset,
-			largest.Right - inset, largest.Bottom - inset);
-		if (rectangle.Width < MinimumRectangleSize || rectangle.Height < MinimumRectangleSize)
-			return false;
-
-		List<CeramicCell> wall = BuildRoundedWall(rectangle, settings.Seed, village.Id,
-			candidateOrdinal, grid.OriginX, grid.OriginZ, village.AccessRoadCells[0]);
 		HashSet<CeramicCell> wallSet = wall.ToHashSet();
 		if (wallSet.Count != wall.Count || !IsDegreeTwoCycle(wallSet)) return false;
 		HashSet<CeramicCell> region = FillInside(wallSet);
@@ -200,7 +193,7 @@ public static class CeramicVillagePlanner
 			}
 			foreach (HashSet<CeramicCell> component in Components(all))
 			{
-				if (component.Count < MinimumRectangleSize * MinimumRectangleSize / 2) continue;
+				if (component.Count < MinimumWallSpan * MinimumWallSpan / 2) continue;
 				long entryDistance = component.Min(cell =>
 				{
 					int centerX = originX + cell.X * CellSize + CellSize / 2;
@@ -245,107 +238,105 @@ public static class CeramicVillagePlanner
 		}
 	}
 
-	private static bool TryFindLargestRectangle(Grid grid, out CellRectangle rectangle)
+	private static bool TryBuildOuterWall(
+		Grid grid,
+		int candidateOrdinal,
+		out List<CeramicCell> wall)
 	{
-		rectangle = default;
-		int bestArea = 0;
-		for (int top = 0; top < grid.Height; top++)
-		for (int bottom = top + MinimumRectangleSize - 1; bottom < grid.Height; bottom++)
+		wall = [];
+		int centerX = (int)Math.Round(grid.Active.Average(static cell => cell.X));
+		Dictionary<int, RowRun> rows = [];
+		foreach (IGrouping<int, CeramicCell> row in grid.Active.GroupBy(static cell => cell.Z))
 		{
-			int runStart = -1;
-			for (int x = 0; x <= grid.Width; x++)
+			List<RowRun> runs = [];
+			int[] values = row.Select(static cell => cell.X).Order().ToArray();
+			int start = values[0], previous = values[0];
+			for (int index = 1; index <= values.Length; index++)
 			{
-				bool complete = x < grid.Width;
-				if (complete)
-					for (int z = top; z <= bottom; z++)
-						if (!grid.Active.Contains(new(x, z)))
-						{
-							complete = false;
-							break;
-						}
-				if (complete)
+				if (index < values.Length && values[index] == previous + 1)
 				{
-					if (runStart < 0) runStart = x;
+					previous = values[index];
 					continue;
 				}
-				if (runStart < 0) continue;
-				int width = x - runStart;
-				int area = width * (bottom - top + 1);
-				if (width >= MinimumRectangleSize && area > bestArea)
-				{
-					bestArea = area;
-					rectangle = new(runStart, top, x - 1, bottom);
-				}
-				runStart = -1;
+				runs.Add(new(start, previous));
+				if (index < values.Length) start = previous = values[index];
 			}
-		}
-		return bestArea != 0;
-	}
-
-	private static List<CeramicCell> BuildRoundedWall(
-		CellRectangle rectangle,
-		int worldSeed,
-		string villageId,
-		int candidateOrdinal,
-		int gridOriginX,
-		int gridOriginZ,
-		PlanPoint3 access)
-	{
-		int left = rectangle.Left;
-		int right = rectangle.Right;
-		int top = rectangle.Top;
-		int bottom = rectangle.Bottom;
-		List<CeramicCell> vertices =
-		[
-			new(left + CornerRun, top), new(right - CornerRun, top),
-			new(right - CornerRun, top + CornerRun), new(right, top + CornerRun),
-			new(right, bottom - CornerRun), new(right - CornerRun, bottom - CornerRun),
-			new(right - CornerRun, bottom), new(left + CornerRun, bottom),
-			new(left + CornerRun, bottom - CornerRun), new(left, bottom - CornerRun),
-			new(left, top + CornerRun), new(left + CornerRun, top + CornerRun),
-		];
-
-		int centerX = (left + right) / 2;
-		int centerZ = (top + bottom) / 2;
-		int worldCenterX = gridOriginX + centerX * CellSize;
-		int worldCenterZ = gridOriginZ + centerZ * CellSize;
-		int dx = access.X - worldCenterX;
-		int dz = access.Z - worldCenterZ;
-		int accessSide = Math.Abs(dx) > Math.Abs(dz)
-			? dx >= 0 ? 1 : 3
-			: dz >= 0 ? 2 : 0;
-		int notchSide = (accessSide + 2 + (DeriveSeed(worldSeed, villageId,
-			candidateOrdinal) & 1)) & 3;
-		int segmentIndex = notchSide switch { 0 => 0, 1 => 3, 2 => 6, _ => 9 };
-		CeramicCell first = vertices[segmentIndex];
-		CeramicCell second = vertices[(segmentIndex + 1) % vertices.Count];
-		int length = Manhattan(first, second);
-		if (length >= 12)
-		{
-			CeramicDirection direction = DirectionBetween(first, second);
-			CeramicDirection inward = RotateClockwise(direction);
-			int notchLength = 6;
-			int before = (length - notchLength) / 2;
-			CeramicCell entry = Move(first, direction, before);
-			CeramicCell exit = Move(entry, direction, notchLength);
-			CeramicCell innerEntry = Move(entry, inward, CornerRun);
-			CeramicCell innerExit = Move(exit, inward, CornerRun);
-			vertices.InsertRange(segmentIndex + 1, [entry, innerEntry, innerExit, exit]);
+			RowRun[] centeredRuns = runs.Where(run => run.Left <= centerX && run.Right >= centerX)
+				.OrderByDescending(static run => run.Width).ToArray();
+			RowRun selected = centeredRuns.Length != 0
+				? centeredRuns[0]
+				: runs.OrderByDescending(static run => run.Width)
+					.ThenBy(run => Math.Abs((run.Left + run.Right) / 2 - centerX)).First();
+			rows[row.Key] = selected;
 		}
 
-		List<CeramicCell> wall = [vertices[0]];
-		CeramicCell current = vertices[0];
-		for (int vertexIndex = 1; vertexIndex <= vertices.Count; vertexIndex++)
+		List<(int Top, int Bottom)> spans = [];
+		int spanStart = -1, previousZ = int.MinValue;
+		foreach ((int z, RowRun run) in rows.OrderBy(static pair => pair.Key))
 		{
-			CeramicCell target = vertices[vertexIndex % vertices.Count];
+			bool eligible = run.Width >= MinimumWallSpan;
+			if (!eligible || spanStart >= 0 && z != previousZ + 1)
+			{
+				if (spanStart >= 0) spans.Add((spanStart, previousZ));
+				spanStart = -1;
+			}
+			if (eligible && spanStart < 0) spanStart = z;
+			previousZ = z;
+		}
+		if (spanStart >= 0) spans.Add((spanStart, previousZ));
+		int inset = candidateOrdinal * 2;
+		var usableSpans = spans.Select(value => (Top: value.Top + inset, Bottom: value.Bottom - inset))
+			.Where(value => value.Bottom - value.Top + 1 >= MinimumWallSpan)
+			.OrderByDescending(value => Enumerable.Range(value.Top, value.Bottom - value.Top + 1)
+				.Sum(z => rows[z].Width))
+			.ThenBy(static value => value.Top).ToArray();
+		if (usableSpans.Length == 0) return false;
+		var span = usableSpans[0];
+
+		List<WallBand> bands = [];
+		for (int top = span.Top; top < span.Bottom;)
+		{
+			int bottom = Math.Min(span.Bottom, top + CornerRun);
+			int left = Enumerable.Range(top, bottom - top + 1).Max(z => rows[z].Left) + inset;
+			int right = Enumerable.Range(top, bottom - top + 1).Min(z => rows[z].Right) - inset;
+			if (right - left + 1 < MinimumWallSpan) return false;
+			bands.Add(new(top, bottom, left, right));
+			top = bottom;
+		}
+		if (bands.Count < 2) return false;
+
+		List<CeramicCell> vertices = [new(bands[0].Left, bands[0].Top),
+			new(bands[0].Right, bands[0].Top)];
+		for (int index = 0; index < bands.Count; index++)
+		{
+			WallBand band = bands[index];
+			vertices.Add(new(band.Right, band.Bottom));
+			if (index + 1 < bands.Count)
+				vertices.Add(new(bands[index + 1].Right, band.Bottom));
+		}
+		vertices.Add(new(bands[^1].Left, bands[^1].Bottom));
+		for (int index = bands.Count - 1; index >= 0; index--)
+		{
+			WallBand band = bands[index];
+			vertices.Add(new(band.Left, band.Top));
+			if (index > 0) vertices.Add(new(bands[index - 1].Left, band.Top));
+		}
+
+		CeramicCell first = vertices[0];
+		wall.Add(first);
+		CeramicCell current = first;
+		foreach (CeramicCell target in vertices.Skip(1).Append(first))
+		{
+			if (target == current) continue;
 			CeramicDirection direction = DirectionBetween(current, target);
 			while (current != target)
 			{
 				current = CeramicGeometry.Offset(current, direction);
-				if (current != wall[0]) wall.Add(current);
+				if (current != first) wall.Add(current);
 			}
 		}
-		return wall;
+		if (wall.Any(cell => !grid.Active.Contains(cell))) return false;
+		return true;
 	}
 
 	private static HashSet<CeramicCell> FillInside(HashSet<CeramicCell> wall)
@@ -441,7 +432,7 @@ public static class CeramicVillagePlanner
 		int gateCenterX = grid.OriginX + gate.X * CellSize + CellSize / 2;
 		int gateCenterZ = grid.OriginZ + gate.Z * CellSize + CellSize / 2;
 		(int outwardX, int outwardZ) = DirectionOffset(outward);
-		PlanPoint start = new(gateCenterX + outwardX * 2, gateCenterZ + outwardZ * 2);
+		PlanPoint start = new(gateCenterX + outwardX, gateCenterZ + outwardZ);
 		PlanPoint target = new(village.AccessRoadCells[0].X, village.AccessRoadCells[0].Z);
 		blocked.Remove(start);
 		blocked.Remove(target);
@@ -495,19 +486,6 @@ public static class CeramicVillagePlanner
 		throw new InvalidDataException("CeramicFish wall vertices must be distinct.");
 	}
 
-	private static CeramicDirection RotateClockwise(CeramicDirection direction) =>
-		(CeramicDirection)(((int)direction + 1) & 3);
-
-	private static CeramicCell Move(CeramicCell cell, CeramicDirection direction, int distance)
-	{
-		for (int index = 0; index < distance; index++)
-			cell = CeramicGeometry.Offset(cell, direction);
-		return cell;
-	}
-
-	private static int Manhattan(CeramicCell first, CeramicCell second) =>
-		Math.Abs(first.X - second.X) + Math.Abs(first.Z - second.Z);
-
 	private static (int X, int Z) DirectionOffset(CeramicDirection direction) => direction switch
 	{
 		CeramicDirection.North => (0, -1),
@@ -545,9 +523,10 @@ public static class CeramicVillagePlanner
 		HashSet<CeramicCell> Active,
 		long EntryDistance);
 
-	private readonly record struct CellRectangle(int Left, int Top, int Right, int Bottom)
+	private readonly record struct RowRun(int Left, int Right)
 	{
 		internal int Width => Right - Left + 1;
-		internal int Height => Bottom - Top + 1;
 	}
+
+	private readonly record struct WallBand(int Top, int Bottom, int Left, int Right);
 }

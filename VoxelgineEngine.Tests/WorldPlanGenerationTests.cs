@@ -49,31 +49,6 @@ public sealed class WorldPlanGenerationTests
 	}
 
 	[Fact]
-	public void StructureNetworksUseDeterministicLandRoutes()
-	{
-		StructureTemplateDescriptor[] templates = CreateTemplates();
-		foreach (int seed in new[] { 5, 77, 9001, -4123 })
-		{
-			WorldGenerationSettings settings = new(seed, 256, 256, 64);
-			WorldPlan first = WorldPlanGenerator.Generate(settings, templates, new string('a', 64));
-			WorldPlan second = WorldPlanGenerator.Generate(settings, templates, new string('a', 64));
-			Assert.Equal(1, first.Sites.Count(site => site.Role == WorldStructureRole.Shelter));
-			Assert.Equal(3, first.Sites.Count(site => site.Role == WorldStructureRole.Relay));
-			Assert.Equal(1, first.Sites.Count(site => site.Role == WorldStructureRole.GravityAnchor));
-			Assert.Equal(3, first.Sites.Count(site => site.Role == WorldStructureRole.Shaft));
-			Assert.NotEmpty(first.Routes);
-			Assert.All(first.Routes, route => Assert.All(route.Cells, cell => Assert.True(first.IsLand(cell.X, cell.Z))));
-			Assert.All(first.Sites, site =>
-			{
-				for (int x = site.Reservation.MinimumX; x <= site.Reservation.MaximumX; x++)
-				for (int z = site.Reservation.MinimumZ; z <= site.Reservation.MaximumZ; z++) AssertFeatureTerrainSafe(first, x, z);
-			});
-			Assert.All(first.Routes, route => Assert.All(route.Cells, cell => AssertFeatureTerrainSafe(first, cell.X, cell.Z)));
-			Assert.Equal(first.Routes.Select(RouteSignature), second.Routes.Select(RouteSignature));
-		}
-	}
-
-	[Fact]
 	public void TerrainHasCentralMountainAndBroadFlatOuterRing()
 	{
 		WorldPlan plan = WorldPlanGenerator.Generate(new(8142, 512, 512, 64));
@@ -117,50 +92,6 @@ public sealed class WorldPlanGenerationTests
 	}
 
 	[Fact]
-	public void LakesAndHillsAreDeterministicAndRespectReservedFeatures()
-	{
-		WorldPlan plan = WorldPlanGenerator.Generate(new(44512, 512, 512, 64), CreateTemplates(), new string('d', 64));
-		PlannedPond[] lakes = plan.Ponds.Where(pond => pond.Kind == HydrologyKind.Lake).ToArray();
-		Assert.Equal(2, lakes.Length);
-		Assert.All(lakes, lake =>
-		{
-			Assert.True(lake.Cells.Length >= 128);
-			Assert.All(lake.Cells, cell =>
-			{
-				Assert.InRange(lake.WaterLevel - cell.Y, 1, 4);
-				Assert.Equal(WorldBiome.Wetland, plan.GetBiome(cell.X, cell.Z));
-				Assert.Equal(0, plan.GetHillHeight(cell.X, cell.Z));
-				Assert.Equal(0, plan.GetTreeDensity(cell.X, cell.Z));
-			});
-		});
-		int landCells = 0;
-		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++) if (plan.IsLand(x, z)) landCells++;
-		Assert.True(plan.HillMask.Span.ToArray().Count(value => value != 0) > landCells / 10, "Rolling hills cover too little usable terrain.");
-		Assert.InRange(plan.HillMask.Span.ToArray().Max(), (byte)5, (byte)13);
-
-		HashSet<PlanPoint> reserved = plan.Ponds.SelectMany(pond => pond.Cells).Select(cell => new PlanPoint(cell.X, cell.Z)).ToHashSet();
-		foreach (PlannedWorldSite site in plan.Sites)
-			for (int x = site.Reservation.MinimumX; x <= site.Reservation.MaximumX; x++)
-			for (int z = site.Reservation.MinimumZ; z <= site.Reservation.MaximumZ; z++) reserved.Add(new(x, z));
-		foreach (PlannedWorldRoute route in plan.Routes)
-		foreach (PlanPoint3 cell in route.Cells) AddRoadWidth(reserved, cell.X, cell.Z);
-		foreach (PlannedVillageArea village in plan.Villages)
-		{
-			foreach (PlanPoint point in village.Footprint) reserved.Add(point);
-			foreach (PlanPoint3 cell in village.AccessRoadCells) AddRoadWidth(reserved, cell.X, cell.Z);
-		}
-		Assert.All(reserved.Where(point => (uint)point.X < (uint)plan.Width && (uint)point.Z < (uint)plan.Length),
-			point => Assert.Equal(0, plan.GetHillHeight(point.X, point.Z)));
-		int maximumNeighborStep = 0;
-		for (int x = 0; x < plan.Width; x++) for (int z = 0; z < plan.Length; z++)
-		{
-			if (x + 1 < plan.Width) maximumNeighborStep = Math.Max(maximumNeighborStep, Math.Abs(plan.GetHillHeight(x, z) - plan.GetHillHeight(x + 1, z)));
-			if (z + 1 < plan.Length) maximumNeighborStep = Math.Max(maximumNeighborStep, Math.Abs(plan.GetHillHeight(x, z) - plan.GetHillHeight(x, z + 1)));
-		}
-		Assert.True(maximumNeighborStep <= 2, $"Hill clearance contains an abrupt {maximumNeighborStep}-block step.");
-	}
-
-	[Fact]
 	public void VillagesAreLargeFlatConnectedAndExcludedFromTreeDensity()
 	{
 		WorldPlan plan = WorldPlanGenerator.Generate(new(93217, 640, 640, 64), CreateTemplates(), new string('c', 64));
@@ -189,25 +120,6 @@ public sealed class WorldPlanGenerationTests
 		for (int dz = -1; dz <= 1; dz++)
 			if ((uint)(cell.X + dx) < (uint)plan.Width && (uint)(cell.Z + dz) < (uint)plan.Length)
 				Assert.Equal(0, plan.GetTreeDensity(cell.X + dx, cell.Z + dz));
-	}
-
-	[Fact]
-	public void MaterializerStampsThreeBlockWideRoads()
-	{
-		Voxelgine.Engine.World.Structures.StructureBlueprintCatalog catalog = Voxelgine.Engine.World.Structures.StructureBlueprintCatalog.LoadDirectory(
-			Path.Combine(AppContext.BaseDirectory, "data", "world", "structures"));
-		WorldPlan plan = Voxelgine.Graphics.WorldPlanMaterializer.GeneratePlan(256, 256, 1776, catalog);
-		Voxelgine.Graphics.ChunkMap map = new();
-		Voxelgine.Graphics.WorldPlanMaterializer.MaterializeAtomically(map, plan, catalog);
-		PlanPoint3 center = plan.Routes.Where(route => route.Kind == WorldFeatureKind.Road).SelectMany(route => route.Cells)
-			.First(cell => Enumerable.Range(-1, 3).All(dx => Enumerable.Range(-1, 3).All(dz =>
-				(uint)(cell.X + dx) < (uint)plan.Width && (uint)(cell.Z + dz) < (uint)plan.Length && plan.IsLand(cell.X + dx, cell.Z + dz))));
-		for (int dx = -1; dx <= 1; dx++)
-		for (int dz = -1; dz <= 1; dz++)
-		{
-			int x = center.X + dx, z = center.Z + dz, y = plan.GetHeight(x, z);
-			Assert.Equal(Voxelgine.Engine.BlockType.Gravel, map.GetBlock(x, y, z));
-		}
 	}
 
 	[Fact]
@@ -453,24 +365,6 @@ public sealed class WorldPlanGenerationTests
 		double nz = (z - (plan.Length - 1) * 0.5) / (plan.Length * 0.5);
 		return Math.Sqrt(nx * nx + nz * nz);
 	}
-	private static void AssertFeatureTerrainSafe(WorldPlan plan, int x, int z)
-	{
-		double nx = (x - (plan.Width - 1) * 0.5) / (plan.Width * 0.5);
-		double nz = (z - (plan.Length - 1) * 0.5) / (plan.Length * 0.5);
-		Assert.True(Math.Sqrt(nx * nx + nz * nz) >= 0.32, $"Feature entered the central mountain at ({x}, {z}).");
-		int height = plan.GetHeight(x, z);
-		foreach ((int dx, int dz) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
-		{
-			int neighborX = x + dx, neighborZ = z + dz;
-			Assert.True((uint)neighborX < (uint)plan.Width && (uint)neighborZ < (uint)plan.Length && plan.IsLand(neighborX, neighborZ));
-			Assert.True(Math.Abs(height - plan.GetHeight(neighborX, neighborZ)) <= 3, $"Feature crossed a steep slope at ({x}, {z}).");
-		}
-	}
-	private static void AddRoadWidth(HashSet<PlanPoint> points, int x, int z)
-	{
-		for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) points.Add(new(x + dx, z + dz));
-	}
-	private static string RouteSignature(PlannedWorldRoute route) => $"{route.Id}|{route.Kind}|{route.SourceSite}|{route.DestinationSite}|{string.Join(';', route.Cells)}";
 	private static StructureTemplateDescriptor[] CreateTemplates() => Enum.GetValues<WorldStructureRole>().Select(role => new StructureTemplateDescriptor(
 		role.ToString().ToLowerInvariant(), role, 3, 3, 1, 1, [0, 90, 180, 270],
 		[

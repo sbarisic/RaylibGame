@@ -3,11 +3,11 @@ using System.IO.Compression;
 
 namespace Voxelgine.WorldGeneration;
 
-internal static class PngRgbaCodec
+public static class PngRgbaCodec
 {
 	private static ReadOnlySpan<byte> Signature => [137, 80, 78, 71, 13, 10, 26, 10];
 
-	internal static byte[] Encode(int width, int height, ReadOnlySpan<byte> rgba)
+	public static byte[] Encode(int width, int height, ReadOnlySpan<byte> rgba)
 	{
 		if (width <= 0 || height <= 0 || rgba.Length != checked(width * height * 4)) throw new ArgumentException("Invalid RGBA raster.");
 		using MemoryStream output = new();
@@ -32,7 +32,7 @@ internal static class PngRgbaCodec
 		return output.ToArray();
 	}
 
-	internal static (int Width, int Height, byte[] Pixels) Decode(ReadOnlySpan<byte> bytes)
+	public static (int Width, int Height, byte[] Pixels) Decode(ReadOnlySpan<byte> bytes)
 	{
 		if (bytes.Length < Signature.Length || !bytes[..8].SequenceEqual(Signature)) throw new InvalidDataException("Invalid PNG signature.");
 		int offset = 8, width = 0, height = 0;

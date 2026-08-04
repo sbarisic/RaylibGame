@@ -2,6 +2,10 @@ namespace Voxelgine.WorldGeneration;
 
 internal sealed class CeramicTopologySearch
 {
+	// The original 4-8-cell room spans scaled to the nearest whole cell at 80%.
+	private const int MinimumRoomSpan = 3;
+	private const int MaximumRoomSpan = 6;
+
 	private readonly CeramicGenerationRequest request;
 	private readonly CeramicFishDefinition definition;
 	private readonly CeramicCompiledCatalog catalog;
@@ -250,6 +254,9 @@ internal sealed class CeramicTopologySearch
 			CeramicWallFeaturePolicy[] wallFeaturePolicies = definition.WallFeaturePolicies
 				.Where(item => item.ComponentSocketType == policy.SocketType)
 				.OrderBy(item => item.FeatureTag, StringComparer.Ordinal).ToArray();
+			CeramicInteriorFeaturePolicy[] interiorFeaturePolicies = definition.InteriorFeaturePolicies
+				.Where(item => item.ComponentSocketType == policy.SocketType)
+				.OrderBy(item => item.FeatureTag, StringComparer.Ordinal).ToArray();
 			foreach (CeramicRectangle rectangle in rectangles)
 			{
 				if (count >= quota.MinimumCells) break;
@@ -405,6 +412,38 @@ internal sealed class CeramicTopologySearch
 				}
 				if (!featuresAvailable
 					|| !CanRealizePlannedBuilding(plannedComponents, selectedComponentTags)) continue;
+
+				HashSet<int> selectedInteriorCells = [];
+				List<int> enclosedInterior = plannedArea.Where(index =>
+					!buildingPerimeter.Contains(index)).ToList();
+				foreach (CeramicInteriorFeaturePolicy featurePolicy in interiorFeaturePolicies)
+				{
+					List<int> candidates = enclosedInterior.Where(index =>
+						!selectedInteriorCells.Contains(index)
+						&& domains[index].Any(optionIndex =>
+						{
+							CeramicTopologyOption option = catalog.Options[optionIndex];
+							return option.TagSet.Contains(featurePolicy.FeatureTag)
+								&& option.Sockets.All(socket => socket == CeramicSocket.NoConnection);
+						})).ToList();
+					random.Shuffle(candidates);
+					int minimumFeatures = featurePolicy.CountPerComponent.Minimum;
+					int maximumFeatures = Math.Min(candidates.Count,
+						featurePolicy.CountPerComponent.Maximum ?? candidates.Count);
+					if (maximumFeatures < minimumFeatures)
+					{
+						featuresAvailable = false;
+						break;
+					}
+					int selectedCount = minimumFeatures
+						+ random.NextInt(maximumFeatures - minimumFeatures + 1);
+					foreach (int index in candidates.Take(selectedCount))
+					{
+						selectedInteriorCells.Add(index);
+						selectedComponentTags.Add((index, featurePolicy.FeatureTag));
+					}
+				}
+				if (!featuresAvailable) continue;
 
 				foreach ((CeramicRectangle plannedRectangle, List<int> plannedPerimeter)
 					in plannedComponents)
@@ -626,8 +665,8 @@ internal sealed class CeramicTopologySearch
 			int minZ = cells.Min(cell => cell.Z);
 			int maxZ = cells.Max(cell => cell.Z);
 			List<CeramicRectangle> values = [];
-			for (int height = 4; height <= 8; height++)
-			for (int width = 4; width <= 8; width++)
+			for (int height = MinimumRoomSpan; height <= MaximumRoomSpan; height++)
+			for (int width = MinimumRoomSpan; width <= MaximumRoomSpan; width++)
 			for (int z = minZ + 1; z + height - 1 < maxZ; z++)
 			for (int x = minX + 1; x + width - 1 < maxX; x++)
 				values.Add(new(x, z, width, height));
@@ -639,8 +678,8 @@ internal sealed class CeramicTopologySearch
 		{
 			int parentRight = parent.X + parent.Width - 1;
 			int parentBottom = parent.Z + parent.Height - 1;
-			for (int height = 4; height <= 8; height++)
-			for (int width = 4; width <= 8; width++)
+			for (int height = MinimumRoomSpan; height <= MaximumRoomSpan; height++)
+			for (int width = MinimumRoomSpan; width <= MaximumRoomSpan; width++)
 			{
 				for (int x = parent.X - width + 3; x <= parentRight - 2; x++)
 				{

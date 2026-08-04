@@ -165,6 +165,13 @@ public sealed record CeramicFishDefinition
 	/// forbidden on the shared partitions identified by the component entry policy.
 	/// </summary>
 	public IReadOnlyList<CeramicWallFeaturePolicy> WallFeaturePolicies { get; init; } = [];
+
+	/// <summary>
+	/// Places non-connecting features strictly inside components of a socket network.
+	/// A feature cell belongs to the single enclosing component and is never part of
+	/// that component's wall graph.
+	/// </summary>
+	public IReadOnlyList<CeramicInteriorFeaturePolicy> InteriorFeaturePolicies { get; init; } = [];
 }
 
 /// <summary>Topology requirements for one connection-bearing socket type.</summary>
@@ -292,6 +299,16 @@ public sealed record CeramicWallFeaturePolicy(
 	CeramicCountRange CountPerComponent,
 	bool OuterWallsOnly = false,
 	int? CellsPerFeature = null);
+
+/// <summary>
+/// Places a bounded number of topology-declared features in the enclosed interior of
+/// each component. Feature prefabs must use no-connection on every face so they cannot
+/// alter the enclosing graph. A cell enclosed by multiple nested components is invalid.
+/// </summary>
+public sealed record CeramicInteriorFeaturePolicy(
+	string ComponentSocketType,
+	string FeatureTag,
+	CeramicCountRange CountPerComponent);
 
 /// <summary>
 /// An authored village module such as a road, field, wall, house corner, or door.

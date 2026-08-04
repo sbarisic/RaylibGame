@@ -27,6 +27,12 @@ public sealed class CeramicVillageMigrationTests
 		Assert.Contains(first.Prefabs, prefab => prefab.Tags.Contains("gate"));
 		Assert.Contains(first.Prefabs, prefab => prefab.Tags.Contains("house-window"));
 		Assert.Contains(first.Prefabs, prefab => prefab.Tags.Contains("next-room-door"));
+		CeramicPrefabDefinition stairs = Assert.Single(first.Prefabs,
+			prefab => prefab.Tags.Contains("house-stairs"));
+		Assert.Contains(stairs.Entities, entity => (BlockType)entity.Value == BlockType.WoodStairs);
+		CeramicInteriorFeaturePolicy stairPolicy = Assert.Single(
+			first.Definition.InteriorFeaturePolicies);
+		Assert.Equal(new CeramicCountRange(0, 1), stairPolicy.CountPerComponent);
 	}
 
 	[Fact]
@@ -91,6 +97,16 @@ public sealed class CeramicVillageMigrationTests
 			"The defense wall should use nearly the full 31-cell-wide preview zone.");
 		Assert.True(defense.Max(static placement => placement.Cell.Z) - defense.Min(static placement => placement.Cell.Z) + 1 >= 25,
 			"The defense wall should use nearly the full 31-cell-deep preview zone.");
+		int houseWallCount = first.Layout.Placements.Count(placement =>
+			catalog.Get(placement.PrefabId).Tags.Contains("house-wall", StringComparer.Ordinal));
+		Assert.True(houseWallCount >= (first.Layout.Placements.Length * 15 + 99) / 100,
+			"House walls should occupy at least 15% of the generated village region.");
+		int stairCount = first.Layout.Placements.Count(placement =>
+			catalog.Get(placement.PrefabId).Tags.Contains("house-stairs", StringComparer.Ordinal));
+		int buildingCount = first.Layout.Placements.Count(placement =>
+			catalog.Get(placement.PrefabId).Tags.Contains("house-door", StringComparer.Ordinal));
+		Assert.True(stairCount > 0, "The fixed production preview should contain upper-floor houses.");
+		Assert.InRange(stairCount, 1, buildingCount);
 	}
 
 	[Fact]
@@ -142,6 +158,60 @@ public sealed class CeramicVillageMigrationTests
 		for (int x = 11; x <= 15; x++)
 		for (int z = 11; z <= 15; z++)
 			Assert.Equal(BlockType.Plank, BlockAt(result, x, 12, z));
+		Assert.Equal(BlockType.None, BlockAt(result, 13, 13, 13));
+	}
+
+	[Fact]
+	public void StairFeatureBuildsOnlyItsBuildingsSecondFloor()
+	{
+		CeramicVillageCatalog catalog = CeramicVillageCatalog.Load(DefinitionPath);
+		WorldGenerationSettings settings = new(78, 32, 32, 64);
+		byte[] heights = Enumerable.Repeat((byte)8, 32 * 32).ToArray();
+		byte[] biomes = Enumerable.Repeat((byte)WorldBiome.Grassland, 32 * 32).ToArray();
+		byte[] zero = new byte[32 * 32];
+		byte[] land = Enumerable.Repeat((byte)255, 32 * 32).ToArray();
+		PlannedWorldSite site = new("site", "unused", WorldStructureRole.Support,
+			new(1, 8, 1), 0, new(0, 0, 2, 2), false);
+		PlanPoint3 access = new(8, 8, 16);
+		PlannedWorldRoute route = new("road", WorldFeatureKind.Road, "site", "site", [access]);
+		PlannedVillagePlacement[] placements =
+		[
+			new("house.corner", new(0, 0), CeramicRotation.Rot90CW),
+			new("house.door", new(1, 0), CeramicRotation.Rot0),
+			new("house.tee", new(2, 0), CeramicRotation.Rot180CW),
+			new("house.shared-room-door", new(2, 1), CeramicRotation.Rot90CW),
+			new("house.tee", new(2, 2), CeramicRotation.Rot0),
+			new("house.window", new(1, 2), CeramicRotation.Rot0),
+			new("house.corner", new(0, 2), CeramicRotation.Rot0),
+			new("house.straight", new(0, 1), CeramicRotation.Rot90CW),
+			new("house.straight", new(3, 0), CeramicRotation.Rot0),
+			new("house.corner", new(4, 0), CeramicRotation.Rot180CW),
+			new("house.straight", new(4, 1), CeramicRotation.Rot90CW),
+			new("house.corner", new(4, 2), CeramicRotation.Rot270CW),
+			new("house.straight", new(3, 2), CeramicRotation.Rot0),
+			new("house.stairs", new(1, 1), CeramicRotation.Rot0),
+		];
+		PlannedVillageArea village = new("village", new(8, 8, 23, 23), 8,
+			(from x in Enumerable.Range(8, 16) from z in Enumerable.Range(8, 16)
+			 select new PlanPoint(x, z)).ToArray(), [access]);
+		PlannedVillageLayout layout = new("village", new(9, 8, 9), placements, [new(8, 16)],
+			78, 1, 10, 10);
+		WorldPlan plan = new(settings, heights, biomes, zero, land, zero,
+			sites: [site], routes: [route], villages: [village], villageLayouts: [layout],
+			ceramicFishDefinitionHash: catalog.Hash);
+
+		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, null, catalog,
+			CancellationToken.None);
+		Assert.Equal(BlockType.WoodStairs, BlockAt(result, 12, 9, 12));
+		Assert.Equal(BlockType.WoodStairs, BlockAt(result, 13, 12, 14));
+		Assert.Equal(BlockType.Plank, BlockAt(result, 13, 12, 13));
+		Assert.Equal(BlockType.None, BlockAt(result, 13, 13, 13));
+		Assert.Equal(BlockType.Bricks, BlockAt(result, 10, 13, 13));
+		Assert.Equal(BlockType.Glass, BlockAt(result, 13, 14, 16));
+		Assert.Equal(BlockType.None, BlockAt(result, 16, 13, 13));
+		Assert.Equal(BlockType.None, BlockAt(result, 16, 14, 13));
+		Assert.Equal(BlockType.Bricks, BlockAt(result, 16, 15, 13));
+		Assert.Equal(BlockType.Plank, BlockAt(result, 13, 17, 13));
 	}
 
 	[Fact]

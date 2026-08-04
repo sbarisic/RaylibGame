@@ -1653,6 +1653,65 @@
       "weight": 1
     },
     {
+      "id": "house.stairs",
+      "tags": [
+        "house-stairs"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 37,
+          "x": 0,
+          "y": 1,
+          "z": 0,
+          "rotation": "rot180CW"
+        },
+        {
+          "value": 37,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot180CW"
+        },
+        {
+          "value": 37,
+          "x": 0,
+          "y": 3,
+          "z": 2,
+          "rotation": "rot90CW"
+        },
+        {
+          "value": 37,
+          "x": 1,
+          "y": 4,
+          "z": 2,
+          "rotation": "rot90CW"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
       "id": "empty",
       "tags": [
         "empty"
@@ -1759,6 +1818,16 @@
       },
       "outerWallsOnly": true,
       "cellsPerFeature": 12
+    }
+  ],
+  "interiorFeaturePolicies": [
+    {
+      "componentSocketType": "house-wall",
+      "featureTag": "house-stairs",
+      "countPerComponent": {
+        "minimum": 0,
+        "maximum": 1
+      }
     }
   ]
 }

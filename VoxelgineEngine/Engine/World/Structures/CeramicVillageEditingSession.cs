@@ -103,6 +103,7 @@ public sealed class CeramicVillageEditingSession
 		ComponentTagPolicies = value.ComponentTagPolicies.ToArray(),
 		ComponentEntryPolicies = value.ComponentEntryPolicies.ToArray(),
 		WallFeaturePolicies = value.WallFeaturePolicies.ToArray(),
+		InteriorFeaturePolicies = value.InteriorFeaturePolicies.ToArray(),
 	};
 
 	private static CeramicPrefabDefinition Clone(CeramicPrefabDefinition value) => value with

@@ -28,11 +28,15 @@ internal static class CeramicFishValidation
 		if (definition.WallFeaturePolicies is null)
 			Add("definition-wall-feature-policies", "Wall feature policies are required.",
 				"$.wallFeaturePolicies");
+		if (definition.InteriorFeaturePolicies is null)
+			Add("definition-interior-feature-policies", "Interior feature policies are required.",
+				"$.interiorFeaturePolicies");
 		if (errors.Count != 0 && (definition.Prefabs is null || definition.ConnectionPolicies is null
 			|| definition.ComponentAdjacencyPolicies is null
 			|| definition.ComponentTagPolicies is null
 			|| definition.ComponentEntryPolicies is null
-			|| definition.WallFeaturePolicies is null)) return new(errors);
+			|| definition.WallFeaturePolicies is null
+			|| definition.InteriorFeaturePolicies is null)) return new(errors);
 
 		IReadOnlyList<CeramicPrefabDefinition> prefabs = definition.Prefabs!;
 		IReadOnlyList<CeramicConnectionPolicy> connectionPolicies = definition.ConnectionPolicies!;
@@ -44,6 +48,8 @@ internal static class CeramicFishValidation
 			definition.ComponentEntryPolicies!;
 		IReadOnlyList<CeramicWallFeaturePolicy> wallFeaturePolicies =
 			definition.WallFeaturePolicies!;
+		IReadOnlyList<CeramicInteriorFeaturePolicy> interiorFeaturePolicies =
+			definition.InteriorFeaturePolicies!;
 		HashSet<string> prefabIds = new(StringComparer.Ordinal);
 		int? sizeX = null;
 		int? sizeZ = null;
@@ -230,6 +236,40 @@ internal static class CeramicFishValidation
 			if (policy.CellsPerFeature is <= 0)
 				Add("wall-feature-policy-density", "Cells per feature must be positive.",
 					path + ".cellsPerFeature");
+			ValidateRange(policy.CountPerComponent, path + ".countPerComponent");
+		}
+		HashSet<(string, string)> interiorFeatureKeys = [];
+		for (int index = 0; index < interiorFeaturePolicies.Count; index++)
+		{
+			CeramicInteriorFeaturePolicy? policy = interiorFeaturePolicies[index];
+			string path = $"$.interiorFeaturePolicies[{index}]";
+			if (policy is null || string.IsNullOrWhiteSpace(policy.ComponentSocketType)
+				|| string.IsNullOrWhiteSpace(policy.FeatureTag))
+			{
+				Add("interior-feature-policy", "The interior feature policy is invalid.", path);
+				continue;
+			}
+			if (!policyTypes.Contains(policy.ComponentSocketType))
+				Add("interior-feature-policy-socket",
+					"The interior feature policy references an unknown network.", path);
+			if (!interiorFeatureKeys.Add((policy.ComponentSocketType, policy.FeatureTag)))
+				Add("interior-feature-policy-duplicate",
+					"The interior feature policy is duplicated.", path);
+			CeramicPrefabDefinition[] featurePrefabs = prefabs.Where(prefab => prefab is not null
+				&& prefab.Tags is not null
+				&& prefab.Tags.Contains(policy.FeatureTag, StringComparer.Ordinal)).ToArray();
+			if (featurePrefabs.Length == 0)
+				Add("interior-feature-policy-tag", "The interior feature tag is not authored.", path);
+			foreach (CeramicPrefabDefinition prefab in featurePrefabs)
+			{
+				if (prefab.Tags.Contains(policy.ComponentSocketType, StringComparer.Ordinal)
+					|| prefab.Sockets is null || prefab.Sockets.Count != 4
+					|| prefab.Sockets.Any(socket => socket is null
+						|| socket.Type != CeramicSocket.NoConnection))
+					Add("interior-feature-prefab-connections",
+						$"Interior feature prefab '{prefab.Id}' must use no-connection on all faces.",
+						path);
+			}
 			ValidateRange(policy.CountPerComponent, path + ".countPerComponent");
 		}
 		return new(errors);

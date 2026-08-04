@@ -58,70 +58,185 @@ internal sealed class WorldPlanVoxelBuilder
 
 	private void BuildVillageInteriors(PlannedVillageLayout layout, CeramicVillageCatalog catalog)
 	{
-		HashSet<PlanPoint> barrier = [];
-		foreach (PlannedVillagePlacement placement in layout.Placements)
+		Dictionary<CeramicCell, PlannedVillagePlacement> walls = layout.Placements
+			.Where(placement => catalog.Get(placement.PrefabId).Tags.Contains(
+				"house-wall", StringComparer.Ordinal))
+			.ToDictionary(static placement => placement.Cell);
+		HashSet<CeramicCell> unseen = walls.Keys.ToHashSet();
+		while (unseen.Count != 0)
 		{
-			CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
-			if (!prefab.Tags.Contains("house-wall", StringComparer.Ordinal)) continue;
-			int centerX = layout.GridOrigin.X + placement.Cell.X * 3 + 1;
-			int centerZ = layout.GridOrigin.Z + placement.Cell.Z * 3 + 1;
-			barrier.Add(new(centerX, centerZ));
-			foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
-				if (CeramicGeometry.GetSocket(prefab, direction, placement.Rotation).Type == "house-wall")
+			CeramicCell root = unseen.OrderBy(static cell => cell.Z)
+				.ThenBy(static cell => cell.X).First();
+			HashSet<CeramicCell> component = [];
+			Queue<CeramicCell> componentQueue = new();
+			unseen.Remove(root);
+			componentQueue.Enqueue(root);
+			while (componentQueue.TryDequeue(out CeramicCell cell))
+			{
+				component.Add(cell);
+				PlannedVillagePlacement placement = walls[cell];
+				CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
+				foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
 				{
-					CeramicCell offset = CeramicGeometry.Offset(new CeramicCell(centerX, centerZ), direction);
-					barrier.Add(new(offset.X, offset.Z));
+					if (CeramicGeometry.GetSocket(prefab, direction, placement.Rotation).Type
+						!= "house-wall") continue;
+					CeramicCell neighbor = CeramicGeometry.Offset(cell, direction);
+					if (unseen.Remove(neighbor)) componentQueue.Enqueue(neighbor);
 				}
+			}
+			BuildBuilding(component);
 		}
-		if (barrier.Count == 0) return;
-		int minimumX = barrier.Min(static point => point.X) - 1;
-		int maximumX = barrier.Max(static point => point.X) + 1;
-		int minimumZ = barrier.Min(static point => point.Z) - 1;
-		int maximumZ = barrier.Max(static point => point.Z) + 1;
-		HashSet<PlanPoint> exterior = [];
-		Queue<PlanPoint> pending = new();
-		for (int x = minimumX; x <= maximumX; x++)
-		{
-			EnqueueExterior(new(x, minimumZ));
-			EnqueueExterior(new(x, maximumZ));
-		}
-		for (int z = minimumZ + 1; z < maximumZ; z++)
-		{
-			EnqueueExterior(new(minimumX, z));
-			EnqueueExterior(new(maximumX, z));
-		}
-		while (pending.TryDequeue(out PlanPoint current))
-		{
-			EnqueueExterior(new(current.X - 1, current.Z));
-			EnqueueExterior(new(current.X + 1, current.Z));
-			EnqueueExterior(new(current.X, current.Z - 1));
-			EnqueueExterior(new(current.X, current.Z + 1));
-		}
-		HashSet<PlanPoint> enclosed = [];
-		for (int x = minimumX + 1; x < maximumX; x++)
-		for (int z = minimumZ + 1; z < maximumZ; z++)
-		{
-			PlanPoint point = new(x, z);
-			if (!barrier.Contains(point) && !exterior.Contains(point)) enclosed.Add(point);
-		}
-		if (enclosed.Count == 0) return;
-		HashSet<PlanPoint> roof = new(enclosed);
-		foreach (PlanPoint wall in barrier)
-			if (new[] { new PlanPoint(wall.X - 1, wall.Z), new(wall.X + 1, wall.Z), new(wall.X, wall.Z - 1), new(wall.X, wall.Z + 1) }
-				.Any(enclosed.Contains)) roof.Add(wall);
-		foreach (PlanPoint point in enclosed)
-		{
-			SetBlock(point.X, layout.GridOrigin.Y, point.Z, BlockType.Stone);
-			for (int y = 1; y <= 3; y++) SetBlock(point.X, layout.GridOrigin.Y + y, point.Z, BlockType.None);
-		}
-		foreach (PlanPoint point in roof)
-			SetBlock(point.X, layout.GridOrigin.Y + 4, point.Z, BlockType.Plank);
 
-		void EnqueueExterior(PlanPoint point)
+		void BuildBuilding(HashSet<CeramicCell> component)
 		{
-			if (point.X < minimumX || point.X > maximumX || point.Z < minimumZ || point.Z > maximumZ
-				|| barrier.Contains(point) || !exterior.Add(point)) return;
-			pending.Enqueue(point);
+			HashSet<PlanPoint> barrier = [];
+			foreach (CeramicCell cell in component)
+			{
+				PlannedVillagePlacement placement = walls[cell];
+				CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
+				PlanPoint center = CellCenter(cell);
+				barrier.Add(center);
+				foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
+					if (CeramicGeometry.GetSocket(prefab, direction, placement.Rotation).Type
+						== "house-wall")
+					{
+						CeramicCell offset = CeramicGeometry.Offset(
+							new CeramicCell(center.X, center.Z), direction);
+						barrier.Add(new(offset.X, offset.Z));
+					}
+			}
+			HashSet<PlanPoint> enclosed = FindEnclosed(barrier);
+			if (enclosed.Count == 0) return;
+			HashSet<PlanPoint> floorAndRoof = new(enclosed);
+			foreach (PlanPoint wall in barrier)
+				if (Adjacent(wall).Any(enclosed.Contains)) floorAndRoof.Add(wall);
+			foreach (PlanPoint point in enclosed)
+			{
+				SetBlock(point.X, layout.GridOrigin.Y, point.Z, BlockType.Stone);
+				for (int y = 1; y <= 3; y++)
+					SetBlock(point.X, layout.GridOrigin.Y + y, point.Z, BlockType.None);
+			}
+			foreach (PlanPoint point in floorAndRoof)
+				SetBlock(point.X, layout.GridOrigin.Y + 4, point.Z, BlockType.Plank);
+
+			PlannedVillagePlacement[] stairs = layout.Placements.Where(placement =>
+				catalog.Get(placement.PrefabId).Tags.Contains("house-stairs", StringComparer.Ordinal)
+				&& PrefabFootprint(placement.Cell).All(enclosed.Contains)).ToArray();
+			if (stairs.Length == 0) return;
+			if (stairs.Length != 1)
+				throw new InvalidDataException("A CeramicFish building may contain only one stair set.");
+
+			for (int y = 5; y <= 8; y++)
+			{
+				foreach (PlanPoint point in enclosed)
+					SetBlock(point.X, layout.GridOrigin.Y + y, point.Z, BlockType.None);
+				foreach (PlanPoint point in barrier)
+					SetBlock(point.X, layout.GridOrigin.Y + y, point.Z, BlockType.Bricks);
+			}
+			foreach (PlanPoint point in floorAndRoof)
+				SetBlock(point.X, layout.GridOrigin.Y + 9, point.Z, BlockType.Plank);
+
+			foreach (CeramicCell wallCell in component)
+			{
+				PlannedVillagePlacement placement = walls[wallCell];
+				CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
+				PlanPoint origin = CellOrigin(wallCell);
+				CeramicEntity[] entities = prefab.Entities.Select(source =>
+					CeramicGeometry.RotateEntity(source, prefab.SizeX, prefab.SizeZ,
+						placement.Rotation)).ToArray();
+				if (prefab.Tags.Contains("house-window", StringComparer.Ordinal))
+				foreach (CeramicEntity entity in entities)
+				{
+					if ((BlockType)entity.Value == BlockType.Glass)
+						SetBlock(origin.X + entity.X, layout.GridOrigin.Y + entity.Y + 4,
+							origin.Z + entity.Z, BlockType.Glass);
+				}
+				if (prefab.Tags.Contains("next-room-door", StringComparer.Ordinal)
+					&& prefab.Tags.Contains("room-door", StringComparer.Ordinal))
+				{
+					HashSet<(int X, int Y, int Z)> occupied = entities.Select(entity =>
+						(entity.X, entity.Y, entity.Z)).ToHashSet();
+					foreach ((int x, int z) in entities.Where(static entity => entity.Y == 0)
+						.Select(static entity => (entity.X, entity.Z)).Distinct())
+					for (int y = 1; y <= 2; y++)
+						if (!occupied.Contains((x, y, z)))
+							SetBlock(origin.X + x, layout.GridOrigin.Y + y + 4,
+								origin.Z + z, BlockType.None);
+				}
+			}
+
+			PlannedVillagePlacement stairPlacement = stairs[0];
+			CeramicPrefabDefinition stairPrefab = catalog.Get(stairPlacement.PrefabId);
+			PlanPoint stairOrigin = CellOrigin(stairPlacement.Cell);
+			foreach (CeramicEntity source in stairPrefab.Entities)
+			{
+				CeramicEntity entity = CeramicGeometry.RotateEntity(source, stairPrefab.SizeX,
+					stairPrefab.SizeZ, stairPlacement.Rotation);
+				if (entity.Y >= 3)
+					SetBlock(stairOrigin.X + entity.X, layout.GridOrigin.Y + 4,
+						stairOrigin.Z + entity.Z, BlockType.None);
+			}
+		}
+
+		HashSet<PlanPoint> FindEnclosed(HashSet<PlanPoint> barrier)
+		{
+			int minimumX = barrier.Min(static point => point.X) - 1;
+			int maximumX = barrier.Max(static point => point.X) + 1;
+			int minimumZ = barrier.Min(static point => point.Z) - 1;
+			int maximumZ = barrier.Max(static point => point.Z) + 1;
+			HashSet<PlanPoint> exterior = [];
+			Queue<PlanPoint> pending = new();
+			for (int x = minimumX; x <= maximumX; x++)
+			{
+				EnqueueExterior(new(x, minimumZ));
+				EnqueueExterior(new(x, maximumZ));
+			}
+			for (int z = minimumZ + 1; z < maximumZ; z++)
+			{
+				EnqueueExterior(new(minimumX, z));
+				EnqueueExterior(new(maximumX, z));
+			}
+			while (pending.TryDequeue(out PlanPoint current))
+				foreach (PlanPoint neighbor in Adjacent(current)) EnqueueExterior(neighbor);
+			HashSet<PlanPoint> enclosed = [];
+			for (int x = minimumX + 1; x < maximumX; x++)
+			for (int z = minimumZ + 1; z < maximumZ; z++)
+			{
+				PlanPoint point = new(x, z);
+				if (!barrier.Contains(point) && !exterior.Contains(point)) enclosed.Add(point);
+			}
+			return enclosed;
+
+			void EnqueueExterior(PlanPoint point)
+			{
+				if (point.X < minimumX || point.X > maximumX || point.Z < minimumZ
+					|| point.Z > maximumZ || barrier.Contains(point)
+					|| !exterior.Add(point)) return;
+				pending.Enqueue(point);
+			}
+		}
+
+		PlanPoint CellOrigin(CeramicCell cell) => new(layout.GridOrigin.X
+			+ cell.X * CeramicVillageCatalog.PrefabWidth, layout.GridOrigin.Z
+			+ cell.Z * CeramicVillageCatalog.PrefabLength);
+		PlanPoint CellCenter(CeramicCell cell)
+		{
+			PlanPoint origin = CellOrigin(cell);
+			return new(origin.X + 1, origin.Z + 1);
+		}
+		IEnumerable<PlanPoint> PrefabFootprint(CeramicCell cell)
+		{
+			PlanPoint origin = CellOrigin(cell);
+			for (int z = 0; z < CeramicVillageCatalog.PrefabLength; z++)
+			for (int x = 0; x < CeramicVillageCatalog.PrefabWidth; x++)
+				yield return new(origin.X + x, origin.Z + z);
+		}
+		static IEnumerable<PlanPoint> Adjacent(PlanPoint point)
+		{
+			yield return new(point.X - 1, point.Z);
+			yield return new(point.X + 1, point.Z);
+			yield return new(point.X, point.Z - 1);
+			yield return new(point.X, point.Z + 1);
 		}
 	}
 

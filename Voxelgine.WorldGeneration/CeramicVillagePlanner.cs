@@ -34,6 +34,8 @@ public static class CeramicVillagePlanner
 	private const int CornerRun = 3;
 	private const int MinimumWallSpan = 12;
 	private const int CandidateCount = 3;
+	private const int MinimumHouseWallPercentage = 15;
+	private const int MaximumHouseWallPercentage = 33;
 
 	public static CeramicVillagePreviewResult PlanPreview(
 		CeramicFishDefinition definition,
@@ -155,7 +157,8 @@ public static class CeramicVillagePlanner
 			TagQuotas =
 			[
 				new("road", PercentageCeiling(region.Count, 6), PercentageFloor(region.Count, 12)),
-				new("house-wall", PercentageCeiling(region.Count, 10), PercentageFloor(region.Count, 22)),
+				new("house-wall", PercentageCeiling(region.Count, MinimumHouseWallPercentage),
+					PercentageFloor(region.Count, MaximumHouseWallPercentage)),
 			],
 		};
 		gridOrigin = new(grid.OriginX, village.SurfaceY, grid.OriginZ);

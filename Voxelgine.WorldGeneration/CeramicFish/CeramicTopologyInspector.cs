@@ -256,6 +256,39 @@ internal static class CeramicTopologyInspector
 					invalid.Value, policy.ComponentSocketType);
 		}
 
+		foreach (CeramicInteriorFeaturePolicy policy in definition.InteriorFeaturePolicies)
+		{
+			CeramicCell[] allFeatures = topology.Where(cell => cell.Tags.Contains(
+				policy.FeatureTag, StringComparer.Ordinal)).Select(cell => cell.Cell).ToArray();
+			Dictionary<CeramicCell, int> ownership = allFeatures.ToDictionary(
+				static cell => cell, static _ => 0);
+			foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
+			{
+				HashSet<CeramicCell> enclosed = FindEnclosedCells(component);
+				CeramicCell[] features = allFeatures.Where(enclosed.Contains).ToArray();
+				checks += enclosed.Count + allFeatures.Length;
+				if (!policy.CountPerComponent.Contains(features.Length))
+					return CreateFailure(out failure, "topology-interior-feature-count",
+						$"A '{policy.ComponentSocketType}' component has {features.Length}"
+							+ $" enclosed '{policy.FeatureTag}' features, outside the configured range.",
+						SocketType: policy.ComponentSocketType);
+				foreach (CeramicCell feature in features) ownership[feature]++;
+			}
+			foreach (CeramicCell feature in allFeatures)
+			{
+				if (ownership[feature] != 1)
+					return CreateFailure(out failure, "topology-interior-feature-enclosure",
+						$"Interior feature '{policy.FeatureTag}' must be enclosed by exactly one"
+							+ $" '{policy.ComponentSocketType}' component.",
+						feature, policy.ComponentSocketType);
+				if (cells[feature].Sockets.Any(socket => socket.IsExternal
+					|| socket.SocketType != CeramicSocket.NoConnection))
+					return CreateFailure(out failure, "topology-interior-feature-connections",
+						$"Interior feature '{policy.FeatureTag}' must not create connections.",
+						feature, policy.ComponentSocketType);
+			}
+		}
+
 		foreach (CeramicComponentAdjacencyPolicy policy in definition.ComponentAdjacencyPolicies)
 		foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
 		{
@@ -325,6 +358,51 @@ internal static class CeramicTopologyInspector
 				}
 			}
 			return partition;
+		}
+
+		HashSet<CeramicCell> FindEnclosedCells(HashSet<CeramicCell> wall)
+		{
+			int minimumX = wall.Min(static cell => cell.X) - 1;
+			int maximumX = wall.Max(static cell => cell.X) + 1;
+			int minimumZ = wall.Min(static cell => cell.Z) - 1;
+			int maximumZ = wall.Max(static cell => cell.Z) + 1;
+			HashSet<CeramicCell> exterior = [];
+			Queue<CeramicCell> pending = new();
+			for (int x = minimumX; x <= maximumX; x++)
+			{
+				Enqueue(new(x, minimumZ));
+				Enqueue(new(x, maximumZ));
+			}
+			for (int z = minimumZ + 1; z < maximumZ; z++)
+			{
+				Enqueue(new(minimumX, z));
+				Enqueue(new(maximumX, z));
+			}
+			while (pending.TryDequeue(out CeramicCell current))
+			foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
+			{
+				CeramicCell neighbor;
+				try { neighbor = CeramicGeometry.Offset(current, direction); }
+				catch (OverflowException) { continue; }
+				Enqueue(neighbor);
+			}
+			HashSet<CeramicCell> enclosed = [];
+			for (int z = minimumZ + 1; z < maximumZ; z++)
+			for (int x = minimumX + 1; x < maximumX; x++)
+			{
+				CeramicCell candidate = new(x, z);
+				if (cells.ContainsKey(candidate) && !wall.Contains(candidate)
+					&& !exterior.Contains(candidate)) enclosed.Add(candidate);
+			}
+			return enclosed;
+
+			void Enqueue(CeramicCell candidate)
+			{
+				if (candidate.X < minimumX || candidate.X > maximumX
+					|| candidate.Z < minimumZ || candidate.Z > maximumZ
+					|| wall.Contains(candidate) || !exterior.Add(candidate)) return;
+				pending.Enqueue(candidate);
+			}
 		}
 	}
 

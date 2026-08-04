@@ -165,6 +165,7 @@ public sealed class CeramicFishTests
 			Assert.Equal(expected.ComponentTagPolicies, loaded.ComponentTagPolicies);
 			Assert.Equal(expected.ComponentEntryPolicies, loaded.ComponentEntryPolicies);
 			Assert.Equal(expected.WallFeaturePolicies, loaded.WallFeaturePolicies);
+			Assert.Equal(expected.InteriorFeaturePolicies, loaded.InteriorFeaturePolicies);
 			Assert.Equal(expected.Prefabs.Select(prefab => prefab.Id),
 				loaded.Prefabs.Select(prefab => prefab.Id));
 

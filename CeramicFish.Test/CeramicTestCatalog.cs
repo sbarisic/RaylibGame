@@ -203,6 +203,7 @@ internal static class CeramicTestCatalog
 			|| !actual.ComponentTagPolicies.SequenceEqual(expected.ComponentTagPolicies)
 			|| !actual.ComponentEntryPolicies.SequenceEqual(expected.ComponentEntryPolicies)
 			|| !actual.WallFeaturePolicies.SequenceEqual(expected.WallFeaturePolicies)
+			|| !actual.InteriorFeaturePolicies.SequenceEqual(expected.InteriorFeaturePolicies)
 			|| actual.Prefabs.Count != expected.Prefabs.Count)
 			throw new InvalidDataException("The CeramicFish JSON root did not round trip correctly.");
 

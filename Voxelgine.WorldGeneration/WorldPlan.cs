@@ -100,8 +100,8 @@ public sealed record PlannedVillageArea(
 public sealed class WorldPlan
 {
 	public const int CurrentFormatVersion = 6;
-	public const int CurrentGeneratorVersion = 12;
-	public const int CurrentMaterializerVersion = 9;
+	public const int CurrentGeneratorVersion = 13;
+	public const int CurrentMaterializerVersion = 11;
 
 	private readonly byte[] heights;
 	private readonly byte[] biomes;

@@ -327,7 +327,7 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		try
 		{
 			PolicyDocument value = JsonSerializer.Deserialize<PolicyDocument>(policyEditor.Text, JsonOptions) ?? throw new InvalidDataException("Policy JSON is empty.");
-			CeramicFishDefinition definition = session.Definition with { ConnectionPolicies = value.ConnectionPolicies ?? [], ComponentAdjacencyPolicies = value.ComponentAdjacencyPolicies ?? [], ComponentTagPolicies = value.ComponentTagPolicies ?? [], ComponentEntryPolicies = value.ComponentEntryPolicies ?? [], WallFeaturePolicies = value.WallFeaturePolicies ?? [] };
+			CeramicFishDefinition definition = session.Definition with { ConnectionPolicies = value.ConnectionPolicies ?? [], ComponentAdjacencyPolicies = value.ComponentAdjacencyPolicies ?? [], ComponentTagPolicies = value.ComponentTagPolicies ?? [], ComponentEntryPolicies = value.ComponentEntryPolicies ?? [], WallFeaturePolicies = value.WallFeaturePolicies ?? [], InteriorFeaturePolicies = value.InteriorFeaturePolicies ?? [] };
 			CeramicVillageCatalog.ValidateVoxelDefinition(definition); session.ReplaceDefinition(definition); selected = session.Get(selected.Id); policyError.Text = "Policies applied and validated."; RefreshEditor();
 		}
 		catch (Exception exception) { policyError.Text = exception.Message; }
@@ -405,9 +405,10 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		IReadOnlyList<CeramicComponentAdjacencyPolicy> ComponentAdjacencyPolicies,
 		IReadOnlyList<CeramicComponentTagPolicy> ComponentTagPolicies,
 		IReadOnlyList<CeramicComponentEntryPolicy> ComponentEntryPolicies,
-		IReadOnlyList<CeramicWallFeaturePolicy> WallFeaturePolicies)
+		IReadOnlyList<CeramicWallFeaturePolicy> WallFeaturePolicies,
+		IReadOnlyList<CeramicInteriorFeaturePolicy> InteriorFeaturePolicies)
 	{
-		internal static PolicyDocument From(CeramicFishDefinition definition) => new(definition.ConnectionPolicies, definition.ComponentAdjacencyPolicies, definition.ComponentTagPolicies, definition.ComponentEntryPolicies, definition.WallFeaturePolicies);
+		internal static PolicyDocument From(CeramicFishDefinition definition) => new(definition.ConnectionPolicies, definition.ComponentAdjacencyPolicies, definition.ComponentTagPolicies, definition.ComponentEntryPolicies, definition.WallFeaturePolicies, definition.InteriorFeaturePolicies);
 	}
 }
 #endif

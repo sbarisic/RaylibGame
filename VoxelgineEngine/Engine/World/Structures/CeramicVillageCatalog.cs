@@ -128,7 +128,17 @@ public sealed class CeramicVillageCatalog
 						$"Entity value {entity.Value} is not a non-empty BlockType.",
 						$"{path}.entities[{entityIndex}].value"));
 			}
+			if (prefab.Tags.Contains("house-stairs", StringComparer.Ordinal)
+				&& !prefab.Entities.Any(entity => (BlockType)entity.Value == BlockType.WoodStairs))
+				errors.Add(new("voxel-stair-prefab",
+					$"Stair prefab '{prefab.Id}' must contain at least one wood stair block.", path));
 		}
+		foreach (CeramicInteriorFeaturePolicy policy in definition.InteriorFeaturePolicies
+			.Where(static policy => policy.FeatureTag == "house-stairs"))
+			if (policy.CountPerComponent.Maximum is null or > 1)
+				errors.Add(new("voxel-stair-count",
+					"House stair policies must allow at most one stair set per building.",
+					"$.interiorFeaturePolicies"));
 		if (errors.Count != 0)
 			throw new CeramicDefinitionException("The CeramicFish village voxel definition is invalid.", errors);
 	}

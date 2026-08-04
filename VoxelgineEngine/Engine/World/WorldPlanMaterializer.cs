@@ -15,11 +15,12 @@ public static class WorldPlanMaterializer
 		StructureBlueprintCatalog catalog,
 		CancellationToken cancellationToken = default,
 		IProgress<WorldGenerationProgress> progress = null,
-		VillagePrefabCatalog villagePrefabs = null)
+		CeramicVillageCatalog ceramicFish = null)
 	{
 		StructureTemplateDescriptor[] descriptors = catalog is null ? [] : Describe(catalog);
 		string catalogHash = catalog is null ? string.Empty : ComputeCatalogHash(catalog);
-		return WorldPlanGenerator.Generate(new(seed, width, length, 64), descriptors, catalogHash, progress, cancellationToken, villagePrefabs?.Descriptor);
+		return WorldPlanGenerator.Generate(new(seed, width, length, 64), descriptors, catalogHash, progress,
+			cancellationToken, ceramicFish?.Definition, ceramicFish?.Hash ?? string.Empty);
 	}
 
 	public static void MaterializeAtomically(
@@ -27,7 +28,7 @@ public static class WorldPlanMaterializer
 		WorldPlan plan,
 		StructureBlueprintCatalog catalog,
 		CancellationToken cancellationToken = default,
-		VillagePrefabCatalog villagePrefabs = null)
+		CeramicVillageCatalog ceramicFish = null)
 	{
 		ArgumentNullException.ThrowIfNull(destination); ArgumentNullException.ThrowIfNull(plan);
 		plan.Validate(); cancellationToken.ThrowIfCancellationRequested();
@@ -41,12 +42,12 @@ public static class WorldPlanMaterializer
 			throw new InvalidDataException("A world plan with structures requires a structure blueprint catalog.");
 		if (plan.VillageLayouts.Count != 0)
 		{
-			if (villagePrefabs is null) throw new InvalidDataException("A world plan with village layouts requires a village prefab catalog.");
-			if (!string.Equals(plan.VillagePrefabCatalogHash, villagePrefabs.Hash, StringComparison.OrdinalIgnoreCase))
-				throw new InvalidDataException("World plan village prefab catalog does not match the active engine catalog.");
+			if (ceramicFish is null) throw new InvalidDataException("A world plan with village layouts requires a CeramicFish definition.");
+			if (!string.Equals(plan.CeramicFishDefinitionHash, ceramicFish.Hash, StringComparison.OrdinalIgnoreCase))
+				throw new InvalidDataException("World plan CeramicFish definition does not match the active definition.");
 		}
 
-		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, villagePrefabs, cancellationToken);
+		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, ceramicFish, cancellationToken);
 		cancellationToken.ThrowIfCancellationRequested();
 		destination.ReplaceAllColumns(result.Columns);
 		destination.RestoreGeneratedFeatures(result.Features);

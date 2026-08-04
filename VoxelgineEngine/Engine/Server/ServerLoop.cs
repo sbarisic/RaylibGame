@@ -256,27 +256,29 @@ namespace Voxelgine.Engine.Server
 				{
 					_logging.Log(GameLogLevel.Info, "Generation", $"begin seed={worldSeed} size={DefaultWorldWidth}x{DefaultWorldLength}");
 					string structureDirectory = Path.Combine(AppContext.BaseDirectory, "data", "world", "structures");
-					string villagePrefabPath = Path.Combine(AppContext.BaseDirectory, "data", "world", "village-prefabs", "catalog.json");
+					string ceramicFishPath = Path.Combine(AppContext.BaseDirectory, "data", "world", "ceramic-fish", "village.json");
 					Stopwatch structureTimer = Stopwatch.StartNew();
 					StructureBlueprintCatalog structureCatalog = StructureBlueprintCatalog.LoadDirectory(structureDirectory);
-					VillagePrefabCatalog villagePrefabs = VillagePrefabCatalog.Load(villagePrefabPath);
+					CeramicVillageCatalog ceramicFish = CeramicVillageCatalog.Load(ceramicFishPath);
 					WorldPlan worldPlan;
 					if (!string.IsNullOrWhiteSpace(worldPlanDirectory))
 					{
 						string catalogHash = WorldPlanMaterializer.ComputeCatalogHash(structureCatalog);
-						worldPlan = WorldPlanBundle.LoadAsync(worldPlanDirectory, catalogHash, cancellationToken, villagePrefabs.Hash).GetAwaiter().GetResult();
+						worldPlan = WorldPlanBundle.LoadAsync(worldPlanDirectory, catalogHash, cancellationToken, ceramicFish.Hash).GetAwaiter().GetResult();
 						_worldSeed = worldPlan.Seed;
 						_logging.Log(GameLogLevel.Info, "Generation", $"plan-load path={Path.GetFullPath(worldPlanDirectory)} seed={worldPlan.Seed}");
 					}
 					else
 					{
-						worldPlan = WorldPlanMaterializer.GeneratePlan(DefaultWorldWidth, DefaultWorldLength, worldSeed, structureCatalog, cancellationToken, villagePrefabs: villagePrefabs);
+						worldPlan = WorldPlanMaterializer.GeneratePlan(DefaultWorldWidth, DefaultWorldLength, worldSeed, structureCatalog, cancellationToken, ceramicFish: ceramicFish);
 					}
-					WorldPlanMaterializer.MaterializeAtomically(_simulation.Map, worldPlan, structureCatalog, cancellationToken, villagePrefabs);
+					WorldPlanMaterializer.MaterializeAtomically(_simulation.Map, worldPlan, structureCatalog, cancellationToken, ceramicFish);
 					PersistWorldPlanSidecar(worldPlan, cancellationToken);
 					StructureGenerationTimings timings = _simulation.Map.StructureGenerationTimings;
 					_logging.Log(GameLogLevel.Info, "Generation",
 						$"structures sites={_simulation.Map.GeneratedFeatures.Sites.Count} routes={_simulation.Map.GeneratedFeatures.Routes.Count} blueprints={structureCatalog.Blueprints.Count} planningMs={timings.SitePlanning.TotalMilliseconds:F1} routesMs={timings.Routes.TotalMilliseconds:F1} stampingMs={timings.Stamping.TotalMilliseconds:F1} worldTotalMs={structureTimer.Elapsed.TotalMilliseconds:F1}");
+					_logging.Log(GameLogLevel.Info, "Generation",
+						$"ceramic-fish villages={worldPlan.VillageLayouts.Count}/{worldPlan.Villages.Count} empty={worldPlan.VillageFailures.Count} attempts={worldPlan.VillageLayouts.Sum(static layout => layout.Attempts)} topologyChecks={worldPlan.VillageLayouts.Sum(static layout => layout.TopologyChecks)} propagationChecks={worldPlan.VillageLayouts.Sum(static layout => layout.PropagationChecks)}");
 					_simulation.Map.ClearPendingChanges();
 					ApplyGeneratedSpawnPoints(cancellationToken);
 					SaveWorld();

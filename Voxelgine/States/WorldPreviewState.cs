@@ -31,7 +31,7 @@ public sealed class WorldPreviewState : GameStateImpl
 	private readonly Label legend;
 	private readonly Dictionary<WorldPlanRendering.Layer, Button> layerButtons = [];
 	private readonly StructureBlueprintCatalog structureCatalog;
-	private readonly VillagePrefabCatalog villagePrefabs;
+	private readonly CeramicVillageCatalog ceramicFish;
 	private CancellationTokenSource generationCancellation;
 	private Task<WorldPlan> generationTask;
 	private WorldPlan plan;
@@ -57,7 +57,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		fishWindow = window as IFishGfxGameWindow ?? throw new ArgumentException("World Preview requires FishGfx.", nameof(window));
 		runtimePaths = engine.AsClient().RuntimePaths;
 		structureCatalog = StructureBlueprintCatalog.LoadDirectory(Path.Combine(AppContext.BaseDirectory, "data", "world", "structures"));
-		villagePrefabs = VillagePrefabCatalog.Load(Path.Combine(AppContext.BaseDirectory, "data", "world", "village-prefabs", "catalog.json"));
+		ceramicFish = CeramicVillageCatalog.Load(Path.Combine(AppContext.BaseDirectory, "data", "world", "ceramic-fish", "village.json"));
 		gui = new FishUIManager(window, engine.Logging, runtimePaths);
 		sidebar = new Panel { ID = "world_preview_sidebar" };
 		viewport = new Panel { ID = "world_preview_viewport" };
@@ -103,8 +103,8 @@ public sealed class WorldPreviewState : GameStateImpl
 		seedInput.Text = "24681357";
 		WorldGenerationSettings settings = new(24681357, 1024, 1024, 64);
 		generationTimer = Stopwatch.StartNew();
-		plan = WorldPlanMaterializer.GeneratePlan(settings.Width, settings.Length, settings.Seed, structureCatalog, villagePrefabs: villagePrefabs);
-		status.Text = $"Generated seed {plan.Seed} with {plan.VillageLayouts.Count}/{plan.Villages.Count} village layouts in {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
+		plan = WorldPlanMaterializer.GeneratePlan(settings.Width, settings.Length, settings.Seed, structureCatalog, ceramicFish: ceramicFish);
+		status.Text = $"Generated seed {plan.Seed} with {plan.VillageLayouts.Count}/{plan.Villages.Count} village layouts and {plan.VillageFailures.Count} empty reservations in {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 		RefreshImage();
 		automaticBundle = Path.Combine(runtimePaths.Root, "world-plans", $"auto-{plan.Seed}-{Guid.NewGuid():N}");
 		WorldPlanBundle.SaveAsync(automaticBundle, plan).GetAwaiter().GetResult();
@@ -116,12 +116,13 @@ public sealed class WorldPreviewState : GameStateImpl
 	{
 		if (plan is null || automaticExport is null || automaticCapture is null) throw new InvalidOperationException("Automatic World Preview did not queue bundle export and capture.");
 		automaticExport.GetAwaiter().GetResult();
-		WorldPlan loaded = WorldPlanBundle.LoadAsync(automaticBundle, expectedVillagePrefabCatalogHash: villagePrefabs.Hash).GetAwaiter().GetResult();
+		WorldPlan loaded = WorldPlanBundle.LoadAsync(automaticBundle, expectedCeramicFishDefinitionHash: ceramicFish.Hash).GetAwaiter().GetResult();
 		if (loaded.Seed != plan.Seed || loaded.Width != 1024 || loaded.Length != 1024) throw new InvalidOperationException("Automatic World Preview bundle metadata is invalid.");
 		if (loaded.Villages.Count < 6 || loaded.Villages.Any(village => village.Footprint.Any(point => loaded.GetTreeDensity(point.X, point.Z) != 0)))
 			throw new InvalidOperationException("Automatic World Preview village reservations are invalid.");
-		if (loaded.VillageLayouts.Count != loaded.Villages.Count || loaded.VillageLayouts.Any(static layout => layout.Modules.Length == 0))
-			throw new InvalidOperationException($"Automatic World Preview generated {loaded.VillageLayouts.Count}/{loaded.Villages.Count} populated village layouts.");
+		if (loaded.VillageLayouts.Count + loaded.VillageFailures.Count != loaded.Villages.Count
+			|| loaded.VillageLayouts.Any(static layout => layout.Placements.Length == 0))
+			throw new InvalidOperationException($"Automatic World Preview did not diagnose every village reservation ({loaded.VillageLayouts.Count} populated, {loaded.VillageFailures.Count} empty, {loaded.Villages.Count} total).");
 		if (!loaded.Ponds.Any(pond => pond.Kind == HydrologyKind.Lake) || !loaded.HillMask.Span.ContainsAnyExcept((byte)0))
 			throw new InvalidOperationException("Automatic World Preview did not generate lakes and unused-space hills.");
 		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "features-floor-2.png", "features-floor-3.png", "features-roof.png", "combined.png" })
@@ -184,14 +185,14 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (!int.TryParse(seedInput.Text?.Trim(), out int seed)) { status.Text = "Seed must be a 32-bit integer."; return; }
 		StartGeneration(() => Task.Run(() => WorldPlanMaterializer.GeneratePlan(
 			1024, 1024, seed, structureCatalog, generationCancellation.Token,
-			new Progress<WorldGenerationProgress>(progressUpdates.Enqueue), villagePrefabs), generationCancellation.Token));
+			new Progress<WorldGenerationProgress>(progressUpdates.Enqueue), ceramicFish), generationCancellation.Token));
 	}
 
 	private void LoadBundle()
 	{
 		string path = pathInput.Text?.Trim();
 		if (string.IsNullOrWhiteSpace(path)) { status.Text = "Enter a bundle directory to load."; return; }
-		StartGeneration(() => WorldPlanBundle.LoadAsync(path, cancellationToken: generationCancellation.Token, expectedVillagePrefabCatalogHash: villagePrefabs.Hash));
+		StartGeneration(() => WorldPlanBundle.LoadAsync(path, cancellationToken: generationCancellation.Token, expectedCeramicFishDefinitionHash: ceramicFish.Hash));
 	}
 
 	private void StartGeneration(Func<Task<WorldPlan>> operation)
@@ -209,7 +210,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (completed.IsCanceled) { status.Text = "Generation cancelled."; return; }
 		if (completed.IsFaulted) { status.Text = $"Generation failed: {completed.Exception?.GetBaseException().Message}"; return; }
 		plan = completed.Result; zoom = 0; pan = Vector2.Zero; RefreshImage();
-		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}\n{plan.Ponds.Count(pond => pond.Kind == HydrologyKind.Lake)} lakes  {plan.VillageLayouts.Count}/{plan.Villages.Count} village layouts  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
+		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}\n{plan.Ponds.Count(pond => pond.Kind == HydrologyKind.Lake)} lakes  {plan.VillageLayouts.Count} populated / {plan.VillageFailures.Count} empty villages  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 	}
 
 	private void CancelGeneration()
@@ -273,10 +274,14 @@ public sealed class WorldPreviewState : GameStateImpl
 		PlannedWorldSite site = plan.Sites.FirstOrDefault(candidate => candidate.Reservation.Contains(x, z));
 		PlannedVillageArea village = plan.Villages.FirstOrDefault(candidate => candidate.Footprint.Contains(new PlanPoint(x, z)));
 		PlannedWorldRoute route = plan.Routes.FirstOrDefault(candidate => candidate.Cells.Any(cell => Math.Abs(cell.X - x) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0) && Math.Abs(cell.Z - z) <= (candidate.Kind == WorldFeatureKind.Road ? 1 : 0)));
-		PlannedVillageModule module = plan.VillageLayouts.SelectMany(static layout => layout.Modules)
-			.Where(candidate => candidate.Floor == LayerFloor(layer) && x >= candidate.Origin.X && x < candidate.Origin.X + 5 && z >= candidate.Origin.Z && z < candidate.Origin.Z + 5)
+		var module = plan.VillageLayouts.SelectMany(layout => layout.Placements.Select(placement => new { Layout = layout, Placement = placement }))
+			.Where(candidate => LayerFloor(layer) == 0
+				&& x >= candidate.Layout.GridOrigin.X + candidate.Placement.Cell.X * 3
+				&& x < candidate.Layout.GridOrigin.X + candidate.Placement.Cell.X * 3 + 3
+				&& z >= candidate.Layout.GridOrigin.Z + candidate.Placement.Cell.Z * 3
+				&& z < candidate.Layout.GridOrigin.Z + candidate.Placement.Cell.Z * 3 + 3)
 			.FirstOrDefault();
-		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {module?.PrefabId ?? site?.Id ?? village?.Id ?? route?.Id ?? "-"}{(module is null ? "" : $"  floor {module.Floor} R{module.Rotation}")}";
+		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {module?.Placement.PrefabId ?? site?.Id ?? village?.Id ?? route?.Id ?? "-"}{(module is null ? "" : $"  R{module.Placement.Rotation}")}";
 	}
 
 	private static int LayerFloor(WorldPlanRendering.Layer value) => value switch

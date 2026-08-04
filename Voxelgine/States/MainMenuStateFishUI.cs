@@ -18,7 +18,7 @@ namespace Voxelgine.States;
 public partial class MainMenuStateFishUI : GameStateImpl
 {
 	private static readonly string[] DeveloperToolEntries =
-		["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview", "Village Prefab Lab"];
+		["NPC Preview", "Effects Preview", "Voxel Material Preview", "World Preview", "CeramicFish Village Lab"];
 	private readonly FishUIManager gui;
 	private readonly IFishLogging logging;
 	private readonly RuntimePaths runtimePaths;
@@ -234,7 +234,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 
 		var prefabButton = new Button
 		{
-			ID = "developer_village_prefab_lab",
+			ID = "developer_ceramic_fish_village_lab",
 			Text = DeveloperToolEntries[4],
 			Position = new Vector2(20, 252),
 			Size = new Vector2(width, 44),
@@ -242,7 +242,7 @@ public partial class MainMenuStateFishUI : GameStateImpl
 		prefabButton.OnButtonPressed += (_, _, _) =>
 		{
 			HideModal(developerWindow);
-			Client.RequestState(ClientStateKind.VillagePrefabLab);
+			Client.RequestState(ClientStateKind.CeramicFishVillageLab);
 		};
 		developerWindow.AddChild(prefabButton);
 

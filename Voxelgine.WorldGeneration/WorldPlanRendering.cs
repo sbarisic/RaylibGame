@@ -90,6 +90,8 @@ public static class WorldPlanRendering
 			foreach (PlanPoint3 cell in route.Cells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, route.Kind == WorldFeatureKind.Road ? 0xB27B42FF : 0xB858E8FF, route.Kind == WorldFeatureKind.Road ? 1 : 0);
 		foreach (PlannedVillageArea village in plan.Villages)
 			foreach (PlanPoint3 cell in village.AccessRoadCells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, 0xB27B42FF, 1);
+		foreach (PlannedVillageLayout layout in plan.VillageLayouts)
+			foreach (PlanPoint cell in layout.GateRoadCells) WriteFeatureCell(plan, rgba, cell.X, cell.Z, 0xB27B42FF, 1);
 		foreach (PlannedWorldSite site in plan.Sites)
 		{
 			uint color = site.Role switch { WorldStructureRole.Shelter => 0x4DC8FFFF, WorldStructureRole.Relay => 0xE7D84BFF, WorldStructureRole.GravityAnchor => 0xE65C5CFF, WorldStructureRole.Shaft => 0xFFFFFFE0, _ => 0x9A72D9FF };
@@ -104,11 +106,15 @@ public static class WorldPlanRendering
 	{
 		if (floor is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(floor));
 		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
-		foreach (PlannedVillageModule module in plan.VillageLayouts.SelectMany(static layout => layout.Modules).Where(module => module.Floor == floor))
+		if (floor != 0) return rgba;
+		foreach (PlannedVillageLayout layout in plan.VillageLayouts)
+		foreach (PlannedVillagePlacement placement in layout.Placements)
 		{
-			uint color = StablePrefabColor(module.PrefabId);
-			for (int x = module.Origin.X; x < module.Origin.X + VillagePrefabDescriptor.Width && x < plan.Width; x++)
-			for (int z = module.Origin.Z; z < module.Origin.Z + VillagePrefabDescriptor.Length && z < plan.Length; z++)
+			uint color = StablePrefabColor(placement.PrefabId);
+			int originX = layout.GridOrigin.X + placement.Cell.X * 3;
+			int originZ = layout.GridOrigin.Z + placement.Cell.Z * 3;
+			for (int x = originX; x < originX + 3 && x < plan.Width; x++)
+			for (int z = originZ; z < originZ + 3 && z < plan.Length; z++)
 				if (x >= 0 && z >= 0) Write(rgba, PixelIndex(plan, x, z), color);
 		}
 		return rgba;

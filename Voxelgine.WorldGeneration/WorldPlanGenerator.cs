@@ -14,8 +14,10 @@ public static class WorldPlanGenerator
 		string structureCatalogHash = "",
 		IProgress<WorldGenerationProgress>? progress = null,
 		CancellationToken cancellationToken = default,
-		VillagePrefabCatalogDescriptor? villagePrefabs = null) =>
-		Task.Run(() => Generate(settings, structures ?? [], structureCatalogHash, progress, cancellationToken, villagePrefabs), cancellationToken);
+		CeramicFishDefinition? ceramicFishDefinition = null,
+		string ceramicFishDefinitionHash = "") =>
+		Task.Run(() => Generate(settings, structures ?? [], structureCatalogHash, progress, cancellationToken,
+			ceramicFishDefinition, ceramicFishDefinitionHash), cancellationToken);
 
 	public static WorldPlan Generate(
 		WorldGenerationSettings settings,
@@ -23,7 +25,8 @@ public static class WorldPlanGenerator
 		string structureCatalogHash = "",
 		IProgress<WorldGenerationProgress>? progress = null,
 		CancellationToken cancellationToken = default,
-		VillagePrefabCatalogDescriptor? villagePrefabs = null)
+		CeramicFishDefinition? ceramicFishDefinition = null,
+		string ceramicFishDefinitionHash = "")
 	{
 		ArgumentNullException.ThrowIfNull(settings);
 		settings.Validate();
@@ -52,18 +55,20 @@ public static class WorldPlanGenerator
 			settings, structures, heights, mask, hydrology, cancellationToken);
 		progress?.Report(new("Villages", 0.56));
 		PlannedVillageArea[] villages = PlanVillages(settings, heights, mask, hydrology, sites, routes, cancellationToken);
-		PlannedVillageLayout[] villageLayouts = villagePrefabs is null
-			? []
-			: VillageLayoutPlanner.Plan(settings, villages, villagePrefabs, cancellationToken);
+		CeramicVillagePlanningResult villagePlanning = ceramicFishDefinition is null
+			? new([], [])
+			: CeramicVillagePlanner.Plan(settings, villages, ceramicFishDefinition, cancellationToken);
 		progress?.Report(new("Hills", 0.68));
-		GenerateHills(settings, terrain, heights, mask, hillMask, hydrology, sites, routes, villages, cancellationToken);
+		GenerateHills(settings, terrain, heights, mask, hillMask, hydrology, sites, routes, villages,
+			villagePlanning.Layouts.SelectMany(static layout => layout.GateRoadCells), cancellationToken);
 		progress?.Report(new("Biomes", 0.78));
 		ClassifyBiomes(settings, moisture, shoreline, heights, mask, hydrology, biomes, cancellationToken);
 		progress?.Report(new("Tree density", 0.88));
-		GenerateTreeDensity(settings, vegetation, biomes, density, hydrology, sites, routes, villages, cancellationToken);
+		GenerateTreeDensity(settings, vegetation, biomes, density, hydrology, sites, routes, villages,
+			villagePlanning.Layouts.SelectMany(static layout => layout.GateRoadCells), cancellationToken);
 		progress?.Report(new("Validation", 0.94));
 		WorldPlan plan = new(settings, heights, biomes, density, mask, hillMask, hydrology, sites, routes, villages,
-			structureCatalogHash, villageLayouts, villagePrefabs?.Hash ?? string.Empty);
+			structureCatalogHash, villagePlanning.Layouts, ceramicFishDefinitionHash, villagePlanning.Failures);
 		_ = DeriveTrees(plan, cancellationToken);
 		progress?.Report(new("Complete", 1));
 		return plan;
@@ -285,11 +290,12 @@ public static class WorldPlanGenerator
 		IReadOnlyList<PlannedWorldSite> sites,
 		IReadOnlyList<PlannedWorldRoute> routes,
 		IReadOnlyList<PlannedVillageArea> villages,
+		IEnumerable<PlanPoint> villageGateRoads,
 		CancellationToken token)
 	{
 		int minimumDimension = Math.Min(settings.Width, settings.Length);
 		if (minimumDimension < 192) return;
-		HashSet<PlanPoint> reserved = BuildFeatureExclusions(hydrology, sites, routes, villages);
+		HashSet<PlanPoint> reserved = BuildFeatureExclusions(hydrology, sites, routes, villages, villageGateRoads);
 		ushort[] featureDistances = BuildFeatureDistanceField(settings, reserved);
 		SeededNoise picker = new(settings.Seed ^ 0x41115EED);
 		double regionalFrequency = 5.25 / minimumDimension;
@@ -479,9 +485,10 @@ public static class WorldPlanGenerator
 		PlannedWorldSite[] sites,
 		PlannedWorldRoute[] routes,
 		PlannedVillageArea[] villages,
+		IEnumerable<PlanPoint> villageGateRoads,
 		CancellationToken token)
 	{
-		HashSet<PlanPoint> excluded = BuildFeatureExclusions(ponds, sites, routes, villages);
+		HashSet<PlanPoint> excluded = BuildFeatureExclusions(ponds, sites, routes, villages, villageGateRoads);
 		for (int x = 0; x < settings.Width; x++)
 		{
 			token.ThrowIfCancellationRequested();
@@ -856,14 +863,16 @@ public static class WorldPlanGenerator
 
 	private static HashSet<PlanPoint> BuildExclusions(WorldPlan plan)
 	{
-		return BuildFeatureExclusions(plan.Ponds, plan.Sites, plan.Routes, plan.Villages);
+		return BuildFeatureExclusions(plan.Ponds, plan.Sites, plan.Routes, plan.Villages,
+			plan.VillageLayouts.SelectMany(static layout => layout.GateRoadCells));
 	}
 
 	private static HashSet<PlanPoint> BuildFeatureExclusions(
 		IEnumerable<PlannedPond> ponds,
 		IEnumerable<PlannedWorldSite> sites,
 		IEnumerable<PlannedWorldRoute> routes,
-		IEnumerable<PlannedVillageArea> villages)
+		IEnumerable<PlannedVillageArea> villages,
+		IEnumerable<PlanPoint>? villageGateRoads = null)
 	{
 		HashSet<PlanPoint> excluded = ponds.SelectMany(p => p.Cells).Select(c => new PlanPoint(c.X, c.Z)).ToHashSet();
 		foreach (PlannedWorldSite site in sites)
@@ -878,6 +887,8 @@ public static class WorldPlanGenerator
 			foreach (PlanPoint3 cell in village.AccessRoadCells)
 				for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) excluded.Add(new(cell.X + dx, cell.Z + dz));
 		}
+		foreach (PlanPoint cell in villageGateRoads ?? [])
+			for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) excluded.Add(new(cell.X + dx, cell.Z + dz));
 		return excluded;
 	}
 

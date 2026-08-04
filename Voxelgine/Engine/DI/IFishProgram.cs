@@ -54,5 +54,5 @@ public enum ClientStateKind
 	EffectsPreview,
 	VoxelMaterialPreview,
 	WorldPreview,
-	VillagePrefabLab,
+	CeramicFishVillageLab,
 }

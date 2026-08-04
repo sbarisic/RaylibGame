@@ -99,9 +99,9 @@ public sealed record PlannedVillageArea(
 
 public sealed class WorldPlan
 {
-	public const int CurrentFormatVersion = 5;
-	public const int CurrentGeneratorVersion = 11;
-	public const int CurrentMaterializerVersion = 8;
+	public const int CurrentFormatVersion = 6;
+	public const int CurrentGeneratorVersion = 12;
+	public const int CurrentMaterializerVersion = 9;
 
 	private readonly byte[] heights;
 	private readonly byte[] biomes;
@@ -122,7 +122,8 @@ public sealed class WorldPlan
 		IEnumerable<PlannedVillageArea>? villages = null,
 		string structureCatalogHash = "",
 		IEnumerable<PlannedVillageLayout>? villageLayouts = null,
-		string villagePrefabCatalogHash = "")
+		string ceramicFishDefinitionHash = "",
+		IEnumerable<PlannedVillageFailure>? villageFailures = null)
 	{
 		Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 		settings.Validate();
@@ -144,10 +145,12 @@ public sealed class WorldPlan
 		}).ToArray();
 		VillageLayouts = (villageLayouts ?? []).Select(static layout => layout with
 		{
-			Modules = layout.Modules.ToArray(),
+			Placements = layout.Placements.ToArray(),
+			GateRoadCells = layout.GateRoadCells.ToArray(),
 		}).ToArray();
+		VillageFailures = (villageFailures ?? []).ToArray();
 		StructureCatalogHash = structureCatalogHash ?? string.Empty;
-		VillagePrefabCatalogHash = villagePrefabCatalogHash ?? string.Empty;
+		CeramicFishDefinitionHash = ceramicFishDefinitionHash ?? string.Empty;
 		Validate();
 	}
 
@@ -166,8 +169,9 @@ public sealed class WorldPlan
 	public IReadOnlyList<PlannedWorldRoute> Routes { get; }
 	public IReadOnlyList<PlannedVillageArea> Villages { get; }
 	public IReadOnlyList<PlannedVillageLayout> VillageLayouts { get; }
+	public IReadOnlyList<PlannedVillageFailure> VillageFailures { get; }
 	public string StructureCatalogHash { get; }
-	public string VillagePrefabCatalogHash { get; }
+	public string CeramicFishDefinitionHash { get; }
 
 	public int Index(int x, int z)
 	{
@@ -273,8 +277,8 @@ public sealed class WorldPlan
 		}
 		if (StructureCatalogHash.Length != 0 && (StructureCatalogHash.Length != 64 || !StructureCatalogHash.All(Uri.IsHexDigit)))
 			throw new InvalidDataException("World-plan structure catalog hash is malformed.");
-		if (VillagePrefabCatalogHash.Length != 0 && (VillagePrefabCatalogHash.Length != 64 || !VillagePrefabCatalogHash.All(Uri.IsHexDigit)))
-			throw new InvalidDataException("World-plan village prefab catalog hash is malformed.");
+		if (CeramicFishDefinitionHash.Length != 0 && (CeramicFishDefinitionHash.Length != 64 || !CeramicFishDefinitionHash.All(Uri.IsHexDigit)))
+			throw new InvalidDataException("World-plan CeramicFish definition hash is malformed.");
 		ValidateVillageLayouts(villageIds);
 		ValidateTreeExclusions();
 	}
@@ -286,16 +290,37 @@ public sealed class WorldPlan
 			throw new InvalidDataException("Village layout IDs must be unique.");
 		foreach (PlannedVillageLayout layout in VillageLayouts)
 		{
-			if (!villageIds.Contains(layout.VillageId) || layout.GroundAttempts is < 1 or > 64 || layout.Modules.Length == 0)
+			if (!villageIds.Contains(layout.VillageId) || layout.Attempts is < 1 or > 64 || layout.Placements.Length == 0
+				|| layout.TopologyChecks < 0 || layout.PropagationChecks < 0)
 				throw new InvalidDataException($"Village layout '{layout.VillageId}' is invalid.");
 			PlannedVillageArea village = villages[layout.VillageId];
-			foreach (PlannedVillageModule module in layout.Modules)
-				if (string.IsNullOrWhiteSpace(module.PrefabId) || module.Rotation is not (0 or 90 or 180 or 270)
-					|| module.Floor is < 0 or > 3
-					|| (uint)module.Origin.X >= (uint)Width || (uint)module.Origin.Z >= (uint)Length
-					|| module.Origin.Y != village.SurfaceY + module.Floor * VillagePrefabDescriptor.Height)
-					throw new InvalidDataException($"Village layout '{layout.VillageId}' contains an invalid module.");
+			if (layout.GridOrigin.Y != village.SurfaceY)
+				throw new InvalidDataException($"Village layout '{layout.VillageId}' has an invalid grid origin.");
+			HashSet<CeramicCell> occupied = [];
+			foreach (PlannedVillagePlacement placement in layout.Placements)
+			{
+				if (string.IsNullOrWhiteSpace(placement.PrefabId) || !Enum.IsDefined(placement.Rotation)
+					|| !occupied.Add(placement.Cell))
+					throw new InvalidDataException($"Village layout '{layout.VillageId}' contains an invalid placement.");
+				int originX = layout.GridOrigin.X + placement.Cell.X * 3;
+				int originZ = layout.GridOrigin.Z + placement.Cell.Z * 3;
+				for (int x = originX; x < originX + 3; x++)
+				for (int z = originZ; z < originZ + 3; z++)
+					if (!village.Footprint.Contains(new PlanPoint(x, z)))
+						throw new InvalidDataException($"Village layout '{layout.VillageId}' leaves its flattened footprint.");
+			}
+			if (layout.GateRoadCells.Length == 0
+				|| layout.GateRoadCells[^1] != new PlanPoint(village.AccessRoadCells[0].X, village.AccessRoadCells[0].Z)
+				|| layout.GateRoadCells.Any(cell => !village.Footprint.Contains(cell))
+				|| layout.GateRoadCells.Zip(layout.GateRoadCells.Skip(1)).Any(pair =>
+					Math.Abs(pair.First.X - pair.Second.X) + Math.Abs(pair.First.Z - pair.Second.Z) != 1))
+				throw new InvalidDataException($"Village layout '{layout.VillageId}' has an invalid gate road.");
 		}
+		if (VillageFailures.Select(static failure => failure.VillageId).Distinct(StringComparer.Ordinal).Count() != VillageFailures.Count
+			|| VillageFailures.Any(failure => !villageIds.Contains(failure.VillageId)
+				|| VillageLayouts.Any(layout => layout.VillageId == failure.VillageId)
+				|| string.IsNullOrWhiteSpace(failure.Code) || string.IsNullOrWhiteSpace(failure.Message)))
+			throw new InvalidDataException("Village failure diagnostics must identify distinct empty village reservations.");
 	}
 
 	private void ValidateTreeExclusions()
@@ -311,6 +336,8 @@ public sealed class WorldPlan
 			foreach (PlanPoint point in village.Footprint) excluded.Add(point);
 			foreach (PlanPoint3 cell in village.AccessRoadCells) AddRoadWidth(excluded, cell.X, cell.Z);
 		}
+		foreach (PlannedVillageLayout layout in VillageLayouts)
+			foreach (PlanPoint cell in layout.GateRoadCells) AddRoadWidth(excluded, cell.X, cell.Z);
 		foreach (PlanPoint point in excluded)
 			if ((uint)point.X < (uint)Width && (uint)point.Z < (uint)Length)
 			{

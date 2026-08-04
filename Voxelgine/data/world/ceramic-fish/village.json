@@ -1,0 +1,1764 @@
+{
+  "id": "voxelgine-village-v1",
+  "prefabs": [
+    {
+      "id": "house.corner",
+      "tags": [
+        "house-wall"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 2,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "house-wall"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "house.straight",
+      "tags": [
+        "house-wall"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "house-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "house.door",
+      "tags": [
+        "house-wall",
+        "house-door"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "house-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "neutral.grass",
+      "tags": [
+        "neutral"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 4
+    },
+    {
+      "id": "road.end",
+      "tags": [
+        "road"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "road"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "road.straight",
+      "tags": [
+        "road"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "road"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "road"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "road.corner",
+      "tags": [
+        "road"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "road"
+        },
+        {
+          "direction": "east",
+          "type": "road"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "road.junction",
+      "tags": [
+        "road"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "road"
+        },
+        {
+          "direction": "east",
+          "type": "road"
+        },
+        {
+          "direction": "south",
+          "type": "road"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "defense.straight",
+      "tags": [
+        "defense-wall"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "defense-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "defense-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "defense.corner",
+      "tags": [
+        "defense-wall"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 1,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 2,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 3,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 4,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "defense-wall"
+        },
+        {
+          "direction": "east",
+          "type": "defense-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "defense.gate",
+      "tags": [
+        "defense-wall",
+        "gate"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 22,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "road"
+        },
+        {
+          "direction": "east",
+          "type": "defense-wall"
+        },
+        {
+          "direction": "south",
+          "type": "road"
+        },
+        {
+          "direction": "west",
+          "type": "defense-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "neutral.alt",
+      "tags": [
+        "neutral"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "house.shared-room-door",
+      "tags": [
+        "house-wall",
+        "next-room-door",
+        "room-door"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 6,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "house-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "house.tee",
+      "tags": [
+        "house-wall"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 2,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "house-wall"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "house-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "house.window",
+      "tags": [
+        "house-wall",
+        "house-window"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 3,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 3,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 1,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 0,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 1,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 2,
+          "y": 2,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 0,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 1,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 12,
+          "x": 2,
+          "y": 3,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 0,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 1,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 5,
+          "x": 2,
+          "y": 4,
+          "z": 1,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "house-wall"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "house-wall"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
+      "id": "empty",
+      "tags": [
+        "empty"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    }
+  ],
+  "connectionPolicies": [
+    {
+      "socketType": "defense-wall",
+      "degree": {
+        "minimum": 2,
+        "maximum": 2
+      },
+      "componentCount": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "externalConnectionCount": {
+        "minimum": 0,
+        "maximum": 0
+      },
+      "requireEntranceReachability": false
+    },
+    {
+      "socketType": "house-wall",
+      "degree": {
+        "minimum": 2,
+        "maximum": 3
+      },
+      "componentCount": {
+        "minimum": 1,
+        "maximum": null
+      },
+      "externalConnectionCount": {
+        "minimum": 0,
+        "maximum": 0
+      },
+      "requireEntranceReachability": false
+    },
+    {
+      "socketType": "road",
+      "degree": {
+        "minimum": 1,
+        "maximum": 3
+      },
+      "componentCount": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "externalConnectionCount": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "requireEntranceReachability": true
+    }
+  ],
+  "formatVersion": 3,
+  "componentAdjacencyPolicies": [],
+  "componentTagPolicies": [],
+  "componentEntryPolicies": [
+    {
+      "componentSocketType": "house-wall",
+      "rootEntryTag": "house-door",
+      "rootAdjacentTag": "road",
+      "parentDoorTag": "next-room-door",
+      "childEntryTag": "room-door",
+      "additionalRoomsPerRoot": {
+        "minimum": 0,
+        "maximum": 2
+      }
+    }
+  ],
+  "wallFeaturePolicies": [
+    {
+      "componentSocketType": "house-wall",
+      "featureTag": "house-window",
+      "countPerComponent": {
+        "minimum": 1,
+        "maximum": 6
+      },
+      "outerWallsOnly": true,
+      "cellsPerFeature": 12
+    }
+  ]
+}

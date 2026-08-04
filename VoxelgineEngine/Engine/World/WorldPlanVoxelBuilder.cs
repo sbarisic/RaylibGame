@@ -19,7 +19,7 @@ internal sealed class WorldPlanVoxelBuilder
 		volumeSampler = WorldPlanGenerator.CreateVolumeSampler(plan);
 	}
 
-	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, VillagePrefabCatalog villagePrefabs, CancellationToken cancellationToken)
+	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, CeramicVillageCatalog ceramicFish, CancellationToken cancellationToken)
 	{
 		WorldPlanVoxelBuilder builder = new(plan);
 		builder.BuildTerrain(cancellationToken);
@@ -27,82 +27,102 @@ internal sealed class WorldPlanVoxelBuilder
 		WorldFeaturePlan features = catalog is null ? WorldFeaturePlan.Empty : ConvertFeatures(plan, catalog);
 		System.Diagnostics.Stopwatch stampTimer = System.Diagnostics.Stopwatch.StartNew();
 		if (catalog is not null) builder.StampFeatures(catalog, features, cancellationToken);
-		if (villagePrefabs is not null) builder.StampVillages(villagePrefabs, cancellationToken);
+		if (ceramicFish is not null) builder.StampVillages(ceramicFish, cancellationToken);
 		builder.StampTrees(cancellationToken);
 		builder.StampFoliage(features, cancellationToken);
 		return new(builder.CreateColumns(), features, new(TimeSpan.Zero, TimeSpan.Zero, stampTimer.Elapsed));
 	}
 
-	private void StampVillages(VillagePrefabCatalog catalog, CancellationToken cancellationToken)
+	private void StampVillages(CeramicVillageCatalog catalog, CancellationToken cancellationToken)
 	{
 		foreach (PlannedVillageLayout layout in plan.VillageLayouts)
 		{
-			foreach (PlannedVillageModule module in layout.Modules.OrderBy(static value => value.Floor).ThenBy(static value => value.Origin.Y))
+			cancellationToken.ThrowIfCancellationRequested();
+			BuildVillageInteriors(layout, catalog);
+			foreach (PlannedVillagePlacement placement in layout.Placements)
 			{
-				VillagePrefab prefab = catalog.Get(module.PrefabId);
-				for (int y = 0; y < VillagePrefabDescriptor.Height; y++)
-				for (int z = 0; z < VillagePrefabDescriptor.Length; z++)
-				for (int x = 0; x < VillagePrefabDescriptor.Width; x++)
+				CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
+				int originX = layout.GridOrigin.X + placement.Cell.X * CeramicVillageCatalog.PrefabWidth;
+				int originZ = layout.GridOrigin.Z + placement.Cell.Z * CeramicVillageCatalog.PrefabLength;
+				foreach (CeramicEntity source in prefab.Entities)
 				{
-					BlockCoordinate rotated = WorldStructurePlanner.Rotate(new(x, y, z),
-						new(VillagePrefabDescriptor.Width, VillagePrefabDescriptor.Height, VillagePrefabDescriptor.Length), module.Rotation);
-					BlockValue value = prefab.GetCell(x, y, z);
-					if (y == 0 && value.Type == BlockType.None) continue;
-					SetBlock(module.Origin.X + rotated.X, module.Origin.Y + rotated.Y, module.Origin.Z + rotated.Z, value.Type);
+					CeramicEntity entity = CeramicGeometry.RotateEntity(source, prefab.SizeX, prefab.SizeZ, placement.Rotation);
+					SetBlock(originX + entity.X, layout.GridOrigin.Y + entity.Y, originZ + entity.Z,
+						CeramicVillageCatalog.ToBlockValue(entity));
 				}
 			}
-			foreach (PlanPoint3 cell in SharedInteriorWallCells(layout, catalog))
-				SetBlock(cell.X, cell.Y, cell.Z, BlockType.None);
+			foreach (PlanPoint cell in layout.GateRoadCells)
+				StampRoadCell(cell.X, cell.Z);
 		}
 	}
 
-	internal static IEnumerable<PlanPoint3> SharedInteriorWallCells(PlannedVillageLayout layout, VillagePrefabCatalog catalog)
+	private void BuildVillageInteriors(PlannedVillageLayout layout, CeramicVillageCatalog catalog)
 	{
-		Dictionary<(int Floor, int X, int Z), PlannedVillageModule> modules = layout.Modules.ToDictionary(
-			static module => (module.Floor, module.Origin.X, module.Origin.Z));
-		foreach (PlannedVillageModule module in layout.Modules)
+		HashSet<PlanPoint> barrier = [];
+		foreach (PlannedVillagePlacement placement in layout.Placements)
 		{
-			if (modules.TryGetValue((module.Floor, module.Origin.X + VillagePrefabDescriptor.Width, module.Origin.Z),
-				out PlannedVillageModule east) && HasInteriorConnection(module, east, VillageSocketDirection.PositiveX, catalog))
-			{
-				for (int y = 1; y < VillagePrefabDescriptor.Height - 1; y++)
-				for (int z = 0; z < VillagePrefabDescriptor.Length; z++)
+			CeramicPrefabDefinition prefab = catalog.Get(placement.PrefabId);
+			if (!prefab.Tags.Contains("house-wall", StringComparer.Ordinal)) continue;
+			int centerX = layout.GridOrigin.X + placement.Cell.X * 3 + 1;
+			int centerZ = layout.GridOrigin.Z + placement.Cell.Z * 3 + 1;
+			barrier.Add(new(centerX, centerZ));
+			foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
+				if (CeramicGeometry.GetSocket(prefab, direction, placement.Rotation).Type == "house-wall")
 				{
-					yield return new(module.Origin.X + VillagePrefabDescriptor.Width - 1, module.Origin.Y + y, module.Origin.Z + z);
-					yield return new(east.Origin.X, east.Origin.Y + y, east.Origin.Z + z);
+					CeramicCell offset = CeramicGeometry.Offset(new CeramicCell(centerX, centerZ), direction);
+					barrier.Add(new(offset.X, offset.Z));
 				}
-			}
-			if (modules.TryGetValue((module.Floor, module.Origin.X, module.Origin.Z + VillagePrefabDescriptor.Length),
-				out PlannedVillageModule south) && HasInteriorConnection(module, south, VillageSocketDirection.PositiveZ, catalog))
-			{
-				for (int y = 1; y < VillagePrefabDescriptor.Height - 1; y++)
-				for (int x = 0; x < VillagePrefabDescriptor.Width; x++)
-				{
-					yield return new(module.Origin.X + x, module.Origin.Y + y, module.Origin.Z + VillagePrefabDescriptor.Length - 1);
-					yield return new(south.Origin.X + x, south.Origin.Y + y, south.Origin.Z);
-				}
-			}
 		}
-	}
+		if (barrier.Count == 0) return;
+		int minimumX = barrier.Min(static point => point.X) - 1;
+		int maximumX = barrier.Max(static point => point.X) + 1;
+		int minimumZ = barrier.Min(static point => point.Z) - 1;
+		int maximumZ = barrier.Max(static point => point.Z) + 1;
+		HashSet<PlanPoint> exterior = [];
+		Queue<PlanPoint> pending = new();
+		for (int x = minimumX; x <= maximumX; x++)
+		{
+			EnqueueExterior(new(x, minimumZ));
+			EnqueueExterior(new(x, maximumZ));
+		}
+		for (int z = minimumZ + 1; z < maximumZ; z++)
+		{
+			EnqueueExterior(new(minimumX, z));
+			EnqueueExterior(new(maximumX, z));
+		}
+		while (pending.TryDequeue(out PlanPoint current))
+		{
+			EnqueueExterior(new(current.X - 1, current.Z));
+			EnqueueExterior(new(current.X + 1, current.Z));
+			EnqueueExterior(new(current.X, current.Z - 1));
+			EnqueueExterior(new(current.X, current.Z + 1));
+		}
+		HashSet<PlanPoint> enclosed = [];
+		for (int x = minimumX + 1; x < maximumX; x++)
+		for (int z = minimumZ + 1; z < maximumZ; z++)
+		{
+			PlanPoint point = new(x, z);
+			if (!barrier.Contains(point) && !exterior.Contains(point)) enclosed.Add(point);
+		}
+		if (enclosed.Count == 0) return;
+		HashSet<PlanPoint> roof = new(enclosed);
+		foreach (PlanPoint wall in barrier)
+			if (new[] { new PlanPoint(wall.X - 1, wall.Z), new(wall.X + 1, wall.Z), new(wall.X, wall.Z - 1), new(wall.X, wall.Z + 1) }
+				.Any(enclosed.Contains)) roof.Add(wall);
+		foreach (PlanPoint point in enclosed)
+		{
+			SetBlock(point.X, layout.GridOrigin.Y, point.Z, BlockType.Stone);
+			for (int y = 1; y <= 3; y++) SetBlock(point.X, layout.GridOrigin.Y + y, point.Z, BlockType.None);
+		}
+		foreach (PlanPoint point in roof)
+			SetBlock(point.X, layout.GridOrigin.Y + 4, point.Z, BlockType.Plank);
 
-	private static bool HasInteriorConnection(PlannedVillageModule first, PlannedVillageModule second,
-		VillageSocketDirection direction, VillagePrefabCatalog catalog)
-	{
-		VillageSocketDescriptor firstSocket = WorldSocket(catalog.Get(first.PrefabId).Descriptor, first.Rotation, direction);
-		VillageSocketDescriptor secondSocket = WorldSocket(catalog.Get(second.PrefabId).Descriptor, second.Rotation,
-			VillageSocketCompatibility.Opposite(direction));
-		return firstSocket.Types.Intersect(secondSocket.Types, StringComparer.Ordinal)
-			.Any(static semantic => semantic.StartsWith("house.", StringComparison.Ordinal)
-				|| semantic.StartsWith("interior.", StringComparison.Ordinal));
-	}
-
-	private static VillageSocketDescriptor WorldSocket(VillagePrefabDescriptor prefab, int rotation,
-		VillageSocketDirection worldDirection)
-	{
-		if (worldDirection is VillageSocketDirection.PositiveY or VillageSocketDirection.NegativeY)
-			return prefab.Socket(worldDirection);
-		int sourceDirection = ((int)worldDirection - rotation / 90) & 3;
-		return prefab.Socket((VillageSocketDirection)sourceDirection);
+		void EnqueueExterior(PlanPoint point)
+		{
+			if (point.X < minimumX || point.X > maximumX || point.Z < minimumZ || point.Z > maximumZ
+				|| barrier.Contains(point) || !exterior.Add(point)) return;
+			pending.Enqueue(point);
+		}
 	}
 
 	private void BuildTerrain(CancellationToken cancellationToken)
@@ -261,15 +281,18 @@ internal sealed class WorldPlanVoxelBuilder
 	}
 
 	private void SetBlock(int x, int y, int z, BlockType block)
+		=> SetBlock(x, y, z, new BlockValue(block));
+
+	private void SetBlock(int x, int y, int z, BlockValue block)
 	{
 		if (!InBounds(x, y, z)) return;
 		(int cx, int cy, int cz, int index) = Locate(x, y, z);
 		if (!chunks.TryGetValue((cx, cy, cz), out BlockValue[] values))
 		{
-			if (block == BlockType.None) return;
+			if (block.Type == BlockType.None) return;
 			chunks[(cx, cy, cz)] = values = new BlockValue[ChunkSnapshot.BlockCount];
 		}
-		values[index] = new(block);
+		values[index] = block;
 	}
 
 	private void SetFog(int x, int y, int z, FogVoxel fog)

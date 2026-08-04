@@ -36,7 +36,7 @@ public static class WorldPlanBundle
 			}
 			BundleManifest manifest = BundleManifest.From(plan, checksums);
 			await File.WriteAllTextAsync(Path.Combine(temporary, ManifestFileName), JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken).ConfigureAwait(false);
-			_ = await LoadAsync(temporary, plan.StructureCatalogHash, cancellationToken, plan.VillagePrefabCatalogHash).ConfigureAwait(false);
+			_ = await LoadAsync(temporary, plan.StructureCatalogHash, cancellationToken, plan.CeramicFishDefinitionHash).ConfigureAwait(false);
 			Directory.Move(temporary, target);
 		}
 		catch
@@ -46,7 +46,7 @@ public static class WorldPlanBundle
 		}
 	}
 
-	public static async Task<WorldPlan> LoadAsync(string directory, string? expectedStructureCatalogHash = null, CancellationToken cancellationToken = default, string? expectedVillagePrefabCatalogHash = null)
+	public static async Task<WorldPlan> LoadAsync(string directory, string? expectedStructureCatalogHash = null, CancellationToken cancellationToken = default, string? expectedCeramicFishDefinitionHash = null)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 		string root = Path.GetFullPath(directory);
@@ -54,7 +54,7 @@ public static class WorldPlanBundle
 		if (!File.Exists(manifestPath)) throw new FileNotFoundException("World-plan manifest is missing.", manifestPath);
 		BundleManifest manifest = JsonSerializer.Deserialize<BundleManifest>(await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false), JsonOptions)
 			?? throw new InvalidDataException("World-plan manifest is empty.");
-		ValidateManifest(manifest, expectedStructureCatalogHash, expectedVillagePrefabCatalogHash);
+		ValidateManifest(manifest, expectedStructureCatalogHash, expectedCeramicFishDefinitionHash);
 		Dictionary<string, byte[]> decoded = new(StringComparer.Ordinal);
 		foreach (string name in LayerNames)
 		{
@@ -89,7 +89,7 @@ public static class WorldPlanBundle
 			hillMask[index] = (byte)(hills[pixel] / WorldPlanRendering.HillEncodingScale);
 		}
 		WorldPlan plan = new(manifest.Settings, heights, biomes, density, mask, hillMask, manifest.Ponds, manifest.Sites, manifest.Routes, manifest.Villages,
-			manifest.StructureCatalogHash, manifest.VillageLayouts, manifest.VillagePrefabCatalogHash);
+			manifest.StructureCatalogHash, manifest.VillageLayouts, manifest.CeramicFishDefinitionHash, manifest.VillageFailures);
 		if (!decoded["features.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderFeatures(plan))) throw new InvalidDataException("features.png does not match manifest feature records.");
 		if (!decoded["features-floor-2.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderVillageFloor(plan, 1))) throw new InvalidDataException("features-floor-2.png does not match manifest feature records.");
 		if (!decoded["features-floor-3.png"].AsSpan().SequenceEqual(WorldPlanRendering.RenderVillageFloor(plan, 2))) throw new InvalidDataException("features-floor-3.png does not match manifest feature records.");
@@ -118,7 +118,7 @@ public static class WorldPlanBundle
 		if (manifest.LayerChecksums.Count != LayerNames.Length || LayerNames.Any(name => !manifest.LayerChecksums.ContainsKey(name))) throw new InvalidDataException("World-plan layer checksum directory is incomplete.");
 		foreach (string hash in manifest.LayerChecksums.Values) if (hash.Length != 64 || !hash.All(Uri.IsHexDigit)) throw new InvalidDataException("World-plan layer checksum is malformed.");
 		if (expectedHash is not null && !string.Equals(expectedHash, manifest.StructureCatalogHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("World-plan structure catalog hash does not match the active catalog.");
-		if (expectedVillageHash is not null && !string.Equals(expectedVillageHash, manifest.VillagePrefabCatalogHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("World-plan village prefab catalog hash does not match the active catalog.");
+		if (expectedVillageHash is not null && !string.Equals(expectedVillageHash, manifest.CeramicFishDefinitionHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("World-plan CeramicFish definition hash does not match the active definition.");
 		if (manifest.BiomePalette.Count != Enum.GetValues<WorldBiome>().Length || WorldPlanRendering.BiomePalette.Any(pair => !manifest.BiomePalette.TryGetValue(pair.Key, out uint color) || color != pair.Value)) throw new InvalidDataException("World-plan biome palette is invalid.");
 		HashSet<string> siteIds = manifest.Sites.Select(site => site.Id).ToHashSet(StringComparer.Ordinal);
 		if (siteIds.Count != manifest.Sites.Length || manifest.Routes.Any(route => !siteIds.Contains(route.SourceSite) || !siteIds.Contains(route.DestinationSite))) throw new InvalidDataException("World-plan features contain duplicate or unresolved site references.");
@@ -128,11 +128,13 @@ public static class WorldPlanBundle
 
 	private sealed record BundleManifest(
 		int FormatVersion, int GeneratorVersion, int MaterializerVersion, WorldGenerationSettings Settings,
-		Dictionary<WorldBiome, uint> BiomePalette, string StructureCatalogHash, string VillagePrefabCatalogHash, PlannedPond[] Ponds,
-		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, PlannedVillageArea[] Villages, PlannedVillageLayout[] VillageLayouts, Dictionary<string, string> LayerChecksums)
+		Dictionary<WorldBiome, uint> BiomePalette, string StructureCatalogHash, string CeramicFishDefinitionHash, PlannedPond[] Ponds,
+		PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes, PlannedVillageArea[] Villages, PlannedVillageLayout[] VillageLayouts,
+		PlannedVillageFailure[] VillageFailures, Dictionary<string, string> LayerChecksums)
 	{
 		internal static BundleManifest From(WorldPlan plan, Dictionary<string, string> checksums) => new(
 			WorldPlan.CurrentFormatVersion, WorldPlan.CurrentGeneratorVersion, WorldPlan.CurrentMaterializerVersion, plan.Settings,
-			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.VillagePrefabCatalogHash, plan.Ponds.ToArray(), plan.Sites.ToArray(), plan.Routes.ToArray(), plan.Villages.ToArray(), plan.VillageLayouts.ToArray(), checksums);
+			WorldPlanRendering.BiomePalette.ToDictionary(), plan.StructureCatalogHash, plan.CeramicFishDefinitionHash, plan.Ponds.ToArray(),
+			plan.Sites.ToArray(), plan.Routes.ToArray(), plan.Villages.ToArray(), plan.VillageLayouts.ToArray(), plan.VillageFailures.ToArray(), checksums);
 	}
 }

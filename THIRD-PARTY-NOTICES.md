@@ -2,8 +2,10 @@
 
 ## WaveFunctionCollapse algorithm
 
-The deterministic tiled-wave solver in `Voxelgine.WorldGeneration/WfcSolver.cs`
-is adapted from Maxim Gumin's WaveFunctionCollapse project.
+The library in `thirdparty/WaveFunctionCollapse` vendors the algorithmic
+`Model.cs` core from Maxim Gumin's WaveFunctionCollapse project at commit
+`de7d22e705e816b62b4d613199d0463820fcaef3`. RaylibGame adds a generic
+simple-tiled adapter plus bounded cancellation and initial-constraint hooks.
 
 Copyright (C) 2016 Maxim Gumin
 

@@ -16,7 +16,9 @@ public sealed class VillagePrefab
 			throw new ArgumentException("Village prefab voxel data must be exactly 5x5x5.", nameof(cells));
 		Descriptor = descriptor with
 		{
-			Sockets = descriptor.Sockets.Select(socket => socket with { Openings = DeriveOpeningMask(socket.Direction, values) }).ToArray()
+			Sockets = descriptor.Sockets.Select(socket => socket with { Openings = DeriveOpeningMask(socket.Direction, values) }).ToArray(),
+			RotationSignatures = BuildRotationSignatures(values),
+			HasVoxels = values.Any(static value => value.Type != BlockType.None),
 		};
 		Descriptor.Validate();
 		Cells = values;
@@ -42,12 +44,36 @@ public sealed class VillagePrefab
 		}
 		return mask;
 	}
+
+	private static string[] BuildRotationSignatures(IReadOnlyList<BlockValue> cells)
+	{
+		string[] signatures = new string[4];
+		for (int quarterTurns = 0; quarterTurns < 4; quarterTurns++)
+		{
+			byte[] bytes = new byte[cells.Count * 3];
+			int offset = 0;
+			for (int y = 0; y < 5; y++) for (int z = 0; z < 5; z++) for (int x = 0; x < 5; x++)
+			{
+				(int sourceX, int sourceZ) = quarterTurns switch
+				{
+					0 => (x, z), 1 => (z, 4 - x), 2 => (4 - x, 4 - z), 3 => (4 - z, x),
+					_ => throw new InvalidOperationException(),
+				};
+				BlockValue value = cells[(y * 5 + sourceZ) * 5 + sourceX];
+				bytes[offset++] = (byte)((ushort)value.Type & 0xFF);
+				bytes[offset++] = (byte)((ushort)value.Type >> 8);
+				bytes[offset++] = value.State;
+			}
+			signatures[quarterTurns] = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+		}
+		return signatures;
+	}
 }
 
 public sealed class VillagePrefabCatalog
 {
-	private const int FormatVersion = 2;
-	public static readonly string[] DefaultSocketSemantics = ["closed", "open", "road", "door", "wall", "gate", "stairs", "any"];
+	private const int FormatVersion = 4;
+	public static readonly string[] DefaultSocketSemantics = ["open", "road", "door", "wall", "gate", "stairs"];
 	private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
 	{
 		WriteIndented = true,
@@ -55,17 +81,20 @@ public sealed class VillagePrefabCatalog
 	};
 	private readonly Dictionary<string, VillagePrefab> byId;
 
-	private VillagePrefabCatalog(string path, VillagePrefab[] prefabs, string[] socketSemantics, string hash)
+	private VillagePrefabCatalog(string path, VillagePrefab[] prefabs, string[] socketSemantics, string externalEntrySemantic,
+		VillageAdjacencyRuleDescriptor[] adjacencyRules, string hash)
 	{
-		Path = path; Prefabs = prefabs; SocketSemantics = socketSemantics; Hash = hash;
+		Path = path; Prefabs = prefabs; SocketSemantics = socketSemantics; ExternalEntrySemantic = externalEntrySemantic; AdjacencyRules = adjacencyRules; Hash = hash;
 		byId = prefabs.ToDictionary(static prefab => prefab.Descriptor.Id, StringComparer.Ordinal);
-		Descriptor = new(prefabs.Select(static prefab => prefab.Descriptor), hash, socketSemantics);
+		Descriptor = new(prefabs.Select(static prefab => prefab.Descriptor), hash, socketSemantics, externalEntrySemantic, adjacencyRules);
 	}
 
 	public string Path { get; }
 	public string Hash { get; }
 	public IReadOnlyList<VillagePrefab> Prefabs { get; }
 	public IReadOnlyList<string> SocketSemantics { get; }
+	public string ExternalEntrySemantic { get; }
+	public IReadOnlyList<VillageAdjacencyRuleDescriptor> AdjacencyRules { get; }
 	public VillagePrefabCatalogDescriptor Descriptor { get; }
 	public VillagePrefab Get(string id) => byId.TryGetValue(id, out VillagePrefab prefab)
 		? prefab : throw new KeyNotFoundException($"Unknown village prefab '{id}'.");
@@ -83,19 +112,26 @@ public sealed class VillagePrefabCatalog
 		if (prefabs.Select(static prefab => prefab.Descriptor.Id).Distinct(StringComparer.Ordinal).Count() != prefabs.Length)
 			throw new InvalidDataException("Village prefab IDs must be unique.");
 		string[] socketSemantics = NormalizeSocketSemantics(document.SocketSemantics, prefabs);
-		_ = new VillagePrefabCatalogDescriptor(prefabs.Select(static prefab => prefab.Descriptor), socketSemantics: socketSemantics);
+		string externalEntrySemantic = ValidateSocketSemantic(document.ExternalEntrySemantic ?? "road");
+		VillageAdjacencyRuleDescriptor[] adjacencyRules = document.AdjacencyRules ?? [];
+		_ = new VillagePrefabCatalogDescriptor(prefabs.Select(static prefab => prefab.Descriptor), socketSemantics: socketSemantics,
+			externalEntrySemantic: externalEntrySemantic, adjacencyRules: adjacencyRules);
 		string hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-		return new(System.IO.Path.GetFullPath(path), prefabs, socketSemantics, hash);
+		return new(System.IO.Path.GetFullPath(path), prefabs, socketSemantics, externalEntrySemantic, adjacencyRules, hash);
 	}
 
-	public static void Save(string path, IEnumerable<VillagePrefab> prefabs, IEnumerable<string> socketSemantics = null)
+	public static void Save(string path, IEnumerable<VillagePrefab> prefabs, IEnumerable<string> socketSemantics = null,
+		string externalEntrySemantic = "road", IEnumerable<VillageAdjacencyRuleDescriptor> adjacencyRules = null)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(path); ArgumentNullException.ThrowIfNull(prefabs);
 		VillagePrefab[] values = prefabs.OrderBy(static prefab => prefab.Descriptor.Id, StringComparer.Ordinal).ToArray();
 		if (values.Length == 0) throw new InvalidDataException("Village prefab catalogs cannot be empty.");
 		string[] semantics = NormalizeSocketSemantics(socketSemantics, values);
-		_ = new VillagePrefabCatalogDescriptor(values.Select(static prefab => prefab.Descriptor), socketSemantics: semantics);
-		CatalogDocument document = new(FormatVersion, 5, 5, 5, semantics, values.Select(ToDocument).ToArray());
+		externalEntrySemantic = ValidateSocketSemantic(externalEntrySemantic);
+		VillageAdjacencyRuleDescriptor[] rules = adjacencyRules?.ToArray() ?? [];
+		_ = new VillagePrefabCatalogDescriptor(values.Select(static prefab => prefab.Descriptor), socketSemantics: semantics,
+			externalEntrySemantic: externalEntrySemantic, adjacencyRules: rules);
+		CatalogDocument document = new(FormatVersion, 5, 5, 5, semantics, externalEntrySemantic, rules, values.Select(ToDocument).ToArray());
 		byte[] json = JsonSerializer.SerializeToUtf8Bytes(document, Options);
 		string fullPath = System.IO.Path.GetFullPath(path); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath)!);
 		string temporary = fullPath + $".tmp-{Guid.NewGuid():N}";
@@ -111,20 +147,23 @@ public sealed class VillagePrefabCatalog
 	public static IReadOnlyList<VillagePrefabCatalog> SaveSynchronized(
 		IEnumerable<string> paths,
 		IEnumerable<VillagePrefab> prefabs,
-		IEnumerable<string> socketSemantics)
+		IEnumerable<string> socketSemantics,
+		string externalEntrySemantic = "road",
+		IEnumerable<VillageAdjacencyRuleDescriptor> adjacencyRules = null)
 	{
 		ArgumentNullException.ThrowIfNull(paths);
 		VillagePrefab[] modules = prefabs?.ToArray() ?? throw new ArgumentNullException(nameof(prefabs));
 		string[] semantics = socketSemantics?.ToArray() ?? throw new ArgumentNullException(nameof(socketSemantics));
+		VillageAdjacencyRuleDescriptor[] rules = adjacencyRules?.ToArray() ?? [];
 		string[] targets = paths.Where(static path => !string.IsNullOrWhiteSpace(path)).Select(System.IO.Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 		if (targets.Length == 0) throw new InvalidDataException("No village prefab catalog save target was resolved.");
 		Dictionary<string, byte[]> originals = targets.ToDictionary(static path => path, static path => File.Exists(path) ? File.ReadAllBytes(path) : null, StringComparer.OrdinalIgnoreCase);
 		List<string> replaced = [];
 		try
 		{
-			foreach (string target in targets) { Save(target, modules, semantics); replaced.Add(target); }
+			foreach (string target in targets) { Save(target, modules, semantics, externalEntrySemantic, rules); replaced.Add(target); }
 			VillagePrefabCatalog[] reloaded = targets.Select(Load).ToArray();
-			if (reloaded.Any(catalog => !CatalogEquals(catalog, modules, semantics))
+			if (reloaded.Any(catalog => !CatalogEquals(catalog, modules, semantics, externalEntrySemantic, rules))
 				|| reloaded.Select(static catalog => catalog.Hash).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 1)
 				throw new InvalidDataException("Saved catalog verification did not match the requested editor state.");
 			return reloaded;
@@ -140,9 +179,11 @@ public sealed class VillagePrefabCatalog
 		}
 	}
 
-	private static bool CatalogEquals(VillagePrefabCatalog catalog, VillagePrefab[] modules, string[] semantics)
+	private static bool CatalogEquals(VillagePrefabCatalog catalog, VillagePrefab[] modules, string[] semantics, string externalEntrySemantic,
+		VillageAdjacencyRuleDescriptor[] adjacencyRules)
 	{
-		if (!catalog.SocketSemantics.SequenceEqual(semantics) || catalog.Prefabs.Count != modules.Length) return false;
+		if (!catalog.SocketSemantics.SequenceEqual(semantics) || catalog.ExternalEntrySemantic != externalEntrySemantic
+			|| !catalog.AdjacencyRules.SequenceEqual(adjacencyRules) || catalog.Prefabs.Count != modules.Length) return false;
 		VillagePrefab[] expected = modules.OrderBy(static module => module.Descriptor.Id, StringComparer.Ordinal).ToArray();
 		for (int index = 0; index < expected.Length; index++)
 		{
@@ -155,8 +196,7 @@ public sealed class VillagePrefabCatalog
 	}
 
 	private static bool DescriptorEquals(VillagePrefabDescriptor left, VillagePrefabDescriptor right) =>
-		left.Id == right.Id && left.DisplayName == right.DisplayName && left.Kind == right.Kind
-		&& left.Weight == right.Weight && left.Levels == right.Levels
+		left.Id == right.Id && left.DisplayName == right.DisplayName && left.Weight == right.Weight
 		&& left.AllowedRotations.SequenceEqual(right.AllowedRotations)
 		&& left.SupportMask.SequenceEqual(right.SupportMask) && left.LoadMask.SequenceEqual(right.LoadMask)
 		&& left.WalkableMask.SequenceEqual(right.WalkableMask) && left.Markers.SequenceEqual(right.Markers)
@@ -181,8 +221,8 @@ public sealed class VillagePrefabCatalog
 		if (requested is not null && normalized.Distinct(StringComparer.Ordinal).Count() != normalized.Length)
 			throw new InvalidDataException("Socket semantics must be unique after normalization.");
 		string[] values = normalized.Distinct(StringComparer.Ordinal).ToArray();
-		if (!values.Contains("closed", StringComparer.Ordinal) || !values.Contains("any", StringComparer.Ordinal))
-			throw new InvalidDataException("Socket semantics must include the reserved 'closed' and 'any' values.");
+		if (values.Contains("closed", StringComparer.Ordinal) || values.Contains("any", StringComparer.Ordinal))
+			throw new InvalidDataException("The legacy 'closed' and 'any' socket semantics are not supported; use an empty socket set.");
 		return values;
 	}
 
@@ -208,7 +248,7 @@ public sealed class VillagePrefabCatalog
 			}
 		}
 		VillagePrefabDescriptor descriptor = prefab.Descriptor;
-		return new(descriptor.Id, descriptor.DisplayName, descriptor.Kind, descriptor.Weight, descriptor.Levels, descriptor.AllowedRotations,
+		return new(descriptor.Id, descriptor.DisplayName, descriptor.Weight, descriptor.AllowedRotations,
 			descriptor.Sockets.ToDictionary(static socket => socket.Direction.ToString(), static socket => socket.Types), palette, layers,
 			MaskRows(descriptor.SupportMask), MaskRows(descriptor.LoadMask), MaskRows(descriptor.WalkableMask), descriptor.Markers);
 	}
@@ -239,16 +279,16 @@ public sealed class VillagePrefabCatalog
 					cells[index++] = symbol is '.' or '_' ? default : palette.TryGetValue(symbol, out BlockValue value) ? value : throw new InvalidDataException($"Village prefab '{module.Id}' uses unknown symbol '{symbol}'.");
 			}
 		}
-		byte[] support = ParseMask(module.SupportMask, defaultValue: module.Kind is not (VillageModuleKind.Outside or VillageModuleKind.Yard or VillageModuleKind.Road));
-		byte[] load = ParseMask(module.LoadMask, defaultValue: module.Kind is VillageModuleKind.Room or VillageModuleKind.Hallway or VillageModuleKind.Stairs or VillageModuleKind.Utility);
-		byte[] walkable = ParseMask(module.WalkableMask, defaultValue: module.Kind is VillageModuleKind.Road or VillageModuleKind.Plaza or VillageModuleKind.Yard or VillageModuleKind.Gate or VillageModuleKind.Room or VillageModuleKind.Hallway or VillageModuleKind.Stairs or VillageModuleKind.Utility);
+		byte[] support = ParseMask(module.SupportMask, defaultValue: false);
+		byte[] load = ParseMask(module.LoadMask, defaultValue: false);
+		byte[] walkable = ParseMask(module.WalkableMask, defaultValue: false);
 		VillageSocketDescriptor[] sockets = Enum.GetValues<VillageSocketDirection>()
 			.Select(direction => new VillageSocketDescriptor(direction,
-				module.Sockets is not null && module.Sockets.TryGetValue(direction.ToString(), out string[] values) ? values : ["any"],
+				module.Sockets is not null && module.Sockets.TryGetValue(direction.ToString(), out string[] values) ? values : [],
 				VillagePrefab.DeriveOpeningMask(direction, cells)))
 			.ToArray();
-		VillagePrefabDescriptor descriptor = new(module.Id, module.Kind, module.Weight, module.Levels,
-			module.Rotations ?? [0], sockets, support, load, walkable, module.Markers ?? [])
+		VillagePrefabDescriptor descriptor = new(module.Id, module.Weight,
+			module.Rotations ?? [0, 90, 180, 270], sockets, support, load, walkable, module.Markers ?? [])
 		{ DisplayName = string.IsNullOrWhiteSpace(module.DisplayName) ? module.Id : module.DisplayName };
 		descriptor.Validate();
 		ValidateGeometry(descriptor, cells);
@@ -265,21 +305,16 @@ public sealed class VillagePrefabCatalog
 
 	private static void ValidateGeometry(VillagePrefabDescriptor descriptor, BlockValue[] cells)
 	{
-		if (descriptor.Kind is VillageModuleKind.Room or VillageModuleKind.Hallway or VillageModuleKind.Utility)
-			for (int z = 1; z < 4; z++) for (int x = 1; x < 4; x++) for (int y = 1; y < 4; y++)
-				if (cells[(y * 5 + z) * 5 + x].Type != BlockType.None)
-					throw new InvalidDataException($"Village prefab '{descriptor.Id}' does not preserve three-block room clearance.");
 		if (descriptor.Markers.Any(static marker => string.Equals(marker.Kind, "Door", StringComparison.OrdinalIgnoreCase)))
 			throw new InvalidDataException($"Village prefab '{descriptor.Id}' uses a Door marker. Doors must be authored as voxel openings.");
 	}
 
-	private sealed record CatalogDocument(int FormatVersion, int Width, int Height, int Length, string[] SocketSemantics, ModuleDocument[] Modules);
+	private sealed record CatalogDocument(int FormatVersion, int Width, int Height, int Length, string[] SocketSemantics,
+		string ExternalEntrySemantic, VillageAdjacencyRuleDescriptor[] AdjacencyRules, ModuleDocument[] Modules);
 	private sealed record ModuleDocument(
 		string Id,
 		string DisplayName,
-		VillageModuleKind Kind,
 		int Weight,
-		VillageModuleLevel Levels,
 		int[] Rotations,
 		Dictionary<string, string[]> Sockets,
 		Dictionary<string, string> Palette,

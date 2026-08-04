@@ -104,7 +104,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		WorldGenerationSettings settings = new(24681357, 1024, 1024, 64);
 		generationTimer = Stopwatch.StartNew();
 		plan = WorldPlanMaterializer.GeneratePlan(settings.Width, settings.Length, settings.Seed, structureCatalog, villagePrefabs: villagePrefabs);
-		status.Text = $"Generated seed {plan.Seed} with {plan.Villages.Count} villages in {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
+		status.Text = $"Generated seed {plan.Seed} with {plan.VillageLayouts.Count}/{plan.Villages.Count} village layouts in {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 		RefreshImage();
 		automaticBundle = Path.Combine(runtimePaths.Root, "world-plans", $"auto-{plan.Seed}-{Guid.NewGuid():N}");
 		WorldPlanBundle.SaveAsync(automaticBundle, plan).GetAwaiter().GetResult();
@@ -120,6 +120,8 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (loaded.Seed != plan.Seed || loaded.Width != 1024 || loaded.Length != 1024) throw new InvalidOperationException("Automatic World Preview bundle metadata is invalid.");
 		if (loaded.Villages.Count < 6 || loaded.Villages.Any(village => village.Footprint.Any(point => loaded.GetTreeDensity(point.X, point.Z) != 0)))
 			throw new InvalidOperationException("Automatic World Preview village reservations are invalid.");
+		if (loaded.VillageLayouts.Count != loaded.Villages.Count || loaded.VillageLayouts.Any(static layout => layout.Modules.Length == 0))
+			throw new InvalidOperationException($"Automatic World Preview generated {loaded.VillageLayouts.Count}/{loaded.Villages.Count} populated village layouts.");
 		if (!loaded.Ponds.Any(pond => pond.Kind == HydrologyKind.Lake) || !loaded.HillMask.Span.ContainsAnyExcept((byte)0))
 			throw new InvalidOperationException("Automatic World Preview did not generate lakes and unused-space hills.");
 		foreach (string file in new[] { "manifest.json", "height.png", "biome.png", "hill-mask.png", "tree-density.png", "features.png", "features-floor-2.png", "features-floor-3.png", "features-roof.png", "combined.png" })
@@ -207,7 +209,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		if (completed.IsCanceled) { status.Text = "Generation cancelled."; return; }
 		if (completed.IsFaulted) { status.Text = $"Generation failed: {completed.Exception?.GetBaseException().Message}"; return; }
 		plan = completed.Result; zoom = 0; pan = Vector2.Zero; RefreshImage();
-		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}\n{plan.Ponds.Count(pond => pond.Kind == HydrologyKind.Lake)} lakes  {plan.Villages.Count} villages  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
+		status.Text = $"Validated seed {plan.Seed}  {plan.Width}x{plan.Length}\n{plan.Ponds.Count(pond => pond.Kind == HydrologyKind.Lake)} lakes  {plan.VillageLayouts.Count}/{plan.Villages.Count} village layouts  {generationTimer.Elapsed.TotalMilliseconds:F0} ms";
 	}
 
 	private void CancelGeneration()
@@ -274,7 +276,7 @@ public sealed class WorldPreviewState : GameStateImpl
 		PlannedVillageModule module = plan.VillageLayouts.SelectMany(static layout => layout.Modules)
 			.Where(candidate => candidate.Floor == LayerFloor(layer) && x >= candidate.Origin.X && x < candidate.Origin.X + 5 && z >= candidate.Origin.Z && z < candidate.Origin.Z + 5)
 			.FirstOrDefault();
-		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {module?.PrefabId ?? site?.Id ?? village?.Id ?? route?.Id ?? "-"}{(module is null ? "" : $"  C{module.ComponentId} R{module.Rotation}")}";
+		inspection.Text = $"X {x}  Z {z}  Y {(plan.IsLand(x, z) ? plan.GetHeight(x, z) : 0)}  hill {plan.GetHillHeight(x, z)}\n{plan.GetBiome(x, z)}  trees {plan.GetTreeDensity(x, z)}  water {(pond is null ? "-" : $"{pond.Kind} {pond.WaterLevel}")}\nfeature {module?.PrefabId ?? site?.Id ?? village?.Id ?? route?.Id ?? "-"}{(module is null ? "" : $"  floor {module.Floor} R{module.Rotation}")}";
 	}
 
 	private static int LayerFloor(WorldPlanRendering.Layer value) => value switch

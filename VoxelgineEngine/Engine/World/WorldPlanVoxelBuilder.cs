@@ -37,12 +37,6 @@ internal sealed class WorldPlanVoxelBuilder
 	{
 		foreach (PlannedVillageLayout layout in plan.VillageLayouts)
 		{
-			// Roads establish the underlying surface. Authored, non-empty prefab floor cells may replace it.
-			foreach (PlanPoint3 road in layout.InternalRoadCells)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
-				StampRoadCell(road.X, road.Z);
-			}
 			foreach (PlannedVillageModule module in layout.Modules.OrderBy(static value => value.Floor).ThenBy(static value => value.Origin.Y))
 			{
 				VillagePrefab prefab = catalog.Get(module.PrefabId);
@@ -57,7 +51,58 @@ internal sealed class WorldPlanVoxelBuilder
 					SetBlock(module.Origin.X + rotated.X, module.Origin.Y + rotated.Y, module.Origin.Z + rotated.Z, value.Type);
 				}
 			}
+			foreach (PlanPoint3 cell in SharedInteriorWallCells(layout, catalog))
+				SetBlock(cell.X, cell.Y, cell.Z, BlockType.None);
 		}
+	}
+
+	internal static IEnumerable<PlanPoint3> SharedInteriorWallCells(PlannedVillageLayout layout, VillagePrefabCatalog catalog)
+	{
+		Dictionary<(int Floor, int X, int Z), PlannedVillageModule> modules = layout.Modules.ToDictionary(
+			static module => (module.Floor, module.Origin.X, module.Origin.Z));
+		foreach (PlannedVillageModule module in layout.Modules)
+		{
+			if (modules.TryGetValue((module.Floor, module.Origin.X + VillagePrefabDescriptor.Width, module.Origin.Z),
+				out PlannedVillageModule east) && HasInteriorConnection(module, east, VillageSocketDirection.PositiveX, catalog))
+			{
+				for (int y = 1; y < VillagePrefabDescriptor.Height - 1; y++)
+				for (int z = 0; z < VillagePrefabDescriptor.Length; z++)
+				{
+					yield return new(module.Origin.X + VillagePrefabDescriptor.Width - 1, module.Origin.Y + y, module.Origin.Z + z);
+					yield return new(east.Origin.X, east.Origin.Y + y, east.Origin.Z + z);
+				}
+			}
+			if (modules.TryGetValue((module.Floor, module.Origin.X, module.Origin.Z + VillagePrefabDescriptor.Length),
+				out PlannedVillageModule south) && HasInteriorConnection(module, south, VillageSocketDirection.PositiveZ, catalog))
+			{
+				for (int y = 1; y < VillagePrefabDescriptor.Height - 1; y++)
+				for (int x = 0; x < VillagePrefabDescriptor.Width; x++)
+				{
+					yield return new(module.Origin.X + x, module.Origin.Y + y, module.Origin.Z + VillagePrefabDescriptor.Length - 1);
+					yield return new(south.Origin.X + x, south.Origin.Y + y, south.Origin.Z);
+				}
+			}
+		}
+	}
+
+	private static bool HasInteriorConnection(PlannedVillageModule first, PlannedVillageModule second,
+		VillageSocketDirection direction, VillagePrefabCatalog catalog)
+	{
+		VillageSocketDescriptor firstSocket = WorldSocket(catalog.Get(first.PrefabId).Descriptor, first.Rotation, direction);
+		VillageSocketDescriptor secondSocket = WorldSocket(catalog.Get(second.PrefabId).Descriptor, second.Rotation,
+			VillageSocketCompatibility.Opposite(direction));
+		return firstSocket.Types.Intersect(secondSocket.Types, StringComparer.Ordinal)
+			.Any(static semantic => semantic.StartsWith("house.", StringComparison.Ordinal)
+				|| semantic.StartsWith("interior.", StringComparison.Ordinal));
+	}
+
+	private static VillageSocketDescriptor WorldSocket(VillagePrefabDescriptor prefab, int rotation,
+		VillageSocketDirection worldDirection)
+	{
+		if (worldDirection is VillageSocketDirection.PositiveY or VillageSocketDirection.NegativeY)
+			return prefab.Socket(worldDirection);
+		int sourceDirection = ((int)worldDirection - rotation / 90) & 3;
+		return prefab.Socket((VillageSocketDirection)sourceDirection);
 	}
 
 	private void BuildTerrain(CancellationToken cancellationToken)

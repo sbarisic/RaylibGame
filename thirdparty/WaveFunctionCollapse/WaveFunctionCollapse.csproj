@@ -3,8 +3,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>Mxgmn.WaveFunctionCollapse</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\thirdparty\WaveFunctionCollapse\WaveFunctionCollapse.csproj" />
-  </ItemGroup>
 </Project>

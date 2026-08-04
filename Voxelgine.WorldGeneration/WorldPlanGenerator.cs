@@ -557,7 +557,9 @@ public static class WorldPlanGenerator
 				HashSet<PlanPoint> footprintSet = footprint.ToHashSet();
 				PlanPoint[] boundary = footprint.Where(point => Neighbors(point).Any(neighbor => !footprintSet.Contains(neighbor)))
 					.OrderBy(point => point.X).ThenBy(point => point.Z).ToArray();
-				(PlanPoint start, PlanPoint3 nearest) = ClosestVillageRoadPair(boundary, roadCells);
+				(PlanPoint start, PlanPoint3 nearest)? accessPair = ClosestVillageRoadPair(boundary, footprintSet, roadCells);
+				if (accessPair is not { } pair) continue;
+				(PlanPoint start, PlanPoint3 nearest) = pair;
 				HashSet<PlanPoint> blocked = pondCells.ToHashSet(); blocked.UnionWith(featureTerrain);
 				foreach (PlannedVillageArea village in villages) blocked.UnionWith(village.Footprint);
 				blocked.UnionWith(footprint); blocked.Remove(start); blocked.Remove(new(nearest.X, nearest.Z));
@@ -601,10 +603,13 @@ public static class WorldPlanGenerator
 	private static PlanBounds BoundsOf(IReadOnlyList<PlanPoint> points) => new(
 		points.Min(point => point.X), points.Min(point => point.Z), points.Max(point => point.X), points.Max(point => point.Z));
 
-	private static (PlanPoint Village, PlanPoint3 Road) ClosestVillageRoadPair(IEnumerable<PlanPoint> boundary, IReadOnlyList<PlanPoint3> roads)
+	private static (PlanPoint Village, PlanPoint3 Road)? ClosestVillageRoadPair(
+		IEnumerable<PlanPoint> boundary, HashSet<PlanPoint> footprint, IReadOnlyList<PlanPoint3> roads)
 	{
+		List<PlanPoint> viable = boundary.Where(point => HasStraightVillageEntry(point, footprint)).ToList();
+		if (viable.Count == 0) return null;
 		PlanPoint bestVillage = default; PlanPoint3 bestRoad = default; long bestDistance = long.MaxValue;
-		foreach (PlanPoint point in boundary)
+		foreach (PlanPoint point in viable)
 		foreach (PlanPoint3 road in roads)
 		{
 			long distance = SquaredDistance(point, new(road.X, road.Z));
@@ -612,6 +617,27 @@ public static class WorldPlanGenerator
 			bestDistance = distance; bestVillage = point; bestRoad = road;
 		}
 		return (bestVillage, bestRoad);
+	}
+
+	private static bool HasStraightVillageEntry(PlanPoint access, HashSet<PlanPoint> footprint)
+	{
+		ReadOnlySpan<(int X, int Z)> outwardDirections = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+		foreach ((int outwardX, int outwardZ) in outwardDirections)
+		{
+			int inwardX = -outwardX, inwardZ = -outwardZ;
+			if (ContainsModuleCenteredAt(access.X + inwardX * 5, access.Z + inwardZ * 5, footprint)
+				&& ContainsModuleCenteredAt(access.X + inwardX * 10, access.Z + inwardZ * 10, footprint))
+				return true;
+		}
+		return false;
+	}
+
+	private static bool ContainsModuleCenteredAt(int centerX, int centerZ, HashSet<PlanPoint> footprint)
+	{
+		for (int offsetX = -2; offsetX <= 2; offsetX++)
+		for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
+			if (!footprint.Contains(new(centerX + offsetX, centerZ + offsetZ))) return false;
+		return true;
 	}
 
 	private static (PlannedWorldSite[] Sites, PlannedWorldRoute[] Routes) PlanFeatures(WorldGenerationSettings settings, IReadOnlyList<StructureTemplateDescriptor> templates, byte[] heights, byte[] mask, PlannedPond[] ponds, CancellationToken token)

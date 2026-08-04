@@ -1,29 +1,5 @@
 namespace Voxelgine.WorldGeneration;
 
-public enum VillageModuleKind : byte
-{
-	Outside,
-	Road,
-	Plaza,
-	Yard,
-	DefenseWall,
-	DefenseCorner,
-	Gate,
-	Room,
-	Hallway,
-	Stairs,
-	Utility,
-	Roof,
-}
-
-[Flags]
-public enum VillageModuleLevel : byte
-{
-	Ground = 1,
-	Upper = 2,
-	Roof = 4,
-}
-
 public enum VillageSocketDirection : byte
 {
 	NegativeZ,
@@ -37,18 +13,38 @@ public enum VillageSocketDirection : byte
 public sealed record VillageSocketDescriptor(VillageSocketDirection Direction, string[] Types, byte[] Openings)
 {
 	public const int OpeningMaskLength = 25;
-
-	public bool IsWildcard => Types.Contains("any", StringComparer.Ordinal);
-	public bool IsClosed => Types.Contains("closed", StringComparer.Ordinal);
 }
 
 public sealed record VillageMarkerDescriptor(string Id, string Kind, int X, int Y, int Z);
 
+public enum VillageAdjacencyRelation : byte { Any, Connected, Disconnected }
+
+public sealed record VillageAdjacencyRuleDescriptor(string Id, string FirstPattern, string SecondPattern, int WeightPercent,
+	VillageAdjacencyRelation Relation = VillageAdjacencyRelation.Any)
+{
+	public void Validate()
+	{
+		if (string.IsNullOrWhiteSpace(Id) || Id.Length > 64 || !ValidPattern(FirstPattern) || !ValidPattern(SecondPattern)
+			|| WeightPercent is < 0 or > 100 || !Enum.IsDefined(Relation))
+			throw new InvalidDataException("Village adjacency rules require an ID, exact or trailing-* prefab patterns, and a weight from 0-100 percent.");
+	}
+
+	public bool Matches(string firstId, string secondId) =>
+		MatchesPattern(FirstPattern, firstId) && MatchesPattern(SecondPattern, secondId)
+		|| MatchesPattern(FirstPattern, secondId) && MatchesPattern(SecondPattern, firstId);
+	public bool AppliesTo(bool connected) => Relation == VillageAdjacencyRelation.Any
+		|| connected && Relation == VillageAdjacencyRelation.Connected
+		|| !connected && Relation == VillageAdjacencyRelation.Disconnected;
+
+	private static bool ValidPattern(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 64
+		&& (value == "*" || !value.Contains('*') || value.EndsWith('*') && value.Count(static character => character == '*') == 1);
+	private static bool MatchesPattern(string pattern, string value) => pattern == "*"
+		|| (pattern.EndsWith('*') ? value.StartsWith(pattern[..^1], StringComparison.Ordinal) : value == pattern);
+}
+
 public sealed record VillagePrefabDescriptor(
 	string Id,
-	VillageModuleKind Kind,
 	int Weight,
-	VillageModuleLevel Levels,
 	int[] AllowedRotations,
 	VillageSocketDescriptor[] Sockets,
 	byte[] SupportMask,
@@ -57,6 +53,8 @@ public sealed record VillagePrefabDescriptor(
 	VillageMarkerDescriptor[] Markers)
 {
 	public string DisplayName { get; init; } = Id;
+	public string[] RotationSignatures { get; init; } = [];
+	public bool HasVoxels { get; init; } = true;
 	public const int Width = 5;
 	public const int Length = 5;
 	public const int Height = 5;
@@ -68,8 +66,6 @@ public sealed record VillagePrefabDescriptor(
 			throw new InvalidDataException("Village prefab IDs must contain 1-64 characters.");
 		if (string.IsNullOrWhiteSpace(DisplayName) || DisplayName.Length > 96)
 			throw new InvalidDataException($"Village prefab '{Id}' must have a display name containing 1-96 characters.");
-		if (!Enum.IsDefined(Kind) || Levels == 0 || (Levels & ~(VillageModuleLevel.Ground | VillageModuleLevel.Upper | VillageModuleLevel.Roof)) != 0)
-			throw new InvalidDataException($"Village prefab '{Id}' has invalid kind or level flags.");
 		if (Weight is < 1 or > 1_000_000)
 			throw new InvalidDataException($"Village prefab '{Id}' has an invalid weight.");
 		if (AllowedRotations.Length == 0 || AllowedRotations.Any(static value => value is not (0 or 90 or 180 or 270))
@@ -84,10 +80,11 @@ public sealed record VillagePrefabDescriptor(
 				|| socket.Types.Distinct(StringComparer.Ordinal).Count() != socket.Types.Length
 				|| socket.Types.Any(static value => string.IsNullOrWhiteSpace(value) || value.Length > 32)
 				|| socket.Openings is null || socket.Openings.Length != VillageSocketDescriptor.OpeningMaskLength
-				|| socket.Openings.Any(static value => value is not (0 or 1))
-				|| socket.Types.Contains("any", StringComparer.Ordinal) && socket.Types.Length != 1
-				|| socket.Types.Contains("closed", StringComparer.Ordinal) && socket.Types.Length != 1))
+				|| socket.Openings.Any(static value => value is not (0 or 1))))
 			throw new InvalidDataException($"Village prefab '{Id}' sockets are invalid.");
+		if (RotationSignatures.Length != 0 && (RotationSignatures.Length != 4
+			|| RotationSignatures.Any(static value => value.Length != 64 || !value.All(Uri.IsHexDigit))))
+			throw new InvalidDataException($"Village prefab '{Id}' has invalid rotation signatures.");
 		if (Markers.Select(static marker => marker.Id).Distinct(StringComparer.Ordinal).Count() != Markers.Length
 			|| Markers.Any(static marker => string.IsNullOrWhiteSpace(marker.Id) || string.IsNullOrWhiteSpace(marker.Kind)
 				|| (uint)marker.X >= Width || (uint)marker.Y >= Height || (uint)marker.Z >= Length))
@@ -102,11 +99,14 @@ public sealed class VillagePrefabCatalogDescriptor
 {
 	private readonly VillagePrefabDescriptor[] prefabs;
 	private readonly string[] socketSemantics;
+	private readonly VillageAdjacencyRuleDescriptor[] adjacencyRules;
 
 	public VillagePrefabCatalogDescriptor(
 		IEnumerable<VillagePrefabDescriptor> prefabs,
 		string hash = "",
-		IEnumerable<string>? socketSemantics = null)
+		IEnumerable<string>? socketSemantics = null,
+		string externalEntrySemantic = "road",
+		IEnumerable<VillageAdjacencyRuleDescriptor>? adjacencyRules = null)
 	{
 		ArgumentNullException.ThrowIfNull(prefabs);
 		this.prefabs = prefabs.OrderBy(static prefab => prefab.Id, StringComparer.Ordinal).ToArray();
@@ -115,49 +115,80 @@ public sealed class VillagePrefabCatalogDescriptor
 		foreach (VillagePrefabDescriptor prefab in this.prefabs) prefab.Validate();
 		this.socketSemantics = (socketSemantics ?? this.prefabs
 			.SelectMany(static prefab => prefab.Sockets)
-			.SelectMany(static socket => socket.Types)
-			.Append("closed")
-			.Append("any"))
+			.SelectMany(static socket => socket.Types))
 			.Distinct(StringComparer.Ordinal)
 			.ToArray();
-		if (this.socketSemantics.Length < 2
+		if (this.socketSemantics.Length == 0
 			|| this.socketSemantics.Distinct(StringComparer.Ordinal).Count() != this.socketSemantics.Length
-			|| !this.socketSemantics.Contains("closed", StringComparer.Ordinal)
-			|| !this.socketSemantics.Contains("any", StringComparer.Ordinal)
+			|| this.socketSemantics.Contains("any", StringComparer.Ordinal)
+			|| this.socketSemantics.Contains("closed", StringComparer.Ordinal)
 			|| this.socketSemantics.Any(static value => string.IsNullOrWhiteSpace(value) || value.Length > 32)
 			|| this.prefabs.SelectMany(static prefab => prefab.Sockets).SelectMany(static socket => socket.Types)
 				.Any(value => !this.socketSemantics.Contains(value, StringComparer.Ordinal)))
-			throw new InvalidDataException("Village prefab socket semantics must be unique, include 'closed' and 'any', and define every socket value in use.");
+			throw new InvalidDataException("Village prefab socket semantics must be unique and define every socket value in use.");
+		ExternalEntrySemantic = externalEntrySemantic?.Trim() ?? string.Empty;
+		if (ExternalEntrySemantic.Length == 0 || !this.socketSemantics.Contains(ExternalEntrySemantic, StringComparer.Ordinal))
+			throw new InvalidDataException("The external-entry semantic must be defined by the catalog vocabulary.");
 		Hash = hash ?? string.Empty;
 		if (Hash.Length != 0 && (Hash.Length != 64 || !Hash.All(Uri.IsHexDigit)))
 			throw new InvalidDataException("Village prefab catalog hash is malformed.");
+		this.adjacencyRules = adjacencyRules?.ToArray() ?? [];
+		if (this.adjacencyRules.Select(static rule => rule.Id).Distinct(StringComparer.Ordinal).Count() != this.adjacencyRules.Length)
+			throw new InvalidDataException("Village adjacency rule IDs must be unique.");
+		foreach (VillageAdjacencyRuleDescriptor rule in this.adjacencyRules) rule.Validate();
 	}
 
 	public IReadOnlyList<VillagePrefabDescriptor> Prefabs => prefabs;
 	public IReadOnlyList<string> SocketSemantics => socketSemantics;
+	public string ExternalEntrySemantic { get; }
 	public string Hash { get; }
+	public IReadOnlyList<VillageAdjacencyRuleDescriptor> AdjacencyRules => adjacencyRules;
+
+	public bool HasUsefulConnectedChain()
+	{
+		VillageSocketDirection[] horizontal =
+			[VillageSocketDirection.NegativeZ, VillageSocketDirection.PositiveX, VillageSocketDirection.PositiveZ, VillageSocketDirection.NegativeX];
+		Dictionary<string, HashSet<string>> graph = socketSemantics.ToDictionary(static value => value, static _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
+		HashSet<string> terminalSemantics = new(StringComparer.Ordinal);
+		foreach (VillagePrefabDescriptor prefab in prefabs)
+		{
+			VillageSocketDescriptor[] faces = horizontal.Select(prefab.Socket).Where(static socket => socket.Types.Length != 0).ToArray();
+			if (faces.Length == 1) terminalSemantics.UnionWith(faces[0].Types);
+			for (int left = 0; left < faces.Length; left++) for (int right = left + 1; right < faces.Length; right++)
+				foreach (string leftType in faces[left].Types) foreach (string rightType in faces[right].Types)
+				{
+					graph[leftType].Add(rightType);
+					graph[rightType].Add(leftType);
+				}
+		}
+		HashSet<string> reached = new(StringComparer.Ordinal) { ExternalEntrySemantic };
+		Queue<string> pending = new(); pending.Enqueue(ExternalEntrySemantic);
+		while (pending.TryDequeue(out string? semantic))
+			foreach (string adjacent in graph[semantic]) if (reached.Add(adjacent)) pending.Enqueue(adjacent);
+		// A useful grammar may terminate on the same semantic it entered with. This is the
+		// common road case: transit modules expose `road` on two or more faces and a complete
+		// roadside building exposes one `road` face. Requiring a semantic rename between those
+		// modules incorrectly rejects that simple, unambiguous chain.
+		return reached.Any(terminalSemantics.Contains)
+			&& graph[ExternalEntrySemantic].Count != 0;
+	}
 }
 
 public sealed record PlannedVillageModule(
 	string PrefabId,
 	int Rotation,
 	int Floor,
-	int ComponentId,
 	PlanPoint3 Origin,
-	VillageModuleKind Kind,
 	long AttemptSeed);
 
 public sealed record PlannedVillageLayout(
 	string VillageId,
 	PlannedVillageModule[] Modules,
-	PlanPoint3[] InternalRoadCells,
 	int GroundAttempts);
 
-internal readonly record struct VillagePrefabVariant(VillagePrefabDescriptor Prefab, int Rotation)
+internal readonly record struct VillagePrefabVariant(VillagePrefabDescriptor Prefab, int Rotation, double Weight)
 {
 	public string Id => $"{Prefab.Id}@{Rotation}";
-	public VillageModuleKind Kind => Prefab.Kind;
-	public int Weight => Prefab.Weight;
 
 	public VillageSocketDescriptor Socket(VillageSocketDirection worldDirection)
 	{
@@ -211,9 +242,12 @@ public static class VillageSocketCompatibility
 
 	public static bool Matches(VillageSocketDescriptor left, VillageSocketDescriptor right)
 	{
-		if (left.Types.Length == 0 || right.Types.Length == 0) return false;
-		if (left.IsClosed || right.IsClosed) return left.IsClosed && right.IsClosed;
-		return left.IsWildcard || right.IsWildcard
-			|| left.Types.Intersect(right.Types, StringComparer.Ordinal).Any();
+		if (left.Types.Length == 0 || right.Types.Length == 0)
+			return left.Types.Length == 0 && right.Types.Length == 0;
+		return left.Types.Intersect(right.Types, StringComparer.Ordinal).Any();
 	}
+
+	public static bool CreatesConnection(VillageSocketDescriptor left, VillageSocketDescriptor right) =>
+		left.Types.Length != 0 && right.Types.Length != 0
+		&& left.Types.Intersect(right.Types, StringComparer.Ordinal).Any();
 }

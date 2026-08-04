@@ -38,6 +38,8 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	private readonly Label header;
 	private readonly Label status;
 	private readonly Label metadata;
+	private readonly Textbox weightInput;
+	private readonly Dictionary<int, CheckBox> rotationChecks = [];
 	private readonly Label hoverLabel;
 	private readonly Label[] axisLabels = new Label[6];
 	private readonly Window createWindow;
@@ -48,6 +50,15 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	private readonly ListBox semanticsList;
 	private readonly Textbox semanticName;
 	private readonly Label semanticError;
+	private readonly DropDown externalEntryDropDown;
+	private readonly Window rulesWindow;
+	private readonly ListBox rulesList;
+	private readonly Textbox ruleId;
+	private readonly Textbox ruleFirstPattern;
+	private readonly Textbox ruleSecondPattern;
+	private readonly Textbox ruleWeightPercent;
+	private readonly DropDown ruleRelation;
+	private readonly Label ruleError;
 	private readonly Dictionary<VillageSocketDirection, DropDown> socketDropDowns = [];
 	private readonly Stack<BlockValue[]> undo = [];
 	private readonly Stack<BlockValue[]> redo = [];
@@ -107,8 +118,22 @@ public sealed class VillagePrefabLabState : GameStateImpl
 		AddButton(sidebar, "Duplicate", 98, 320, 94, DuplicatePrefab);
 		AddButton(sidebar, "Delete", 198, 320, 70, DeletePrefab);
 		AddButton(sidebar, "Save", 274, 320, 70, Save);
-		metadata = new Label { ID = "village_prefab_metadata", Position = new Vector2(16, 366), Size = new Vector2(328, 86) }; sidebar.AddChild(metadata);
-		status = new Label { ID = "village_prefab_status", Position = new Vector2(16, 458), Size = new Vector2(328, 108), Text = "Select a module to edit." }; sidebar.AddChild(status);
+		metadata = new Label { ID = "village_prefab_metadata", Position = new Vector2(16, 366), Size = new Vector2(328, 52) }; sidebar.AddChild(metadata);
+		sidebar.AddChild(new Label { Text = "Weight", Position = new Vector2(16, 424), Size = new Vector2(54, 26) });
+		weightInput = new Textbox { ID = "village_prefab_weight", Position = new Vector2(72, 422), Size = new Vector2(76, 28) };
+		weightInput.OnTextChanged += (_, value) => UpdateWeight(value); sidebar.AddChild(weightInput);
+		sidebar.AddChild(new Label { Text = "Rotations", Position = new Vector2(158, 424), Size = new Vector2(70, 22) });
+		int rotationIndex = 0;
+		foreach (int rotation in new[] { 0, 90, 180, 270 })
+		{
+			float x = 166 + rotationIndex * 44;
+			sidebar.AddChild(new Label { Text = $"{rotation}°", Position = new Vector2(x, 444), Size = new Vector2(38, 18) });
+			CheckBox check = new() { ID = $"village_prefab_rotation_{rotation}", Position = new Vector2(x, 462), Size = new Vector2(20, 20), TooltipText = $"Allow {rotation} degree rotation" };
+			int captured = rotation; check.OnCheckedChanged += (_, _) => UpdateRotations(captured); sidebar.AddChild(check); rotationChecks[rotation] = check;
+			rotationIndex++;
+		}
+		status = new Label { ID = "village_prefab_status", Position = new Vector2(16, 490), Size = new Vector2(328, 42), Text = "Select a module to edit." }; sidebar.AddChild(status);
+		AddButton(sidebar, "Adjacency rules...", 16, 538, 328, ShowRulesDialog);
 		AddButton(sidebar, "Validate / Test WFC", 16, 576, 160, ValidateCatalog);
 		AddButton(sidebar, "Back", 184, 576, 160, () => Client.RequestState(ClientStateKind.MainMenu));
 
@@ -159,15 +184,36 @@ public sealed class VillagePrefabLabState : GameStateImpl
 		createError = new Label { ID = "village_prefab_create_error", Position = new Vector2(20, 176), Size = new Vector2(420, 34) }; createWindow.AddChild(createError);
 		AddButton(createWindow, "Create", 20, 224, 200, ConfirmCreatePrefab); AddButton(createWindow, "Cancel", 240, 224, 200, () => HideModal(createWindow)); createWindow.OnClosed += HideModal;
 
-		semanticsWindow = new Window { ID = "village_prefab_semantics_dialog", Title = "Socket Semantics", Size = new Vector2(480, 470), IsResizable = false, IsModal = true, CloseButtonEnabled = true, ShowCloseButton = true, Visible = false };
-		semanticsWindow.AddChild(new Label { Text = "These names are shared by every prefab. Faces match when at least one checked name overlaps.\n'any' is a wildcard; 'closed' permits no connection.", Position = new Vector2(20, 46), Size = new Vector2(440, 48) });
+		semanticsWindow = new Window { ID = "village_prefab_semantics_dialog", Title = "Socket Semantics", Size = new Vector2(480, 540), IsResizable = false, IsModal = true, CloseButtonEnabled = true, ShowCloseButton = true, Visible = false };
+		semanticsWindow.AddChild(new Label { Text = "These names are shared by every prefab. Faces match when at least one checked name overlaps.\nAn empty selection is a sealed face.", Position = new Vector2(20, 46), Size = new Vector2(440, 48) });
 		semanticsList = new ListBox { ID = "village_prefab_semantics_list", Position = new Vector2(20, 100), Size = new Vector2(440, 220), CustomItemHeight = 26 }; semanticsWindow.AddChild(semanticsList);
-		semanticName = new Textbox { ID = "village_prefab_semantic_name", Placeholder = "new semantic name", Position = new Vector2(20, 330), Size = new Vector2(300, 30) }; semanticsWindow.AddChild(semanticName);
-		AddButton(semanticsWindow, "Add", 330, 328, 130, AddSocketSemantic);
-		semanticError = new Label { ID = "village_prefab_semantic_error", Position = new Vector2(20, 368), Size = new Vector2(440, 34) }; semanticsWindow.AddChild(semanticError);
-		AddButton(semanticsWindow, "Remove selected", 20, 410, 210, RemoveSocketSemantic); AddButton(semanticsWindow, "Done", 250, 410, 210, FinishEditingSemantics); semanticsWindow.OnClosed += _ => FinishEditingSemantics();
+		semanticsWindow.AddChild(new Label { Text = "External entry semantic", Position = new Vector2(20, 328), Size = new Vector2(180, 24) });
+		externalEntryDropDown = new DropDown { ID = "village_prefab_external_entry", Position = new Vector2(210, 326), Size = new Vector2(250, 28) };
+		externalEntryDropDown.OnItemSelected += (_, item) => { if (!synchronizingSockets && item.UserData is string value) { session.SetExternalEntrySemantic(value); Refresh(); } }; semanticsWindow.AddChild(externalEntryDropDown);
+		semanticName = new Textbox { ID = "village_prefab_semantic_name", Placeholder = "new semantic name", Position = new Vector2(20, 370), Size = new Vector2(300, 30) }; semanticsWindow.AddChild(semanticName);
+		AddButton(semanticsWindow, "Add", 330, 368, 130, AddSocketSemantic);
+		semanticError = new Label { ID = "village_prefab_semantic_error", Position = new Vector2(20, 408), Size = new Vector2(440, 34) }; semanticsWindow.AddChild(semanticError);
+		AddButton(semanticsWindow, "Remove selected", 20, 468, 210, RemoveSocketSemantic); AddButton(semanticsWindow, "Done", 250, 468, 210, FinishEditingSemantics); semanticsWindow.OnClosed += _ => FinishEditingSemantics();
 
-		gui.AddControl(sidebar); gui.AddControl(editor); gui.AddControl(createWindow); gui.AddControl(semanticsWindow);
+		rulesWindow = new Window { ID = "village_prefab_adjacency_rules", Title = "Adjacency Rules", Size = new Vector2(520, 500), IsResizable = false, IsModal = true, CloseButtonEnabled = true, ShowCloseButton = true, Visible = false };
+		rulesWindow.AddChild(new Label { Text = "Rules multiply selection weight for neighboring prefab IDs. Use an exact ID or a trailing wildcard such as road.*. 0% is a hard exclusion.", Position = new Vector2(20, 44), Size = new Vector2(480, 50) });
+		rulesList = new ListBox { ID = "village_prefab_adjacency_rule_list", Position = new Vector2(20, 98), Size = new Vector2(480, 130), CustomItemHeight = 27 }; rulesWindow.AddChild(rulesList);
+		rulesWindow.AddChild(new Label { Text = "Rule ID", Position = new Vector2(20, 238), Size = new Vector2(110, 22) });
+		ruleId = new Textbox { ID = "village_prefab_rule_id", Placeholder = "discourage-road-clusters", Position = new Vector2(140, 236), Size = new Vector2(360, 28) }; rulesWindow.AddChild(ruleId);
+		rulesWindow.AddChild(new Label { Text = "First pattern", Position = new Vector2(20, 274), Size = new Vector2(110, 22) });
+		ruleFirstPattern = new Textbox { ID = "village_prefab_rule_first", Placeholder = "road.*", Position = new Vector2(140, 272), Size = new Vector2(360, 28) }; rulesWindow.AddChild(ruleFirstPattern);
+		rulesWindow.AddChild(new Label { Text = "Second pattern", Position = new Vector2(20, 310), Size = new Vector2(110, 22) });
+		ruleSecondPattern = new Textbox { ID = "village_prefab_rule_second", Placeholder = "road.*", Position = new Vector2(140, 308), Size = new Vector2(360, 28) }; rulesWindow.AddChild(ruleSecondPattern);
+		rulesWindow.AddChild(new Label { Text = "Weight percent", Position = new Vector2(20, 346), Size = new Vector2(110, 22) });
+		ruleWeightPercent = new Textbox { ID = "village_prefab_rule_weight", Text = "25", Position = new Vector2(140, 344), Size = new Vector2(90, 28) }; rulesWindow.AddChild(ruleWeightPercent);
+		ruleRelation = new DropDown { ID = "village_prefab_rule_relation", Position = new Vector2(240, 344), Size = new Vector2(130, 28) };
+		foreach (VillageAdjacencyRelation relation in Enum.GetValues<VillageAdjacencyRelation>()) ruleRelation.AddItem(new DropDownItem(relation.ToString(), relation));
+		ruleRelation.SelectIndex((int)VillageAdjacencyRelation.Disconnected); rulesWindow.AddChild(ruleRelation);
+		AddButton(rulesWindow, "Add rule", 380, 342, 120, AddAdjacencyRule);
+		ruleError = new Label { ID = "village_prefab_rule_error", Position = new Vector2(20, 384), Size = new Vector2(480, 42) }; rulesWindow.AddChild(ruleError);
+		AddButton(rulesWindow, "Remove selected", 20, 442, 230, RemoveAdjacencyRule); AddButton(rulesWindow, "Done", 270, 442, 230, () => HideModal(rulesWindow)); rulesWindow.OnClosed += HideModal;
+
+		gui.AddControl(sidebar); gui.AddControl(editor); gui.AddControl(createWindow); gui.AddControl(semanticsWindow); gui.AddControl(rulesWindow);
 		RebuildSocketDropDowns(); RebuildPrefabList(); Select(session.Prefabs[0]); Layout(); ConfigureCamera();
 	}
 
@@ -176,15 +222,16 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	internal void EnableAutomaticValidation()
 	{
 		automatic = true;
-		Select(session.Prefabs.First(static prefab => prefab.Descriptor.Kind == VillageModuleKind.Room));
+		Select(session.Prefabs.First(static prefab => prefab.Descriptor.HasVoxels));
 		string semantic = "auto_socket";
 		if (!session.SocketSemantics.Contains(semantic, StringComparer.Ordinal)) session.AddSemantic(semantic);
 		RebuildSocketDropDowns(); SetSocket(VillageSocketDirection.PositiveX, [semantic]); SetSocket(VillageSocketDirection.NegativeX, []);
 		Paint(new(2, 0, 0), BlockType.None); Paint(new(2, 1, 0), BlockType.None); Undo(); Redo();
 		string path = Path.Combine(runtimePaths.Root, "prefab-lab-auto", $"catalog-{Guid.NewGuid():N}.json");
-		(VillagePrefab[] modules, string[] semantics, _) = session.Snapshot(); VillagePrefabCatalog.Save(path, modules, semantics);
+		(VillagePrefab[] modules, string[] semantics, string externalEntry, VillageAdjacencyRuleDescriptor[] rules, _) = session.Snapshot(); VillagePrefabCatalog.Save(path, modules, semantics, externalEntry, rules);
 		VillagePrefabCatalog loaded = VillagePrefabCatalog.Load(path);
 		if (!loaded.SocketSemantics.Contains(semantic, StringComparer.Ordinal)) throw new InvalidOperationException("Automatic semantic persistence failed.");
+		if (!loaded.AdjacencyRules.SequenceEqual(rules)) throw new InvalidOperationException("Automatic adjacency-rule persistence failed.");
 		if (loaded.Get(selected.Descriptor.Id).Descriptor.Socket(VillageSocketDirection.NegativeX).Types.Length != 0)
 			throw new InvalidOperationException("Automatic disabled-face socket persistence failed.");
 		status.Text = "Automatic 3D prefab edit/save/load validation passed; waiting for preview mesh.";
@@ -205,10 +252,12 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	public override void Tick(float gameTime) { if (Window.InMgr.IsInputPressed(InputKey.Esc)) Client.RequestState(ClientStateKind.MainMenu); }
 	public override void BeginFrame(in FrameTiming timing)
 	{
-		Layout(); ConfigureCamera(); Vector2 mouse = Window.InMgr.GetMousePos(); bool overViewport = Contains(viewport, mouse);
-		if (Window.InMgr.IsInputPressed(InputKey.Click_Middle)) { middlePressPosition = mouse; middleDragged = false; }
-		if (Window.InMgr.IsInputDown(InputKey.Click_Middle) && Vector2.DistanceSquared(mouse, middlePressPosition) > 9) middleDragged = true;
-		bool orbit = overViewport && (Window.InMgr.IsInputDown(InputKey.Click_Middle) && middleDragged || Window.InMgr.IsInputDown(InputKey.Click_Left) && Window.InMgr.IsInputDown(InputKey.Alt));
+		Layout(); ConfigureCamera(); Vector2 mouse = Window.InMgr.GetMousePos();
+		bool modalOpen = IsModalOpen();
+		bool overViewport = !modalOpen && Contains(viewport, mouse);
+		if (!modalOpen && Window.InMgr.IsInputPressed(InputKey.Click_Middle)) { middlePressPosition = mouse; middleDragged = false; }
+		if (!modalOpen && Window.InMgr.IsInputDown(InputKey.Click_Middle) && Vector2.DistanceSquared(mouse, middlePressPosition) > 9) middleDragged = true;
+		bool orbit = !modalOpen && overViewport && (Window.InMgr.IsInputDown(InputKey.Click_Middle) && middleDragged || Window.InMgr.IsInputDown(InputKey.Click_Left) && Window.InMgr.IsInputDown(InputKey.Alt));
 		if (orbit) { Vector2 delta = mouse - previousMouse; cameraYaw += delta.X * .35f; cameraElevation = Math.Clamp(cameraElevation - delta.Y * .25f, -85, 85); }
 		if (overViewport && !orbit)
 		{
@@ -219,7 +268,7 @@ public sealed class VillagePrefabLabState : GameStateImpl
 			if (Window.InMgr.IsInputReleased(InputKey.Click_Middle) && !middleDragged && hasOccupiedHit) { paintBlock = working[Index(occupiedCell)].Type; SelectBlockList(paintBlock); }
 			cameraDistance = Math.Clamp(cameraDistance - Window.InMgr.GetMouseWheel() * .5f, 6, 22);
 		}
-		else if (!overViewport) { hasHover = false; hoverLabel.Text = "Hover the white grid to inspect X/Y/Z."; }
+		else if (!overViewport) { hasHover = false; hoverLabel.Text = modalOpen ? "Close the dialog to edit the 3D prefab." : "Hover the white grid to inspect X/Y/Z."; }
 		previousMouse = mouse; UpdateAxisLabels(); voxelScene.Update(camera); gui.Update(timing.DeltaTime, timing.TotalTime);
 		if (automatic && automaticCapture is null && voxelScene.Renderer.IsIdle
 			&& voxelScene.GetPresentationState(new ChunkCoordinate(0, 0, 0)) == VoxelPresentationState.Resident)
@@ -262,7 +311,7 @@ public sealed class VillagePrefabLabState : GameStateImpl
 		editorHeaderPanel.Size = new Vector2(Math.Max(0, editor.Size.X - 16), 50);
 		editorToolsPanel.Size = new Vector2(230, Math.Max(0, Math.Min(620, editor.Size.Y - 72)));
 		viewport = new(editor.Position.X + 246, editor.Position.Y + 42, Math.Max(0, editor.Size.X - 258), Math.Max(0, editor.Size.Y - 54));
-		CenterModal(createWindow); CenterModal(semanticsWindow);
+		CenterModal(createWindow); CenterModal(semanticsWindow); CenterModal(rulesWindow);
 	}
 
 	private void ConfigureCamera() => ConfigureCamera(fishWindow.RenderWindow.FramebufferSize);
@@ -277,7 +326,7 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	{
 		string query = search.Text?.Trim() ?? string.Empty; prefabList.Items.Clear();
 		foreach (VillagePrefab prefab in session.Prefabs.Where(prefab => query.Length == 0 || prefab.Descriptor.Id.Contains(query, StringComparison.OrdinalIgnoreCase) || prefab.Descriptor.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)))
-			prefabList.AddItem(new ListBoxItem($"{prefab.Descriptor.Kind}: {prefab.Descriptor.DisplayName} ({prefab.Descriptor.Id})", prefab));
+			prefabList.AddItem(new ListBoxItem($"{prefab.Descriptor.DisplayName} ({prefab.Descriptor.Id})", prefab));
 	}
 
 	private void Select(VillagePrefab prefab)
@@ -309,10 +358,12 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	private void Refresh()
 	{
 		if (selected is null) return; header.Text = $"Village Prefab Lab  •  {selected.Descriptor.DisplayName}";
-		metadata.Text = $"ID: {selected.Descriptor.Id}\nKind: {selected.Descriptor.Kind}   Weight: {selected.Descriptor.Weight}\nLevels: {selected.Descriptor.Levels}\nRevision: {session.Revision}{(session.IsDirty ? "  •  unsaved" : string.Empty)}";
+		metadata.Text = $"ID: {selected.Descriptor.Id}\nEntry semantic: {session.ExternalEntrySemantic}\nRevision: {session.Revision}{(session.IsDirty ? "  •  unsaved" : string.Empty)}";
 		synchronizingSockets = true;
 		try
 		{
+			weightInput.Text = selected.Descriptor.Weight.ToString();
+			foreach ((int rotation, CheckBox check) in rotationChecks) check.IsChecked = selected.Descriptor.AllowedRotations.Contains(rotation);
 			foreach ((VillageSocketDirection direction, DropDown dropDown) in socketDropDowns)
 			{
 				dropDown.ClearSelection(); string[] selectedTypes = selected.Descriptor.Socket(direction).Types;
@@ -322,17 +373,29 @@ public sealed class VillagePrefabLabState : GameStateImpl
 		finally { synchronizingSockets = false; }
 	}
 
+	private void UpdateWeight(string value)
+	{
+		if (synchronizingSockets || selected is null || !int.TryParse(value, out int weight) || weight is < 1 or > 1_000_000) return;
+		if (selected.Descriptor.Weight == weight) return;
+		selected = new VillagePrefab(selected.Descriptor with { Weight = weight }, working); session.Replace(selected); Refresh();
+	}
+
+	private void UpdateRotations(int _)
+	{
+		if (synchronizingSockets || selected is null) return;
+		int[] rotations = rotationChecks.Where(static pair => pair.Value.IsChecked).Select(static pair => pair.Key).Order().ToArray();
+		if (rotations.Length == 0) { synchronizingSockets = true; rotationChecks[selected.Descriptor.AllowedRotations[0]].IsChecked = true; synchronizingSockets = false; status.Text = "At least one rotation is required."; return; }
+		if (selected.Descriptor.AllowedRotations.SequenceEqual(rotations)) return;
+		selected = new VillagePrefab(selected.Descriptor with { AllowedRotations = rotations }, working); session.Replace(selected); Refresh();
+	}
+
 	private void SetSocket(VillageSocketDirection direction, string[] values)
 	{
 		if (synchronizingSockets || selected is null) return;
 		try
 		{
-			string[] current = selected.Descriptor.Socket(direction).Types;
 			values = values.Distinct(StringComparer.Ordinal).ToArray();
-			if (values.Contains("any", StringComparer.Ordinal) && values.Length > 1)
-				values = current.Contains("any", StringComparer.Ordinal) ? values.Where(static value => value != "any").ToArray() : ["any"];
-			if (values.Contains("closed", StringComparer.Ordinal) && values.Length > 1)
-				values = current.Contains("closed", StringComparer.Ordinal) ? values.Where(static value => value != "closed").ToArray() : ["closed"];
+			string[] current = selected.Descriptor.Socket(direction).Types;
 			if (current.SequenceEqual(values)) { Refresh(); return; }
 			VillageSocketDescriptor[] sockets = selected.Descriptor.Sockets.Select(socket => socket.Direction == direction ? socket with { Types = values } : socket).ToArray();
 			selected = new VillagePrefab(selected.Descriptor with { Sockets = sockets }, working); session.Replace(selected);
@@ -353,8 +416,8 @@ public sealed class VillagePrefabLabState : GameStateImpl
 			if (id.Length is < 1 or > 64) throw new InvalidDataException("Enter a prefab ID containing 1-64 characters.");
 			if (display.Length is < 1 or > 96) throw new InvalidDataException("Enter a display name containing 1-96 characters.");
 			VillagePrefabDescriptor template = session.Prefabs[0].Descriptor;
-			VillageSocketDescriptor[] sockets = Enum.GetValues<VillageSocketDirection>().Select(static direction => new VillageSocketDescriptor(direction, ["any"], new byte[25])).ToArray();
-			VillagePrefab prefab = new(template with { Id = id, DisplayName = display, Kind = VillageModuleKind.Yard, Weight = 1, Levels = VillageModuleLevel.Ground, AllowedRotations = [0], Sockets = sockets, SupportMask = new byte[25], LoadMask = new byte[25], WalkableMask = new byte[25], Markers = [] }, new BlockValue[125]);
+			VillageSocketDescriptor[] sockets = Enum.GetValues<VillageSocketDirection>().Select(static direction => new VillageSocketDescriptor(direction, [], new byte[25])).ToArray();
+			VillagePrefab prefab = new(template with { Id = id, DisplayName = display, Weight = 1, AllowedRotations = [0, 90, 180, 270], Sockets = sockets, SupportMask = new byte[25], LoadMask = new byte[25], WalkableMask = new byte[25], Markers = [] }, new BlockValue[125]);
 			session.Add(prefab); RebuildPrefabList(); Select(prefab); HideModal(createWindow);
 		}
 		catch (Exception exception) { createError.Text = exception.Message; }
@@ -366,20 +429,32 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	{
 		try
 		{
-			CommitWorking(); (VillagePrefab[] prefabs, string[] semantics, long revision) = session.Snapshot();
+			CommitWorking(); (VillagePrefab[] prefabs, string[] semantics, string externalEntry, VillageAdjacencyRuleDescriptor[] rules, long revision) = session.Snapshot();
 			string[] targets = new[] { sourceCatalogPath, runtimeCatalogPath }.Where(static path => !string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-			IReadOnlyList<VillagePrefabCatalog> saved = VillagePrefabCatalog.SaveSynchronized(targets, prefabs, semantics); session.MarkSaved(revision);
+			IReadOnlyList<VillagePrefabCatalog> saved = VillagePrefabCatalog.SaveSynchronized(targets, prefabs, semantics, externalEntry, rules); session.MarkSaved(revision);
 			status.Text = $"Saved and verified {prefabs.Length} modules, {semantics.Length} semantics.\nHash {saved[0].Hash[..12]}\n{string.Join("\n", targets)}"; Refresh();
 		}
 		catch (Exception exception) { status.Text = $"Save failed; previous files restored.\n{exception.Message}"; }
 	}
 
-	private void ValidateCatalog() { try { CommitWorking(); (VillagePrefab[] prefabs, string[] semantics, _) = session.Snapshot(); VillagePrefabCatalogDescriptor descriptor = new(prefabs.Select(static prefab => prefab.Descriptor), socketSemantics: semantics); status.Text = $"Valid: {descriptor.Prefabs.Count} modules, {descriptor.Prefabs.Sum(static prefab => prefab.AllowedRotations.Length)} variants, {descriptor.SocketSemantics.Count} semantics."; } catch (Exception exception) { status.Text = $"Validation failed: {exception.Message}"; } }
-	private void ShowSemanticsDialog() { CloseSocketDropDowns(); RebuildSemanticsList(); semanticName.Text = string.Empty; semanticError.Text = string.Empty; ShowModal(semanticsWindow); }
+	private void ValidateCatalog() { try { CommitWorking(); (VillagePrefab[] prefabs, string[] semantics, string externalEntry, VillageAdjacencyRuleDescriptor[] rules, _) = session.Snapshot(); VillagePrefabCatalogDescriptor descriptor = new(prefabs.Select(static prefab => prefab.Descriptor), socketSemantics: semantics, externalEntrySemantic: externalEntry, adjacencyRules: rules); status.Text = descriptor.HasUsefulConnectedChain() ? $"Valid: {descriptor.Prefabs.Count} modules, {descriptor.Prefabs.Sum(static prefab => prefab.AllowedRotations.Length)} configured rotations, {descriptor.SocketSemantics.Count} semantics, {descriptor.AdjacencyRules.Count} adjacency rules." : $"Catalog is valid, but no connected socket chain leads from '{externalEntry}' to a terminating prefab. Villages will remain empty."; } catch (Exception exception) { status.Text = $"Validation failed: {exception.Message}"; } }
+	private void ShowSemanticsDialog() { CloseSocketDropDowns(); RebuildSemanticsList(); RebuildExternalEntryDropDown(); semanticName.Text = string.Empty; semanticError.Text = string.Empty; ShowModal(semanticsWindow); }
 	private void FinishEditingSemantics() { CloseSocketDropDowns(); RebuildSocketDropDowns(); Refresh(); HideModal(semanticsWindow); }
-	private void AddSocketSemantic() { try { session.AddSemantic(semanticName.Text); semanticName.Text = string.Empty; semanticError.Text = string.Empty; RebuildSemanticsList(); RebuildSocketDropDowns(); Refresh(); } catch (Exception exception) { semanticError.Text = exception.Message; } }
+	private void AddSocketSemantic() { try { session.AddSemantic(semanticName.Text); semanticName.Text = string.Empty; semanticError.Text = string.Empty; RebuildSemanticsList(); RebuildSocketDropDowns(); RebuildExternalEntryDropDown(); Refresh(); } catch (Exception exception) { semanticError.Text = exception.Message; } }
 	private void RemoveSocketSemantic() { try { if (semanticsList.GetSelectedItems().FirstOrDefault()?.UserData is not string value) throw new InvalidDataException("Select a socket semantic to remove."); session.RemoveSemantic(value); semanticError.Text = string.Empty; RebuildSemanticsList(); RebuildSocketDropDowns(); Refresh(); } catch (Exception exception) { semanticError.Text = exception.Message; } }
 	private void RebuildSemanticsList() { semanticsList.Items.Clear(); foreach (string value in session.SocketSemantics) semanticsList.AddItem(new ListBoxItem(value, value)); }
+	private void RebuildExternalEntryDropDown()
+	{
+		synchronizingSockets = true;
+		try
+		{
+			externalEntryDropDown.ClearItems();
+			foreach (string value in session.SocketSemantics) externalEntryDropDown.AddItem(new DropDownItem(value, value));
+			int index = session.SocketSemantics.ToList().FindIndex(value => value == session.ExternalEntrySemantic);
+			if (index >= 0) externalEntryDropDown.SelectIndex(index);
+		}
+		finally { synchronizingSockets = false; }
+	}
 	private void RebuildSocketDropDowns()
 	{
 		synchronizingSockets = true;
@@ -394,6 +469,39 @@ public sealed class VillagePrefabLabState : GameStateImpl
 		finally { synchronizingSockets = false; }
 	}
 	private void CloseSocketDropDowns() { foreach (DropDown dropDown in socketDropDowns.Values) dropDown.Close(); }
+	private void ShowRulesDialog()
+	{
+		RebuildRulesList(); ruleId.Text = string.Empty; ruleFirstPattern.Text = string.Empty;
+		ruleSecondPattern.Text = string.Empty; ruleWeightPercent.Text = "25"; ruleRelation.SelectIndex((int)VillageAdjacencyRelation.Disconnected); ruleError.Text = string.Empty; ShowModal(rulesWindow);
+	}
+	private void AddAdjacencyRule()
+	{
+		try
+		{
+			if (!int.TryParse(ruleWeightPercent.Text, out int weight)) throw new InvalidDataException("Weight percent must be an integer from 0 through 100.");
+			VillageAdjacencyRelation relation = ruleRelation.GetSelectedItem()?.UserData is VillageAdjacencyRelation value ? value : VillageAdjacencyRelation.Disconnected;
+			VillageAdjacencyRuleDescriptor rule = new(ruleId.Text?.Trim() ?? string.Empty,
+				ruleFirstPattern.Text?.Trim() ?? string.Empty, ruleSecondPattern.Text?.Trim() ?? string.Empty, weight, relation);
+			session.AddAdjacencyRule(rule); ruleError.Text = string.Empty; RebuildRulesList(); Refresh();
+		}
+		catch (Exception exception) { ruleError.Text = exception.Message; }
+	}
+	private void RemoveAdjacencyRule()
+	{
+		try
+		{
+			if (rulesList.GetSelectedItems().FirstOrDefault()?.UserData is not VillageAdjacencyRuleDescriptor rule)
+				throw new InvalidDataException("Select an adjacency rule to remove.");
+			session.RemoveAdjacencyRule(rule.Id); ruleError.Text = string.Empty; RebuildRulesList(); Refresh();
+		}
+		catch (Exception exception) { ruleError.Text = exception.Message; }
+	}
+	private void RebuildRulesList()
+	{
+		rulesList.Items.Clear();
+		foreach (VillageAdjacencyRuleDescriptor rule in session.AdjacencyRules)
+			rulesList.AddItem(new ListBoxItem($"{rule.Id}: {rule.FirstPattern} ↔ {rule.SecondPattern}, {rule.Relation}, {rule.WeightPercent}%", rule));
+	}
 
 	private bool TryPick(Vector2 logicalMouse, out Int3 placement, out Int3 occupied, out bool occupiedHit)
 	{
@@ -449,6 +557,7 @@ public sealed class VillagePrefabLabState : GameStateImpl
 	private static bool DescriptorEqual(VillagePrefabDescriptor left, VillagePrefabDescriptor right) => left.Id == right.Id && left.DisplayName == right.DisplayName && left.Sockets.All(socket => right.Sockets.Any(other => socket.Direction == other.Direction && socket.Types.SequenceEqual(other.Types) && socket.Openings.SequenceEqual(other.Openings)));
 	private static bool CellsEqual(VillagePrefab left, VillagePrefab right) { for (int y = 0; y < 5; y++) for (int z = 0; z < 5; z++) for (int x = 0; x < 5; x++) if (left.GetCell(x, y, z) != right.GetCell(x, y, z)) return false; return true; }
 	private readonly record struct Int3(int X, int Y, int Z);
+	private bool IsModalOpen() => createWindow.Visible || semanticsWindow.Visible || rulesWindow.Visible || gui.UI.ModalControl is not null;
 	private void ShowModal(Window modal) { CenterModal(modal); modal.ShowModal(); }
 	private void HideModal(Window modal) { modal.Visible = false; if (gui.UI.ModalControl == modal) gui.UI.SetModalControl(null); }
 	private void CenterModal(Window modal) => modal.Position = new Vector2(Math.Max(0, (Window.Width - modal.Size.X) / 2), Math.Max(0, (Window.Height - modal.Size.Y) / 2));

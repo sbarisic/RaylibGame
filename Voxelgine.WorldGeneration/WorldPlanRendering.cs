@@ -106,19 +106,22 @@ public static class WorldPlanRendering
 		byte[] rgba = new byte[checked(plan.Width * plan.Length * 4)];
 		foreach (PlannedVillageModule module in plan.VillageLayouts.SelectMany(static layout => layout.Modules).Where(module => module.Floor == floor))
 		{
-			uint color = module.Kind switch
-			{
-				VillageModuleKind.Road => 0xB27B42FF, VillageModuleKind.Plaza => 0xC99A5BFF,
-				VillageModuleKind.Yard => 0x72A85DFF, VillageModuleKind.DefenseWall => 0x777D83FF,
-				VillageModuleKind.DefenseCorner => 0x62686EFF, VillageModuleKind.Gate => 0xE7D84BFF,
-				VillageModuleKind.Stairs => 0x52C7E8FF, VillageModuleKind.Roof => 0xB95757FF,
-				VillageModuleKind.Utility => 0xD884C6FF, _ => 0xDCA6D6FF,
-			};
+			uint color = StablePrefabColor(module.PrefabId);
 			for (int x = module.Origin.X; x < module.Origin.X + VillagePrefabDescriptor.Width && x < plan.Width; x++)
 			for (int z = module.Origin.Z; z < module.Origin.Z + VillagePrefabDescriptor.Length && z < plan.Length; z++)
 				if (x >= 0 && z >= 0) Write(rgba, PixelIndex(plan, x, z), color);
 		}
 		return rgba;
+	}
+
+	private static uint StablePrefabColor(string id)
+	{
+		uint hash = 2166136261;
+		foreach (char value in id) { hash ^= value; hash *= 16777619; }
+		byte red = (byte)(96 + (hash & 0x7F));
+		byte green = (byte)(96 + ((hash >> 8) & 0x7F));
+		byte blue = (byte)(96 + ((hash >> 16) & 0x7F));
+		return (uint)(red << 24 | green << 16 | blue << 8 | 0xFF);
 	}
 
 	private static void WriteFeatureCell(WorldPlan plan, byte[] pixels, int x, int z, uint color, int radius)

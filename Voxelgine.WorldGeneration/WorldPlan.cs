@@ -99,9 +99,9 @@ public sealed record PlannedVillageArea(
 
 public sealed class WorldPlan
 {
-	public const int CurrentFormatVersion = 4;
-	public const int CurrentGeneratorVersion = 10;
-	public const int CurrentMaterializerVersion = 6;
+	public const int CurrentFormatVersion = 5;
+	public const int CurrentGeneratorVersion = 11;
+	public const int CurrentMaterializerVersion = 8;
 
 	private readonly byte[] heights;
 	private readonly byte[] biomes;
@@ -145,7 +145,6 @@ public sealed class WorldPlan
 		VillageLayouts = (villageLayouts ?? []).Select(static layout => layout with
 		{
 			Modules = layout.Modules.ToArray(),
-			InternalRoadCells = layout.InternalRoadCells.ToArray(),
 		}).ToArray();
 		StructureCatalogHash = structureCatalogHash ?? string.Empty;
 		VillagePrefabCatalogHash = villagePrefabCatalogHash ?? string.Empty;
@@ -292,21 +291,10 @@ public sealed class WorldPlan
 			PlannedVillageArea village = villages[layout.VillageId];
 			foreach (PlannedVillageModule module in layout.Modules)
 				if (string.IsNullOrWhiteSpace(module.PrefabId) || module.Rotation is not (0 or 90 or 180 or 270)
-					|| module.Floor is < 0 or > 3 || module.ComponentId < 0 || !Enum.IsDefined(module.Kind)
+					|| module.Floor is < 0 or > 3
 					|| (uint)module.Origin.X >= (uint)Width || (uint)module.Origin.Z >= (uint)Length
-					|| (module.Kind != VillageModuleKind.Roof
-						&& module.Origin.Y != village.SurfaceY + module.Floor * VillagePrefabDescriptor.Height))
+					|| module.Origin.Y != village.SurfaceY + module.Floor * VillagePrefabDescriptor.Height)
 					throw new InvalidDataException($"Village layout '{layout.VillageId}' contains an invalid module.");
-			foreach (IGrouping<int, PlannedVillageModule> roofs in layout.Modules.Where(static module => module.Kind == VillageModuleKind.Roof)
-				.GroupBy(static module => module.ComponentId))
-			{
-				int topFloorY = layout.Modules.Where(module => module.ComponentId == roofs.Key && module.Kind != VillageModuleKind.Roof)
-					.Select(static module => module.Origin.Y).DefaultIfEmpty(int.MinValue).Max();
-				if (topFloorY == int.MinValue || roofs.Any(module => module.Origin.Y != topFloorY + VillagePrefabDescriptor.Height))
-					throw new InvalidDataException($"Village layout '{layout.VillageId}' contains a vertically misaligned roof.");
-			}
-			if (layout.InternalRoadCells.Any(cell => (uint)cell.X >= (uint)Width || (uint)cell.Z >= (uint)Length || !IsLand(cell.X, cell.Z)))
-				throw new InvalidDataException($"Village layout '{layout.VillageId}' contains an invalid road.");
 		}
 	}
 

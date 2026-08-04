@@ -6,8 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $expected = [ordered]@{
-    'thirdparty/FishGfx' = 'e45eceecc557ee512aca37626c500db683278d49'
-    'thirdparty/FishGfx/thirdparty/FishUI' = '2565fb3f6cd0b8f5ba0818ccd475d767b827e8c8'
+    'thirdparty/FishGfx' = '0e543f59b50c633a05b92fe52d317e79cf4fb9f0'
+    'thirdparty/FishGfx/thirdparty/FishUI' = '9395864c8d3528430bf602a960cf4ee0e41f802a'
     'thirdparty/miniaudio' = '9634bedb5b5a2ca38c1ee7108a9358a4e233f14d'
 }
 

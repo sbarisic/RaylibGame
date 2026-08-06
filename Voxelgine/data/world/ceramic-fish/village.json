@@ -1653,6 +1653,100 @@
       "weight": 1
     },
     {
+      "id": "field.dry",
+      "tags": [
+        "dry-farmland"
+      ],
+      "sizeX": 3,
+      "sizeY": 5,
+      "sizeZ": 3,
+      "entities": [
+        {
+          "value": 33,
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        },
+        {
+          "value": 33,
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "rotation": "rot0"
+        }
+      ],
+      "sockets": [
+        {
+          "direction": "north",
+          "type": "no-connection"
+        },
+        {
+          "direction": "east",
+          "type": "no-connection"
+        },
+        {
+          "direction": "south",
+          "type": "no-connection"
+        },
+        {
+          "direction": "west",
+          "type": "no-connection"
+        }
+      ],
+      "allowedRotations": "all",
+      "weight": 1
+    },
+    {
       "id": "house.stairs",
       "tags": [
         "house-stairs"
@@ -1828,6 +1922,24 @@
         "minimum": 0,
         "maximum": 1
       }
+    }
+  ],
+  "areaFeaturePolicies": [
+    {
+      "featureTag": "dry-farmland",
+      "countPerRegion": {
+        "minimum": 0,
+        "maximum": 3
+      },
+      "widthInCells": {
+        "minimum": 1,
+        "maximum": 5
+      },
+      "lengthInCells": {
+        "minimum": 3,
+        "maximum": 6
+      },
+      "requiredAdjacentTag": "road"
     }
   ]
 }

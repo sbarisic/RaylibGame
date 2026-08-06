@@ -172,6 +172,12 @@ public sealed record CeramicFishDefinition
 	/// that component's wall graph.
 	/// </summary>
 	public IReadOnlyList<CeramicInteriorFeaturePolicy> InteriorFeaturePolicies { get; init; } = [];
+
+	/// <summary>
+	/// Rectangular, non-connecting features placed in unoccupied outdoor cells, such as
+	/// fields or gardens. Each connected feature component is one filled rectangle.
+	/// </summary>
+	public IReadOnlyList<CeramicAreaFeaturePolicy> AreaFeaturePolicies { get; init; } = [];
 }
 
 /// <summary>Topology requirements for one connection-bearing socket type.</summary>
@@ -309,6 +315,18 @@ public sealed record CeramicInteriorFeaturePolicy(
 	string ComponentSocketType,
 	string FeatureTag,
 	CeramicCountRange CountPerComponent);
+
+/// <summary>
+/// Places optional rectangular feature components in outdoor topology space. Width and
+/// length are measured in prefab cells. Rectangles may rotate, so either range may align
+/// with the X axis. RequiredAdjacentTag, when present, must touch each rectangle by an edge.
+/// </summary>
+public sealed record CeramicAreaFeaturePolicy(
+	string FeatureTag,
+	CeramicCountRange CountPerRegion,
+	CeramicCountRange WidthInCells,
+	CeramicCountRange LengthInCells,
+	string? RequiredAdjacentTag = null);
 
 /// <summary>
 /// An authored village module such as a road, field, wall, house corner, or door.

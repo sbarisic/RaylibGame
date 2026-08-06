@@ -132,6 +132,17 @@ public sealed class CeramicVillageCatalog
 				&& !prefab.Entities.Any(entity => (BlockType)entity.Value == BlockType.WoodStairs))
 				errors.Add(new("voxel-stair-prefab",
 					$"Stair prefab '{prefab.Id}' must contain at least one wood stair block.", path));
+			if (prefab.Tags.Contains("dry-farmland", StringComparer.Ordinal))
+			{
+				HashSet<(int X, int Z)> farmland = prefab.Entities.Where(entity => entity.Y == 0
+					&& (BlockType)entity.Value == BlockType.DryFarmland)
+					.Select(static entity => (entity.X, entity.Z)).ToHashSet();
+				if (prefab.Entities.Count != PrefabWidth * PrefabLength
+					|| farmland.Count != PrefabWidth * PrefabLength)
+					errors.Add(new("voxel-farmland-prefab",
+						$"Farmland prefab '{prefab.Id}' must fill its 3x3 surface with dry farmland.",
+						path));
+			}
 		}
 		foreach (CeramicInteriorFeaturePolicy policy in definition.InteriorFeaturePolicies
 			.Where(static policy => policy.FeatureTag == "house-stairs"))

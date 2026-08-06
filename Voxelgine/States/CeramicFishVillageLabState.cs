@@ -38,6 +38,11 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 	private readonly Camera camera = new();
 	private readonly Panel sidebar = new() { ID = "village_prefab_sidebar" };
 	private readonly Panel editor = new() { ID = "village_prefab_editor", IsTransparent = true };
+	private readonly Panel editorTools = new()
+	{
+		ID = "village_prefab_editor_tools",
+		Size = new Vector2(244, 604),
+	};
 	private readonly ListBox prefabList = new() { ID = "village_prefab_list", CustomItemHeight = 25 };
 	private readonly ListBox blockList = new() { ID = "village_prefab_block_list", CustomItemHeight = 23 };
 	private readonly Label header = new() { ID = "village_prefab_header" };
@@ -118,31 +123,32 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		AddButton(sidebar, "Village Preview", 190, 562, 168, ShowVillagePreview);
 		AddButton(sidebar, "Back", 16, 604, 342, () => Client.RequestState(ClientStateKind.MainMenu));
 
-		AddLabel(editor, "3 x 5 x 3 voxel prefab", 18, 14, 230, true);
-		hoverLabel.Position = new Vector2(18, 40); hoverLabel.Size = new Vector2(750, 24); hoverLabel.Text = "Hover the voxel volume to inspect X/Y/Z."; editor.AddChild(hoverLabel);
-		AddLabel(editor, "Block palette", 18, 72, 210);
+		editor.AddChild(editorTools);
+		AddLabel(editorTools, "3 x 5 x 3 voxel prefab", 18, 14, 210);
+		hoverLabel.Position = new Vector2(18, 40); hoverLabel.Size = new Vector2(210, 24); hoverLabel.Text = "Hover voxel to inspect."; editorTools.AddChild(hoverLabel);
+		AddLabel(editorTools, "Block palette", 18, 72, 210);
 		blockList.Position = new Vector2(18, 96); blockList.Size = new Vector2(210, 205);
 		blockList.AddItem(new ListBoxItem("0: Erase", BlockType.None));
 		foreach (BlockType block in Enum.GetValues<BlockType>().Where(static value => value != BlockType.None))
 			blockList.AddItem(new ListBoxItem($"{(int)block}: {block}", block));
 		blockList.OnItemSelected += (_, _, item) => { if (item?.UserData is BlockType block) paintBlock = block; };
-		editor.AddChild(blockList);
-		AddLabel(editor, "Stair orientation", 18, 310, 120);
+		editorTools.AddChild(blockList);
+		AddLabel(editorTools, "Stair orientation", 18, 310, 120);
 		stairRotation.Position = new Vector2(138, 306); stairRotation.Size = new Vector2(90, 28);
 		foreach (CeramicRotation rotation in Enum.GetValues<CeramicRotation>()) stairRotation.AddItem(new(rotation.ToString(), rotation));
 		stairRotation.OnItemSelected += (_, item) => paintRotation = (CeramicRotation)item.UserData;
-		stairRotation.SelectIndex(0); editor.AddChild(stairRotation);
-		AddButton(editor, "Undo", 18, 344, 100, Undo); AddButton(editor, "Redo", 128, 344, 100, Redo);
-		AddLabel(editor, "Face sockets", 18, 388, 210);
+		stairRotation.SelectIndex(0); editorTools.AddChild(stairRotation);
+		AddButton(editorTools, "Undo", 18, 344, 100, Undo); AddButton(editorTools, "Redo", 128, 344, 100, Redo);
+		AddLabel(editorTools, "Face sockets", 18, 388, 210);
 		int socketIndex = 0;
 		foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
 		{
 			float y = 416 + socketIndex++ * 46;
-			AddLabel(editor, direction.ToString(), 18, y + 3, 62);
+			AddLabel(editorTools, direction.ToString(), 18, y + 3, 62);
 			DropDown input = new() { ID = $"village_prefab_socket_{direction.ToString().ToLowerInvariant()}", Position = new Vector2(82, y), Size = new Vector2(146, 28), Searchable = true };
 			CeramicDirection captured = direction;
 			input.OnItemSelected += (_, item) => SetSocket(captured, item.UserData as string ?? item.Text);
-			editor.AddChild(input); socketInputs[direction] = input;
+			editorTools.AddChild(input); socketInputs[direction] = input;
 		}
 		AddLabel(editor, "L: place   R: erase   M: pick   Alt+L/M-drag: orbit   Wheel: zoom", 250, 14, 650, true);
 
@@ -194,7 +200,7 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		if (over && !villageMode && !orbit)
 		{
 			hasHover = TryPick(mouse, out hoverCell, out occupiedCell, out occupiedHit);
-			if (hasHover) hoverLabel.Text = $"X={hoverCell.X} Y={hoverCell.Y} Z={hoverCell.Z}  {working[Index(hoverCell)].Type}  paint {paintBlock} R{paintRotation}";
+			if (hasHover) hoverLabel.Text = $"{hoverCell.X},{hoverCell.Y},{hoverCell.Z} {working[Index(hoverCell)].Type} -> {paintBlock} {paintRotation}";
 			if (hasHover && Window.InMgr.IsInputPressed(InputKey.Click_Left)) Paint(hoverCell, paintBlock, paintRotation);
 			if (occupiedHit && Window.InMgr.IsInputPressed(InputKey.Click_Right)) Paint(occupiedCell, BlockType.None, CeramicRotation.Rot0);
 			if (occupiedHit && Window.InMgr.IsInputReleased(InputKey.Click_Middle) && !middleDragged) paintBlock = working[Index(occupiedCell)].Type;
@@ -327,7 +333,7 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		try
 		{
 			PolicyDocument value = JsonSerializer.Deserialize<PolicyDocument>(policyEditor.Text, JsonOptions) ?? throw new InvalidDataException("Policy JSON is empty.");
-			CeramicFishDefinition definition = session.Definition with { ConnectionPolicies = value.ConnectionPolicies ?? [], ComponentAdjacencyPolicies = value.ComponentAdjacencyPolicies ?? [], ComponentTagPolicies = value.ComponentTagPolicies ?? [], ComponentEntryPolicies = value.ComponentEntryPolicies ?? [], WallFeaturePolicies = value.WallFeaturePolicies ?? [], InteriorFeaturePolicies = value.InteriorFeaturePolicies ?? [] };
+			CeramicFishDefinition definition = session.Definition with { ConnectionPolicies = value.ConnectionPolicies ?? [], ComponentAdjacencyPolicies = value.ComponentAdjacencyPolicies ?? [], ComponentTagPolicies = value.ComponentTagPolicies ?? [], ComponentEntryPolicies = value.ComponentEntryPolicies ?? [], WallFeaturePolicies = value.WallFeaturePolicies ?? [], InteriorFeaturePolicies = value.InteriorFeaturePolicies ?? [], AreaFeaturePolicies = value.AreaFeaturePolicies ?? [] };
 			CeramicVillageCatalog.ValidateVoxelDefinition(definition); session.ReplaceDefinition(definition); selected = session.Get(selected.Id); policyError.Text = "Policies applied and validated."; RefreshEditor();
 		}
 		catch (Exception exception) { policyError.Text = exception.Message; }
@@ -406,9 +412,10 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 		IReadOnlyList<CeramicComponentTagPolicy> ComponentTagPolicies,
 		IReadOnlyList<CeramicComponentEntryPolicy> ComponentEntryPolicies,
 		IReadOnlyList<CeramicWallFeaturePolicy> WallFeaturePolicies,
-		IReadOnlyList<CeramicInteriorFeaturePolicy> InteriorFeaturePolicies)
+		IReadOnlyList<CeramicInteriorFeaturePolicy> InteriorFeaturePolicies,
+		IReadOnlyList<CeramicAreaFeaturePolicy> AreaFeaturePolicies)
 	{
-		internal static PolicyDocument From(CeramicFishDefinition definition) => new(definition.ConnectionPolicies, definition.ComponentAdjacencyPolicies, definition.ComponentTagPolicies, definition.ComponentEntryPolicies, definition.WallFeaturePolicies, definition.InteriorFeaturePolicies);
+		internal static PolicyDocument From(CeramicFishDefinition definition) => new(definition.ConnectionPolicies, definition.ComponentAdjacencyPolicies, definition.ComponentTagPolicies, definition.ComponentEntryPolicies, definition.WallFeaturePolicies, definition.InteriorFeaturePolicies, definition.AreaFeaturePolicies);
 	}
 }
 #endif

@@ -22,10 +22,10 @@ public readonly record struct FishGfxGameplayParticleAssets(
 		ArgumentException.ThrowIfNullOrWhiteSpace(idPrefix);
 
 		return new FishGfxGameplayParticleAssets(
-			assets.LoadColorTexture($"{idPrefix}.smoke", "data/textures/smoke/1.png"),
-			assets.LoadColorTexture($"{idPrefix}.fire", "data/textures/fire/1.png"),
-			assets.LoadColorTexture($"{idPrefix}.blood", "data/textures/blood/1.png"),
-			assets.LoadColorTexture($"{idPrefix}.spark", "data/textures/spark/1.png"));
+			assets.GetOrLoadColorTexture($"{idPrefix}.smoke", "data/textures/smoke/1.png"),
+			assets.GetOrLoadColorTexture($"{idPrefix}.fire", "data/textures/fire/1.png"),
+			assets.GetOrLoadColorTexture($"{idPrefix}.blood", "data/textures/blood/1.png"),
+			assets.GetOrLoadColorTexture($"{idPrefix}.spark", "data/textures/spark/1.png"));
 	}
 }
 #endif

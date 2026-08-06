@@ -139,6 +139,7 @@ internal sealed class CeramicTopologySearch
 					constraint.SocketType, constraint.Direction);
 		}
 
+		HashSet<int> constructedBuildingArea = [];
 		foreach (CeramicConnectionPolicy policy in definition.ConnectionPolicies
 			.OrderBy(item => item.SocketType, StringComparer.Ordinal))
 		{
@@ -247,7 +248,6 @@ internal sealed class CeramicTopologySearch
 			if (count >= quota.MinimumCells) continue;
 			List<CeramicRectangle> rectangles = CreateRectangles();
 			random.Shuffle(rectangles);
-			HashSet<int> claimedBuildingArea = [];
 			CeramicComponentTagPolicy[] componentTagPolicies = definition.ComponentTagPolicies
 				.Where(item => item.ComponentSocketType == policy.SocketType)
 				.OrderBy(item => item.RequiredTag, StringComparer.Ordinal).ToArray();
@@ -264,7 +264,7 @@ internal sealed class CeramicTopologySearch
 				List<int> area = RectangleArea(rectangle);
 				if (perimeter.Count == 0 || area.Count == 0
 					|| count + perimeter.Count > (quota.MaximumCells ?? int.MaxValue)
-					|| !AreaIsAvailable(area, claimedBuildingArea, []))
+					|| !AreaIsAvailable(area, constructedBuildingArea, []))
 					continue;
 				HashSet<int> perimeterSet = perimeter.ToHashSet();
 				if (!CanRealizeLoop(rectangle, perimeter, policy.SocketType, quota.Tag))
@@ -313,7 +313,7 @@ internal sealed class CeramicTopologySearch
 						{
 							List<int> childArea = RectangleArea(childRectangle);
 							if (childArea.Count == 0
-								|| !AreaIsAvailable(childArea, claimedBuildingArea, plannedArea,
+								|| !AreaIsAvailable(childArea, constructedBuildingArea, plannedArea,
 									allowReservedOverlap: true)) continue;
 							List<int> childPerimeter = RectanglePerimeter(childRectangle);
 							if (childPerimeter.Count == 0) continue;
@@ -474,7 +474,7 @@ internal sealed class CeramicTopologySearch
 				foreach (int index in buildingPerimeter) tags[index].Add(quota.Tag);
 				count += buildingPerimeter.Count;
 				foreach ((int index, string tag) in selectedComponentTags) tags[index].Add(tag);
-				claimedBuildingArea.UnionWith(plannedArea);
+				constructedBuildingArea.UnionWith(plannedArea);
 				if (!CheckBudget()) return ConstructionFailure(out topology, out failure,
 					"topology-budget-exceeded",
 					"The topology check budget was exhausted.");
@@ -618,6 +618,86 @@ internal sealed class CeramicTopologySearch
 								&& tags[neighbor].Contains(adjacentTag); }
 							catch (OverflowException) { return false; }
 						});
+		}
+
+		HashSet<int> areaFeatureCells = [];
+		foreach (CeramicAreaFeaturePolicy policy in definition.AreaFeaturePolicies
+			.OrderBy(item => item.FeatureTag, StringComparer.Ordinal))
+		{
+			int maximumPlots = policy.CountPerRegion.Maximum
+				?? policy.CountPerRegion.Minimum;
+			int requestedPlots = policy.CountPerRegion.Minimum
+				+ random.NextInt(maximumPlots - policy.CountPerRegion.Minimum + 1);
+			int placedPlots = 0;
+			for (int plotOrdinal = 0; plotOrdinal < requestedPlots; plotOrdinal++)
+			{
+				List<(CeramicRectangle Rectangle, List<int> Area)> candidates = [];
+				int minimumX = cells.Min(static cell => cell.X);
+				int maximumX = cells.Max(static cell => cell.X);
+				int minimumZ = cells.Min(static cell => cell.Z);
+				int maximumZ = cells.Max(static cell => cell.Z);
+				for (int length = policy.LengthInCells.Minimum;
+					length <= policy.LengthInCells.Maximum!.Value; length++)
+				for (int width = policy.WidthInCells.Minimum;
+					width <= policy.WidthInCells.Maximum!.Value; width++)
+				foreach ((int rectangleWidth, int rectangleHeight) in
+					new[] { (width, length), (length, width) }.Distinct())
+				for (int z = minimumZ; z + rectangleHeight - 1 <= maximumZ; z++)
+				for (int x = minimumX; x + rectangleWidth - 1 <= maximumX; x++)
+				{
+					CeramicRectangle rectangle = new(x, z, rectangleWidth, rectangleHeight);
+					List<int> area = RectangleArea(rectangle);
+					if (area.Count != rectangleWidth * rectangleHeight
+						|| area.Any(index => constructedBuildingArea.Contains(index)
+							|| areaFeatureCells.Contains(index)
+							|| tags[index].Contains("defense-wall")
+							|| tags[index].Contains("road")
+							|| sockets[index].Any(type => type != CeramicSocket.NoConnection)
+							|| !domains[index].Any(optionIndex =>
+							{
+								CeramicTopologyOption option = catalog.Options[optionIndex];
+								return option.TagSet.Contains(policy.FeatureTag)
+									&& option.Sockets.All(socket => socket == CeramicSocket.NoConnection);
+							}))) continue;
+					HashSet<int> areaSet = area.ToHashSet();
+					if (area.Any(index => Enum.GetValues<CeramicDirection>().Any(direction =>
+					{
+						try
+						{
+							return indices.TryGetValue(CeramicGeometry.Offset(cells[index], direction),
+								out int neighbor) && !areaSet.Contains(neighbor)
+								&& (areaFeatureCells.Contains(neighbor)
+									|| constructedBuildingArea.Contains(neighbor));
+						}
+						catch (OverflowException) { return false; }
+					}))) continue;
+					if (policy.RequiredAdjacentTag is not null && !area.Any(index =>
+						Enum.GetValues<CeramicDirection>().Any(direction =>
+						{
+							try
+							{
+								return indices.TryGetValue(CeramicGeometry.Offset(cells[index], direction),
+									out int neighbor) && !areaSet.Contains(neighbor)
+									&& tags[neighbor].Contains(policy.RequiredAdjacentTag);
+							}
+							catch (OverflowException) { return false; }
+						}))) continue;
+					candidates.Add((rectangle, area));
+				}
+				if (candidates.Count == 0) break;
+				random.Shuffle(candidates);
+				foreach (int index in candidates[0].Area)
+				{
+					tags[index].Add(policy.FeatureTag);
+					areaFeatureCells.Add(index);
+				}
+				placedPlots++;
+				if (!CheckBudget()) return ConstructionFailure(out topology, out failure,
+					"topology-budget-exceeded", "The topology check budget was exhausted.");
+			}
+			if (placedPlots < policy.CountPerRegion.Minimum)
+				return ConstructionFailure(out topology, out failure, "topology-area-feature-count",
+					$"Area feature '{policy.FeatureTag}' could not reach its minimum plot count.");
 		}
 
 		List<CeramicTopologyCell> result = new(cells.Length);

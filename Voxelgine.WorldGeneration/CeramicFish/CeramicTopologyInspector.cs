@@ -289,6 +289,66 @@ internal static class CeramicTopologyInspector
 			}
 		}
 
+		foreach (CeramicAreaFeaturePolicy policy in definition.AreaFeaturePolicies)
+		{
+			HashSet<CeramicCell> unseen = topology.Where(cell => cell.Tags.Contains(
+				policy.FeatureTag, StringComparer.Ordinal)).Select(cell => cell.Cell).ToHashSet();
+			List<HashSet<CeramicCell>> components = [];
+			while (unseen.Count != 0)
+			{
+				CeramicCell root = unseen.OrderBy(static cell => cell.Z)
+					.ThenBy(static cell => cell.X).First();
+				HashSet<CeramicCell> component = [];
+				Queue<CeramicCell> pending = new();
+				unseen.Remove(root);
+				pending.Enqueue(root);
+				while (pending.TryDequeue(out CeramicCell current))
+				{
+					component.Add(current);
+					foreach (CeramicCell neighbor in AdjacentCells(current))
+						if (unseen.Remove(neighbor)) pending.Enqueue(neighbor);
+				}
+				components.Add(component);
+			}
+			if (!policy.CountPerRegion.Contains(components.Count))
+				return CreateFailure(out failure, "topology-area-feature-count",
+					$"Area feature '{policy.FeatureTag}' has {components.Count} plots,"
+						+ " outside the configured range.");
+			foreach (HashSet<CeramicCell> component in components)
+			{
+				checks += component.Count * 5L;
+				int minimumX = component.Min(static cell => cell.X);
+				int maximumX = component.Max(static cell => cell.X);
+				int minimumZ = component.Min(static cell => cell.Z);
+				int maximumZ = component.Max(static cell => cell.Z);
+				int width = maximumX - minimumX + 1;
+				int length = maximumZ - minimumZ + 1;
+				bool dimensionsValid = (policy.WidthInCells.Contains(width)
+					&& policy.LengthInCells.Contains(length))
+					|| (policy.WidthInCells.Contains(length)
+						&& policy.LengthInCells.Contains(width));
+				if (!dimensionsValid || component.Count != width * length)
+					return CreateFailure(out failure, "topology-area-feature-shape",
+						$"Area feature '{policy.FeatureTag}' must be a filled rectangle"
+							+ " with configured width and length.");
+				CeramicCell? connected = component.Where(cell => cells[cell].Sockets.Any(socket =>
+					socket.IsExternal || socket.SocketType != CeramicSocket.NoConnection))
+					.Cast<CeramicCell?>().FirstOrDefault();
+				if (connected.HasValue)
+					return CreateFailure(out failure, "topology-area-feature-connections",
+						$"Area feature '{policy.FeatureTag}' must not create connections.",
+						connected.Value);
+				if (policy.RequiredAdjacentTag is not null && !component.Any(cell =>
+					AdjacentCells(cell).Any(neighbor => !component.Contains(neighbor)
+						&& cells.TryGetValue(neighbor, out CeramicTopologyCell? adjacent)
+						&& adjacent.Tags.Contains(policy.RequiredAdjacentTag,
+							StringComparer.Ordinal))))
+					return CreateFailure(out failure, "topology-area-feature-adjacency",
+						$"Area feature '{policy.FeatureTag}' must border"
+							+ $" '{policy.RequiredAdjacentTag}'.");
+			}
+		}
+
 		foreach (CeramicComponentAdjacencyPolicy policy in definition.ComponentAdjacencyPolicies)
 		foreach (HashSet<CeramicCell> component in componentsByType[policy.ComponentSocketType])
 		{

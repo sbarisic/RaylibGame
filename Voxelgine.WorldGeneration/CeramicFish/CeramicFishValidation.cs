@@ -31,12 +31,16 @@ internal static class CeramicFishValidation
 		if (definition.InteriorFeaturePolicies is null)
 			Add("definition-interior-feature-policies", "Interior feature policies are required.",
 				"$.interiorFeaturePolicies");
+		if (definition.AreaFeaturePolicies is null)
+			Add("definition-area-feature-policies", "Area feature policies are required.",
+				"$.areaFeaturePolicies");
 		if (errors.Count != 0 && (definition.Prefabs is null || definition.ConnectionPolicies is null
 			|| definition.ComponentAdjacencyPolicies is null
 			|| definition.ComponentTagPolicies is null
 			|| definition.ComponentEntryPolicies is null
 			|| definition.WallFeaturePolicies is null
-			|| definition.InteriorFeaturePolicies is null)) return new(errors);
+			|| definition.InteriorFeaturePolicies is null
+			|| definition.AreaFeaturePolicies is null)) return new(errors);
 
 		IReadOnlyList<CeramicPrefabDefinition> prefabs = definition.Prefabs!;
 		IReadOnlyList<CeramicConnectionPolicy> connectionPolicies = definition.ConnectionPolicies!;
@@ -50,6 +54,8 @@ internal static class CeramicFishValidation
 			definition.WallFeaturePolicies!;
 		IReadOnlyList<CeramicInteriorFeaturePolicy> interiorFeaturePolicies =
 			definition.InteriorFeaturePolicies!;
+		IReadOnlyList<CeramicAreaFeaturePolicy> areaFeaturePolicies =
+			definition.AreaFeaturePolicies!;
 		HashSet<string> prefabIds = new(StringComparer.Ordinal);
 		int? sizeX = null;
 		int? sizeZ = null;
@@ -272,6 +278,38 @@ internal static class CeramicFishValidation
 			}
 			ValidateRange(policy.CountPerComponent, path + ".countPerComponent");
 		}
+		HashSet<string> areaFeatureTags = new(StringComparer.Ordinal);
+		for (int index = 0; index < areaFeaturePolicies.Count; index++)
+		{
+			CeramicAreaFeaturePolicy? policy = areaFeaturePolicies[index];
+			string path = $"$.areaFeaturePolicies[{index}]";
+			if (policy is null || string.IsNullOrWhiteSpace(policy.FeatureTag))
+			{
+				Add("area-feature-policy", "The area feature policy is invalid.", path);
+				continue;
+			}
+			if (!areaFeatureTags.Add(policy.FeatureTag))
+				Add("area-feature-policy-duplicate", "The area feature policy is duplicated.", path);
+			CeramicPrefabDefinition[] featurePrefabs = prefabs.Where(prefab => prefab is not null
+				&& prefab.Tags is not null
+				&& prefab.Tags.Contains(policy.FeatureTag, StringComparer.Ordinal)).ToArray();
+			if (featurePrefabs.Length == 0)
+				Add("area-feature-policy-tag", "The area feature tag is not authored.", path);
+			foreach (CeramicPrefabDefinition prefab in featurePrefabs)
+				if (prefab.Sockets is null || prefab.Sockets.Count != 4
+					|| prefab.Sockets.Any(socket => socket is null
+						|| socket.Type != CeramicSocket.NoConnection))
+					Add("area-feature-prefab-connections",
+						$"Area feature prefab '{prefab.Id}' must use no-connection on all faces.", path);
+			if (policy.RequiredAdjacentTag is not null
+				&& (string.IsNullOrWhiteSpace(policy.RequiredAdjacentTag)
+					|| !prefabs.Any(prefab => prefab.Tags is not null && prefab.Tags.Contains(
+						policy.RequiredAdjacentTag, StringComparer.Ordinal))))
+				Add("area-feature-adjacent-tag", "The required adjacent tag is not authored.", path);
+			ValidateRange(policy.CountPerRegion, path + ".countPerRegion");
+			ValidatePositiveRange(policy.WidthInCells, path + ".widthInCells");
+			ValidatePositiveRange(policy.LengthInCells, path + ".lengthInCells");
+		}
 		return new(errors);
 
 		void Add(string code, string message, string path) => errors.Add(new(code, message, path));
@@ -281,6 +319,12 @@ internal static class CeramicFishValidation
 				|| (maximumAllowed.HasValue && (range.Minimum > maximumAllowed
 					|| range.Maximum > maximumAllowed)))
 				Add("count-range", "Count ranges must be non-negative and non-inverted.", path);
+		}
+		void ValidatePositiveRange(CeramicCountRange range, string path)
+		{
+			if (range.Minimum < 1 || range.Maximum is null || range.Maximum < range.Minimum)
+				Add("positive-count-range",
+					"Dimension ranges must be positive, bounded, and non-inverted.", path);
 		}
 	}
 

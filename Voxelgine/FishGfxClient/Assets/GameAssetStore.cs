@@ -55,6 +55,24 @@ public sealed class GameAssetStore : IDisposable
 		);
 	}
 
+	public AssetHandle<Texture> GetOrLoadTexture(
+		string id,
+		string path,
+		TextureLoadOptions options = null)
+	{
+		string fullPath = Resolve(path);
+		return GetOrRegister(id, () => graphics.LoadTexture(fullPath, options), fullPath);
+	}
+
+	public AssetHandle<Texture> GetOrLoadColorTexture(string id, string path)
+	{
+		return GetOrLoadTexture(
+			id,
+			path,
+			new TextureLoadOptions { Format = TextureFormat.SRGB8Alpha8 }
+		);
+	}
+
 	public AssetHandle<TrueTypeFont> LoadFont(string id, string path, TrueTypeFontOptions options = null)
 	{
 		string fullPath = Resolve(path);

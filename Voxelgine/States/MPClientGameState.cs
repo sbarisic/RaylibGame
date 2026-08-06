@@ -409,6 +409,8 @@ namespace Voxelgine.States
 			catch (Exception ex)
 			{
 				_logging.Log(GameLogLevel.Error, "Update", "Multiplayer variable update failed.", ex);
+				if (!_initialized && string.IsNullOrEmpty(_errorText))
+					FailWorldLoad(ex);
 			}
 		}
 

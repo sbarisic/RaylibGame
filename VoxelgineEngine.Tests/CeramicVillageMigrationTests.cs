@@ -33,6 +33,14 @@ public sealed class CeramicVillageMigrationTests
 		CeramicInteriorFeaturePolicy stairPolicy = Assert.Single(
 			first.Definition.InteriorFeaturePolicies);
 		Assert.Equal(new CeramicCountRange(0, 1), stairPolicy.CountPerComponent);
+		CeramicPrefabDefinition farmland = Assert.Single(first.Prefabs,
+			prefab => prefab.Tags.Contains("dry-farmland"));
+		Assert.Equal(9, farmland.Entities.Count(entity =>
+			(BlockType)entity.Value == BlockType.DryFarmland));
+		CeramicAreaFeaturePolicy farmlandPolicy = Assert.Single(
+			first.Definition.AreaFeaturePolicies);
+		Assert.Equal(new CeramicCountRange(1, 5), farmlandPolicy.WidthInCells);
+		Assert.Equal(new CeramicCountRange(3, 6), farmlandPolicy.LengthInCells);
 	}
 
 	[Fact]
@@ -50,6 +58,23 @@ public sealed class CeramicVillageMigrationTests
 		CeramicDefinitionException error = Assert.Throws<CeramicDefinitionException>(() =>
 			CeramicVillageCatalog.ValidateVoxelDefinition(invalid));
 		Assert.Contains(error.Errors, item => item.Code == "voxel-entity-value");
+	}
+
+	[Fact]
+	public void VoxelValidationRejectsIncompleteFarmlandPrefab()
+	{
+		CeramicVillageCatalog catalog = CeramicVillageCatalog.Load(DefinitionPath);
+		CeramicPrefabDefinition farmland = catalog.Prefabs.Single(prefab =>
+			prefab.Tags.Contains("dry-farmland", StringComparer.Ordinal));
+		CeramicFishDefinition invalid = catalog.Definition with
+		{
+			Prefabs = catalog.Prefabs.Select(prefab => prefab.Id == farmland.Id
+				? prefab with { Entities = prefab.Entities.Skip(1).ToArray() }
+				: prefab).ToArray(),
+		};
+		CeramicDefinitionException error = Assert.Throws<CeramicDefinitionException>(() =>
+			CeramicVillageCatalog.ValidateVoxelDefinition(invalid));
+		Assert.Contains(error.Errors, item => item.Code == "voxel-farmland-prefab");
 	}
 
 	[Fact]
@@ -107,6 +132,28 @@ public sealed class CeramicVillageMigrationTests
 			catalog.Get(placement.PrefabId).Tags.Contains("house-door", StringComparer.Ordinal));
 		Assert.True(stairCount > 0, "The fixed production preview should contain upper-floor houses.");
 		Assert.InRange(stairCount, 1, buildingCount);
+		HashSet<CeramicCell> farmlandCells = first.Layout.Placements.Where(placement =>
+			catalog.Get(placement.PrefabId).Tags.Contains("dry-farmland", StringComparer.Ordinal))
+			.Select(static placement => placement.Cell).ToHashSet();
+		List<HashSet<CeramicCell>> plots = ConnectedComponents(farmlandCells);
+		Assert.InRange(plots.Count, 1, 3);
+		Dictionary<CeramicCell, CeramicPrefabDefinition> placedPrefabs = first.Layout.Placements
+			.ToDictionary(static placement => placement.Cell,
+				placement => catalog.Get(placement.PrefabId));
+		foreach (HashSet<CeramicCell> plot in plots)
+		{
+			int width = plot.Max(static cell => cell.X) - plot.Min(static cell => cell.X) + 1;
+			int length = plot.Max(static cell => cell.Z) - plot.Min(static cell => cell.Z) + 1;
+			Assert.Equal(width * length, plot.Count);
+			Assert.True(width is >= 1 and <= 5 && length is >= 3 and <= 6
+				|| length is >= 1 and <= 5 && width is >= 3 and <= 6);
+			Assert.Contains(plot, cell => Enum.GetValues<CeramicDirection>().Any(direction =>
+				placedPrefabs.TryGetValue(CeramicGeometry.Offset(cell, direction), out var adjacent)
+				&& adjacent.Tags.Contains("road", StringComparer.Ordinal)));
+		}
+		Assert.DoesNotContain(farmlandCells, cell => Enum.GetValues<CeramicDirection>()
+			.Any(direction => placedPrefabs.TryGetValue(CeramicGeometry.Offset(cell, direction),
+				out var adjacent) && adjacent.Tags.Contains("house-wall", StringComparer.Ordinal)));
 	}
 
 	[Fact]
@@ -146,6 +193,7 @@ public sealed class CeramicVillageMigrationTests
 			new("house.window", new(1, 2), CeramicRotation.Rot0),
 			new("house.corner", new(0, 2), CeramicRotation.Rot0),
 			new("house.straight", new(0, 1), CeramicRotation.Rot90CW),
+			new("field.dry", new(4, 4), CeramicRotation.Rot90CW),
 		];
 		PlannedVillageLayout layout = new("village", new(9, 8, 9), placements, [new(8, 16)], 77, 1, 10, 10);
 		WorldPlan plan = new(settings, heights, biomes, zero, land, zero, sites: [site], routes: [route], villages: [village],
@@ -159,6 +207,7 @@ public sealed class CeramicVillageMigrationTests
 		for (int z = 11; z <= 15; z++)
 			Assert.Equal(BlockType.Plank, BlockAt(result, x, 12, z));
 		Assert.Equal(BlockType.None, BlockAt(result, 13, 13, 13));
+		Assert.Equal(BlockType.DryFarmland, BlockAt(result, 22, 8, 22));
 	}
 
 	[Fact]
@@ -257,5 +306,30 @@ public sealed class CeramicVillageMigrationTests
 		ChunkColumnSnapshot column = result.Columns.Single(value => value.X == x >> 4 && value.Z == z >> 4);
 		ChunkSnapshot chunk = column.Chunks.Single(value => value.ChunkY == y >> 4);
 		return chunk.GetBlock(x & 15, y & 15, z & 15);
+	}
+
+	private static List<HashSet<CeramicCell>> ConnectedComponents(HashSet<CeramicCell> source)
+	{
+		HashSet<CeramicCell> unseen = source.ToHashSet();
+		List<HashSet<CeramicCell>> result = [];
+		while (unseen.Count != 0)
+		{
+			CeramicCell root = unseen.First();
+			HashSet<CeramicCell> component = [];
+			Queue<CeramicCell> pending = new();
+			unseen.Remove(root);
+			pending.Enqueue(root);
+			while (pending.TryDequeue(out CeramicCell cell))
+			{
+				component.Add(cell);
+				foreach (CeramicDirection direction in Enum.GetValues<CeramicDirection>())
+				{
+					CeramicCell neighbor = CeramicGeometry.Offset(cell, direction);
+					if (unseen.Remove(neighbor)) pending.Enqueue(neighbor);
+				}
+			}
+			result.Add(component);
+		}
+		return result;
 	}
 }

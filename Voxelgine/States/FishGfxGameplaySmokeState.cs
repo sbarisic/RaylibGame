@@ -77,6 +77,18 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 				window.Assets,
 				"acceptance.particles"
 			);
+		FishGfxGameplayParticleAssets reusedParticleAssets =
+			FishGfxGameplayParticleAssets.Register(
+				window.Assets,
+				"acceptance.particles"
+			);
+		if (!ReferenceEquals(particleAssets.Smoke.Value, reusedParticleAssets.Smoke.Value)
+			|| !ReferenceEquals(particleAssets.Fire.Value, reusedParticleAssets.Fire.Value)
+			|| !ReferenceEquals(particleAssets.Blood.Value, reusedParticleAssets.Blood.Value)
+			|| !ReferenceEquals(particleAssets.Spark.Value, reusedParticleAssets.Spark.Value))
+		{
+			throw new InvalidOperationException("Process-lifetime particle textures were not reused.");
+		}
 		particles = new FishGfxGameplayParticles(
 			window.RenderWindow.Graphics,
 			particleAssets,

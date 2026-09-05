@@ -1,6 +1,9 @@
 # Aurora Falls - Mod System TODO
 
-Planned tasks for implementing the mod system API.
+Proposal only: the mod loader and APIs below are not implemented. Current
+engine contracts are in [Architecture](docs/ARCHITECTURE.md). A future mod API
+must preserve authenticated identities, administrator gates, and authoritative
+transaction ownership; it must not bypass those boundaries.
 
 > **CPX (Complexity Points)** - 1 to 5 scale:
 > - **1** - Single file control/component
@@ -26,8 +29,8 @@ Planned tasks for implementing the mod system API.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| **Mod type** | C# plugin assemblies | Full type safety, IDE support, access to all .NET 9 features. Single mod technology — no Lua. |
-| **Plugin loading** | `AssemblyLoadContext` | .NET 9 supports safe assembly loading/unloading, mod isolation |
+| **Mod type** | C# plugin assemblies | Full type safety, IDE support, access to all .NET 10 features. Single mod technology — no Lua. |
+| **Plugin loading** | `AssemblyLoadContext` | Collectible contexts support unloading; assemblies are not a security sandbox |
 | **Mod discovery** | `mods/` directory with JSON manifests | Simple convention-based discovery, each mod in its own subfolder |
 | **API exposure** | Interface-based mod API (`IModAPI`) | Mods receive a single API entry point exposing all subsystems; decouples mod code from engine internals |
 | **Event system** | Publish/subscribe event bus | Mods subscribe to game events (block changes, entity spawns, player actions, tick); avoids tight coupling |
@@ -44,15 +47,15 @@ Planned tasks for implementing the mod system API.
 | **Player** | `Player`, `FPSCamera` | Position, velocity, camera, inventory access |
 | **Items/Weapons** | `ItemCatalog`, `PlayerInventory`, `GameplayItemUseController` | Register item definitions and capabilities; request authoritative inventory and item-use operations |
 | **Particles** | `ParticleSystem` | Spawn smoke/fire/blood/custom particles, register particle types |
-| **Sound** | `SoundMgr` | Play sounds, register sound combos |
-| **Resources** | `ResMgr` | Register textures, models, shaders; texture collections |
+| **Sound** | `AudioSystem` / `IGameAudioSink` | Play sounds, register sound combos |
+| **Resources** | `GameAssetStore` | Register textures, models, shaders; texture collections |
 | **Input** | `InputMgr`, `InputKey` | Query input state, register custom key bindings |
 | **GUI** | `FishUIManager`, FishUI controls | Create custom GUI windows/controls |
 | **Day/Night** | `DayNightCycle` | Query/set time, sky properties |
 | **Config** | `GameConfig` | Per-mod configuration load/save |
 | **Logging** | `IFishLogging` | Per-mod prefixed logging |
 | **Pathfinding** | `VoxelPathfinder`, `PathFollower` | Path queries for custom entities |
-| **Networking** | `ServerLoop`, `MultiplayerGameState` | Register custom packet types, send/receive mod data between server and clients |
+| **Networking** | `ServerLoop`, `MPClientGameState` | Register custom packet types, send/receive mod data between server and clients |
 
 ### Mod Folder Structure
 
@@ -93,7 +96,7 @@ mods/
 ### High Priority
 
 - [ ] **Event Bus system** — Create a publish/subscribe event bus (`GameEventBus`) that engine systems fire events into and mods can subscribe to. Events: `OnBlockPlaced`, `OnBlockRemoved`, `OnEntitySpawned`, `OnEntityRemoved`, `OnPlayerDamaged`, `OnPlayerMoved`, `OnTick`, `OnLockstepTick`, `OnGameStateChanged`, `OnWorldGenerated`, `OnWorldLoaded`, `OnWorldSaved`. Each event carries relevant data (position, block type, entity ref, etc.). The event bus should be a DI singleton. Engine code must be updated to fire events at appropriate points (`ChunkMap.SetPlacedBlock`, `EntityManager.Spawn`, `GameState`, `Player`, etc.) **[CPX: 5]**
-- [ ] **Mod API interface** — Define `IMod` interface and `ModBase` abstract class that mods implement. `IMod` defines lifecycle methods: `OnInit(IModAPI api)`, `OnEnable()`, `OnDisable()`, `OnTick(float dt)`. `IModAPI` is the single entry point mods use to access all subsystems (world, entities, player, etc.) — mods never reference engine internals directly. Create `IModAPI` interface with properties for each sub-API (`IWorldAPI`, `IEntityAPI`, `IPlayerAPI`, etc.). Include `ModSide` enum (`Server`/`Client`/`Both`) for multiplayer-aware mod loading. Place in a new `VoxelgineEngine/Engine/Modding/` directory (Raylib-free so server can load mods too) **[CPX: 3]**
+- [ ] **Mod API interface** — Define `IMod` interface and `ModBase` abstract class that mods implement. `IMod` defines lifecycle methods: `OnInit(IModAPI api)`, `OnEnable()`, `OnDisable()`, `OnTick(float dt)`. `IModAPI` is the single entry point mods use to access all subsystems (world, entities, player, etc.) — mods never reference engine internals directly. Create `IModAPI` interface with properties for each sub-API (`IWorldAPI`, `IEntityAPI`, `IPlayerAPI`, etc.). Include `ModSide` enum (`Server`/`Client`/`Both`) for multiplayer-aware mod loading. Place in a new `VoxelgineEngine/Engine/Modding/` directory (renderer-free so server can load mods too) **[CPX: 3]**
 - [ ] **Mod Loader** — Create `ModLoader` class that discovers mod folders in `mods/`, reads `mod.json` manifests, validates dependencies, and loads C# assemblies via `AssemblyLoadContext`. Handle dependency ordering (topological sort). Filter mods by `side` field based on whether running as server or client. Report errors via `IFishLogging`. Register as DI singleton. Integrate into `Program.cs` startup after resource initialization but before game state creation. Server loads server+both mods; client loads client+both mods **[CPX: 4]**
 - [ ] **Mod Lifecycle Manager** — Create `ModManager` that manages the lifecycle of loaded mods: calls `OnInit` → `OnEnable` during startup, `OnTick` each frame, `OnDisable` → unload during shutdown. Handle mod enable/disable at runtime. Track mod state (Loaded/Enabled/Disabled/Error). Integrate with `GameWindow` tick loop (client) and `ServerLoop` tick (server) **[CPX: 3]**
 
@@ -114,10 +117,10 @@ mods/
 
 ### Medium Priority
 
-- [ ] **Resource API** (`IResourceAPI`) — Expose: `RegisterTexture(name, path)`, `RegisterModel(name, path)`, `RegisterShader(name, vertPath, fragPath)`, `RegisterSoundCombo(name, pathPattern, count, volume)`, `GetTexture(name)`, `GetModel(name)`. Mod resource paths are relative to the mod's `data/` folder. Backed by `ResMgr` and `SoundMgr` **[CPX: 3]**
+- [ ] **Resource API** (`IResourceAPI`) — Expose: `RegisterTexture(name, path)`, `RegisterModel(name, path)`, `RegisterShader(name, vertPath, fragPath)`, `RegisterSoundCombo(name, pathPattern, count, volume)`, `GetTexture(name)`, `GetModel(name)`. Mod resource paths are relative to the mod's `data/` folder. Backed by `GameAssetStore` and `AudioSystem` / `IGameAudioSink` **[CPX: 3]**
 - [ ] **Item/Weapon API** (`IItemAPI`) — Expose deterministic item-definition registration and authoritative use callbacks. Inventory state stays private and all mutations run through validated transactions. Backed by `ItemCatalog` and `PlayerInventory` **[CPX: 3]**
 - [ ] **Particle API** (`IParticleAPI`) — Expose: `SpawnSmoke(pos, vel, color)`, `SpawnFire(pos, force, color, scale)`, `SpawnBlood(pos, normal, scale)`, `SpawnTracer(start, end, color)`. Future: `RegisterParticleType(name, properties)` for custom particle types. Backed by `ParticleSystem` **[CPX: 2]**
-- [ ] **Sound API** (`ISoundAPI`) — Expose: `PlayCombo(name, listenerPos, listenerDir, soundPos)`, `RegisterCombo(name, pathPattern, count, volume)`, `SetMasterVolume(vol)`. Backed by `SoundMgr` **[CPX: 2]**
+- [ ] **Sound API** (`ISoundAPI`) — Expose: `PlayCombo(name, listenerPos, listenerDir, soundPos)`, `RegisterCombo(name, pathPattern, count, volume)`, `SetMasterVolume(vol)`. Backed by `AudioSystem` / `IGameAudioSink` **[CPX: 2]**
 - [ ] **GUI API** (`IGuiAPI`) — Expose: `CreateWindow(title, pos, size)`, `CreateButton(text, pos, size)`, `CreateLabel(text, pos, size)`, `CreateCheckbox(pos, size)`, `AddToScreen(control)`, `RemoveFromScreen(control)`. Allow mods to create FishUI controls and add them to the game GUI. Backed by `FishUIManager` **[CPX: 3]**
 - [ ] **Input API** (`IInputAPI`) — Expose: `IsKeyDown(key)`, `IsKeyPressed(key)`, `GetMousePosition()`, `GetMouseDelta()`, `RegisterAction(name, defaultKey)` for custom input actions that can be rebound. Backed by `InputMgr` **[CPX: 2]**
 
@@ -173,10 +176,10 @@ mods/
 ## Notes
 
 - `BlockType` is currently a `ushort` enum — supporting dynamic/mod-defined block types will require an ID registry system mapping names to runtime IDs
-- Static classes (`ResMgr`, `GraphicsUtils`, `CustomModel`) need wrapper APIs since mods shouldn't access engine statics directly
+- Application-owned assets and renderer resources need explicit supported interfaces; mods must not assume process-global ownership
 - The event bus is the foundation — most API layers depend on it for notifying mods about game events
 - Maintain the "dependency-free" philosophy for the mod API — mods should only reference the API assembly, not engine internals
-- Mod API interfaces should be in `VoxelgineEngine` (Raylib-free) so both the client and dedicated server can load mods
+- Mod API interfaces should be in `VoxelgineEngine` (renderer-free) so both the client and dedicated server can load mods
 - Consider publishing the mod API as a NuGet package in the future for easy mod development
 - Multiplayer: gameplay mods (block/entity/player changes) execute on the server; clients see changes via existing sync packets (block changes, entity snapshots, etc.). Client-side mods (particles, GUI, sounds) are presentation only.
 - Server and client must have the same set of `"both"` mods to ensure custom block type IDs and entity type registrations match

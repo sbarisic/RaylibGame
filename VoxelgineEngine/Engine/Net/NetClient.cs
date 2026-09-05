@@ -55,7 +55,18 @@ namespace Voxelgine.Engine
 	public class NetClient : IDisposable
 	{
 		private readonly UdpTransport _transport;
-		private readonly ConcurrentQueue<byte[]> _receiveQueue = new();
+		private readonly BoundedDatagramQueue _receiveQueue = new();
+		private NetworkIdentity identity = new();
+		private ServerTrustStore trust = new();
+		private ClientHandshake handshake;
+		private double nextHandshakeSend;
+		private string trustEndpoint;
+		public PlayerIdentity Identity => identity.Identity;
+		public void ConfigureIdentity(NetworkIdentity value, ServerTrustStore trustedServers)
+		{
+			if (State != ClientState.Disconnected) throw new InvalidOperationException("Disconnect before changing identity.");
+			identity.Dispose(); identity = value; trust = trustedServers;
+		}
 		private readonly IFishLogging _logging;
 		private readonly NetworkSimulation _netSim = new();
 		private readonly List<byte[]> _simReady = new();
@@ -139,7 +150,7 @@ namespace Voxelgine.Engine
 		/// Returns the number of seconds since the last data was received from the server.
 		/// Returns 0 if not connected.
 		/// </summary>
-		public float TimeSinceLastReceive(float currentTime) => _connection?.TimeSinceLastReceive(currentTime) ?? 0f;
+		public double TimeSinceLastReceive(double currentTime) => _connection?.TimeSinceLastReceive(currentTime) ?? 0f;
 
 		/// <summary>
 		/// When enabled, logs all sent and received packets with type, size, and endpoint.
@@ -169,13 +180,14 @@ namespace Voxelgine.Engine
 		/// <param name="port">The server UDP port.</param>
 		/// <param name="playerName">The local player's display name.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Connect(string host, int port, string playerName, float currentTime)
+		public void Connect(string host, int port, string playerName, double currentTime)
 		{
 			if (State != ClientState.Disconnected)
 				throw new InvalidOperationException($"Cannot connect while in state {State}.");
 
+			_ = ConnectionHandshake.ReadName(System.Text.Encoding.UTF8.GetBytes(playerName));
 			_serverEndPoint = new IPEndPoint(
-				Dns.GetHostAddresses(host)[0],
+				Dns.GetHostAddresses(host).First(address => address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork),
 				port
 			);
 
@@ -190,12 +202,10 @@ namespace Voxelgine.Engine
 
 			_logging?.ClientNetworkWriteLine($"Connecting to {host}:{port} as \"{playerName}\"...");
 
-			var connectPacket = new ConnectPacket
-			{
-				PlayerName = playerName,
-				ProtocolVersion = NetServer.ProtocolVersion,
-			};
-			SendInternal(connectPacket, true, currentTime);
+			trustEndpoint = host.Trim().ToLowerInvariant() + ":" + port;
+			handshake = new ClientHandshake(identity, playerName);
+			nextHandshakeSend = currentTime + 0.5;
+			_transport.SendTo(handshake.Outgoing, _serverEndPoint);
 		}
 
 		/// <summary>
@@ -203,7 +213,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		/// <param name="reason">The reason for disconnecting.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Disconnect(string reason, float currentTime)
+		public void Disconnect(string reason, double currentTime)
 		{
 			if (State == ClientState.Disconnected)
 				return;
@@ -227,7 +237,7 @@ namespace Voxelgine.Engine
 		/// <param name="packet">The packet to send.</param>
 		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Send(Packet packet, bool reliable, float currentTime)
+		public void Send(Packet packet, bool reliable, double currentTime)
 		{
 			if (_connection == null || State == ClientState.Disconnected)
 				return;
@@ -240,7 +250,7 @@ namespace Voxelgine.Engine
 		/// and timeout detection. Must be called once per tick on the game thread.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Tick(float currentTime)
+		public void Tick(double currentTime)
 		{
 			if (State == ClientState.Disconnected || _connection == null)
 				return;
@@ -248,18 +258,27 @@ namespace Voxelgine.Engine
 			_connection.Bandwidth.Update(currentTime);
 
 			// Feed incoming datagrams into the network simulation pipeline
-			while (_receiveQueue.TryDequeue(out var rawData))
+			foreach (var item in _receiveQueue.Drain())
 			{
-				_netSim.Submit(rawData, currentTime);
+				_netSim.Submit(item.Data, currentTime);
 			}
 
 			// Collect datagrams ready for processing (may be delayed by simulation)
 			_simReady.Clear();
 			_netSim.Collect(currentTime, _simReady);
 
-			foreach (var data in _simReady)
+			foreach (var received in _simReady)
 			{
-				_connection.Bandwidth.RecordReceived(data.Length);
+				byte[] data = received;
+				int datagramLength = data.Length;
+				if (State == ClientState.Connecting && data.Length >= 2 && data[0] == ConnectionHandshake.Marker)
+				{
+					HandleHandshake(data, currentTime);
+					if (_connection == null) return;
+					continue;
+				}
+				if (_connection.Authentication == null || !_connection.Authentication.TryUnprotect(data, out data)) continue;
+				_connection.Bandwidth.RecordReceived(datagramLength);
 
 				var subPackets = PacketBatcher.UnbatchDatagram(data);
 				foreach (var sub in subPackets)
@@ -275,6 +294,12 @@ namespace Voxelgine.Engine
 					if (_connection == null || State == ClientState.Disconnected)
 						return;
 				}
+			}
+
+			if (State == ClientState.Connecting && currentTime >= nextHandshakeSend)
+			{
+				nextHandshakeSend = currentTime + 0.5;
+				_transport.SendTo(handshake.Outgoing, _serverEndPoint);
 			}
 
 			if (_connection.HasTimedOut(currentTime))
@@ -340,17 +365,18 @@ namespace Voxelgine.Engine
 			}
 
 			_transport.Dispose();
+			identity.Dispose();
 		}
 
 		private void QueueReceivedData(byte[] data, IPEndPoint sender)
 		{
 			if (_serverEndPoint != null && sender.Equals(_serverEndPoint))
 			{
-				_receiveQueue.Enqueue(data);
+				_receiveQueue.Enqueue(data, sender);
 			}
 		}
 
-		private void HandlePacket(Packet packet, float currentTime)
+		private void HandlePacket(Packet packet, double currentTime)
 		{
 			switch (packet)
 			{
@@ -389,6 +415,7 @@ namespace Voxelgine.Engine
 			if (State != ClientState.Connecting)
 				return;
 
+			trust.Confirm(trustEndpoint, handshake.ServerIdentity);
 			_connection.PlayerId = accept.PlayerId;
 			_connection.State = ConnectionState.Connected;
 			LocalTick = 0;
@@ -414,10 +441,10 @@ namespace Voxelgine.Engine
 			if (!PacketLoggingEnabled || _logging == null)
 				return;
 
-			_logging.Log(GameLogLevel.Trace, "Network", $"direction={direction} type={packet.Type} bytes={packet.Serialize().Length} endpoint={_serverEndPoint} localTick={LocalTick}");
+			_logging.Log(GameLogLevel.Trace, "Network", $"direction={direction} type={packet.Type} endpoint={_serverEndPoint} localTick={LocalTick}");
 		}
 
-		private void SendInternal(Packet packet, bool reliable, float currentTime)
+		private void SendInternal(Packet packet, bool reliable, double currentTime)
 		{
 			LogPacket("SEND", packet);
 			ReliableSendClass sendClass = packet is ConnectPacket
@@ -436,6 +463,26 @@ namespace Voxelgine.Engine
 			}
 		}
 
+		private void HandleHandshake(byte[] data, double time)
+		{
+			try
+			{
+				if (data[1] == ConnectionHandshake.Challenge)
+				{
+					var authentication = handshake.AcceptChallenge(data, trust, trustEndpoint);
+					if (authentication != null) _connection.Authentication = authentication;
+					_transport.SendTo(handshake.Outgoing, _serverEndPoint);
+				}
+				else if (data[1] == ConnectionHandshake.Rejected)
+				{
+					byte[][] fields = ConnectionHandshake.Decode(data, ConnectionHandshake.Rejected, 32, 256);
+					if (fields[0].AsSpan().SequenceEqual(handshake.Nonce)) HandleConnectReject(new ConnectRejectPacket { Reason = System.Text.Encoding.UTF8.GetString(fields[1]) });
+				}
+			}
+			catch (InvalidOperationException exception) { HandleConnectReject(new ConnectRejectPacket { Reason = exception.Message }); }
+			catch (Exception exception) when (exception is System.Security.Cryptography.CryptographicException or IOException or ArgumentException) { }
+		}
+
 		private void Cleanup()
 		{
 			State = ClientState.Disconnected;
@@ -450,7 +497,8 @@ namespace Voxelgine.Engine
 			_connection = null;
 			_serverEndPoint = null;
 
-			while (_receiveQueue.TryDequeue(out _)) { }
+			_receiveQueue.Clear();
+			handshake?.Dispose(); handshake = null;
 		}
 	}
 }

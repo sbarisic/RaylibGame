@@ -18,10 +18,12 @@ public sealed class WorldObjectPlaceRequestPacket : Packet
 {
 	public override PacketType Type => PacketType.WorldObjectPlaceRequest;
 	public uint ActionId { get; set; }
+	public int CommandTick { get; set; }
+	public ItemUseChannel Channel { get; set; }
 	public int X { get; set; } public int Y { get; set; } public int Z { get; set; }
 	public byte PlantType { get; set; }
-	public override void Write(BinaryWriter writer) { writer.Write(ActionId); writer.Write(X); writer.Write(Y); writer.Write(Z); writer.Write(PlantType); }
-	public override void Read(BinaryReader reader) { ActionId = reader.ReadUInt32(); X = reader.ReadInt32(); Y = reader.ReadInt32(); Z = reader.ReadInt32(); PlantType = reader.ReadByte(); }
+	public override void Write(BinaryWriter writer) { writer.Write(ActionId); writer.Write(CommandTick); writer.Write((byte)Channel); writer.Write(X); writer.Write(Y); writer.Write(Z); writer.Write(PlantType); }
+	public override void Read(BinaryReader reader) { ActionId = reader.ReadUInt32(); CommandTick = reader.ReadInt32(); Channel = (ItemUseChannel)reader.ReadByte(); X = reader.ReadInt32(); Y = reader.ReadInt32(); Z = reader.ReadInt32(); PlantType = reader.ReadByte(); }
 }
 
 public sealed class WorldObjectColumnPacket : Packet

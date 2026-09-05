@@ -25,7 +25,7 @@ namespace Voxelgine.Engine.Server
 		/// Broadcasts a <see cref="WorldSnapshotPacket"/> containing all player positions to all clients.
 		/// Sent unreliably at tick rate for remote player interpolation and local player reconciliation.
 		/// </summary>
-		private void BroadcastPlayerSnapshots(float currentTime)
+		private void BroadcastPlayerSnapshots(double currentTime)
 		{
 			var allPlayers = _simulation.Players.GetAllPlayers().ToArray();
 			if (allPlayers.Length == 0)
@@ -68,7 +68,7 @@ namespace Voxelgine.Engine.Server
 		/// the last broadcast. Skips entities with identical position, velocity, and animation state
 		/// to reduce bandwidth for stationary entities (closed doors, idle pickups, etc.).
 		/// </summary>
-		private void BroadcastEntitySnapshots(float currentTime)
+		private void BroadcastEntitySnapshots(double currentTime)
 		{
 			// Collect live entity IDs to prune stale entries afterwards
 			int liveCount = 0;
@@ -138,7 +138,7 @@ namespace Voxelgine.Engine.Server
 		/// Collects ordered world mutations and broadcasts them to all clients.
 		/// Called once per tick after physics and entity updates.
 		/// </summary>
-		private void BroadcastBlockChanges(float currentTime)
+		private void BroadcastBlockChanges(double currentTime)
 		{
 			IReadOnlyList<WorldMutation> mutations =
 				_simulation.Map.GetPendingWorldMutations();
@@ -250,7 +250,7 @@ namespace Voxelgine.Engine.Server
 		/// Broadcasts a <see cref="DayTimeSyncPacket"/> to all clients at a fixed interval.
 		/// Keeps clients' day/night cycle synchronized with the server.
 		/// </summary>
-		private void BroadcastTimeSync(float currentTime)
+		private void BroadcastTimeSync(double currentTime)
 		{
 			if (currentTime - _lastTimeSyncTime < TimeSyncInterval)
 				return;

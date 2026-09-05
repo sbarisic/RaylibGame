@@ -27,6 +27,7 @@ namespace Voxelgine.Engine
 		/// Parameters: entity, touching player.
 		/// </summary>
 		public event Action<VoxEntity, Player> PlayerTouchedEntity;
+		public event Action<VoxEntity> EntityRemoved;
 
 		public EntityManager(IFishEngineRunner eng)
 		{
@@ -97,6 +98,7 @@ namespace Voxelgine.Engine
 
 			EntitiesById.Remove(networkId);
 			Entities.Remove(ent);
+			EntityRemoved?.Invoke(ent);
 			return ent;
 		}
 
@@ -111,7 +113,9 @@ namespace Voxelgine.Engine
 			if (entity.NetworkId != 0)
 				EntitiesById.Remove(entity.NetworkId);
 
-			return Entities.Remove(entity);
+			if (!Entities.Remove(entity)) return false;
+			EntityRemoved?.Invoke(entity);
+			return true;
 		}
 
 		/// <summary>

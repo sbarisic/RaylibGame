@@ -40,7 +40,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		/// <param name="data">Raw UDP datagram bytes.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Submit(byte[] data, float currentTime)
+		public void Submit(byte[] data, double currentTime)
 		{
 			if (!Enabled)
 			{
@@ -65,7 +65,7 @@ namespace Voxelgine.Engine
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>
 		/// <param name="output">List to append ready packets to.</param>
-		public void Collect(float currentTime, List<byte[]> output)
+		public void Collect(double currentTime, List<byte[]> output)
 		{
 			int writeIdx = 0;
 			for (int i = 0; i < _delayed.Count; i++)
@@ -93,9 +93,9 @@ namespace Voxelgine.Engine
 		private readonly struct DelayedPacket
 		{
 			public readonly byte[] Data;
-			public readonly float DeliverAt;
+			public readonly double DeliverAt;
 
-			public DelayedPacket(byte[] data, float deliverAt)
+			public DelayedPacket(byte[] data, double deliverAt)
 			{
 				Data = data;
 				DeliverAt = deliverAt;

@@ -22,7 +22,7 @@ namespace Voxelgine.States;
 
 public unsafe partial class MPClientGameState
 {
-	private float _clientFrameTime;
+	private double _clientFrameTime;
 	private float _clientDeltaTime;
 	private bool _hasClientFrameTime;
 	private readonly RollingFrameRateCounter _frameRateCounter = new();
@@ -53,14 +53,14 @@ public unsafe partial class MPClientGameState
 	private bool _hasPreviousFishCameraState;
 	private bool _rendererProfilingEnabled;
 	private float _nextRendererProfileLogTime;
-	private float _meshSchedulerStallSince;
-	private float _nextMeshSchedulerStallLogTime;
+	private double _meshSchedulerStallSince;
+	private double _nextMeshSchedulerStallLogTime;
 	private bool _hasReplicatedBlockChange;
 	private int _lastReplicatedBlockX;
 	private int _lastReplicatedBlockY;
 	private int _lastReplicatedBlockZ;
 	private long _lastReplicatedBlockRevision;
-	private float _lastReplicatedBlockChangeTime;
+	private double _lastReplicatedBlockChangeTime;
 	private float _nextHitchLogTime;
 	private string _pendingHitchLog;
 	private GameCameraState _profilingPreviousCamera;
@@ -82,9 +82,10 @@ public unsafe partial class MPClientGameState
 
 	private void RecordClientFrameTime(float gameTime)
 	{
+		double now = GetClientTime();
 		if (_hasClientFrameTime)
 		{
-			_clientDeltaTime = Math.Clamp(gameTime - _clientFrameTime, 0, 0.25f);
+			_clientDeltaTime = (float)Math.Clamp(now - _clientFrameTime, 0d, 0.25d);
 		}
 		else
 		{
@@ -92,12 +93,12 @@ public unsafe partial class MPClientGameState
 			_hasClientFrameTime = true;
 		}
 
-		_clientFrameTime = gameTime;
+		_clientFrameTime = now;
 	}
 
-	internal float GetClientTime()
+	internal double GetClientTime()
 	{
-		return Eng.TotalTime;
+		return System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
 	}
 
 	private float GetClientDeltaTime()
@@ -339,8 +340,8 @@ public unsafe partial class MPClientGameState
 			_simulation.DayNight.SkyLightMultiplier
 		);
 
-		UpdateRemoteInterpolation(timing.TotalTime, timing.DeltaTime);
-		UpdateEntityInterpolation(timing.TotalTime);
+		UpdateRemoteInterpolation(GetClientTime(), timing.DeltaTime);
+		UpdateEntityInterpolation(GetClientTime());
 		UpdateFishGfxEntityAdapters(timing.DeltaTime);
 	}
 
@@ -358,7 +359,7 @@ public unsafe partial class MPClientGameState
 	}
 
 	private void LogMeshSchedulerStallIfNeeded(
-		float currentTime,
+		double currentTime,
 		in VoxelRendererFrameDiagnostics diagnostics)
 	{
 		VoxelRendererWorkload workload = diagnostics.Workload;

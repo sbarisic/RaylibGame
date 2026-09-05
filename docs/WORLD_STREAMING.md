@@ -5,14 +5,16 @@ There is one active schema and no legacy reader, converter, or old-client path.
 
 ## Column archive
 
-`<runtime-root>/worlds/map.bin` is an indexed column archive. Its header stores the schema magic
-and version, world seed, and authoritative player, pickup, and NPC spawn
-positions. The directory maps each X/Z column to an offset, compressed length,
-and checksum. Each payload contains the complete vertical column as chunk-Y
-records, `(ushort run length, ushort block ID)` solid runs, and
-`(ushort run length, uint packed fog)` runs, compressed independently with fast
-Deflate. The current archive schema is version 2; version 1 is deliberately
-incompatible and follows the same backup/regeneration path.
+`<runtime-root>/worlds/map.bin` uses archive format 6. A checksummed section
+directory stores metadata, independently compressed voxel columns, world plants,
+furniture inventories, stable NPC life records, and generated-object tombstones.
+Metadata includes spawn positions, generated features, machine intent, progression,
+and absolute calendar hours. The hardening changes preserve this format.
+
+Column payloads carry chunk-Y records and run-length encoded block values
+(numeric block ID plus state byte), together with the separate packed fog layer.
+They use independent fast Deflate compression and checksums. Player profiles
+are stored separately by verified identity.
 
 Server startup validates the magic/version before reading. An incompatible file
 is moved to `map.bin.incompatible-<timestamp>.bak`, then the requested seed is
@@ -22,7 +24,7 @@ compressed payloads and re-encode only columns whose runtime revision changed.
 
 ## Bootstrap and interest streaming
 
-Connecting reserves a player ID and loads player data without placing the player
+Successful identity authentication reserves a player ID and loads player data without placing the player
 in the simulation. The server streams columns nearest-first:
 
 1. Core columns intersecting a 32-block radius around the authoritative focus.
@@ -47,7 +49,8 @@ treat genuinely absent chunks as air.
 
 ## Reliable transport
 
-Reliable UDP datagrams use this 17-byte header:
+Inside the authenticated protocol 2 envelope, reliable UDP payloads use this
+17-byte header:
 
 ```text
 flags:1 | sequence:4 | ackSequence:4 | ackBits:8
@@ -60,6 +63,11 @@ the same update. Retransmission starts at 200 ms, adapts toward twice the measur
 RTT, clamps to 100-1000 ms, backs off exponentially, and disconnects after 12
 unsuccessful retries.
 
+Reliability does not impose application ordering. Column revisions and action
+IDs supply it. All datagrams, including ACK-only traffic, are authenticated before
+connection state changes. The 41-byte envelope fits within the 1,200-byte MTU.
+See [Multiplayer](../MULTIPLAYER.md) for handshake, replay and queue limits.
+
 Search `<runtime-root>/logs/console.log` for `[WorldStream]`, `[Persistence]`, or `[Network]` to
 diagnose checksums, revision resynchronization, backpressure, retries, archive
 replacement, and readiness transitions. F5 exposes stream, queue, reliability,
@@ -69,6 +77,50 @@ lighting, and meshing progress.
 
 Fog is an independent four-byte voxel layer (`premultiplied RGB + density`) and
 may coexist with solids. Block and fog edits increment the same column revision
-and share one ordered mutation stream. Debug builds expose `/fog fill` and
+and share one ordered mutation stream. Debug builds expose administrator-only `/fog fill` and
 `/fog clear`; use `/help` for their bounded volume syntax. A missed mixed
 revision causes the same full-column resynchronization as a missed block edit.
+
+## Lightweight world objects and recovery
+
+Voxel-column application triggers the matching object snapshot. Snapshots contain
+at most 16,384 records, 4 MiB decoded data, 128 parts, 256 records per part, and
+64 KiB per part. The server retains at most 16 outstanding snapshots per client,
+one per column. Each snapshot retains its immutable payload and next unsent part.
+Backpressure pauses transmission; it does not discard the remainder.
+
+`WorldObjectColumnApplied` retires matching epoch/revision work. A missing
+application acknowledgement causes a two-second retry. A first-part enqueue
+failure remains pending and is retried when capacity returns. Resync requests
+coalesce, later changes wait behind an in-flight snapshot, and failed delta
+queueing schedules a fresh snapshot. Stream replacement and disconnect clear
+outstanding work. Clients validate all records before mutation and acknowledge
+ignored duplicate snapshots. Older streams, epochs, and revisions cannot replace
+newer state. Deltas require the expected epoch and base revision.
+
+An immature-crop index preserves X/Z/Y processing order without sorting every
+world object each second. Wet wheat still advances by 547 fixed-point units per
+second and matures on update 120. Growth commits at most 1,024 operations per
+transaction. Planting, harvest, maturity, support loss, and restoration maintain
+the index.
+
+Delta subscribers receive column metadata without building sorted records. Full
+ordered snapshots are built only for snapshot consumers and persistence. The
+client coalesces pending object columns and compares position/material/growth
+stage before voxel writes; unchanged stages cause no writes or mesh invalidation.
+Changed overlay chunks receive one lighting-dirty notification per column apply.
+The encoded voxel cache keeps only the newest revision per coordinate; in-flight
+sends retain their own immutable payload references.
+
+## Clocks and saving
+
+Server simulation time derives from a long tick count and the unchanged float
+physics step. Network and lifecycle timestamps use doubles. `SetTime` replaces
+the hour within the current calendar day and rebases NPC fatigue timing. It does
+not create elapsed fatigue or sleep recovery. Save/load preserves absolute hours.
+NPC dawn, death, removal, navigation failure, and bed removal release sleep
+reservations and life-control ownership.
+
+Saves remain synchronous. `[Persistence] world-save` includes duration, byte size,
+and column count, including the cost of flushing the temporary file and saving
+players. Background saving is a separate concurrency task.

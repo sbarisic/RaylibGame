@@ -32,7 +32,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 	private readonly Func<FishGfxVoxelScene> getScene;
 	private readonly Func<bool> getInitialized;
 	private readonly Func<int> getDrawDistance;
-	private readonly Func<float> getTime;
+	private readonly Func<double> getTime;
 	private readonly Action<Exception> fail;
 	private readonly ConcurrentQueue<DecodedWorldColumn> decodedColumns = new();
 	private readonly HashSet<ChunkColumnCoordinate> receivedCoreColumns = new();
@@ -54,20 +54,20 @@ internal sealed partial class ClientWorldStream : IDisposable
 	private int expectedHaloColumns;
 	private bool bootstrapComplete;
 	private bool clientReadySent;
-	private float nextClientReadySendTime;
-	private float nextReadinessLogTime;
+	private double nextClientReadySendTime;
+	private double nextReadinessLogTime;
 	private Vector3 focus;
 	private long decodeTicks;
 	private long applyTicks;
 	private int decodeCount;
 	private int applyCount;
-	private float nextInterestRefreshTime;
+	private double nextInterestRefreshTime;
 	private int lastInterestChunkX = int.MinValue;
 	private int lastInterestChunkZ = int.MinValue;
 	private int lastInterestRadius;
-	private float nextIntegrityCheckTime;
-	private float integritySuspectSince;
-	private float nextIntegrityRepairTime;
+	private double nextIntegrityCheckTime;
+	private double integritySuspectSince;
+	private double nextIntegrityRepairTime;
 	private ClientColumnIntegrityResult integritySuspect;
 	private int generation;
 	private bool disposed;
@@ -79,7 +79,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 		Func<FishGfxVoxelScene> getScene,
 		Func<bool> getInitialized,
 		Func<int> getDrawDistance,
-		Func<float> getTime,
+		Func<double> getTime,
 		Action<Exception> fail)
 	{
 		this.logging = logging ?? throw new ArgumentNullException(nameof(logging));
@@ -242,7 +242,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 			return;
 
 		int forgotten = acknowledgements.ForgetColumn(StreamId, columnX, columnZ);
-		float now = getTime();
+		double now = getTime();
 		logging.Log(
 			GameLogLevel.Warning,
 			"WorldStream",
@@ -266,7 +266,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 		int chunkX = (int)Math.Floor((double)interestFocus.X / Chunk.ChunkSize);
 		int chunkZ = (int)Math.Floor((double)interestFocus.Z / Chunk.ChunkSize);
 		int radius = getDrawDistance() + 32;
-		float now = getTime();
+		double now = getTime();
 		if (!force && chunkX == lastInterestChunkX && chunkZ == lastInterestChunkZ
 			&& radius == lastInterestRadius && now < nextInterestRefreshTime)
 		{
@@ -432,7 +432,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 			}
 		}
 
-		float now = getTime();
+		double now = getTime();
 		if (clientReadySent && now < nextClientReadySendTime)
 			return;
 		bool firstSend = !clientReadySent;
@@ -467,7 +467,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 	{
 		if (getScene()?.IsStreamingBackpressured == true)
 			return;
-		float now = getTime();
+		double now = getTime();
 		for (int sent = 0; sent < 2 && acknowledgements.TryDequeueReady(out WorldColumnPacket packet); sent++)
 		{
 			if (packet.StreamId != StreamId)
@@ -484,7 +484,7 @@ internal sealed partial class ClientWorldStream : IDisposable
 
 	private void RepairFocusedColumnIfNeeded(GameSimulation simulation)
 	{
-		float now = getTime();
+		double now = getTime();
 		if (now < nextIntegrityCheckTime)
 			return;
 		nextIntegrityCheckTime = now + IntegrityCheckSeconds;

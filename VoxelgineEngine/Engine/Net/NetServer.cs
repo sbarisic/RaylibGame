@@ -26,13 +26,13 @@ namespace Voxelgine.Engine
 	/// for the game loop to process.
 	/// </para>
 	/// </remarks>
-	public class NetServer : IDisposable
+	public partial class NetServer : IDisposable
 	{
 		/// <summary>
 		/// Diagnostic packet-schema metadata. Development builds use one current
 		/// schema and do not carry compatibility behavior for older executables.
 		/// </summary>
-		public const int ProtocolVersion = 1;
+		public const int ProtocolVersion = 2;
 
 		/// <summary>
 		/// Maximum number of concurrent player connections.
@@ -42,7 +42,7 @@ namespace Voxelgine.Engine
 		private readonly UdpTransport _transport;
 		private readonly Dictionary<IPEndPoint, NetConnection> _connections = new();
 		private readonly Dictionary<int, NetConnection> _playerConnections = new();
-		private readonly ConcurrentQueue<(byte[] Data, IPEndPoint Sender)> _receiveQueue = new();
+		private readonly BoundedDatagramQueue _receiveQueue = new();
 		private readonly HashSet<int> _usedPlayerIds = new();
 		private readonly IFishLogging _logging;
 
@@ -85,6 +85,9 @@ namespace Voxelgine.Engine
 		/// The UDP port the server is bound to.
 		/// </summary>
 		public int Port => _port;
+		public int PendingHandshakeCount => handshakes.Count;
+		public int IncomingDatagramCount => _receiveQueue.Count;
+		public int IncomingDatagramBytes => _receiveQueue.Bytes;
 
 		/// <summary>
 		/// The current server tick, incremented each <see cref="Tick"/> call.
@@ -123,6 +126,7 @@ namespace Voxelgine.Engine
 			_port = port;
 			_transport.OnDataReceived += QueueReceivedData;
 			_transport.Bind(port);
+			_port = _transport.LocalEndPoint.Port;
 			_running = true;
 			_logging?.ServerNetworkWriteLine($"Server started on port {port}");
 		}
@@ -131,7 +135,7 @@ namespace Voxelgine.Engine
 		/// Stops the server, disconnecting all clients and releasing the UDP port.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds for packet wrapping.</param>
-		public void Stop(float currentTime)
+		public void Stop(double currentTime)
 		{
 			if (!_running)
 				return;
@@ -151,7 +155,9 @@ namespace Voxelgine.Engine
 			_playerConnections.Clear();
 			_usedPlayerIds.Clear();
 
-			while (_receiveQueue.TryDequeue(out _)) { }
+			_receiveQueue.Clear();
+			foreach (var pending in handshakes.Values) pending.Authentication.Dispose();
+			handshakes.Clear();
 		}
 
 		/// <summary>
@@ -159,12 +165,13 @@ namespace Voxelgine.Engine
 		/// and timeout detection. Must be called once per server tick on the game thread.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Tick(float currentTime)
+		public void Tick(double currentTime)
 		{
 			if (!_running)
 				return;
 
-			while (_receiveQueue.TryDequeue(out var item))
+			ExpireHandshakes(currentTime);
+			foreach (var item in _receiveQueue.Drain())
 			{
 				ProcessDatagram(item.Data, item.Sender, currentTime);
 			}
@@ -213,7 +220,7 @@ namespace Voxelgine.Engine
 		/// <param name="packet">The packet to send.</param>
 		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void SendTo(int playerId, Packet packet, bool reliable, float currentTime)
+		public void SendTo(int playerId, Packet packet, bool reliable, double currentTime)
 		{
 			if (_playerConnections.TryGetValue(playerId, out var connection))
 			{
@@ -229,7 +236,7 @@ namespace Voxelgine.Engine
 			int playerId,
 			Packet packet,
 			bool reliable,
-			float currentTime,
+			double currentTime,
 			ReliableSendClass sendClass)
 		{
 			return _playerConnections.TryGetValue(playerId, out NetConnection connection) &&
@@ -242,7 +249,7 @@ namespace Voxelgine.Engine
 		/// <param name="packet">The packet to send.</param>
 		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Broadcast(Packet packet, bool reliable, float currentTime)
+		public void Broadcast(Packet packet, bool reliable, double currentTime)
 		{
 			foreach (var connection in _connections.Values)
 			{
@@ -260,7 +267,7 @@ namespace Voxelgine.Engine
 		/// <param name="packet">The packet to send.</param>
 		/// <param name="reliable">Whether the packet requires reliable delivery.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void BroadcastExcept(int excludePlayerId, Packet packet, bool reliable, float currentTime)
+		public void BroadcastExcept(int excludePlayerId, Packet packet, bool reliable, double currentTime)
 		{
 			foreach (var connection in _connections.Values)
 			{
@@ -297,7 +304,7 @@ namespace Voxelgine.Engine
 		/// <param name="playerId">The player ID to disconnect.</param>
 		/// <param name="reason">The reason for disconnection.</param>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void Kick(int playerId, string reason, float currentTime)
+		public void Kick(int playerId, string reason, double currentTime)
 		{
 			if (_playerConnections.TryGetValue(playerId, out var connection))
 			{
@@ -312,20 +319,26 @@ namespace Voxelgine.Engine
 
 			_disposed = true;
 			Stop(0f);
+			foreach (var connection in _connections.Values) connection.Reset();
+			foreach (var pending in handshakes.Values) pending.Authentication.Dispose();
+			handshakes.Clear();
+			_receiveQueue.Clear();
 			_transport.Dispose();
+			serverIdentity.Dispose();
 		}
 
 		private void QueueReceivedData(byte[] data, IPEndPoint sender)
 		{
-			_receiveQueue.Enqueue((data, sender));
+			_receiveQueue.Enqueue(data, sender);
 		}
 
-		private void ProcessDatagram(byte[] data, IPEndPoint sender, float currentTime)
+		private void ProcessDatagram(byte[] data, IPEndPoint sender, double currentTime)
 		{
 			if (_connections.TryGetValue(sender, out var connection))
 			{
-				connection.Bandwidth.RecordReceived(data.Length);
-
+				int datagramLength = data.Length;
+				if (connection.Authentication == null || !connection.Authentication.TryUnprotect(data, out data)) return;
+				connection.Bandwidth.RecordReceived(datagramLength);
 				var subPackets = PacketBatcher.UnbatchDatagram(data);
 				foreach (var sub in subPackets)
 				{
@@ -346,84 +359,15 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		private void HandleNewConnection(byte[] data, IPEndPoint sender, float currentTime)
-		{
-			var tempConnection = new NetConnection(sender, currentTime);
-			Packet packet = tempConnection.UnwrapPacket(data, currentTime);
-
-			if (packet is not ConnectPacket connect)
-				return;
-
-			if (connect.ProtocolVersion != ProtocolVersion)
-			{
-				_logging?.Log(
-					GameLogLevel.Warning,
-					"Network",
-					$"schema-metadata-mismatch endpoint={sender} server={ProtocolVersion} client={connect.ProtocolVersion}; continuing development connection");
-			}
-
-			if (_connections.Count >= MaxPlayers)
-			{
-				_logging?.ServerNetworkWriteLine($"Rejected connection from {sender}: server is full ({_connections.Count}/{MaxPlayers})");
-				var reject = new ConnectRejectPacket
-				{
-					Reason = "Server is full"
-				};
-				tempConnection.SendImmediate(
-					reject,
-					true,
-					currentTime,
-					_transport,
-					ReliableSendClass.Control);
-				return;
-			}
-
-			int playerId = AllocatePlayerId();
-			if (playerId < 0)
-			{
-				var reject = new ConnectRejectPacket
-				{
-					Reason = "No available player slots"
-				};
-				tempConnection.SendImmediate(
-					reject,
-					true,
-					currentTime,
-					_transport,
-					ReliableSendClass.Control);
-				return;
-			}
-
-			tempConnection.PlayerId = playerId;
-			tempConnection.PlayerName = connect.PlayerName;
-			tempConnection.State = ConnectionState.Connected;
-
-			_connections[sender] = tempConnection;
-			_playerConnections[playerId] = tempConnection;
-			_usedPlayerIds.Add(playerId);
-
-			_logging?.ServerNetworkWriteLine($"Accepted connection from {sender}: [{playerId}] \"{connect.PlayerName}\"");
-
-			var accept = new ConnectAcceptPacket
-				{
-					PlayerId = playerId,
-					ServerTick = ServerTick,
-					WorldSeed = WorldSeed,
-				};
-			QueuePacket(tempConnection, accept, true, currentTime);
-
-			OnClientConnected?.Invoke(tempConnection);
-		}
-
 		private void LogPacket(string direction, Packet packet, NetConnection connection)
 		{
 			if (!PacketLoggingEnabled || _logging == null)
 				return;
 
-			_logging.Log(GameLogLevel.Trace, "Network", $"direction={direction} type={packet.Type} bytes={packet.Serialize().Length} playerId={connection.PlayerId} endpoint={connection.RemoteEndPoint} serverTick={ServerTick}");
+			_logging.Log(GameLogLevel.Trace, "Network", $"direction={direction} type={packet.Type} playerId={connection.PlayerId} endpoint={connection.RemoteEndPoint} serverTick={ServerTick}");
 		}
 
-		private void HandlePacket(NetConnection connection, Packet packet, float currentTime)
+		private void HandlePacket(NetConnection connection, Packet packet, double currentTime)
 		{
 			switch (packet)
 			{
@@ -446,7 +390,7 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		private void DisconnectClient(NetConnection connection, string reason, float currentTime)
+		private void DisconnectClient(NetConnection connection, string reason, double currentTime)
 		{
 			if (connection.State == ConnectionState.Disconnected)
 				return;
@@ -467,6 +411,7 @@ namespace Voxelgine.Engine
 			_connections.Remove(connection.RemoteEndPoint);
 
 			OnClientDisconnected?.Invoke(connection, reason);
+			connection.Reset();
 		}
 
 		private int AllocatePlayerId()
@@ -484,7 +429,7 @@ namespace Voxelgine.Engine
 		/// Sends a packet immediately without batching. Used for disconnect packets
 		/// and other cases where the connection may be removed before the next flush.
 		/// </summary>
-		private void SendDirect(NetConnection connection, Packet packet, bool reliable, float currentTime)
+		private void SendDirect(NetConnection connection, Packet packet, bool reliable, double currentTime)
 		{
 			LogPacket("SEND", packet, connection);
 			if (!connection.SendImmediate(
@@ -509,7 +454,7 @@ namespace Voxelgine.Engine
 			NetConnection connection,
 			Packet packet,
 			bool reliable,
-			float currentTime,
+			double currentTime,
 			ReliableSendClass? requestedClass = null)
 		{
 			LogPacket("SEND", packet, connection);
@@ -537,7 +482,7 @@ namespace Voxelgine.Engine
 		/// Called at the end of each <see cref="Tick"/> to combine small packets into
 		/// MTU-sized datagrams, reducing per-packet UDP/IP overhead.
 		/// </summary>
-		private void FlushAllConnections(float currentTime)
+		private void FlushAllConnections(double currentTime)
 		{
 			foreach (var connection in _connections.Values)
 			{

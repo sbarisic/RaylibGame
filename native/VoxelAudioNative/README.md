@@ -31,3 +31,8 @@ runtime dependency today.
 
 The real-time mixer never calls managed code. Completion, underrun, diagnostic,
 and statistics state is polled by `AudioSystem.Update` on the game thread.
+
+The current gameplay/network changes do not alter this ABI or its miniaudio pin.
+Run the managed/native suite through [Audio build and test](../../docs/AUDIO.md)
+and audit the published client package. The dedicated server must not load this
+DLL. Device listening and multi-device acceptance remain separate from unit tests.

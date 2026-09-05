@@ -11,6 +11,8 @@ public partial class ServerLoop
 
 	private void OpenBasket(ServerClientSession viewer, VEntItemBasket basket)
 	{
+		if (!CanAccessBasket(viewer, basket)) return;
+		CloseContainer(viewer, resolveCursor: true);
 		long generation = _containerGenerations.GetValueOrDefault(basket.PersistentKey, 1);
 		viewer.ContainerSession = new ContainerViewerSession(_nextContainerSessionId++, basket.PersistentKey, generation);
 		SendContainerState(viewer, basket, true);
@@ -22,12 +24,14 @@ public partial class ServerLoop
 			return;
 		VEntItemBasket basket = FindBasket(session.ContainerKey);
 		long generation = _containerGenerations.GetValueOrDefault(session.ContainerKey, 1);
-		if (basket == null || generation != session.Generation)
+		if (!CanAccessBasket(viewer, basket) || generation != session.Generation)
 		{
 			CloseContainer(viewer, resolveCursor:true); return;
 		}
+		if (packet.ActionId == 0 || packet.ActionId <= viewer.LastContainerActionId) { SendContainerState(viewer, basket, true); return; }
+		viewer.LastContainerActionId = packet.ActionId;
 		InventoryTransactionResult result = _inventoryTransactions.ApplyContainerClick(
-			viewer.PlayerName, viewer.Inventory, basket.Inventory, basket.PersistentKey.ToString(), packet.Kind, packet.Slot,
+			viewer.InventoryOwnerKey, viewer.Inventory, basket.Inventory, basket.PersistentKey.ToString(), packet.Kind, packet.Slot,
 			packet.ExpectedPlayerRevision, packet.ExpectedContainerRevision);
 		if (result.Accepted && result.Changed)
 		{
@@ -51,18 +55,37 @@ public partial class ServerLoop
 		_server.TrySendTo(viewer.Player.PlayerId,new ContainerStatePacket{SessionId=session.SessionId,ContainerKey=session.ContainerKey.ToString(),ContainerRevision=1,PlayerRevision=viewer.Inventory.Revision,IsOpen=false,Slots=Array.Empty<ItemStack>()},true,CurrentTime,ReliableSendClass.Gameplay);
 		if(resolveCursor)
 		{
-			ItemStack overflow=_inventoryTransactions.ResolveCursor(viewer.PlayerName,viewer.Inventory,FindContainerByString);
+			ItemStack overflow=_inventoryTransactions.ResolveCursor(viewer.InventoryOwnerKey,viewer.Inventory,key =>
+			{
+				return FindContainerByString(key);
+			});
+			VEntItemBasket changed = FindBasket(session.ContainerKey);
+			if (changed != null) { _simulation.Furniture.Replace(changed.CaptureRecord()); BroadcastContainerState(changed); }
 			if(!overflow.IsEmpty)SpawnItemDrop(overflow,viewer.Player.Position);
 			SendInventoryState(viewer,0,true);
 		}
+	}
+
+	private bool CanAccessBasket(ServerClientSession viewer, VEntItemBasket basket)
+	{
+		if (basket == null || !viewer.IsGameplayActive || viewer.Player.IsDead) return false;
+		Vector3 offset = basket.Position - viewer.Player.Position;
+		float distance = offset.Length();
+		return distance <= MaxBlockReach && (distance < 0.001f ||
+			!_simulation.Map.TryRaycast(viewer.Player.Position, offset / distance, Math.Max(0, distance - 0.1f), out _));
+	}
+	private void UpdateContainerSessions()
+	{
+		foreach (ServerClientSession viewer in _sessions.Values)
+			if (viewer.ContainerSession is ContainerViewerSession session && !CanAccessBasket(viewer, FindBasket(session.ContainerKey)))
+				CloseContainer(viewer, resolveCursor: true);
 	}
 
 	private void RemoveBasket(VEntItemBasket basket)
 	{
 		long generation=_containerGenerations.GetValueOrDefault(basket.PersistentKey,1)+1;_containerGenerations[basket.PersistentKey]=generation;
 		ServerClientSession[] viewers=_sessions.Values.Where(session=>session.ContainerSession?.ContainerKey==basket.PersistentKey).ToArray();
-		foreach(ServerClientSession viewer in viewers){ContainerViewerSession session=viewer.ContainerSession;viewer.ContainerSession=null;_server.TrySendTo(viewer.Player.PlayerId,new ContainerStatePacket{SessionId=session.SessionId,ContainerKey=basket.PersistentKey.ToString(),ContainerRevision=basket.Inventory.Revision,PlayerRevision=viewer.Inventory.Revision,IsOpen=false,Slots=Array.Empty<ItemStack>()},true,CurrentTime,ReliableSendClass.Gameplay);}
-		foreach(ServerClientSession viewer in viewers){ItemStack overflow=_inventoryTransactions.ResolveCursor(viewer.PlayerName,viewer.Inventory,_=>null);if(!overflow.IsEmpty)SpawnItemDrop(overflow,viewer.Player.Position);SendInventoryState(viewer,0,true);}
+		foreach (ServerClientSession viewer in viewers) CloseContainer(viewer, resolveCursor: true);
 		foreach(ItemStack stack in basket.Inventory.GetSlots())if(!stack.IsEmpty)SpawnItemDrop(stack,basket.Position);SpawnItemDrop(new ItemStack(ItemIds.ItemBasket,1),basket.Position);
 		if(basket.PersistentKey.Kind==PersistentFurnitureKeyKind.Generated)_simulation.Tombstones.Add(GeneratedObjectKind.Furniture,basket.PersistentKey.GeneratedMarkerId);
 		_simulation.Furniture.Remove(basket.PersistentKey,out _);_simulation.Entities.Remove(basket);_server.Broadcast(new EntityRemovePacket{NetworkId=basket.NetworkId},true,CurrentTime);

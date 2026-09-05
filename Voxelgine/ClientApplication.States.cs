@@ -78,7 +78,8 @@ internal sealed partial class ClientApplication
 			ApplicationKind.HostedServer,
 			Path.Combine(RuntimePaths.Root, "hosted-server"),
 			Environment.CurrentDirectory);
-		ServerApplication application = new(serverPaths, Config.LogLevel);
+		using NetworkIdentity identity = NetworkIdentity.LoadOrCreate(Path.Combine(RuntimePaths.Root,"client-identity.pk8"));
+		ServerApplication application = new(serverPaths, Config.LogLevel, identity.Identity);
 		try
 		{
 			application.StartHosted(port, seed, forceRegenerate, worldPlanDirectory);

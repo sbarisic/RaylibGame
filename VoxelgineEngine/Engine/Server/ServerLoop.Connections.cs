@@ -15,7 +15,7 @@ public partial class ServerLoop
 		var inventory = new PlayerInventory();
 		byte selectedHotbarSlot = 0;
 		if (_playerData.TryLoad(
-			connection.PlayerName,
+			connection.Identity.Fingerprint,
 			out Vector3 savedPosition,
 			out float savedHealth,
 			out Vector3 savedVelocity,
@@ -106,6 +106,7 @@ public partial class ServerLoop
 	{
 		int playerId = connection.PlayerId;
 		_worldStream.Cancel(playerId);
+		_worldObjectStream.Cancel(playerId);
 		if (!_sessions.Remove(playerId, out ServerClientSession session))
 			return;
 
@@ -117,8 +118,9 @@ public partial class ServerLoop
 
 		CloseContainer(session, resolveCursor:true);
 		ResolveCursorForDisconnect(session.Inventory);
+		_inventoryTransactions.ClearOwner(session.InventoryOwnerKey);
 		_playerData.Save(
-			session.PlayerName,
+			session.InventoryOwnerKey,
 			session.Player.Position,
 			session.Player.Health,
 			session.Player.GetVelocity(),

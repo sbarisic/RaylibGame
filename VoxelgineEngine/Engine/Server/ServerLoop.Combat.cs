@@ -221,7 +221,7 @@ namespace Voxelgine.Engine.Server
 			List<int> toRespawn = null;
 			foreach (ServerClientSession session in _sessions.Values)
 			{
-				if (session.RespawnStartedAt is float startedAt && CurrentTime - startedAt >= RespawnDelay)
+				if (session.RespawnStartedAt is double startedAt && CurrentTime - startedAt >= RespawnDelay)
 				{
 					toRespawn ??= new List<int>();
 					toRespawn.Add(session.Player.PlayerId);

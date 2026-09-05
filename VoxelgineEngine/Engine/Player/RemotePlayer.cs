@@ -80,7 +80,7 @@ namespace Voxelgine.Engine
 			Vector3 velocity,
 			Vector2 cameraAngle,
 			byte animationState,
-			float currentTime)
+			double currentTime)
 		{
 			PlayerSnapshot snapshot = new()
 			{
@@ -100,7 +100,7 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public void Update(float currentTime, float deltaTime)
+		public void Update(double currentTime, float deltaTime)
 		{
 			_ = deltaTime;
 			if (_snapshotBuffer.Count == 0)
@@ -109,7 +109,7 @@ namespace Voxelgine.Engine
 			if (_snapshotBuffer.Count < 2)
 				return;
 
-			float renderTime = currentTime - InterpolationDelay;
+			double renderTime = currentTime - InterpolationDelay;
 			if (!_snapshotBuffer.Sample(renderTime, out PlayerSnapshot from, out PlayerSnapshot to, out float amount))
 				return;
 

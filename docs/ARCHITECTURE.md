@@ -4,6 +4,7 @@
 
 | Project | Target | Responsibilities | Forbidden dependencies |
 |---|---|---|---|
+| `Voxelgine.WorldGeneration` | `net10.0` | Seed-local world planning, validation, preview data and CeramicFish topology | Client graphics, audio and authoritative runtime state |
 | `VoxelgineEngine` | `net10.0` | Shared contracts, math, input, networking, and backend-neutral types | FishGfx, FishUI, Raylib, GLFW, audio-native code |
 | `VoxelgineServer` | `net10.0` | Authoritative simulation and dedicated-server host | Client assembly and every graphics/audio runtime |
 | `Voxelgine` | `net10.0-windows10.0.17763.0`, x64 final target | Window, input, rendering, UI, assets, and client presentation | Server-only ownership |
@@ -33,8 +34,8 @@ directly while the game remains pre-release. The invariants that remain are:
 - existing input bindings when legacy configuration names are loaded.
 
 An incompatible `map.bin` is moved to a timestamped backup before a fresh
-column archive is generated. The protocol-number field is diagnostic schema
-metadata rather than a compatibility layer. See [World archive and spatial
+column archive is generated. The current archive format is 6 and network protocol is 2. Protocol mismatches
+are rejected before player allocation; no unauthenticated compatibility path exists. See [World archive and spatial
 streaming](WORLD_STREAMING.md).
 
 The client may establish new screenshot baselines after visual review. Exact
@@ -102,3 +103,26 @@ a failed reload leaves the last valid resource live.
   find no `Raylib_cs`,
   `Raylib.`, or `Rlgl.` references outside historical documentation and the
   FishGfx test asset directory named `raylibgame`.
+
+## Identity, transactions, and object state
+
+Application composition owns persistent P-256 keys and server trust storage.
+The host identity is explicitly supplied to `ServerAccessPolicy`. `NetServer`
+verifies signed handshakes and datagram MACs before exposing gameplay messages.
+Display names never determine profile ownership or administrator privileges.
+
+`ServerClientSession` owns command history, action sequence state, predictions'
+authoritative outcomes, and container sessions. `InventoryTransactionService`
+commits validated store changes on the serialized server thread. Click, crafting,
+and item-use acknowledgement domains remain separate.
+
+`WorldObjectStore` owns plants and their column epochs/revisions. Delta events
+carry metadata and operations; full sorted records are produced for actual
+snapshot consumers. `WorldObjectStreamManager` owns bounded per-client retry
+work. `FarmingService` owns the immature-crop index. `WorldPlantOverlay` compares
+presentation materials while `FishGfxVoxelScene` alone writes the rendering mirror.
+
+The calendar persists absolute hours; manual time changes rebase NPC fatigue.
+The physics delta remains float, while server uptime derives from long ticks and
+transport deadlines use monotonic doubles. See [Multiplayer](../MULTIPLAYER.md)
+for wire contracts and [Runtime data](RUNTIME_DATA.md) for identity migration.

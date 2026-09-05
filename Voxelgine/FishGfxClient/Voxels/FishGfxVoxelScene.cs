@@ -22,8 +22,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 	private readonly ConcurrentQueue<BlockChange> pendingChanges = new();
 	private readonly ConcurrentQueue<ChunkColumnSnapshot> pendingColumns = new();
 	private readonly ConcurrentQueue<PreparedClientColumn> pendingPreparedColumns = new();
-	private readonly ConcurrentQueue<WorldObjectColumnState> pendingObjectColumns = new();
-	private readonly Dictionary<(int X, int Z), HashSet<BlockCoordinate>> objectOverlays = new();
+	private readonly ConcurrentDictionary<(int X, int Z), WorldObjectColumnState> pendingObjectColumns = new();
+	private readonly WorldPlantOverlay objectOverlays = new();
+	private readonly Dictionary<(int X, int Z), WorldObjectColumnState> appliedObjectColumns = new();
+	private readonly HashSet<(int X, int Z)> replacedObjectTerrain = new();
 	private readonly WorldObjectStore worldObjects;
 	private readonly Queue<(int X, int Z, long Revision)> completedPreparedColumns = new();
 	private readonly List<ChunkCoordinate> columnRemovalScratch = new();
@@ -242,8 +244,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 			}
 			while (pendingPreparedColumns.TryDequeue(out PreparedClientColumn prepared))
 				prepared.Dispose();
-			while (pendingObjectColumns.TryDequeue(out _)) { }
-			objectOverlays.Clear();
+			pendingObjectColumns.Clear();
+			objectOverlays.Clear(); appliedObjectColumns.Clear(); replacedObjectTerrain.Clear();
 			completedPreparedColumns.Clear();
 			currentPreparedColumn?.Dispose();
 			currentPreparedColumn = null;
@@ -282,8 +284,11 @@ public sealed class FishGfxVoxelScene : IDisposable
 				Apply(change);
 			while (completedPreparedColumns.TryDequeue(out var completed))
 				PreparedColumnApplied?.Invoke(completed.X, completed.Z, completed.Revision);
-			while (pendingObjectColumns.TryDequeue(out WorldObjectColumnState objectColumn))
-				ApplyObjectColumn(objectColumn);
+			foreach (var key in replacedObjectTerrain)
+				if (!pendingObjectColumns.ContainsKey(key) && appliedObjectColumns.TryGetValue(key, out var previous)) ApplyObjectColumn(previous);
+			foreach (var key in pendingObjectColumns.Keys)
+				if (pendingObjectColumns.TryRemove(key, out WorldObjectColumnState objectColumn)) ApplyObjectColumn(objectColumn);
+			replacedObjectTerrain.Clear();
 		}
 	}
 
@@ -641,6 +646,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			Lighting.LoadChunk(coordinate, skyExposedAbove: snapshot.ChunkY == highestY);
 		}
 		RefreshSkyExposure(column.X, column.Z);
+		replacedObjectTerrain.Add((column.X, column.Z));
 	}
 
 	private PreparedColumnApplication BeginPreparedColumn(PreparedClientColumn column)
@@ -703,6 +709,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			Lighting.MarkChunkDirty(chunk.Coordinate);
 		}
 		RefreshSkyExposure(application.X, application.Z);
+		replacedObjectTerrain.Add((application.X, application.Z));
 		completedPreparedColumns.Enqueue((application.X, application.Z, application.Revision));
 	}
 
@@ -756,29 +763,20 @@ public sealed class FishGfxVoxelScene : IDisposable
 			pendingChanges.Enqueue(change);
 	}
 
-	private void QueueObjectColumn(WorldObjectColumnState column) => pendingObjectColumns.Enqueue(column);
-	private void QueueObjectColumn(WorldObjectColumnState column, WorldObjectDeltaRecord _) => pendingObjectColumns.Enqueue(column);
+	private void QueueObjectColumn(WorldObjectColumnState column) => pendingObjectColumns[(column.X, column.Z)] = column;
+	private void QueueObjectColumn(WorldObjectColumnState column, WorldObjectDeltaRecord _) => pendingObjectColumns[(column.X, column.Z)] = column;
 
 	private void ApplyObjectColumn(WorldObjectColumnState column)
 	{
-		(int X, int Z) key = (column.X, column.Z);
-		if (objectOverlays.Remove(key, out HashSet<BlockCoordinate> previous))
-			foreach (BlockCoordinate position in previous)
-			{
-				World.SetVoxel(position.X, position.Y, position.Z, new VoxelCell(assets.GetMaterialId(source.GetBlockValue(position.X, position.Y, position.Z))));
-				ChunkCoordinate previousChunk = ChunkCoordinate.FromWorld(position.X, position.Y, position.Z, out _, out _, out _);
-				Lighting.MarkChunkDirty(previousChunk);
-			}
-		HashSet<BlockCoordinate> current = new();
-		foreach (WorldPlantRecord plant in column.Records)
+		appliedObjectColumns[(column.X, column.Z)] = column;
+		HashSet<ChunkCoordinate> dirty = new();
+		objectOverlays.Apply(column, stage => assets.WheatMaterialIds[stage], (position, material) =>
 		{
-			BlockCoordinate position = plant.Position;
-			World.SetVoxel(position.X, position.Y, position.Z, new VoxelCell(assets.WheatMaterialIds[plant.GrowthStage]));
-			current.Add(position);
-			ChunkCoordinate chunk = ChunkCoordinate.FromWorld(position.X, position.Y, position.Z, out _, out _, out _);
-			Lighting.MarkChunkDirty(chunk);
-		}
-		objectOverlays[key] = current;
+			ushort value = material ?? assets.GetMaterialId(source.GetBlockValue(position.X, position.Y, position.Z));
+			World.SetVoxel(position.X, position.Y, position.Z, new VoxelCell(value));
+			dirty.Add(ChunkCoordinate.FromWorld(position.X, position.Y, position.Z, out _, out _, out _));
+		}, force: replacedObjectTerrain.Contains((column.X, column.Z)));
+		foreach (ChunkCoordinate chunk in dirty) Lighting.MarkChunkDirty(chunk);
 	}
 
 	private void QueueReset()

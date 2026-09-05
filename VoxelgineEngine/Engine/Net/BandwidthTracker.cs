@@ -8,7 +8,7 @@ namespace Voxelgine.Engine
 	{
 		private long _bytesSentAccum;
 		private long _bytesReceivedAccum;
-		private float _lastResetTime;
+		private double _lastResetTime;
 
 		/// <summary>Bytes sent in the last completed one-second window.</summary>
 		public long BytesSentPerSec { get; private set; }
@@ -41,7 +41,7 @@ namespace Voxelgine.Engine
 		/// Call once per tick to keep <see cref="BytesSentPerSec"/> and
 		/// <see cref="BytesReceivedPerSec"/> up to date.
 		/// </summary>
-		public void Update(float currentTime)
+		public void Update(double currentTime)
 		{
 			if (currentTime - _lastResetTime >= 1f)
 			{

@@ -42,8 +42,11 @@ public partial class MPClientGameState
 			FailWorldLoad);
 	}
 
+	private int _latestWorldStreamId;
 	private void BeginWorldStream(WorldStreamBeginPacket packet)
 	{
+		if (packet.StreamId == 0 || _latestWorldStreamId != 0 && unchecked(packet.StreamId - _latestWorldStreamId) <= 0) return;
+		_latestWorldStreamId = packet.StreamId;
 		CancelWorldLoad();
 		_objectAssemblies.Clear();
 		DisposeFishGfxVoxelScene();

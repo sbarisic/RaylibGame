@@ -48,3 +48,9 @@ Short effects should remain WAV and use `streamed: false`; long ambience loops
 should be FLAC and use `streamed: true`. Three-dimensional files with more than
 one source channel are downmixed to mono before miniaudio spatialization and
 reported once through the configured diagnostic logger.
+
+The example is illustrative. The shipped cue list and paths are authoritative in
+[the game bank](../Voxelgine/data/audio/audio-bank.json); validate additions against
+[the schema](audio-bank.schema.json). See [Audio architecture](../docs/AUDIO.md)
+for process-scoped ownership, ambience policy, and validation. Network identity
+and profile migration do not change audio-bank version 1.

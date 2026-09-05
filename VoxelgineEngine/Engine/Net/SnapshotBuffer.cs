@@ -9,7 +9,7 @@ namespace Voxelgine.Engine
 	public struct TimestampedSnapshot<T> where T : struct
 	{
 		public T Data;
-		public float Time;
+		public double Time;
 	}
 
 	/// <summary>
@@ -39,7 +39,7 @@ namespace Voxelgine.Engine
 		/// Adds a new snapshot to the buffer with the given timestamp.
 		/// Older entries are overwritten when the buffer is full.
 		/// </summary>
-		public void Add(T data, float time)
+		public void Add(T data, double time)
 		{
 			_buffer[_head] = new TimestampedSnapshot<T> { Data = data, Time = time };
 			_head = (_head + 1) % BufferSize;
@@ -57,7 +57,7 @@ namespace Voxelgine.Engine
 		/// <param name="to">The snapshot just after <paramref name="renderTime"/>.</param>
 		/// <param name="t">Interpolation factor [0..1] between <paramref name="from"/> and <paramref name="to"/>.</param>
 		/// <returns>True if interpolation is possible (at least 2 snapshots); false otherwise.</returns>
-		public bool Sample(float renderTime, out T from, out T to, out float t)
+		public bool Sample(double renderTime, out T from, out T to, out float t)
 		{
 			if (_count == 0)
 			{
@@ -96,9 +96,9 @@ namespace Voxelgine.Engine
 				int prevNewest = (_head - 2 + BufferSize) % BufferSize;
 				from = _buffer[prevNewest].Data;
 				to = _buffer[newest].Data;
-				float delta = _buffer[newest].Time - _buffer[prevNewest].Time;
+				double delta = _buffer[newest].Time - _buffer[prevNewest].Time;
 				if (delta > 0f)
-					t = Math.Clamp((renderTime - _buffer[prevNewest].Time) / delta, 0f, 1f);
+					t = (float)Math.Clamp((renderTime - _buffer[prevNewest].Time) / delta, 0f, 1f);
 				else
 					t = 1f;
 				return true;
@@ -114,9 +114,9 @@ namespace Voxelgine.Engine
 				{
 					from = _buffer[idxA].Data;
 					to = _buffer[idxB].Data;
-					float delta = _buffer[idxB].Time - _buffer[idxA].Time;
+					double delta = _buffer[idxB].Time - _buffer[idxA].Time;
 					if (delta > 0f)
-						t = (renderTime - _buffer[idxA].Time) / delta;
+						t = (float)((renderTime - _buffer[idxA].Time) / delta);
 					else
 						t = 0f;
 					return true;

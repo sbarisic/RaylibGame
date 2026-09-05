@@ -105,9 +105,10 @@ namespace Voxelgine.Engine.Server
 		/// </summary>
 		private readonly Dictionary<int, ServerClientSession> _sessions = new();
 		private readonly PlayerDataStore _playerData;
+		private readonly ServerAccessPolicy _access;
 		private ulong _nextPlayerSessionId = 1;
 
-		private float _lastTimeSyncTime;
+		private double _lastTimeSyncTime;
 
 		/// <summary>
 		/// Tracks death time for each dead player. Key = playerId, Value = time of death.
@@ -130,12 +131,12 @@ namespace Voxelgine.Engine.Server
 		);
 		private int _startInvoked;
 		private bool _disposed;
-		private float _lastAutoSaveTime;
+		private double _lastAutoSaveTime;
 
 		/// <summary>
 		/// The current server time in seconds since start.
 		/// </summary>
-		public float CurrentTime { get; private set; }
+		public double CurrentTime { get; private set; }
 
 		/// <summary>
 		/// The game simulation owned by this server.
@@ -156,7 +157,7 @@ namespace Voxelgine.Engine.Server
 
 		public ServerLoop(
 			RuntimePaths runtimePaths,
-			GameLogLevel minimumLogLevel = GameLogLevel.Trace)
+			GameLogLevel minimumLogLevel = GameLogLevel.Info, PlayerIdentity? hostIdentity = null)
 		{
 			_runtimePaths = runtimePaths ?? throw new ArgumentNullException(nameof(runtimePaths));
 			_runtimePaths.CreateDirectories();
@@ -170,10 +171,13 @@ namespace Voxelgine.Engine.Server
 			_logging.Init(true);
 			_lerpManager = new LerpManager();
 			_eng = new ServerEngineRunner(_logging, _lerpManager);
-			_playerData = new PlayerDataStore(_runtimePaths.PlayerDirectory, _logging);
+			PlayerDataStore.BackupLegacyProfiles(_runtimePaths.PlayerDirectory);
+			_playerData = new PlayerDataStore(Path.Combine(_runtimePaths.PlayerDirectory, "identities"), _logging);
+			_access = new ServerAccessPolicy(Path.Combine(_runtimePaths.Root,"server-access.json"),hostIdentity);
 			_logging.Log(GameLogLevel.Info, "Startup", $"Server initialized processId={Environment.ProcessId} logLevel={minimumLogLevel} workingDirectory={Environment.CurrentDirectory}");
 
 			_server = new NetServer(_logging);
+			_server.ConfigureIdentity(NetworkIdentity.LoadOrCreate(Path.Combine(_runtimePaths.Root,"server-identity.pk8")), _access.IsBanned);
 #if DEBUG
 			//_server.PacketLoggingEnabled = true;
 #endif
@@ -309,6 +313,8 @@ namespace Voxelgine.Engine.Server
 				RestoreGeneratedPhaseOneMarkers();
 				_npcLife = new NpcLifeService(_simulation.Furniture, () => _simulation.Entities.GetAllEntities().OfType<VEntBed>(), _simulation.DayNight.AbsoluteGameHours);
 				_npcLife.Restore(_loadedNpcLife, _simulation.DayNight.AbsoluteGameHours);
+				_simulation.DayNight.TimeChanged += _npcLife.RebaseTime;
+				_simulation.Entities.EntityRemoved += entity => { if (entity is VEntNPC npc) _npcLife.Detach(npc); };
 
 				// Spawn server-side entities
 				Stopwatch entityTimer = Stopwatch.StartNew();
@@ -364,13 +370,14 @@ namespace Voxelgine.Engine.Server
 		private void RunLoop()
 		{
 			Stopwatch stopwatch = Stopwatch.StartNew();
-			float accumulator = 0f;
-			float previousTime = 0f;
+			double accumulator = 0;
+			double previousTime = 0;
+			long simulationTick = 0;
 
 			while (_running)
 			{
-				float newTime = (float)stopwatch.Elapsed.TotalSeconds;
-				float frameTime = newTime - previousTime;
+				double newTime = stopwatch.Elapsed.TotalSeconds;
+				double frameTime = newTime - previousTime;
 
 				if (frameTime > MaxFrameTime)
 					frameTime = MaxFrameTime;
@@ -381,12 +388,12 @@ namespace Voxelgine.Engine.Server
 				while (accumulator >= DeltaTime)
 				{
 					Tick(CurrentTime, DeltaTime);
-					CurrentTime += DeltaTime;
+					CurrentTime = ++simulationTick * (double)DeltaTime;
 					accumulator -= DeltaTime;
 				}
 
 				// Sleep briefly to avoid burning CPU when no ticks are pending
-				float remainingTime = DeltaTime - accumulator;
+				double remainingTime = DeltaTime - accumulator;
 				if (remainingTime > 0.001f)
 				{
 					Thread.Sleep(1);
@@ -396,7 +403,7 @@ namespace Voxelgine.Engine.Server
 			Shutdown();
 		}
 
-		private void Tick(float totalTime, float dt)
+		private void Tick(double totalTime, float dt)
 		{
 			// 0. Process queued admin commands
 			ProcessCommands();
@@ -406,6 +413,8 @@ namespace Voxelgine.Engine.Server
 
 			// 2. Send pending world data fragments to connecting clients
 			_worldStream.Tick(totalTime);
+			_worldObjectStream.Tick(totalTime);
+			UpdateContainerSessions();
 
 			// 3. Process player respawns
 			ProcessRespawns();
@@ -427,7 +436,7 @@ namespace Voxelgine.Engine.Server
 			// 8. Update entity simulation
 			// Note: Entity UpdateLockstep requires InputMgr; on the server, entities run
 			// their own AI and don't process player input, so we pass null.
-			_simulation.Entities.UpdateLockstep(totalTime, dt, null);
+			_simulation.Entities.UpdateLockstep((float)totalTime, dt, null);
 
 			// 9. Kill and remove NPCs which fell out of the world
 			RemoveFallenNpcs();
@@ -489,7 +498,7 @@ namespace Voxelgine.Engine.Server
 					InputState state = new();
 					command.UnpackKeys(ref state);
 					inputSource.SetState(state);
-					inputMgr.Tick(CurrentTime);
+					inputMgr.Tick((float)CurrentTime);
 
 					player.SetCamAngle(new Vector3(command.CameraAngle.X, command.CameraAngle.Y, 0));
 					player.UpdateDirectionVectors();
@@ -672,7 +681,7 @@ namespace Voxelgine.Engine.Server
 				if (!session.IsGameplayActive)
 					continue;
 				_playerData.Save(
-					session.PlayerName,
+					session.InventoryOwnerKey,
 					session.Player.Position,
 					session.Player.Health,
 					session.Player.GetVelocity(),

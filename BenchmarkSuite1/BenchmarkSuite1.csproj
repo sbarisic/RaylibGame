@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+	<Compile Remove="Measure/**/*.cs" />
 	<ProjectReference Include="..\VoxelgineEngine\VoxelgineEngine.csproj" />
   </ItemGroup>
 </Project>

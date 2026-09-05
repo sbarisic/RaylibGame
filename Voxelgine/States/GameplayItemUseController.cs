@@ -98,6 +98,7 @@ internal sealed class GameplayItemUseController : IDisposable
 			send(new WorldObjectPlaceRequestPacket
 			{
 				ActionId = BeginAction(),
+				CommandTick = commandTick, Channel = channel,
 				X = hit.X,
 				Y = hit.Y,
 				Z = hit.Z,
@@ -111,6 +112,7 @@ internal sealed class GameplayItemUseController : IDisposable
 			send(new WorldObjectPlaceRequestPacket
 			{
 				ActionId = BeginAction(),
+				CommandTick = commandTick, Channel = channel,
 				X = hit.X + (int)hit.Normal.X,
 				Y = hit.Y + (int)hit.Normal.Y,
 				Z = hit.Z + (int)hit.Normal.Z,
@@ -121,7 +123,7 @@ internal sealed class GameplayItemUseController : IDisposable
 
 		if (selected.Item == ItemIds.Bed)
 		{
-			send(new WorldObjectPlaceRequestPacket{ActionId=BeginAction(),X=hit.X+(int)hit.Normal.X,Y=hit.Y+(int)hit.Normal.Y,Z=hit.Z+(int)hit.Normal.Z,PlantType=(byte)WorldObjectPlacementKind.Bed});return;
+			send(new WorldObjectPlaceRequestPacket{ActionId=BeginAction(),CommandTick=commandTick,Channel=channel,X=hit.X+(int)hit.Normal.X,Y=hit.Y+(int)hit.Normal.Y,Z=hit.Z+(int)hit.Normal.Z,PlantType=(byte)WorldObjectPlacementKind.Bed});return;
 		}
 
 		if (selected.IsEmpty || ItemCatalog.Get(selected.Item).PlacesBlock is not BlockType block)

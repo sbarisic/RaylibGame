@@ -42,7 +42,7 @@ namespace Voxelgine.Engine
 
 		private const float RttSmoothFactor = 0.8f;
 		private readonly ReliableChannel channel = new();
-		private readonly PacketFragmenter fragmenter = new();
+		private readonly PacketFragmenter fragmenter = new(PacketBatcher.DefaultMtu - AuthenticatedDatagrams.Overhead - ReliableChannel.HeaderSize - PacketFragmenter.FragmentHeaderSize);
 		private readonly BandwidthTracker bandwidth = new();
 		private readonly Queue<byte[]> controlQueue = new();
 		private readonly Queue<byte[]> gameplayQueue = new();
@@ -50,18 +50,18 @@ namespace Voxelgine.Engine
 		private readonly Queue<byte[]> unreliableQueue = new();
 		private readonly List<byte[]> rawPriorityQueue = new();
 
-		private float lastReceiveTime;
-		private float lastPingSentTime;
+		private double lastReceiveTime;
+		private double lastPingSentTime;
 		private long lastPingTimestamp;
 		private float roundTripTime;
 		private bool roundTripTimeInitialized;
-		private float diagnosticsRateSampleTime;
+		private double diagnosticsRateSampleTime;
 		private long diagnosticsRateAcknowledgements;
 		private long diagnosticsRateRetransmissions;
 		private float acknowledgementsPerSecond;
 		private float retransmissionsPerSecond;
 
-		public NetConnection(IPEndPoint remoteEndPoint, float currentTime)
+		public NetConnection(IPEndPoint remoteEndPoint, double currentTime)
 		{
 			RemoteEndPoint = remoteEndPoint ?? throw new ArgumentNullException(nameof(remoteEndPoint));
 			lastReceiveTime = currentTime;
@@ -71,6 +71,8 @@ namespace Voxelgine.Engine
 		}
 
 		public IPEndPoint RemoteEndPoint { get; }
+		public PlayerIdentity Identity { get; set; }
+		public AuthenticatedDatagrams Authentication { get; set; }
 		public ConnectionState State { get; set; }
 		public int PlayerId { get; set; } = -1;
 		public string PlayerName { get; set; } = string.Empty;
@@ -94,7 +96,7 @@ namespace Voxelgine.Engine
 			acknowledgementsPerSecond,
 			retransmissionsPerSecond);
 
-		public Packet UnwrapPacket(byte[] rawData, float currentTime)
+		public Packet UnwrapPacket(byte[] rawData, double currentTime)
 		{
 			ReliableReceiveResult result = channel.Unwrap(rawData);
 			if (!result.IsValid)
@@ -118,16 +120,16 @@ namespace Voxelgine.Engine
 			}
 		}
 
-		public bool HasTimedOut(float currentTime) => currentTime - lastReceiveTime >= DefaultTimeout;
+		public bool HasTimedOut(double currentTime) => currentTime - lastReceiveTime >= DefaultTimeout;
 
-		public float TimeSinceLastReceive(float currentTime) => currentTime - lastReceiveTime;
+		public double TimeSinceLastReceive(double currentTime) => currentTime - lastReceiveTime;
 
-		public bool ShouldSendPing(float currentTime) => currentTime - lastPingSentTime >= PingInterval;
+		public bool ShouldSendPing(double currentTime) => currentTime - lastPingSentTime >= PingInterval;
 
-		public PingPacket CreatePing(float currentTime)
+		public PingPacket CreatePing(double currentTime)
 		{
 			lastPingSentTime = currentTime;
-			lastPingTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+			lastPingTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
 			return new PingPacket { Timestamp = lastPingTimestamp };
 		}
 
@@ -135,11 +137,12 @@ namespace Voxelgine.Engine
 
 		public void ProcessPong(PongPacket pong)
 		{
-			long elapsedMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - pong.Timestamp;
-			if (elapsedMilliseconds < 0)
+			if (pong.Timestamp != lastPingTimestamp) return;
+			double elapsedSeconds = System.Diagnostics.Stopwatch.GetElapsedTime(pong.Timestamp).TotalSeconds;
+			if (elapsedSeconds < 0)
 				return;
 
-			float sample = elapsedMilliseconds / 1000f;
+			float sample = (float)elapsedSeconds;
 			if (!roundTripTimeInitialized)
 			{
 				roundTripTime = sample;
@@ -160,10 +163,13 @@ namespace Voxelgine.Engine
 		public bool QueuePacket(
 			Packet packet,
 			bool reliable,
-			float currentTime,
+			double currentTime,
 			ReliableSendClass sendClass = ReliableSendClass.Gameplay)
 		{
 			ArgumentNullException.ThrowIfNull(packet);
+			if (reliable && (sendClass == ReliableSendClass.Bulk
+				? bulkQueue.Count >= BulkQueueCapacity
+				: controlQueue.Count + gameplayQueue.Count >= ControlAndGameplayQueueCapacity)) return false;
 			byte[] serialized = packet.Serialize();
 			if (!reliable)
 			{
@@ -189,7 +195,7 @@ namespace Voxelgine.Engine
 		public bool SendImmediate(
 			Packet packet,
 			bool reliable,
-			float currentTime,
+			double currentTime,
 			UdpTransport transport,
 			ReliableSendClass sendClass = ReliableSendClass.Control)
 		{
@@ -199,7 +205,7 @@ namespace Voxelgine.Engine
 			return true;
 		}
 
-		public bool CollectRetransmissions(float currentTime, out uint failedSequence)
+		public bool CollectRetransmissions(double currentTime, out uint failedSequence)
 		{
 			ReliableRetransmissionBatch batch = channel.CollectRetransmissions(currentTime, roundTripTime);
 			foreach (byte[] packet in batch.Packets)
@@ -208,9 +214,9 @@ namespace Voxelgine.Engine
 			return !batch.RetryLimitExceeded;
 		}
 
-		public void CleanupStaleFragments(float currentTime) => fragmenter.CleanupStaleGroups(currentTime);
+		public void CleanupStaleFragments(double currentTime) => fragmenter.CleanupStaleGroups(currentTime);
 
-		public void FlushOutgoing(UdpTransport transport, float currentTime, int maxBytesPerTick = 0)
+		public void FlushOutgoing(UdpTransport transport, double currentTime, int maxBytesPerTick = 0)
 		{
 			ArgumentNullException.ThrowIfNull(transport);
 			bandwidth.Update(currentTime);
@@ -244,16 +250,19 @@ namespace Voxelgine.Engine
 				return;
 			}
 
-			foreach (byte[] datagram in PacketBatcher.CreateBatchedDatagrams(packets))
+			foreach (byte[] datagram in PacketBatcher.CreateBatchedDatagrams(packets, PacketBatcher.DefaultMtu - AuthenticatedDatagrams.Overhead))
 			{
-				transport.SendTo(datagram, RemoteEndPoint);
-				bandwidth.RecordSent(datagram.Length);
+				byte[] outgoing = Authentication?.Protect(datagram) ?? datagram;
+				transport.SendTo(outgoing, RemoteEndPoint);
+				bandwidth.RecordSent(outgoing.Length);
 			}
 			UpdateDiagnosticRates(currentTime);
 		}
 
 		public void Reset()
 		{
+			Authentication?.Dispose();
+			Authentication = null;
 			controlQueue.Clear();
 			gameplayQueue.Clear();
 			bulkQueue.Clear();
@@ -268,16 +277,16 @@ namespace Voxelgine.Engine
 			retransmissionsPerSecond = 0;
 		}
 
-		private void UpdateDiagnosticRates(float currentTime)
+		private void UpdateDiagnosticRates(double currentTime)
 		{
-			float elapsed = currentTime - diagnosticsRateSampleTime;
+			double elapsed = currentTime - diagnosticsRateSampleTime;
 			if (elapsed < 1)
 				return;
 
 			long acknowledgements = channel.AckOnlyPacketsSent;
 			long retransmissions = channel.RetransmissionsSent;
-			acknowledgementsPerSecond = (acknowledgements - diagnosticsRateAcknowledgements) / elapsed;
-			retransmissionsPerSecond = (retransmissions - diagnosticsRateRetransmissions) / elapsed;
+			acknowledgementsPerSecond = (float)((acknowledgements - diagnosticsRateAcknowledgements) / elapsed);
+			retransmissionsPerSecond = (float)((retransmissions - diagnosticsRateRetransmissions) / elapsed);
 			diagnosticsRateAcknowledgements = acknowledgements;
 			diagnosticsRateRetransmissions = retransmissions;
 			diagnosticsRateSampleTime = currentTime;
@@ -294,7 +303,7 @@ namespace Voxelgine.Engine
 		private void DrainReliable(
 			Queue<byte[]> source,
 			List<byte[]> destination,
-			float currentTime,
+			double currentTime,
 			int inFlightLimit = ReliableChannel.WindowSize)
 		{
 			while (source.Count != 0 &&

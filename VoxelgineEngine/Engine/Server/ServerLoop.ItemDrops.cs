@@ -49,6 +49,8 @@ public partial class ServerLoop
 
 	private void ResolveCursorForDeath(ServerClientSession session)
 	{
+		CloseContainer(session, resolveCursor: true);
+		_inventoryTransactions.ClearOwner(session.InventoryOwnerKey);
 		ItemStack remainder = session.Inventory.ResolveCursorForDeath();
 		if (remainder.IsEmpty)
 		{

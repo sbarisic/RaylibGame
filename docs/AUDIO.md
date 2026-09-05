@@ -112,3 +112,11 @@ cmake -S native/VoxelAudioNative -B out/VoxelAudioNative -A x64 `
 cmake --build out/VoxelAudioNative --config Release `
   --target VoxelAudioNative --parallel
 ```
+
+## Validation scope
+
+The audio implementation and native ABI are unchanged by gameplay/network
+hardening. Run the audio suite after engine and client suites in both Debug and
+Release to avoid shared output contention. Automated native tests do not establish
+subjective listening quality or every physical device configuration. See
+[Validation](VALIDATION.md) for current evidence.

@@ -8,6 +8,44 @@ namespace VoxelgineEngine.Tests;
 
 public sealed class NpcLifeTests
 {
+	[Theory]
+	[InlineData("dawn")]
+	[InlineData("death")]
+	[InlineData("detach")]
+	[InlineData("navigation")]
+	[InlineData("bed")]
+	public void SeekingSleepReleasesNavigationAndReservation(string cause)
+	{
+		ChunkMap map=new(); for(int x=-12;x<=12;x++)for(int z=-12;z<=12;z++)map.SetBlock(x,0,z,BlockType.Stone);
+		FurnitureStore furniture=new(); var key=furniture.AllocatePlacedKey(); var anchor=new BlockCoordinate(0,1,0);
+		furniture.Add(new(key,FurnitureType.Bed,anchor,2,Array.Empty<ItemStack>())); VEntBed bed=new();bed.Initialize(key,anchor,2);
+		var id=StableNpcId.Persistent(new PersistentEntityId(90)); NpcLifeService life=new(furniture,()=>new[]{bed},20);
+		life.Restore(new[]{new NpcLifeRecord(id,7000,null)},20); VEntNPC npc=CreateNpc(id);npc.SetPosition(new(8,1,8));npc.InitPathfinding(map);life.Attach(npc);
+		life.Update(20,20,0);Assert.True(npc.IsLifeControlled);Assert.False(npc.IsSleeping);
+		switch(cause)
+		{
+			case "death":npc.Health=0;break;
+			case "detach":life.Detach(npc);break;
+			case "navigation":npc.StopNavigation();break;
+			case "bed":life.OnBedRemoved(key);break;
+		}
+		if(cause is not ("detach" or "bed"))life.Update(20,cause=="dawn"?6:20,1);
+		Assert.False(npc.IsLifeControlled);Assert.False(npc.IsSleeping);Assert.False(npc.IsNavigating);
+		var reservations=(System.Collections.IDictionary)typeof(NpcLifeService).GetField("reservations",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.GetValue(life)!;
+		Assert.Empty(reservations);
+	}
+
+	[Fact]
+	public void ExplicitClockChangesDoNotManufactureFatigue()
+	{
+		var id=StableNpcId.Persistent(new PersistentEntityId(91));DayNightCycle clock=new();
+		NpcLifeService life=new(new(),()=>Array.Empty<VEntBed>(),clock.AbsoluteGameHours);life.Attach(CreateNpc(id));clock.TimeChanged+=life.RebaseTime;
+		clock.SetTime(23);life.Update(clock.AbsoluteGameHours,clock.TimeOfDay,100_000_000d);
+		Assert.True(life.TryGet(id,out var unchanged));Assert.Equal(0,unchanged.Fatigue);
+		clock.SetTime(6);clock.Update(25);life.Update(clock.AbsoluteGameHours,clock.TimeOfDay,100_000_000.015);
+		Assert.True(life.TryGet(id,out var elapsed));Assert.Equal(625,elapsed.Fatigue);
+	}
+
 	[Fact]
 	public void FatigueUsesGameHoursAndStableIdentity()
 	{

@@ -34,6 +34,9 @@ public sealed class FarmingService : IDisposable
 	private readonly IFarmlandHydrationSource hydrationSource;
 	private readonly HashSet<BlockCoordinate> farmland = new();
 	private readonly HashSet<BlockCoordinate> hydrationQueue = new();
+	private readonly SortedDictionary<(int X, int Z, int Y), WorldPlantRecord> growing = new();
+	private readonly Dictionary<PersistentWorldObjectKey, (int X, int Z, int Y)> growingKeys = new();
+	public int GrowingPlantCount => growing.Count;
 	private float accumulator;
 	private bool disposed;
 
@@ -43,6 +46,10 @@ public sealed class FarmingService : IDisposable
 		this.objects = objects ?? throw new ArgumentNullException(nameof(objects));
 		this.hydrationSource = hydrationSource ?? new WaterFarmlandHydrationSource();
 		map.BlockChanged += OnBlockChanged;
+		objects.ColumnDelta += OnObjectDelta;
+		objects.ColumnReplaced += OnObjectReplacement;
+		objects.Restored += RebuildGrowingIndex;
+		RebuildGrowingIndex();
 	}
 
 	public event Action<WorldPlantRecord> PlantLostSupport;
@@ -118,14 +125,15 @@ public sealed class FarmingService : IDisposable
 	private void AdvanceWheat()
 	{
 		List<WorldObjectOperation> operations = new();
-		foreach (WorldPlantRecord plant in objects.GetAll())
+		foreach (WorldPlantRecord plant in growing.Values)
 		{
 			if (plant.PlantType != WorldPlantType.Wheat || plant.IsMature ||
 				map.GetBlock(plant.Support.X, plant.Support.Y, plant.Support.Z) != BlockType.WetFarmland) continue;
 			ushort progress = (ushort)Math.Min(ushort.MaxValue, plant.GrowthProgress + WheatGrowthIncrement);
 			operations.Add(new WorldObjectOperation(WorldObjectOperationKind.Upsert, plant with { GrowthProgress = progress }, default));
 		}
-		if (operations.Count != 0) objects.ApplyTransaction(operations);
+		for (int offset = 0; offset < operations.Count; offset += 1024)
+			objects.ApplyTransaction(operations.GetRange(offset, Math.Min(1024, operations.Count - offset)));
 	}
 
 	private void OnBlockChanged(BlockChange change)
@@ -153,10 +161,37 @@ public sealed class FarmingService : IDisposable
 		}
 	}
 
+	private void RebuildGrowingIndex()
+	{
+		growing.Clear(); growingKeys.Clear();
+		foreach (WorldPlantRecord plant in objects.GetAll()) IndexPlant(plant);
+	}
+	private void IndexPlant(WorldPlantRecord plant)
+	{
+		if (plant.PlantType != WorldPlantType.Wheat || plant.IsMature) { RemoveGrowing(plant.Key); return; }
+		var position = (plant.Position.X, plant.Position.Z, plant.Position.Y);
+		if (growingKeys.TryGetValue(plant.Key, out var previous) && previous != position) growing.Remove(previous);
+		growing[position] = plant; growingKeys[plant.Key] = position;
+	}
+	private void RemoveGrowing(PersistentWorldObjectKey key)
+	{
+		if (growingKeys.Remove(key, out var position)) growing.Remove(position);
+	}
+	private void OnObjectDelta(WorldObjectColumnState column, WorldObjectDeltaRecord delta)
+	{
+		foreach (WorldObjectOperation operation in delta.Operations)
+			if (operation.Kind == WorldObjectOperationKind.Upsert) IndexPlant(operation.Record);
+			else RemoveGrowing(operation.Key);
+	}
+	private void OnObjectReplacement(WorldObjectColumnState column) => RebuildGrowingIndex();
+
 	public void Dispose()
 	{
 		if (disposed) return;
 		disposed = true;
 		map.BlockChanged -= OnBlockChanged;
+		objects.ColumnDelta -= OnObjectDelta;
+		objects.ColumnReplaced -= OnObjectReplacement;
+		objects.Restored -= RebuildGrowingIndex;
 	}
 }

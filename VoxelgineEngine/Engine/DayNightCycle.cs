@@ -34,6 +34,7 @@ public sealed class DayNightCycle
 	private float targetTime = -1f;
 
 	public event Action<DayNightLightingState> LightingChanged;
+	public event Action<double> TimeChanged;
 
 	public float TimeOfDay { get; private set; } = 8f;
 	public double AbsoluteGameHours { get; private set; } = 8d;
@@ -74,8 +75,8 @@ public sealed class DayNightCycle
 				return;
 
 			float elapsedHours = deltaTime * (24f / DayLengthSeconds) * TimeScale;
-			TimeOfDay += elapsedHours;
 			AbsoluteGameHours += elapsedHours;
+			TimeOfDay = (float)(AbsoluteGameHours % 24d);
 			WrapTime();
 		}
 		else if (targetTime >= 0f)
@@ -114,6 +115,8 @@ public sealed class DayNightCycle
 		if (IsAuthority)
 		{
 			TimeOfDay = hours;
+			AbsoluteGameHours = Math.Floor(AbsoluteGameHours / 24d) * 24d + hours;
+			TimeChanged?.Invoke(AbsoluteGameHours);
 			UpdateLighting();
 			return;
 		}

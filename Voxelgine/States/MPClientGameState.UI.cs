@@ -364,8 +364,8 @@ namespace Voxelgine.States
 			if (_connectionStatusLabel == null || _client == null)
 				return;
 
-			float currentTime = GetClientTime();
-			float timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
+			double currentTime = GetClientTime();
+			double timeSinceReceive = _client.TimeSinceLastReceive(currentTime);
 
 			if (timeSinceReceive > 3f)
 			{

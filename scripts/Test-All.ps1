@@ -131,7 +131,11 @@ try {
     try {
         Invoke-Checked 'submodule-pins' { & (Join-Path $PSScriptRoot 'Test-SubmodulePins.ps1') }
         Invoke-Checked 'assets' { & (Join-Path $PSScriptRoot 'Test-Assets.ps1') }
-        Invoke-Checked 'tests' { dotnet test RaylibGame.sln -c $Configuration -p:Platform=x64 --nologo } -RequireNativeSuccess
+        Invoke-Checked 'documentation' { & (Join-Path $PSScriptRoot 'Test-Documentation.ps1') }
+        Invoke-Checked 'tests-engine' { dotnet test VoxelgineEngine.Tests/VoxelgineEngine.Tests.csproj -c $Configuration -f net10.0 --nologo } -RequireNativeSuccess
+        Invoke-Checked 'tests-client' { dotnet test UnitTest/UnitTest.csproj -c $Configuration -f net10.0-windows10.0.17763.0 -p:Platform=x64 --nologo } -RequireNativeSuccess
+        Invoke-Checked 'tests-audio' { dotnet test Voxelgine.Audio.Tests/Voxelgine.Audio.Tests.csproj -c $Configuration -p:Platform=x64 --nologo } -RequireNativeSuccess
+        Invoke-Checked 'release-build' { dotnet build RaylibGame.sln -c Release -p:Platform=x64 --nologo } -RequireNativeSuccess
 
         if ($IncludeFishGfx) {
             Invoke-Checked 'fishgfx-tests' {
@@ -149,6 +153,9 @@ try {
         } -RequireNativeSuccess
         Invoke-Checked 'publish-layout-client' { & (Join-Path $PSScriptRoot 'Test-PublishLayout.ps1') -Kind Client -Path $clientPublish }
         Invoke-Checked 'publish-layout-server' { & (Join-Path $PSScriptRoot 'Test-PublishLayout.ps1') -Kind Server -Path $serverPublish }
+        Invoke-Checked 'multiplayer-hosted-dedicated' {
+            dotnet run --project BenchmarkSuite1/Measure/Measure.csproj -c Release -- --multiplayer-smoke (Join-Path $serverPublish 'VoxelgineServer.dll') (Join-Path $runtimeRoot 'multiplayer')
+        } -RequireNativeSuccess
 
         $automaticModes = @(
             '--fishgfx-auto-menu-options',

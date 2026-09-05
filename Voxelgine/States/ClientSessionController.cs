@@ -21,7 +21,7 @@ internal sealed class ClientSessionController : IDisposable
 		Action<ConnectAcceptPacket> connected,
 		Action<string> disconnected,
 		Action<string> rejected,
-		Action<Packet> packetReceived)
+		Action<Packet> packetReceived, RuntimePaths runtimePaths = null)
 	{
 		this.connected = connected ?? throw new ArgumentNullException(nameof(connected));
 		this.disconnected = disconnected ?? throw new ArgumentNullException(nameof(disconnected));
@@ -29,6 +29,7 @@ internal sealed class ClientSessionController : IDisposable
 		this.packetReceived = packetReceived ?? throw new ArgumentNullException(nameof(packetReceived));
 
 		Client = new NetClient(logging ?? throw new ArgumentNullException(nameof(logging)));
+		if (runtimePaths != null) Client.ConfigureIdentity(NetworkIdentity.LoadOrCreate(Path.Combine(runtimePaths.Root, "client-identity.pk8")), new ServerTrustStore(Path.Combine(runtimePaths.Root,"trusted-servers.json")));
 		Client.OnConnected += connected;
 		Client.OnDisconnected += disconnected;
 		Client.OnConnectionRejected += rejected;
@@ -37,7 +38,7 @@ internal sealed class ClientSessionController : IDisposable
 
 	internal NetClient Client { get; }
 
-	internal void Connect(string host, int port, string playerName, float time)
+	internal void Connect(string host, int port, string playerName, double time)
 	{
 		ObjectDisposedException.ThrowIf(disposed, this);
 		Client.Connect(host, port, playerName, time);

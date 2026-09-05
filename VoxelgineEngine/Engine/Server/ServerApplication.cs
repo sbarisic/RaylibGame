@@ -7,10 +7,10 @@ public sealed class ServerApplication : IDisposable
 	private Thread thread;
 	private bool disposed;
 
-	public ServerApplication(RuntimePaths runtimePaths, DI.GameLogLevel logLevel)
+	public ServerApplication(RuntimePaths runtimePaths, DI.GameLogLevel logLevel, PlayerIdentity? hostIdentity = null)
 	{
 		ArgumentNullException.ThrowIfNull(runtimePaths);
-		server = new ServerLoop(runtimePaths, logLevel);
+		server = new ServerLoop(runtimePaths, logLevel, hostIdentity);
 	}
 
 	public ServerLoop Server => server;

@@ -17,6 +17,7 @@ public partial class ServerLoop
 		{
 			BlockPlaceRequestPacket request => (request.ItemUseActionId, request.CommandTick, request.Channel),
 			BlockRemoveRequestPacket request => (request.ItemUseActionId, request.CommandTick, request.Channel),
+			WorldObjectPlaceRequestPacket request => (request.ActionId, request.CommandTick, request.Channel),
 			WeaponFirePacket request => (request.ItemUseActionId, request.CommandTick, request.Channel),
 			_ => default,
 		};
@@ -27,7 +28,18 @@ public partial class ServerLoop
 			return;
 		}
 
+		if (actionId < session.NextExpectedItemUseActionId)
+		{
+			SendItemUseResult(session, actionId, commandTick, false, ItemUseRejectionReason.CommandExpired);
+			return;
+		}
+
+		// A retransmitted ID retains the first queued request, even if its payload changed.
+		if (session.PendingItemUses.Exists(item => item.ActionId == actionId))
+			return;
+
 		if (actionId == 0 ||
+			actionId - session.NextExpectedItemUseActionId > MaximumPendingItemUses ||
 			commandTick <= 0 ||
 			commandTick > session.CommandQueue.LastSimulatedCommandTick + ServerCommandQueue.MaximumAhead ||
 			channel is not (ItemUseChannel.Primary or ItemUseChannel.Secondary))
@@ -36,8 +48,6 @@ public partial class ServerLoop
 			return;
 		}
 
-		if (session.PendingItemUses.Exists(item => item.ActionId == actionId))
-			return;
 		if (session.PendingItemUses.Count >= MaximumPendingItemUses)
 		{
 			CompleteRejectedItemUse(session, actionId, commandTick, ItemUseRejectionReason.QueueFull);
@@ -116,10 +126,12 @@ public partial class ServerLoop
 		in SimulatedCommandRecord command,
 		Packet packet)
 	{
+		if (!session.IsGameplayActive || session.Player.IsDead) return (false, ItemUseRejectionReason.InvalidTarget);
 		return packet switch
 		{
 			BlockPlaceRequestPacket place => ExecuteBlockPlacement(session, command, place),
 			BlockRemoveRequestPacket remove => ExecuteBlockRemoval(session, command, remove),
+			WorldObjectPlaceRequestPacket place => ExecuteWorldObjectPlacement(session, command, place),
 			WeaponFirePacket fire => ExecuteWeaponUse(session, command, fire),
 			_ => (false, ItemUseRejectionReason.InvalidTarget),
 		};

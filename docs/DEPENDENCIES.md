@@ -9,17 +9,12 @@ with `-` or `+`.
 
 | Dependency | Path | Revision |
 |---|---|---|
-| FishGfx | `thirdparty/FishGfx` | `d182514d36718f82c0f55db27516c655f5f4a78f` |
-| FishUI | `thirdparty/FishGfx/thirdparty/FishUI` | `2cd957596ec786852a0c1b2a51f4b47f864d046d` |
+| FishGfx | `thirdparty/FishGfx` | `f8f7f9afe994d41e27d6f551b79116bf134bb9e9` |
+| FishUI | `thirdparty/FishGfx/thirdparty/FishUI` | `18285683769e38ac0842af1f63efc9d033b5bacd` |
 | miniaudio | `thirdparty/miniaudio` | `9634bedb5b5a2ca38c1ee7108a9358a4e233f14d` |
 
-The FishGfx migration was seeded from
-`e4aab38a4d5ee4389bcebe94dcbd2c17cf4467d7`. Its parent gitlink advances to
-`723688c` only after the reusable window, monitor, VSync, cursor, logical-size,
-framebuffer-size, and high-DPI work was committed and pushed upstream, then to
-`4b9ff35` after the FishUI high-DPI scissor fix and regression test were pushed,
-then to `d182514` after runtime voxel-atlas replacement was added for queued
-game-asset hot reload.
+The table matches the checked-in gitlinks and `scripts/Test-SubmodulePins.ps1`.
+Earlier migration revisions are historical and are not current dependency pins.
 
 The miniaudio revision is the locked `0.11.25` migration revision. The parent
 gitlink, rather than a branch name or a moving tag, is authoritative.
@@ -76,3 +71,8 @@ git diff --submodule=log -- thirdparty/FishGfx thirdparty/miniaudio
 Do not add duplicate parent-side copy rules for `glfw3.dll`, FishGfx shaders, or
 FishUI data. Those assets must flow through project references so downstream
 build and publish behavior is exercised exactly as consumers use it.
+
+The identity transport uses platform .NET cryptography and adds no NuGet or native
+cryptography dependency. The subsequent graphics/UI hardening updates the two reviewed submodule revisions above and preserves upstream FishUI CI removal.
+
+The graphics/UI API migration uses Unicode scalar input and glyph metrics, atomic font atlases, bounded process output and per-context state caches. Active consumers compile through the updated project references; see [the dependency report](../thirdparty/FishGfx/HARDENING.md) for measurements and [the UI contract](../thirdparty/FishGfx/thirdparty/FishUI/docs/HARDENING.md) for custom-control overrides.

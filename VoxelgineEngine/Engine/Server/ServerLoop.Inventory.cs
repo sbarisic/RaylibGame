@@ -23,7 +23,7 @@ public partial class ServerLoop
 			int slot = packet.Kind == InventoryActionKind.CancelCursor
 				? PlayerInventory.NoCursorOrigin
 				: packet.Slot;
-			InventoryTransactionResult result = _inventoryTransactions.ApplyPlayerClick(session.PlayerName, session.Inventory, packet.Kind, slot, packet.ExpectedRevision);
+			InventoryTransactionResult result = _inventoryTransactions.ApplyPlayerClick(session.InventoryOwnerKey, session.Inventory, packet.Kind, slot, packet.ExpectedRevision);
 			accepted = result.Accepted;
 		}
 

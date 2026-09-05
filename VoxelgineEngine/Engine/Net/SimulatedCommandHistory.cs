@@ -33,7 +33,7 @@ public sealed class SimulatedCommandHistory
 
 	public bool TryGet(int tick, out SimulatedCommandRecord record)
 	{
-		if (tick <= 0)
+		if (tick <= 0 || tick < OldestTick)
 		{
 			record = default;
 			return false;

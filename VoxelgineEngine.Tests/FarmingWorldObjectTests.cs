@@ -121,7 +121,7 @@ public sealed class FarmingWorldObjectTests
 		WorldObjectOperation[] delta = { new(WorldObjectOperationKind.Upsert, changed, default) };
 
 		Assert.False(store.TryApplyReplicatedDelta(0, 0, 16, 9, 10, delta));
-		Assert.False(store.TryApplyReplicatedDelta(0, 0, 17, 8, 9, delta));
+		Assert.True(store.TryApplyReplicatedDelta(0, 0, 17, 8, 9, delta)); // Duplicate is ignored.
 		Assert.True(store.TryGet(key, out WorldPlantRecord unchanged));
 		Assert.Equal(0, unchanged.GrowthProgress);
 		Assert.True(store.TryApplyReplicatedDelta(0, 0, 17, 9, 10, delta));

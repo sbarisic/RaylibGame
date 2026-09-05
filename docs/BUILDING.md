@@ -30,6 +30,7 @@ git clone --recurse-submodules https://github.com/sbarisic/RaylibGame.git
 Set-Location RaylibGame
 git submodule status --recursive
 pwsh -NoProfile -File scripts/Test-SubmodulePins.ps1
+pwsh -NoProfile -File scripts/Test-Documentation.ps1
 ```
 
 For an existing checkout:
@@ -44,15 +45,17 @@ lock. See [Dependency pins](DEPENDENCIES.md).
 
 ## Build and tests
 
-Run the modern FishGfx acceptance surface first. Legacy FishGfx solutions and
-sample projects are not migration gates.
+When renderer dependencies change, run the modern FishGfx acceptance surface.
+Legacy FishGfx solutions and sample projects are not acceptance gates.
 
 ```powershell
 dotnet restore thirdparty/FishGfx/FishGfx.Modern.sln
 dotnet test thirdparty/FishGfx/FishGfx.Modern.sln -c Release --no-restore
 ```
 
-Then build and test RaylibGame:
+Run engine, client, and audio suites sequentially in Debug and Release. Avoid
+concurrent builds/tests sharing native or managed outputs. For example, the
+Release commands are:
 
 ```powershell
 dotnet restore RaylibGame.sln
@@ -119,6 +122,33 @@ rg -n --glob '!thirdparty/FishGfx/data/textures/voxels/raylibgame/**' `
 Final acceptance also includes a fresh recursive clone, hosted and remote
 multiplayer, a dedicated server, save/load compatibility, window and DPI modes,
 ambience transitions, repeated state changes, shader-reload failure, and clean
-shutdown without Raylib installed. Performance is compared to the recorded
-Raylib baseline: median frame time may regress by at most 10 percent and p99 by
-at most 20 percent in the deterministic scene.
+shutdown without Raylib installed. The historical Raylib comparison is a migration target, not a current measured
+result. Use the current workload and acceptance procedures in
+[Validation](VALIDATION.md), and report unavailable graphical/platform checks
+separately from passed suites.
+
+## Focused performance measurements
+
+BenchmarkDotNet accepts filters:
+
+```powershell
+dotnet run --project BenchmarkSuite1/BenchmarkSuite1.csproj -c Release -- --filter '*FarmingBenchmarks*' '*ObjectOverlayBenchmarks*' '*ColumnRevisionBenchmarks*'
+```
+
+For bounded comparative measurements with setup excluded, use:
+
+```powershell
+dotnet run --project BenchmarkSuite1/Measure/Measure.csproj -c Release
+```
+
+The probe records median/p95/p99, current-thread allocations, overlay write/dirty
+counts, network queue retention, and repeated-column cache retention. Its
+`Baseline=true` build option and `EngineProject=<absolute baseline project>`
+override allow the same probe to build against an isolated original checkout.
+The baseline overlay branch models the old write/dirty loop; it is not a GPU
+frame-time benchmark. Preserve raw JSON and machine/runtime context with results.
+Do not run timed comparisons concurrently with builds or test suites.
+
+Protocol 2 requires clients and servers to upgrade together; archive format 6 is
+preserved. Test isolated runtime roots so fresh identity profiles, server pins,
+and legacy backups cannot affect normal developer saves.

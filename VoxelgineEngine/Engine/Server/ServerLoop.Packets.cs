@@ -27,8 +27,9 @@ namespace Voxelgine.Engine.Server
 				return;
 			}
 
-			if (packet is WorldObjectColumnAppliedPacket)
+			if (packet is WorldObjectColumnAppliedPacket objectApplied)
 			{
+				_worldObjectStream.HandleApplied(connection.PlayerId, objectApplied);
 				return;
 			}
 
@@ -69,7 +70,7 @@ namespace Voxelgine.Engine.Server
 					EnqueueItemUse(connection, weaponFire);
 					break;
 				case WorldObjectPlaceRequestPacket placeObject:
-					HandleWorldObjectPlace(connection, placeObject);
+					EnqueueItemUse(connection, placeObject);
 					break;
 				case WorldInteractRequestPacket interact:
 					HandleWorldInteract(connection, interact);
@@ -93,11 +94,11 @@ namespace Voxelgine.Engine.Server
 							break;
 
 						case DebugSpawnEntityRequestPacket debugSpawn:
-							HandleDebugSpawnEntityRequest(connection, debugSpawn);
+							if (_access.IsAdministrator(connection.Identity)) HandleDebugSpawnEntityRequest(connection, debugSpawn);
 							break;
 
 						case DebugPlaceBlockRequestPacket debugPlace:
-							HandleDebugPlaceBlockRequest(connection, debugPlace);
+							if (_access.IsAdministrator(connection.Identity)) HandleDebugPlaceBlockRequest(connection, debugPlace);
 							break;
 					}
 				}

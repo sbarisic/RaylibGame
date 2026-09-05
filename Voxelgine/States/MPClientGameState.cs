@@ -182,7 +182,7 @@ namespace Voxelgine.States
 				OnConnected,
 				OnDisconnected,
 				OnConnectionRejected,
-				OnPacketReceived);
+				OnPacketReceived, Client.RuntimePaths);
 #if DEBUG
 			//_client.PacketLoggingEnabled = true;
 #endif
@@ -263,7 +263,7 @@ namespace Voxelgine.States
 
 			try
 			{
-				float currentTime = GetClientTime();
+				double currentTime = GetClientTime();
 
 				// Process network (client may still be processing final packets)
 				_client?.Tick(currentTime);
@@ -421,7 +421,7 @@ namespace Voxelgine.States
 
 			try
 			{
-				float currentTime = TotalTime;
+				double currentTime = GetClientTime();
 
 				// Increment client tick
 				_client.LocalTick++;

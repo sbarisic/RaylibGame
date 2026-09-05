@@ -24,6 +24,7 @@ namespace Voxelgine.States
 		{
 			_logging.Log(GameLogLevel.Info, "Network", $"Disconnected reason={reason}");
 			CancelWorldLoad();
+			_latestWorldStreamId = 0;
 
 			if (_initialized)
 			{
@@ -76,7 +77,7 @@ namespace Voxelgine.States
 				return;
 			}
 
-			float currentTime = GetClientTime();
+			double currentTime = GetClientTime();
 
 			switch (packet)
 			{
@@ -171,7 +172,7 @@ namespace Voxelgine.States
 			}
 		}
 
-		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, float currentTime)
+		private void HandleWorldSnapshot(WorldSnapshotPacket snapshot, double currentTime)
 		{
 			if (_simulation == null)
 				return;
@@ -415,7 +416,7 @@ namespace Voxelgine.States
 		/// Handles an <see cref="EntitySnapshotPacket"/> from the server.
 		/// Stores the snapshot in the interpolation buffer for smooth rendering.
 		/// </summary>
-		private void HandleEntitySnapshot(EntitySnapshotPacket packet, float currentTime)
+		private void HandleEntitySnapshot(EntitySnapshotPacket packet, double currentTime)
 		{
 			if (_simulation == null)
 				return;
@@ -483,9 +484,9 @@ namespace Voxelgine.States
 		/// <summary>
 		/// Updates entity positions from interpolation buffers. Called each frame.
 		/// </summary>
-		private void UpdateEntityInterpolation(float currentTime)
+		private void UpdateEntityInterpolation(double currentTime)
 		{
-			float renderTime = currentTime - EntityInterpolationDelay;
+			double renderTime = currentTime - EntityInterpolationDelay;
 
 			foreach (var kvp in _entitySnapshots)
 			{

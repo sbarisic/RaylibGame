@@ -32,6 +32,8 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 			Environment.CurrentDirectory,
 			message => Console.Error.WriteLine($"[PROCESS][WARNING][RuntimePaths] {message}"));
 		RuntimePaths.CreateDirectories();
+		string resetTrust = GetOptionValue(arguments,"--reset-server-trust");
+		if (!string.IsNullOrWhiteSpace(resetTrust)) new ServerTrustStore(Path.Combine(RuntimePaths.Root,"trusted-servers.json")).Reset(resetTrust.Trim().ToLowerInvariant());
 
 		Config = new GameConfig(RuntimePaths);
 		Config.LoadFromJson();
@@ -108,9 +110,9 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 	public void Run()
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
-		float simulationTime = 0;
-		float accumulator = 0;
-		float previousTime = 0;
+		long simulationTick = 0;
+		double accumulator = 0;
+		double previousTime = 0;
 		int renderedFrames = 0;
 		int automaticFrameCount = GetAutomaticFrameCount();
 
@@ -119,24 +121,24 @@ internal sealed partial class ClientApplication : IClientEngineRunner, IDisposab
 			while (Window.IsOpen())
 			{
 				stateHost.ProcessPending();
-				float totalTime = (float)stopwatch.Elapsed.TotalSeconds;
-				TotalTime = totalTime;
-				float frameTime = Math.Min(totalTime - previousTime, MaximumFrameTime);
+				double totalTime = stopwatch.Elapsed.TotalSeconds;
+				TotalTime = (float)totalTime;
+				float frameTime = (float)Math.Min(totalTime - previousTime, MaximumFrameTime);
 				previousTime = totalTime;
 				accumulator += frameTime;
 
-				Window.Tick(totalTime);
+				Window.Tick((float)totalTime);
 				Audio.Update(frameTime);
 				while (accumulator >= FixedDeltaTime)
 				{
 					LerpManager.Update(FixedDeltaTime);
-					Window.UpdateLockstep(simulationTime, FixedDeltaTime);
-					simulationTime += FixedDeltaTime;
+					double simulationTime = simulationTick++ * (double)FixedDeltaTime;
+					Window.UpdateLockstep((float)simulationTime, FixedDeltaTime);
 					accumulator -= FixedDeltaTime;
 				}
 
 				ChunkDrawCalls = 0;
-				Window.Render(accumulator / FixedDeltaTime);
+				Window.Render((float)(accumulator / FixedDeltaTime));
 				if (IsAutomaticRun && ++renderedFrames >= automaticFrameCount)
 				{
 					ValidateAutomaticFrame((IFishGfxGameWindow)Window, stateHost.ActiveState);

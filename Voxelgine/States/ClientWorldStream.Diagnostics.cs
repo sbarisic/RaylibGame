@@ -91,7 +91,7 @@ internal sealed partial class ClientWorldStream
 
 	private void LogReadinessBlockers()
 	{
-		float now = getTime();
+		double now = getTime();
 		if (now < nextReadinessLogTime)
 			return;
 		nextReadinessLogTime = now + 2;

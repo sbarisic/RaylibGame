@@ -16,6 +16,17 @@ public sealed class PlayerDataStore
 		_logging = logging;
 	}
 
+	public static void BackupLegacyProfiles(string directory)
+	{
+		string root=Path.GetFullPath(directory);
+		if(!Directory.Exists(root)) return;
+		string[] files=Directory.GetFiles(root,"*.bin",SearchOption.TopDirectoryOnly);
+		if(files.Length==0) return;
+		string backup=Path.Combine(root,"legacy-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(backup);
+		foreach(string file in files) File.Move(file,Path.Combine(backup,Path.GetFileName(file)));
+	}
+
 	public void Save(
 		string playerName,
 		Vector3 position,
@@ -117,14 +128,14 @@ public sealed class PlayerDataStore
 		}
 		catch (Exception exception)
 		{
-			_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to load player name={playerName} path={filePath}; deleting incompatible data", exception);
+			_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to load player name={playerName} path={filePath}; quarantining unreadable data", exception);
 			try
 			{
-				File.Delete(filePath);
+				File.Move(filePath, filePath + ".invalid-" + Guid.NewGuid().ToString("N") + ".bak");
 			}
 			catch (Exception deleteException)
 			{
-				_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to delete invalid player data path={filePath}", deleteException);
+				_logging?.Log(GameLogLevel.Error, "Persistence", $"Failed to quarantine invalid player data path={filePath}", deleteException);
 			}
 			return false;
 		}

@@ -6,6 +6,22 @@ namespace UnitTest;
 public sealed class ClientInventoryModelTests
 {
 	[Fact]
+	public void RemovingUnsentPredictionDoesNotSkipWireActionIds()
+	{
+		ClientInventoryModel model = new();
+		ItemStack[] slots = new ItemStack[PlayerInventory.SlotCount];
+		slots[0] = new(ItemIds.Wheat, 10); slots[1] = new(ItemIds.Wheat, 10); slots[3] = new(ItemIds.Wheat, 10);
+		model.Apply(new InventoryStatePacket { Revision=1, Slots=slots, CursorOriginSlot=InventoryStatePacket.NoCursorOrigin });
+		List<InventoryActionRequestPacket> sent = new(); model.PacketReady += sent.Add;
+		Assert.True(model.QueueAction(InventoryActionKind.LeftClickSlot,0));
+		Assert.True(model.QueueAction(InventoryActionKind.LeftClickSlot,1));
+		Assert.True(model.QueueAction(InventoryActionKind.LeftClickSlot,3));
+		slots = (ItemStack[])slots.Clone(); slots[0]=default; slots[1]=new(ItemIds.Wheat,ItemCatalog.Get(ItemIds.Wheat).MaximumStack);
+		model.Apply(new InventoryStatePacket { Revision=3,AcknowledgedActionId=1,ActionAccepted=true,Slots=slots,Cursor=new(ItemIds.Wheat,10),CursorOriginSlot=0 });
+		Assert.Equal(2,sent.Count); Assert.Equal(2u,sent[1].ActionId); Assert.Equal(3,sent[1].Slot);
+	}
+
+	[Fact]
 	public void PredictionSendsOneActionAtATimeAndReplaysAfterAcceptance()
 	{
 		ClientInventoryModel model = CreateModel(ItemStack.Create(ItemIds.FromBlock(BlockType.Dirt), 8));

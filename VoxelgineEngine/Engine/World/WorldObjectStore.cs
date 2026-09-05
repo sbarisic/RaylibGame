@@ -62,12 +62,15 @@ public sealed class WorldObjectStore
 	private readonly Dictionary<PersistentWorldObjectKey, WorldPlantRecord> byKey = new();
 	private readonly Dictionary<BlockCoordinate, PersistentWorldObjectKey> byPosition = new();
 	private readonly Dictionary<ChunkColumnCoordinate, ColumnData> columns = new();
+	private readonly HashSet<ChunkColumnCoordinate> installedSnapshots = new();
 	private ulong nextPlacedId = 1;
 	private ulong nextEpoch = 1;
 
 	public int Count => byKey.Count;
 	public event Action<WorldObjectColumnState, WorldObjectDeltaRecord> ColumnChanged;
 	public event Action<WorldObjectColumnState> ColumnReplaced;
+	public event Action<WorldObjectColumnState, WorldObjectDeltaRecord> ColumnDelta;
+	public event Action Restored;
 
 	public PersistentWorldObjectKey AllocatePlacedKey() =>
 		PersistentWorldObjectKey.Placed(new PersistentWorldObjectId(nextPlacedId++));
@@ -104,8 +107,10 @@ public sealed class WorldObjectStore
 
 	public void InstallColumnSnapshot(int x, int z, ulong epoch, long revision, IReadOnlyList<WorldPlantRecord> records)
 	{
+		ArgumentNullException.ThrowIfNull(records);
 		if (epoch == 0 || revision < 1 || records.Count > MaximumColumnRecords) throw new InvalidDataException("Invalid world-object column snapshot.");
 		ChunkColumnCoordinate coordinate = new(x, z);
+		if (installedSnapshots.Contains(coordinate) && columns.TryGetValue(coordinate, out ColumnData active) && (epoch < active.Epoch || epoch == active.Epoch && revision <= active.Revision)) return;
 		HashSet<PersistentWorldObjectKey> previousKeys = columns.TryGetValue(coordinate, out ColumnData previous)
 			? previous.Keys.ToHashSet() : new HashSet<PersistentWorldObjectKey>();
 		HashSet<PersistentWorldObjectKey> incomingKeys = new();
@@ -114,6 +119,7 @@ public sealed class WorldObjectStore
 		{
 			Validate(record);
 			if (ColumnOf(record.Position) != coordinate || !incomingKeys.Add(record.Key) || !incomingPositions.Add(record.Position) ||
+				(byKey.ContainsKey(record.Key) && !previousKeys.Contains(record.Key)) ||
 				(byPosition.TryGetValue(record.Position, out PersistentWorldObjectKey occupied) && !previousKeys.Contains(occupied)))
 				throw new InvalidDataException("World-object column snapshot contains an invalid duplicate or coordinate.");
 		}
@@ -124,12 +130,17 @@ public sealed class WorldObjectStore
 			column.Keys.Add(record.Key); byKey.Add(record.Key, record); byPosition.Add(record.Position, record.Key);
 		}
 		columns[coordinate] = column;
+		installedSnapshots.Add(coordinate);
 		ColumnReplaced?.Invoke(Snapshot(coordinate, column));
 	}
 
 	public bool TryApplyReplicatedDelta(int x, int z, ulong epoch, long baseRevision, long revision, IReadOnlyList<WorldObjectOperation> operations)
 	{
+		if (operations == null || operations.Count > 1024 || operations.Any(operation => !Enum.IsDefined(operation.Kind))) return false;
 		ChunkColumnCoordinate coordinate = new(x, z);
+		// Local empty-column bookkeeping is not an authoritative replication baseline.
+		if (!installedSnapshots.Contains(coordinate)) return false;
+		if (columns.TryGetValue(coordinate, out ColumnData current) && current.Epoch == epoch && revision <= current.Revision) return true;
 		if (!columns.TryGetValue(coordinate, out ColumnData column) || column.Epoch != epoch || column.Revision != baseRevision || revision != baseRevision + 1)
 			return false;
 		try
@@ -149,6 +160,7 @@ public sealed class WorldObjectStore
 				}
 			}
 			if (candidate.Count > MaximumColumnRecords || candidate.Values.Select(static record => record.Position).Distinct().Count() != candidate.Count ||
+				candidate.Any(pair => byKey.ContainsKey(pair.Key) && !column.Keys.Contains(pair.Key)) ||
 				candidate.Any(pair => byPosition.TryGetValue(pair.Value.Position, out PersistentWorldObjectKey occupied) && !column.Keys.Contains(occupied))) return false;
 			foreach (PersistentWorldObjectKey key in column.Keys) if (byKey.Remove(key, out WorldPlantRecord old)) byPosition.Remove(old.Position);
 			column.Keys.Clear();
@@ -157,7 +169,7 @@ public sealed class WorldObjectStore
 				byKey[key]=record; byPosition[record.Position]=key; column.Keys.Add(key);
 			}
 			column.Revision = revision;
-			ColumnChanged?.Invoke(Snapshot(coordinate, column), new WorldObjectDeltaRecord(baseRevision, revision, operations));
+			NotifyDelta(coordinate, column, new WorldObjectDeltaRecord(baseRevision, revision, operations));
 			return true;
 		}
 		catch (ArgumentException) { return false; }
@@ -220,13 +232,13 @@ public sealed class WorldObjectStore
 			WorldObjectDeltaRecord delta = new(baseRevision, column.Revision, columnOperations.ToArray());
 			column.History.Enqueue(delta);
 			while (column.History.Count > MaximumRetainedDeltaRevisions) column.History.Dequeue();
-			ColumnChanged?.Invoke(Snapshot(coordinate, column), delta);
+			NotifyDelta(coordinate, column, delta);
 		}
 	}
 
 	public void Restore(IEnumerable<WorldPlantRecord> records)
 	{
-		byKey.Clear(); byPosition.Clear(); columns.Clear(); nextPlacedId = 1; nextEpoch = 1;
+		byKey.Clear(); byPosition.Clear(); columns.Clear(); installedSnapshots.Clear(); nextPlacedId = 1; nextEpoch = 1;
 		foreach (WorldPlantRecord record in records)
 		{
 			Validate(record);
@@ -238,6 +250,13 @@ public sealed class WorldObjectStore
 			if (record.Key.Kind == PersistentWorldObjectKeyKind.Placed)
 				nextPlacedId = Math.Max(nextPlacedId, checked(record.Key.PersistentWorldObjectId.Value + 1));
 		}
+		Restored?.Invoke();
+	}
+
+	private void NotifyDelta(ChunkColumnCoordinate coordinate, ColumnData column, WorldObjectDeltaRecord delta)
+	{
+		ColumnDelta?.Invoke(new(coordinate.X, coordinate.Z, column.Epoch, column.Revision, Array.Empty<WorldPlantRecord>()), delta);
+		ColumnChanged?.Invoke(Snapshot(coordinate, column), delta);
 	}
 
 	private ColumnData GetOrCreateColumn(ChunkColumnCoordinate coordinate)
@@ -256,7 +275,13 @@ public sealed class WorldObjectStore
 
 	private static void Validate(WorldPlantRecord record)
 	{
-		if (!Enum.IsDefined(record.PlantType) || record.Health == 0 || record.HarvestItem.IsEmpty)
+		bool validKey = record.Key.Kind switch
+		{
+			PersistentWorldObjectKeyKind.Placed => record.Key.PersistentWorldObjectId.Value != 0,
+			PersistentWorldObjectKeyKind.Generated => !string.IsNullOrWhiteSpace(record.Key.GeneratedMarkerId.Site.Value) && !string.IsNullOrWhiteSpace(record.Key.GeneratedMarkerId.BlueprintMarkerId),
+			_ => false,
+		};
+		if (!validKey || record.Support.Y == int.MaxValue || !Enum.IsDefined(record.PlantType) || record.Health == 0 || !ItemCatalog.TryGet(record.HarvestItem, out _))
 			throw new ArgumentException("World plant record is invalid.", nameof(record));
 	}
 

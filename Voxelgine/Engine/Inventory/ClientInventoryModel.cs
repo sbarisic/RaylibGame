@@ -36,7 +36,7 @@ public sealed class ClientInventoryModel
 		if (!predicted.Accepted || !predicted.Changed)
 			return false;
 
-		_pending.Add(new PendingInventoryAction(_nextActionId++, kind, slot));
+		_pending.Add(new PendingInventoryAction(0, kind, slot));
 		Changed?.Invoke();
 		TrySendNext();
 		return true;
@@ -135,7 +135,8 @@ public sealed class ClientInventoryModel
 		if (_actionInFlight || _pending.Count == 0)
 			return;
 
-		PendingInventoryAction action = _pending[0];
+		PendingInventoryAction action = _pending[0] with { ActionId = _nextActionId++ };
+		_pending[0] = action;
 		_actionInFlight = true;
 		PacketReady?.Invoke(new InventoryActionRequestPacket
 		{

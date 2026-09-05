@@ -12,7 +12,7 @@ namespace VoxelgineServer
 			bool seedExplicit = false;
 			string worldPlan = null;
 			string dataRoot = null;
-			Voxelgine.Engine.DI.GameLogLevel logLevel = Voxelgine.Engine.DI.GameLogLevel.Trace;
+			Voxelgine.Engine.DI.GameLogLevel logLevel = Voxelgine.Engine.DI.GameLogLevel.Info;
 
 			for (int i = 0; i < args.Length; i++)
 			{
@@ -64,7 +64,7 @@ namespace VoxelgineServer
 						Console.WriteLine("  --seed <seed>   World generation seed (default: 666)");
 						Console.WriteLine("  --world-plan <directory>  Load a validated canonical world plan");
 						Console.WriteLine("  --force-regen   Force world regeneration even if save file exists");
-						Console.WriteLine("  --log-level     Minimum console.log level (default: Trace)");
+						Console.WriteLine("  --log-level     Minimum console.log level (default: Info)");
 						Console.WriteLine("  --data-root     Writable world, player, and log directory");
 						Console.WriteLine("  --help          Show this help message");
 						return 0;

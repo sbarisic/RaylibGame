@@ -8,13 +8,13 @@ public unsafe partial class MPClientGameState
 {
 	private readonly Dictionary<ObjectAssemblyKey, ObjectAssembly> _objectAssemblies = new();
 
-	private void HandleWorldObjectColumn(WorldObjectColumnPacket packet, float currentTime)
+	private void HandleWorldObjectColumn(WorldObjectColumnPacket packet, double currentTime)
 	{
 		if (_simulation == null || packet.StreamId != WorldStreamId) return;
 		ObjectAssemblyKey key = new(packet.StreamId, packet.X, packet.Z, packet.Epoch, packet.Revision, packet.SnapshotId);
 		if (!_objectAssemblies.TryGetValue(key, out ObjectAssembly assembly))
 		{
-			if (_objectAssemblies.Count >= 64)
+			if (_objectAssemblies.Count >= 16)
 			{
 				ObjectAssemblyKey oldest = _objectAssemblies.MinBy(static pair => pair.Value.CreatedAt).Key;
 				_objectAssemblies.Remove(oldest);
@@ -58,7 +58,7 @@ public unsafe partial class MPClientGameState
 		_client.Send(new WorldObjectResyncRequestPacket { StreamId=WorldStreamId, X=x, Z=z, Epoch=epoch, Revision=revision }, true, GetClientTime());
 	}
 
-	private void ExpireWorldObjectAssemblies(float currentTime)
+	private void ExpireWorldObjectAssemblies(double currentTime)
 	{
 		foreach ((ObjectAssemblyKey key, ObjectAssembly assembly) in _objectAssemblies.ToArray())
 			if (currentTime - assembly.CreatedAt >= 10f) { _objectAssemblies.Remove(key); RequestWorldObjectResync(key.X, key.Z, key.Epoch, key.Revision); }
@@ -100,8 +100,8 @@ public unsafe partial class MPClientGameState
 		private readonly byte[][] parts;
 		private readonly ushort[] recordCounts;
 		private readonly WorldObjectColumnPacket basis;
-		public ObjectAssembly(WorldObjectColumnPacket packet, float createdAt) { basis=packet; CreatedAt=createdAt; parts=new byte[packet.PartCount][]; recordCounts=new ushort[packet.PartCount]; }
-		public float CreatedAt { get; }
+		public ObjectAssembly(WorldObjectColumnPacket packet, double createdAt) { basis=packet; CreatedAt=createdAt; parts=new byte[packet.PartCount][]; recordCounts=new ushort[packet.PartCount]; }
+		public double CreatedAt { get; }
 		public bool IsComplete => parts.All(static part => part != null);
 		public bool TryAdd(WorldObjectColumnPacket packet)
 		{

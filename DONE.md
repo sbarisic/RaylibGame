@@ -1,5 +1,26 @@
 # Aurora Falls - Completed Items
 
+## Gameplay and multiplayer hardening (2026-09-05)
+
+Focused regressions verify authenticated identity/UDP handling, persistent policy
+and trust, duplicate connection rejection, ordered plant/furniture item use,
+separate inventory acknowledgement IDs, atomic transfers, cursor returns to
+containers, snapshot rollback protection and retries under backpressure, bounded
+crop updates, NPC cancellation, and consistent calendar/transport clocks.
+Unchanged plant stages avoid overlay writes; obsolete encoded column revisions
+are pruned. Full validation evidence and limitations belong in
+[Validation](docs/VALIDATION.md). Follow-up presentation remains in [TODO](TODO.md).
+
+## Historical accomplishments
+
+The entries below record earlier work and its terminology. Raylib rendering,
+whole-world transfer, old packet/test totals, unrestricted commands, and old
+file paths describe those historical implementations. Current contracts are in
+[Architecture](docs/ARCHITECTURE.md), [Multiplayer](MULTIPLAYER.md), and
+[Streaming](docs/WORLD_STREAMING.md).
+
+<!-- historical:start -->
+
 Consolidated list of completed features, improvements, and bug fixes.
 
 ---
@@ -155,3 +176,5 @@ works for any connected client.
 - **Logging: Replace Console.* with IFishLogging** � Replaced all `Console.WriteLine` calls with `IFishLogging.WriteLine` via DI across all engine files. Removed unused Flexbox library. Updated README.md.
 - **Mod System: Architecture planning** � Analyzed entire codebase (DI, entities, world, player, weapons, particles, sound, resources, input, GUI, scripting, pathfinding, day/night) and created comprehensive [TODO_MODS.md](TODO_MODS.md) with mod system architecture, API design, implementation plan, and ~30 prioritized subtasks.
 - **Multiplayer System: Architecture & implementation** — Full client-server multiplayer from architecture planning through implementation. Core refactoring: FPSCamera static→instance, `PlayerManager`, `IInputSource` abstraction, `GameSimulation` separation, three-project split (`VoxelgineEngine`/`VoxelgineServer`), `EntityManager` network IDs, `WeaponGun` fire/hit separation, `DayNightCycle` authority, `ViewModel` JSON model migration. `ServerLoop` split into 6 partial class files. `BlockInfo.IsRendered()` centralized for mesh/lighting checks. See [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference.
+
+<!-- historical:end -->

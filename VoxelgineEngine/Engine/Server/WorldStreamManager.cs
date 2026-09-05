@@ -19,7 +19,7 @@ public sealed class WorldStreamManager
 	private readonly ChunkMap map;
 	private readonly IFishLogging logging;
 	private readonly Dictionary<int, ClientStream> streams = new();
-	private readonly Dictionary<EncodedColumnKey, EncodedColumn> encodedCache = new();
+	private readonly Dictionary<ChunkColumnCoordinate, EncodedColumn> encodedCache = new();
 	private WorldArchivePayloadCache archivePayloads;
 	private int nextStreamId;
 
@@ -48,7 +48,7 @@ public sealed class WorldStreamManager
 		encodedCache.Clear();
 	}
 
-	public void Begin(int playerId, Vector3 focusPosition, int worldSeed, float currentTime)
+	public void Begin(int playerId, Vector3 focusPosition, int worldSeed, double currentTime)
 	{
 		Cancel(playerId);
 		int streamId = unchecked(++nextStreamId);
@@ -96,7 +96,7 @@ public sealed class WorldStreamManager
 			$"begin playerId={playerId} streamId={streamId} focus={focusPosition} core={core.Count} halo={halo.Count} total={map.ColumnCount}");
 	}
 
-	public void Tick(float currentTime)
+	public void Tick(double currentTime)
 	{
 		foreach ((int playerId, ClientStream stream) in streams)
 		{
@@ -267,8 +267,8 @@ public sealed class WorldStreamManager
 	private EncodedColumn GetEncoded(ChunkColumnCoordinate coordinate)
 	{
 		long revision = map.GetColumnRevision(coordinate.X, coordinate.Z);
-		EncodedColumnKey key = new(coordinate, revision);
-		if (encodedCache.TryGetValue(key, out EncodedColumn encoded))
+		ChunkColumnCoordinate key = coordinate;
+		if (encodedCache.TryGetValue(key, out EncodedColumn encoded) && encoded.Revision == revision)
 			return encoded;
 		if (archivePayloads?.TryGet(
 			coordinate.X,

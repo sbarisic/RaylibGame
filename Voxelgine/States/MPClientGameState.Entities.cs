@@ -12,7 +12,7 @@ namespace Voxelgine.States;
 
 public unsafe partial class MPClientGameState
 {
-	private void UpdateRemoteInterpolation(float totalTime, float deltaTime)
+	private void UpdateRemoteInterpolation(double totalTime, float deltaTime)
 	{
 		foreach (RemotePlayer remotePlayer in _simulation.Players.GetAllRemotePlayers())
 		{

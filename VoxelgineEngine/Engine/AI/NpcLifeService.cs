@@ -45,23 +45,26 @@ public sealed class NpcLifeService
 	{
 		List<(StableNpcId,PersistentFurnitureKey)> cleared=new();foreach(LifeState state in states.Values)if(state.Record.AssignedBed is PersistentFurnitureKey key&&(!furniture.TryGet(key,out PersistentFurnitureRecord record)||record.Type!=FurnitureType.Bed)){cleared.Add((state.Record.NpcId,key));state.Record=state.Record with{AssignedBed=null};}return cleared;
 	}
-	public void Update(double absoluteGameHours,float timeOfDay,float realTime)
+	public void Update(double absoluteGameHours,float timeOfDay,double realTime)
 	{
 		double elapsed=Math.Max(0,absoluteGameHours-lastGameHours);lastGameHours=absoluteGameHours;bool night=timeOfDay>=18f||timeOfDay<6f;
 		foreach(LifeState state in states.Values)
 		{
-			VEntNPC npc=state.Npc;if(npc==null||npc.IsDead)continue;state.PreciseFatigue=Math.Clamp(state.PreciseFatigue+(npc.IsSleeping?-5000d:625d)*elapsed,0d,10000d);state.Record=state.Record with{Fatigue=(ushort)Math.Round(state.PreciseFatigue)};
+			VEntNPC npc=state.Npc;if(npc==null)continue;if(npc.IsDead){Wake(state);continue;}state.PreciseFatigue=Math.Clamp(state.PreciseFatigue+(npc.IsSleeping?-5000d:625d)*elapsed,0d,10000d);state.Record=state.Record with{Fatigue=(ushort)Math.Round(state.PreciseFatigue)};
 			if(npc.IsSleeping)
 			{
 				if(!night||state.PreciseFatigue<=WakeFatigue||state.TargetBed is not PersistentFurnitureKey sleepingBed||!TryGetBed(sleepingBed,out _))Wake(state);
 				continue;
 			}
-			if(!night||state.PreciseFatigue<SeekSleepFatigue||realTime<state.RetryAfter)continue;
+			if(!night){Wake(state);continue;}
+			if(state.TargetBed is PersistentFurnitureKey missing && !TryGetBed(missing,out _)){Wake(state);continue;}
+			if(state.PreciseFatigue<SeekSleepFatigue||realTime<state.RetryAfter)continue;
 			if(state.TargetBed is null)
 			{
 				VEntBed bed=ChooseBed(state,npc.Position);if(bed==null){state.RetryAfter=realTime+30f;continue;}state.TargetBed=bed.PersistentKey;reservations[bed.PersistentKey]=state.Record.NpcId;state.SeekingSince=realTime;npc.IsLifeControlled=true;
 				Vector3 approach=GetApproach(bed);if(!npc.NavigateTo(approach)){Release(state);state.RetryAfter=realTime+30f;continue;}
 			}
+			if(state.TargetBed is PersistentFurnitureKey navigationBed && TryGetBed(navigationBed,out VEntBed navigationTarget) && !npc.IsNavigating && !npc.HasReachedTarget && Vector3.DistanceSquared(npc.Position,GetApproach(navigationTarget))>=0.64f){Wake(state);state.RetryAfter=realTime+30d;continue;}
 			if(realTime-state.SeekingSince>=20f){npc.StopNavigation();Release(state);state.RetryAfter=realTime+30f;continue;}
 			if(state.TargetBed is PersistentFurnitureKey target&&TryGetBed(target,out VEntBed targetBed)&&(npc.HasReachedTarget||Vector3.DistanceSquared(npc.Position,GetApproach(targetBed))<0.64f))
 				npc.EnterSleep(new Vector3(targetBed.Anchor.X+0.5f,targetBed.Anchor.Y+0.35f,targetBed.Anchor.Z+0.5f));
@@ -79,11 +82,13 @@ public sealed class NpcLifeService
 	private bool IsAvailable(PersistentFurnitureKey bed,StableNpcId npc)=>!reservations.TryGetValue(bed,out StableNpcId reserved)||reserved==npc;
 	private bool TryGetBed(PersistentFurnitureKey key,out VEntBed bed){bed=beds().FirstOrDefault(candidate=>candidate.PersistentKey==key);return bed!=null&&furniture.TryGet(key,out PersistentFurnitureRecord record)&&record.Type==FurnitureType.Bed;}
 	private static Vector3 GetApproach(VEntBed bed){BlockCoordinate offset=VEntBed.FacingOffset(bed.Facing);return new Vector3(bed.Anchor.X+0.5f-offset.X,bed.Anchor.Y,bed.Anchor.Z+0.5f-offset.Z);}
-	private void Wake(LifeState state){state.Npc?.WakeFromSleep();Release(state);}
+	public void RebaseTime(double absoluteGameHours) => lastGameHours = absoluteGameHours;
+	public void Detach(VEntNPC npc){if(npc!=null&&states.TryGetValue(npc.StableId,out LifeState state)&&ReferenceEquals(state.Npc,npc)){Wake(state);state.Npc=null;}}
+	private void Wake(LifeState state){if(state.TargetBed.HasValue||state.Npc?.IsSleeping==true){state.Npc?.StopNavigation();state.Npc?.WakeFromSleep();}Release(state);}
 	private void Release(LifeState state){if(state.TargetBed is PersistentFurnitureKey bed)reservations.Remove(bed);state.TargetBed=null;if(state.Npc?.IsSleeping!=true&&state.Npc!=null)state.Npc.IsLifeControlled=false;}
 	private sealed class LifeState
 	{
 		public LifeState(NpcLifeRecord record){Record=record;PreciseFatigue=record.Fatigue;}
-		public NpcLifeRecord Record;public double PreciseFatigue;public VEntNPC Npc;public PersistentFurnitureKey? TargetBed;public float SeekingSince;public float RetryAfter;
+		public NpcLifeRecord Record;public double PreciseFatigue;public VEntNPC Npc;public PersistentFurnitureKey? TargetBed;public double SeekingSince;public double RetryAfter;
 	}
 }

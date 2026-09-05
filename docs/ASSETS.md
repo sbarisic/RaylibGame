@@ -75,3 +75,11 @@ At minimum, an automated render must observe non-background pixels, settled
 voxel meshing, and clean resource shutdown. Manual review also covers resize,
 high DPI, all window modes, monitor changes, VSync, UI input, shader reload, and
 repeated game-state switches.
+
+## Plant and furniture presentation
+
+Wheat uses eight growth-stage materials in the voxel overlay. Repeated updates
+within one stage do not write voxels. Object changes coalesce by column and only
+affected chunks receive dirty notifications. Basket/bed models and NPC sleep
+animations remain follow-up work; lifecycle correctness does not imply visual
+completion. See [Streaming](WORLD_STREAMING.md).

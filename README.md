@@ -92,7 +92,7 @@ dotnet run --project VoxelgineServer/VoxelgineServer.csproj -c Release -- `
 The complete toolchain, publish, test, and package-audit commands are in
 [Building and validation](docs/BUILDING.md).
 
-## Migration documentation
+## Documentation
 
 - [Architecture and migration invariants](docs/ARCHITECTURE.md)
 - [Dependency pins and upstream workflow](docs/DEPENDENCIES.md)
@@ -100,6 +100,16 @@ The complete toolchain, publish, test, and package-audit commands are in
 - [Models, shaders, and asset conversion](docs/ASSETS.md)
 - [Building, testing, publishing, and package audits](docs/BUILDING.md)
 - [World archive and spatial streaming](docs/WORLD_STREAMING.md)
+
+## Multiplayer and persistent identity
+
+Network protocol 2 authenticates persistent local P-256 identities and all UDP
+datagrams. Display names do not own saves. Legacy player files are backed up;
+identity-based profiles start fresh. The client pins server keys after the first
+authenticated connection. Global sandbox/debug commands require the host or an
+authorized administrator. World archive format 6 remains unchanged. See
+[Multiplayer](MULTIPLAYER.md), [Hosting](VoxelgineServer/README.md), and
+[Runtime data](docs/RUNTIME_DATA.md) before moving keys or resetting trust.
 
 ## Controls
 
@@ -110,13 +120,17 @@ The complete toolchain, publish, test, and package-audit commands are in
 | Space | Jump or swim up |
 | Shift | Walk, swim down, or ledge safety |
 | C | Toggle noclip |
-| 1-4 | Select hotbar slot |
+| 1-9, 0 | Select one of ten hotbar slots |
 | Left mouse | Use item or break block |
-| Right mouse | Place block |
+| Right mouse | Place the selected block, wheat, basket, or bed |
+| E | Interact with a plant or furniture |
+| Tab | Open inventory |
+| P (hold) | Show player list |
+| T | Open chat |
 | F1 | Toggle debug menu |
 | F3 | Toggle debug mode |
 | F5 | Toggle network/renderer statistics |
-| Escape | Return to the main menu |
+| Escape | Close the active overlay, or disconnect and return to the main menu |
 
 ## License
 

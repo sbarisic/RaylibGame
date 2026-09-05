@@ -1,5 +1,10 @@
 # WORLDBUILDING
 
+Design proposal: this document describes intended experience, not completed
+gameplay. The implemented plan/materialization pipeline, structures, biomes,
+villages, farming, and persistence are described in [World generation](WORLD_GEN.md).
+Broader survival, enemies, and progression below remain design work.
+
 ## High-Level Concept
 
 Aurora Falls - game

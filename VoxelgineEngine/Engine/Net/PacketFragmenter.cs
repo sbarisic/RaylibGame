@@ -149,7 +149,7 @@ namespace Voxelgine.Engine
 		/// The complete packet data (ready for <see cref="Packet.Deserialize"/>),
 		/// or null if still waiting for more fragments.
 		/// </returns>
-		public byte[] HandleReceived(byte[] packetData, float currentTime)
+		public byte[] HandleReceived(byte[] packetData, double currentTime)
 		{
 			if (!IsFragment(packetData))
 				return packetData;
@@ -205,7 +205,7 @@ namespace Voxelgine.Engine
 		/// within <see cref="StaleGroupTimeout"/> seconds.
 		/// </summary>
 		/// <param name="currentTime">Current time in seconds.</param>
-		public void CleanupStaleGroups(float currentTime)
+		public void CleanupStaleGroups(double currentTime)
 		{
 			List<ushort> stale = null;
 
@@ -254,7 +254,7 @@ namespace Voxelgine.Engine
 			/// The time when the most recent fragment in this group was received.
 			/// Used for stale group cleanup.
 			/// </summary>
-			public float LastFragmentTime { get; private set; }
+			public double LastFragmentTime { get; private set; }
 			public int FragmentCount => _fragments.Length;
 
 			/// <summary>
@@ -267,7 +267,7 @@ namespace Voxelgine.Engine
 				_fragments = new byte[totalFragments][];
 			}
 
-			public bool SetFragment(int index, byte[] payload, float currentTime)
+			public bool SetFragment(int index, byte[] payload, double currentTime)
 			{
 				if (index < 0 || index >= _fragments.Length)
 					return false;

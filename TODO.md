@@ -1,140 +1,56 @@
-# Aurora Falls - Voxelgine Engine TODO
+# Aurora Falls - outstanding work
 
-A list of planned features, improvements, and tasks for this project.
+The client uses FishGfx and FishUI on Windows x64. Portable planning lives in
+`Voxelgine.WorldGeneration`; authoritative simulation lives in `VoxelgineEngine`.
+The dedicated server has no graphics or audio dependency. Current ownership and
+contracts are documented in [Architecture](docs/ARCHITECTURE.md) and
+[Multiplayer](MULTIPLAYER.md). Completed records are in [DONE.md](DONE.md).
 
-> **CPX (Complexity Points)** - 1 to 5 scale:
-> - **1** - Single file control/component
-> - **2** - Single file control/component with single function change dependencies
-> - **3** - Multi-file control/component or single file with multiple dependencies, no architecture changes
-> - **4** - Multi-file control/component with multiple dependencies and significant logic, possible minor architecture changes
-> - **5** - Large feature spanning multiple components and subsystems, major architecture changes
+## Known issues to investigate
 
-> Instructions for the TODO list:
-- Move all completed TODO items into a separate Completed document (DONE.md) and simplify by consolidating/combining similar ones and shortening the descriptions where possible
+- NPC chat response: saying "hello" reportedly does not produce the expected
+  reaction. Keep this open until reproduced and verified through gameplay.
 
-> How TODO file should be iterated:
-- First handle the Uncategorized section, if any similar issues already are on the TODO list, increase their priority instead of adding duplicates (categorize all at once)
-- When Uncategorized section is empty, start by fixing Active Bugs
-- After Active Bugs, handle the rest of the TODO file by priority and complexity (High priority takes precedance, then CPX points).
+## Correctness and operational follow-up
 
----
+- Review persistent identity recovery UX and expose key/trust management in the
+  UI. Local keys, manual backups, and explicit command-line trust reset are the
+  current implementation; there is no account service or legacy-profile import.
+- Add sustained WAN loss/jitter, adversarial load, multi-client long-running soak,
+  and default-size world performance captures beyond focused regression tests.
+- Measure and design background saving with explicit snapshot ownership. Saves
+  remain synchronous and report duration; do not introduce unsynchronized world
+  access to remove a measured stall.
+- Continue default-size generation memory and broad seed-quality acceptance.
 
-## Project Overview
+## Presentation and gameplay
 
-**Aurora Falls** is a voxel-based 3D game engine built with **Raylib-cs** targeting **.NET 10**.
+- Add furniture models and sleep animations; preserve the implemented lifecycle
+  and bed-reservation rules while improving presentation.
+- Water flow: move water into available lower/adjacent cells without multiplying
+  it. Define deterministic server behavior and budgets before implementation.
+- LAN server discovery and browser.
+- Configurable key bindings.
+- Disabled inventory-item presentation.
+- Broader progression and world content: [Worldbuilding](WORLDBUILDING.md).
+- Mod system and supported APIs: [Mod proposal](TODO_MODS.md).
 
-Three-project architecture: `Voxelgine` (client + Raylib), `VoxelgineEngine` (shared/Raylib-free), `VoxelgineServer` (dedicated headless server).
+## Documentation and acceptance
 
-### Current Architecture
+- Expand the API reference and newcomer tutorial as stable public interfaces form.
+- Complete manual visual, DPI/window-mode, audio-listening, monitor-change, and
+  shader-reload acceptance where an automated smoke is insufficient.
+- Keep current test evidence in [Validation](docs/VALIDATION.md); historical test
+  counts and migration accomplishments are not current acceptance claims.
 
-| System | Status | Description |
-|--------|--------|-------------|
-| **Core Engine** | ✅ | `GameWindow`, `GameState`, `GameSimulation`, `GameConfig`, `InputMgr`, `SoundMgr`, `ResMgr`, explicit application composition, `FishLogging` |
-| **Graphics** | ✅ | `ChunkMap`, `Chunk`, GBuffer deferred rendering, `Skybox`, `Frustum` culling |
-| **Voxel World** | ✅ | Procedural island generation via simplex noise, block types, dual-channel lighting (skylight/block light) |
-| **Entity System** | ✅ | `VoxEntity` base, `VEntItemDrop`, `VEntNPC`, `VEntSlidingDoor`, `EntityManager` with network IDs, authority flag, spawn properties |
-| **Player** | ✅ | `Player`, `FPSCamera` (instance-based), `PlayerManager`, `RemotePlayer`, `ViewModel`, inventory, health/respawn |
-| **Items and weapons** | ✅ | Deterministic item catalog, 60-slot authoritative inventory, transactional placement/breaking, gun and hammer item definitions |
-| **GUI** | ✅ | FishUI-based: `FishUIManager`, `RaylibFishUIGfx`, custom controls, main menu with connect/host dialogs |
-| **Particles** | ✅ | `ParticleSystem` with smoke, fire, blood, spark effects and `EffectsPreviewState` with custom particle sandbox |
-| **Animation** | ✅ | `AnimLerp`, `LerpManager`, easing functions, `NPCAnimator` |
-| **Physics** | ✅ | `AABB`, `PhysData`, `PhysicsUtils` + `WorldCollision` + `RayMath` (split across Engine/Voxelgine) |
-| **Multiplayer** | ✅ | Client-server authoritative, UDP transport, reliable delivery, client prediction with predicted fire effects, remote player interpolation, entity/block/combat sync, listen server mode — see [MULTIPLAYER.md](MULTIPLAYER.md) for protocol reference |
-| **NPC/AI** | ✅ | `VEntNPC` with A* pathfinding and AI behavior VM (`AIRunner`, `AIPrograms`) |
-| **Scripting** | ⬜ | `Scripting.cs` exists (empty/stub) |
-| **Mod System** | ⬜ | Not implemented — see [TODO_MODS.md](TODO_MODS.md) |
+## Uncategorized
 
-Legend: ✅ Functional | 🔶 Partial/WIP | ⬜ Planned
+New reports belong here until reproduced and prioritized. Move verified completed
+work to DONE.md; retain unresolved behavior and unavailable acceptance gates.
 
----
+## Maintenance constraints
 
-## Features
-
-### High Priority
-
-*No high priority items — Mod System tracked in [TODO_MODS.md](TODO_MODS.md)*
-
-### Medium Priority
-
-- [ ] **World: Water flow physics** — Water blocks flow to lower adjacent positions if free; on flat surfaces move in a random direction if a neighbor is free (move the block, don't spawn new ones) **[CPX: 4]**
-
-### On Hold
-
-- [ ] **Multiplayer: LAN server browser** — Broadcast UDP discovery on LAN, servers respond with name/player count/map info, client displays list to select and connect **[CPX: 3]**
-- [ ] **Input: Key rebinding system** — Add input mapping/rebinding support to `InputMgr` for customizable controls **[CPX: 3]**
-
----
-
-## Improvements
-
-### High Priority
-
-*No high priority items*
-
-### Medium Priority
-
-*No medium priority items*
-
-### On Hold
-
-- [ ] **GUI: Disabled inventory items**
-
----
-
-## Documentation
-
-### High Priority
-
-*No high priority items*
-
-### Medium Priority
-
-*No medium priority items*
-
-### Lower Priority
-
-- [ ] API reference documentation
-- [ ] Getting started guide
-- [ ] Architecture overview
-- [ ] Multiplayer architecture document — technical description of client-server model, prediction/reconciliation, interpolation, and sync strategies
-- [ ] Multiplayer hosting guide — instructions for hosting dedicated/listen servers, CLI arguments, port forwarding, configuration
-- [ ] Network protocol reference — document all packet types, binary formats, and field descriptions
-
----
-
-## Code Cleanup & Technical Debt
-
-### Code Refactoring
-
-*No refactoring items*
-
----
-
-## Known Issues / Bugs
-
-### Active Bugs
-
-*No active bugs*
-
-### Uncategorized (Analyze and create TODO entries in above appropriate sections with priority. Do not fix or implement them just yet. Assign complexity points where applicable. Do not delete this section when you are done, just empty it)
-
-- When i write "hello" in chat, the NPC does not seem to react to it
-
----
-
-## Notes
-
-- Try to edit files and use tools WITHOUT POWERSHELL where possible, shell scripts get stuck and then manually terminate
-- Maintain the "dependency-free" philosophy - keep the core library minimal
-- Do not be afraid to break backwards compatibility if new changes will simplify or improve the project
-- Do not use powershell commands unless absolutely necessary
-- If you encounter features in systems which are required when working on a current improvement/bugfix, extend that system with the required features as part of the current task instead of creating separate TODO entries
-- Problem solutions need to be optimized, performant and well thought out before implementation, avoid quick fixes
-- See MULTIPLAYER.md for multiplayer architecture
-- Keep files below 1000 lines, split when they get too large. Either partial classes or split into multiple smaller classes that handle a single functionality.
-
----
-
-## Completed
-
-See [DONE.md](DONE.md) for completed items.
+Keep the core dependency surface small. Preserve unrelated local work, numeric
+block IDs, the 0.015-second physics delta, world ownership, and existing movement.
+Prefer responsibility-based files below 1,000 lines. Dependency documentation
+belongs to its owning submodule and is not part of first-party documentation edits.

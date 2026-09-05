@@ -9,13 +9,16 @@ namespace UnitTest;
 public sealed unsafe class MPClientGameStateTests
 {
 	[Fact]
-	public void ClientClockUsesApplicationTimeBeforeFirstStateTick()
+	public void ClientClockUsesMonotonicDoubleTimeBeforeFirstStateTick()
 	{
 		using TestContext context = new();
 		context.Engine.TotalTime = 23.5f;
 		MPClientGameState state = new(context.Window, context.Engine);
 
-		Assert.Equal(23.5f, state.GetClientTime());
+		double before = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+		double observed = state.GetClientTime();
+		double after = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+		Assert.InRange(observed, before, after);
 	}
 
 	[Fact]

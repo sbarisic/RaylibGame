@@ -76,7 +76,7 @@ namespace Voxelgine.Engine
 		public long RetransmissionsSent { get; private set; }
 		public long RetryFailures { get; private set; }
 
-		public bool TryWrapReliable(byte[] packetData, float currentTime, out byte[] rawData)
+		public bool TryWrapReliable(byte[] packetData, double currentTime, out byte[] rawData)
 		{
 			ArgumentNullException.ThrowIfNull(packetData);
 			if (sendWindow.Count >= WindowSize)
@@ -167,7 +167,7 @@ namespace Voxelgine.Engine
 			return new ReliableReceiveResult(true, false, !accepted, accepted ? payload : null);
 		}
 
-		public ReliableRetransmissionBatch CollectRetransmissions(float currentTime, float roundTripTime)
+		public ReliableRetransmissionBatch CollectRetransmissions(double currentTime, float roundTripTime)
 		{
 			List<byte[]> packets = new();
 			float baseTimeout = roundTripTime > 0
@@ -275,7 +275,7 @@ namespace Voxelgine.Engine
 
 		private sealed class PendingPacket
 		{
-			internal PendingPacket(uint sequence, byte[] packetData, float sentTime)
+			internal PendingPacket(uint sequence, byte[] packetData, double sentTime)
 			{
 				Sequence = sequence;
 				PacketData = packetData;
@@ -284,7 +284,7 @@ namespace Voxelgine.Engine
 
 			internal uint Sequence { get; }
 			internal byte[] PacketData { get; }
-			internal float SentTime { get; set; }
+			internal double SentTime { get; set; }
 			internal int RetryCount { get; set; }
 		}
 	}

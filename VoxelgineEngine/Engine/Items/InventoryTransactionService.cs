@@ -62,7 +62,9 @@ public sealed class InventoryTransactionService
 	{
 		ArgumentNullException.ThrowIfNull(player);
 		if (player.Revision != expectedRevision) return Rejected(player, null, playerKey);
+		ItemStack previousCursor = player.Cursor;
 		InventoryMutationResult result = player.ApplyClick(kind, slot);
+		if (!player.Cursor.IsEmpty && player.Cursor.Item != previousCursor.Item) cursorOrigins.Remove(playerKey);
 		UpdatePlayerOrigin(playerKey, player, kind, slot);
 		return new(result.Accepted, result.Changed, player.Revision, 0, GetOrigin(playerKey));
 	}
@@ -130,14 +132,25 @@ public sealed class InventoryTransactionService
 		if ((uint)sourceSlot >= source.SlotCount || count == 0) return false;
 		ItemStack stack = source.GetSlot(sourceSlot);
 		if (stack.IsEmpty || stack.Count < count) return false;
+		long sourceRevision = source.Revision, targetRevision = target.Revision;
+		ItemStack[] targetSlots = target.GetSlots().ToArray();
 		ItemStack moving = new(stack.Item, count);
-		InventoryInsertionResult insertion = target.TryInsert(moving);
-		if (!insertion.Remainder.IsEmpty) return false;
+		// Fill compatible stacks first, then empty slots, without touching either store.
+		for (int pass = 0; pass < 2 && !moving.IsEmpty; pass++)
+			for (int i = 0; i < targetSlots.Length && !moving.IsEmpty; i++)
+				if (pass == 0 ? !targetSlots[i].IsEmpty : targetSlots[i].IsEmpty)
+					moving = InsertInto(ref targetSlots[i], moving);
+		if (!moving.IsEmpty || source.Revision != sourceRevision || target.Revision != targetRevision) return false;
 		ItemStack[] slots = source.GetSlots().ToArray();
 		ushort left = checked((ushort)(stack.Count - count));
 		slots[sourceSlot] = left == 0 ? ItemStack.Empty : new ItemStack(stack.Item, left);
-		return source.TryCommit(slots, source.Revision);
+		if (!target.TryCommitTransaction(targetSlots, target.Cursor, target.CursorOriginSlot, targetRevision) ||
+			!source.TryCommit(slots, sourceRevision))
+			throw new InvalidOperationException("Validated transfer lost serialized ownership.");
+		return true;
 	}
+
+	public void ClearOwner(string playerKey) => cursorOrigins.Remove(playerKey);
 
 	private static bool ApplyClickCore(InventoryActionKind kind, ref ItemStack cursor, ref ItemStack target)
 	{

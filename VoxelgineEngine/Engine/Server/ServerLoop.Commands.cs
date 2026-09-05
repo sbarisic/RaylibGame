@@ -112,6 +112,12 @@ namespace Voxelgine.Engine.Server
 					CmdKick(args, output);
 					break;
 
+				case "op":
+				case "deop":
+				case "unban":
+					CmdAccess(cmd,args,output);
+					break;
+
 				case "ban":
 					CmdBan(args, output);
 					break;
@@ -170,26 +176,18 @@ namespace Voxelgine.Engine.Server
 			_server.Kick(conn.PlayerId, "Kicked by server", CurrentTime);
 		}
 
-		private void CmdBan(string args, CommandOutput output)
+		private void CmdAccess(string command,string argument,CommandOutput output)
 		{
-			if (string.IsNullOrEmpty(args))
-			{
-				output.Reject("[CMD] Usage: ban <player name or id>");
-				return;
-			}
-
-			var conn = FindConnectionByNameOrId(args);
-			if (conn == null)
-			{
-				output.Reject($"[CMD] Player not found: {args}");
-				return;
-			}
-
-			// Ban is implemented as kick with a ban message.
-			// A full ban list (persisted IP/name bans) would require additional infrastructure.
-			output.WriteLine($"[CMD] Banning player [{conn.PlayerId}] \"{conn.PlayerName}\"...");
-			_server.Kick(conn.PlayerId, "Banned by server", CurrentTime);
+			NetConnection connection=FindConnectionByNameOrId(argument);
+			PlayerIdentity identity=connection?.Identity ?? new PlayerIdentity(argument.ToLowerInvariant());
+			if(!ServerAccessPolicy.IsFingerprint(identity.Fingerprint)) { output.Reject("Use a connected player name/id or a full identity fingerprint."); return; }
+			if(command=="ban" || command=="unban") _access.SetBanned(identity,command=="ban");
+			else _access.SetAdministrator(identity,command=="op");
+			output.WriteLine($"{command}: {identity.Fingerprint}");
+			if(command=="ban" && connection!=null) _server.Kick(connection.PlayerId,"Banned by server",CurrentTime);
 		}
+
+		private void CmdBan(string args,CommandOutput output)=>CmdAccess("ban",args,output);
 
 		private void CmdSay(string message, CommandOutput output)
 		{
@@ -266,6 +264,7 @@ namespace Voxelgine.Engine.Server
 			{
 				var conn = _server.GetConnection(player.PlayerId);
 				string name = conn?.PlayerName ?? "Unknown";
+				output.WriteLine($"    identity={conn?.Identity.Fingerprint}");
 				int ping = conn?.RoundTripTimeMs ?? 0;
 				string status = player.IsDead ? " [DEAD]" : "";
 				output.WriteLine($"  [{player.PlayerId}] \"{name}\" - Pos: ({player.Position.X:F1}, {player.Position.Y:F1}, {player.Position.Z:F1}) - HP: {player.Health:F0} - Ping: {ping}ms{status}");
@@ -276,7 +275,8 @@ namespace Voxelgine.Engine.Server
 		{
 			output.WriteLine("[CMD] Server console commands:");
 			output.WriteLine("  kick <player>  - Kick a player by name or ID");
-			output.WriteLine("  ban <player>   - Ban a player by name or ID");
+			output.WriteLine("  ban / unban <player|fingerprint> - Persist or remove an identity ban");
+			output.WriteLine("  op / deop <player|fingerprint> - Grant or revoke administrator access");
 			output.WriteLine("  say <message>  - Broadcast a server message to all players");
 			output.WriteLine("  time [hours]   - Show or set time of day (0-24)");
 			output.WriteLine("  save           - Save the world to disk");
@@ -307,6 +307,10 @@ namespace Voxelgine.Engine.Server
 				if (!ConsoleCommandCatalog.TryGetPlayerCommand(request.CommandName, out ConsoleCommandDefinition definition))
 				{
 					output.Reject($"Unknown player command: {request.CommandName}.");
+				}
+				else if (definition.Name != "machine" && !_access.IsAdministrator(connection.Identity))
+				{
+					output.Reject("This command requires server administrator permission.");
 				}
 				else if (!definition.AcceptsArgumentCount(request.Arguments.Length))
 				{
@@ -609,7 +613,7 @@ namespace Voxelgine.Engine.Server
 			foreach (var conn in _server.GetConnections())
 			{
 				if (conn.State == ConnectionState.Connected &&
-					string.Equals(conn.PlayerName, nameOrId, StringComparison.OrdinalIgnoreCase))
+					(string.Equals(conn.PlayerName, nameOrId, StringComparison.OrdinalIgnoreCase) || conn.Identity.Fingerprint == nameOrId))
 				{
 					return conn;
 				}

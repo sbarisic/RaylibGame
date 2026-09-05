@@ -32,22 +32,31 @@ public sealed class ServerClientSession
 	public ServerCommandQueue CommandQueue { get; }
 	public SimulatedCommandHistory CommandHistory { get; }
 	public string PlayerName => Connection.PlayerName;
+	public string InventoryOwnerKey => Connection.Identity.Fingerprint ?? throw new InvalidOperationException("Player session has no verified identity.");
 	public bool IsGameplayActive { get; set; }
 	public byte SelectedHotbarSlot { get; set; }
 	public int SelectionCommandTick { get; set; }
-	public float? RespawnStartedAt { get; set; }
-	public float AttackAnimationEndTime { get; set; }
+	public double? RespawnStartedAt { get; set; }
+	public double AttackAnimationEndTime { get; set; }
 	public uint NextExpectedInventoryActionId { get; set; } = 1;
 	public uint NextExpectedItemUseActionId { get; set; } = 1;
 	public ProcessedActionHistory InventoryActionHistory { get; } = new(128);
 	public ProcessedActionHistory ItemUseActionHistory { get; } = new(128);
 	public HashSet<long> ConsumedItemUseChannels { get; } = new();
 	public List<PendingItemUseRequest> PendingItemUses { get; } = new(32);
-	public float LastWeaponFireTime { get; set; } = float.NegativeInfinity;
+	public double LastWeaponFireTime { get; set; } = float.NegativeInfinity;
+	public uint LastCraftActionId { get; set; }
+	public ProcessedActionHistory CraftActionHistory { get; } = new(128);
+	public uint LastContainerActionId { get; set; }
 	public ContainerViewerSession ContainerSession { get; set; }
 
 	public void ClearTransientState()
 	{
+		NextExpectedInventoryActionId = NextExpectedItemUseActionId = 1;
+		ContainerSession = null;
+		LastCraftActionId = LastContainerActionId = 0;
+		CraftActionHistory.Clear();
+		LastWeaponFireTime = double.NegativeInfinity;
 		CommandQueue.Clear();
 		CommandHistory.Clear();
 		InventoryActionHistory.Clear();

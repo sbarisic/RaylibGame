@@ -62,11 +62,22 @@ FishGfxVoxelScene (client only)
   `- VoxelRenderer
 ```
 
-The mirror is populated incrementally with `SetChunk` as complete columns are
-applied and updated with `SetVoxel` for subsequent edits. Startup does not
-capture every chunk or request a global renderer rebuild.
+The mirror installs prepared chunks inside explicit column-update transactions
+and publishes each completed column before applying subsequent edits with
+`SetVoxel`. Queued application uses a 2 ms soft budget and a 512-unit ceiling;
+lighting has a separate 2 ms budget. Normal streamed startup applies prepared
+columns incrementally. Explicit world reset and synchronization of an existing
+map remain bulk operations and can exceed the application deadline.
 It cannot write saves or packets. Renderer state never enters `Chunk`,
 `ChunkSnapshot`, or a domain entity.
+
+FishGfx caches cube visibility and unique corner lighting during meshing and
+indexes dirty work by horizontal column. `VoxelMeshing` selects `Culled` or
+experimental `GreedyOpaque` in game configuration; `Culled` remains the default.
+Uniform opaque rectangles can merge without changing numeric voxel identities,
+collision or the vertex layout. Render queues release retained draws on disposal;
+idle empty geometry pages can be reclaimed after queued draws release ownership.
+See [voxel performance](VOXEL_PERFORMANCE.md) for measurements and promotion gates.
 
 ## Client frame and render ownership
 

@@ -1,5 +1,18 @@
 # World archive and spatial streaming
 
+Renderer application is resumable under a 2 ms soft deadline and 512-unit limit.
+Prepared and ordinary snapshots use the same atomic column publication path;
+ordinary snapshots do not generate streamed-column acknowledgements. Block edits
+remain behind pending columns, and acknowledgements remain behind earlier edits.
+Each call permits one unit of progress; preparation, commit, and world reset can
+exceed the soft deadline. Lighting separately checks a 2 ms deadline between
+bounded propagation steps, while mesh uploads retain their 1 ms budget.
+
+The renderer's global `IsIdle` includes deferred distant work. Camera-specific
+`GetPendingWork(camera).IsSettled` reports whether eligible work has settled and
+exposes dirty, deferred, lighting-blocked, in-flight, completed, upload and
+transparent-sort state. Benchmark timeouts print this state and partial timings.
+
 Aurora Falls currently treats world and network formats as development-only.
 There is one active schema and no legacy reader, converter, or old-client path.
 

@@ -8,6 +8,12 @@ contracts are documented in [Architecture](docs/ARCHITECTURE.md) and
 
 ## Known issues to investigate
 
+- Complete the full camera-path frame-time and manual texture/lighting/shadow/fog
+  acceptance matrix before enabling greedy meshing by default. Profile the
+  feature-rich village planner: selected seeds still have large allocation and
+  time costs. Revisit render-queue storage reuse only with a faster measured design.
+  See [Voxel performance](docs/VOXEL_PERFORMANCE.md).
+
 - NPC chat response: saying "hello" reportedly does not produce the expected
   reaction. Keep this open until reproduced and verified through gameplay.
 

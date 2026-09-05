@@ -169,3 +169,13 @@ The supported-solution package audits reported no vulnerable packages. GitHub se
 The Debug integration gate passed in `artifacts/validation/20260905-141004-691` (423 engine, 234 client and 29 audio tests). The Release gate passed in `artifacts/validation/20260905-141638-958`. A final bitmap-font char compatibility regression was then reproduced and fixed upstream; all 446 FishGfx tests passed again in Debug and Release. The final parent Release gate at FishGfx `f8f7f9afe994d41e27d6f551b79116bf134bb9e9` passed in `artifacts/validation/20260905-142130-433`, again with all 686 parent tests, a zero-warning Release solution build, client/server publish audits, authenticated hosted/dedicated restart scenarios, all 11 automatic render modes and matching before/after recursive repository snapshots.
 
 The final parent package audit reported no vulnerable packages in the supported solution. The excluded legacy FishGfx alert remains as described above. Documentation checks passed for 19 parent, six FishGfx and 17 FishUI Markdown files; current protocol, archive, packet IDs and nested pins match source. Final report edits were followed by documentation and whitespace checks. The publication includes the previously staged gameplay hardening and the reviewed dependency changes; it excludes generated captures, temporary baseline checkouts, private identities and runtime data.
+
+## Subsequent voxel performance delivery
+
+The [voxel performance report](VOXEL_PERFORMANCE.md) records the subsequent
+generation, meshing, scheduling and geometry-retention changes at FishGfx
+`302661197f4d52e8ac2f479e41348142a78b4855`. Its final Debug and Release gates pass
+691 parent tests per configuration, with 456 FishGfx and 245 FishUI tests tested
+separately in both configurations. Earlier counts and revisions above describe
+the preceding hardening delivery. Greedy meshing remains opt-in; the new report
+separates measured component gains from outstanding sustained visual acceptance.

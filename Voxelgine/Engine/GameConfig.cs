@@ -8,6 +8,8 @@ using Voxelgine.Engine.Input;
 
 namespace Voxelgine.Engine
 {
+	public enum VoxelMeshingMode { Culled, GreedyOpaque }
+
 	public class GameConfig : IFishConfig
 	{
 		private readonly RuntimePaths runtimePaths;
@@ -57,6 +59,8 @@ namespace Voxelgine.Engine
 		public int MaxChunkDrawDistance = DefaultMaxChunkDrawDistance;
 
 		public int ChunkMeshUploadBudget = DefaultChunkMeshUploadBudget;
+
+		public VoxelMeshingMode VoxelMeshing = VoxelMeshingMode.Culled;
 
 		public SunShadowQuality SunShadowQuality = SunShadowQuality.Medium;
 

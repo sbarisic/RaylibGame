@@ -54,7 +54,8 @@ public sealed class FishGfxVoxelScene : IDisposable
 		int chunkMeshUploadBudget = GameConfig.DefaultChunkMeshUploadBudget,
 		VolumetricFogQuality fogQuality = VolumetricFogQuality.Medium,
 		bool synchronizeExisting = true,
-		WorldObjectStore worldObjects = null)
+		WorldObjectStore worldObjects = null,
+		VoxelCubeMeshingMode cubeMeshingMode = VoxelCubeMeshingMode.Culled)
 	{
 		ArgumentNullException.ThrowIfNull(graphics);
 		this.source = source ?? throw new ArgumentNullException(nameof(source));
@@ -64,7 +65,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 		Lighting = new VoxelLighting(
 			World,
 			assets.Palette,
-			new VoxelLightingOptions { UpdateBudget = 65_536 });
+			new VoxelLightingOptions { UpdateBudget = 65_536, TimeBudgetMilliseconds = 2 });
 		rendererOptions = new VoxelRendererOptions
 		{
 			WorkerCount = Math.Min(4, Math.Max(2, Environment.ProcessorCount / 2)),
@@ -87,6 +88,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			MeshUploadByteBudget = 1 * 1024 * 1024,
 			MeshUploadSliceBytes = 256 * 1024,
 			AlphaCutoff = FishGfxVoxelAssets.CutoutAlphaCutoff,
+			Meshing = new VoxelMeshingOptions { CubeMeshingMode = cubeMeshingMode },
 		};
 		Renderer = new VoxelRenderer(
 			graphics,
@@ -254,42 +256,48 @@ public sealed class FishGfxVoxelScene : IDisposable
 			return;
 		}
 
-		if (currentPreparedColumn == null
-			&& pendingPreparedColumns.TryDequeue(out PreparedClientColumn preparedColumn))
+		long started = System.Diagnostics.Stopwatch.GetTimestamp();
+		int operations = 0;
+		bool HasBudget() => operations == 0 || operations < 512
+			&& System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds < 2;
+		while (HasBudget())
 		{
-			currentPreparedColumn = BeginPreparedColumn(preparedColumn);
-		}
-
-		if (currentPreparedColumn != null)
-		{
-			if (!currentPreparedColumn.IsComplete)
-				ApplyNextPreparedChunk(currentPreparedColumn);
+			if (currentPreparedColumn == null)
+			{
+				if (pendingPreparedColumns.TryDequeue(out var prepared)) currentPreparedColumn = BeginPreparedColumn(prepared);
+				else if (pendingColumns.TryDequeue(out var column)) currentPreparedColumn = BeginPreparedColumn(PrepareStreamedColumn(column), notify: false);
+				else break;
+			}
+			operations++;
+			if (!currentPreparedColumn.IsComplete) ApplyNextPreparedChunk(currentPreparedColumn);
 			if (currentPreparedColumn.IsComplete)
 			{
 				CompletePreparedColumn(currentPreparedColumn);
-				currentPreparedColumn.Dispose();
-				currentPreparedColumn = null;
+				currentPreparedColumn.Dispose(); currentPreparedColumn = null;
 			}
 		}
-
-		if (currentPreparedColumn == null && pendingPreparedColumns.IsEmpty)
+		if (currentPreparedColumn != null || !pendingPreparedColumns.IsEmpty || !pendingColumns.IsEmpty) return;
+		while (HasBudget() && pendingChanges.TryDequeue(out BlockChange change)) { operations++; Apply(change); }
+		if (!pendingChanges.IsEmpty) return;
+		while (HasBudget() && completedPreparedColumns.TryDequeue(out var completed))
 		{
-			while (pendingColumns.TryDequeue(out ChunkColumnSnapshot column))
-				ApplyColumn(column);
+			operations++; PreparedColumnApplied?.Invoke(completed.X, completed.Z, completed.Revision);
+		}
+		foreach (var key in replacedObjectTerrain)
+		{
+			if (!HasBudget()) break;
+			operations++;
+			if (!pendingObjectColumns.ContainsKey(key) && appliedObjectColumns.TryGetValue(key, out var previous)) ApplyObjectColumn(previous);
+			// HashSet.Remove does not invalidate enumeration on the supported .NET runtime.
+			replacedObjectTerrain.Remove(key);
+		}
+		foreach (var pair in pendingObjectColumns)
+		{
+			if (!HasBudget()) break;
+			operations++;
+			if (pendingObjectColumns.TryRemove(pair.Key, out var objectColumn)) ApplyObjectColumn(objectColumn);
 		}
 
-		if (currentPreparedColumn == null && pendingPreparedColumns.IsEmpty)
-		{
-			while (pendingChanges.TryDequeue(out BlockChange change))
-				Apply(change);
-			while (completedPreparedColumns.TryDequeue(out var completed))
-				PreparedColumnApplied?.Invoke(completed.X, completed.Z, completed.Revision);
-			foreach (var key in replacedObjectTerrain)
-				if (!pendingObjectColumns.ContainsKey(key) && appliedObjectColumns.TryGetValue(key, out var previous)) ApplyObjectColumn(previous);
-			foreach (var key in pendingObjectColumns.Keys)
-				if (pendingObjectColumns.TryRemove(key, out WorldObjectColumnState objectColumn)) ApplyObjectColumn(objectColumn);
-			replacedObjectTerrain.Clear();
-		}
 	}
 
 	public PreparedClientColumn PrepareStreamedColumn(ChunkColumnSnapshot column)
@@ -618,38 +626,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 		Lighting.RequestFullRebuild();
 	}
 
-	private void ApplyColumn(ChunkColumnSnapshot column)
-	{
-		campfires.ReplaceColumn(column);
-		ChunkCoordinate[] previous = residents
-			.Where(coordinate => coordinate.X == column.X && coordinate.Z == column.Z)
-			.ToArray();
-		foreach (ChunkCoordinate coordinate in previous)
-		{
-			residents.Remove(coordinate);
-			Lighting.UnloadChunk(coordinate);
-			World.RemoveChunk(coordinate);
-		}
-
-		int highestY = column.Chunks.Count == 0
-			? int.MinValue
-			: column.Chunks.Max(static snapshot => snapshot.ChunkY);
-		foreach (ChunkSnapshot snapshot in column.Chunks)
-		{
-			ChunkCoordinate coordinate = new(snapshot.ChunkX, snapshot.ChunkY, snapshot.ChunkZ);
-			VoxelCell[] cells = new VoxelCell[VoxelWorld.ChunkVolume];
-			for (int index = 0; index < cells.Length; index++)
-				cells[index] = new VoxelCell(assets.GetMaterialId(snapshot.Values[index]));
-
-			World.SetChunk(coordinate, cells);
-			residents.Add(coordinate);
-			Lighting.LoadChunk(coordinate, skyExposedAbove: snapshot.ChunkY == highestY);
-		}
-		RefreshSkyExposure(column.X, column.Z);
-		replacedObjectTerrain.Add((column.X, column.Z));
-	}
-
-	private PreparedColumnApplication BeginPreparedColumn(PreparedClientColumn column)
+	private PreparedColumnApplication BeginPreparedColumn(PreparedClientColumn column, bool notify = true)
 	{
 		PreparedRenderChunk[] chunks = column.ConsumeRenderChunks();
 		int columnX = column.DomainColumn.X;
@@ -671,7 +648,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			revision,
 			chunks,
 			previous,
-			update);
+			update, notify);
 	}
 
 	private void ApplyNextPreparedChunk(PreparedColumnApplication application)
@@ -710,7 +687,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 		}
 		RefreshSkyExposure(application.X, application.Z);
 		replacedObjectTerrain.Add((application.X, application.Z));
-		completedPreparedColumns.Enqueue((application.X, application.Z, application.Revision));
+		if (application.Notify) completedPreparedColumns.Enqueue((application.X, application.Z, application.Revision));
 	}
 
 	private void Apply(BlockChange change)
@@ -808,7 +785,7 @@ public sealed class FishGfxVoxelScene : IDisposable
 			long revision,
 			PreparedRenderChunk[] chunks,
 			ChunkCoordinate[] previousChunks,
-			VoxelColumnUpdate update)
+			VoxelColumnUpdate update, bool notify)
 		{
 			X = x;
 			Z = z;
@@ -816,8 +793,10 @@ public sealed class FishGfxVoxelScene : IDisposable
 			Chunks = chunks;
 			PreviousChunks = previousChunks;
 			Update = update;
+			Notify = notify;
 		}
 
+		internal bool Notify { get; }
 		internal int X { get; }
 		internal int Z { get; }
 		internal long Revision { get; }

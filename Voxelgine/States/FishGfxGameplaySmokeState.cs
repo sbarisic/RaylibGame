@@ -306,6 +306,7 @@ internal sealed class FishGfxGameplaySmokeState : GameStateImpl
 
 	protected override void DisposeCore()
 	{
+		renderQueue.Dispose();
 		if (disposed)
 		{
 			return;

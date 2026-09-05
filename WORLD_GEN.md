@@ -86,6 +86,22 @@ bootstrap and interest streaming use those authoritative columns. See
 
 ## Remaining work and validation
 
+Terrain materialization computes one solid interval, biome and radial profile per
+horizontal cell. Up to four workers build independent terrain chunk columns;
+the builder merges their buffers in coordinate order before sequential feature,
+village, tree and foliage stamping. Hill and vegetation planning share a bounded
+feature-exclusion raster. Tree derivation runs when consumed, rather than being
+performed and discarded during plan validation.
+
+`WorldPlanMaterializer.MaterializeAtomically` accepts `terrainWorkers` (1–4,
+default 4) and an optional `stageCompleted` diagnostic callback for staging work.
+Cancellation still prevents publication. These changes preserve generated content
+and require no plan, generator, materializer or archive version change.
+
+The [voxel performance report](docs/VOXEL_PERFORMANCE.md) describes the generation
+probe, fixed seeds, voxel fingerprints and measured limits. Feature-rich planning
+must be measured separately from terrain materialization.
+
 The implemented feature plan includes biomes, structures, connecting routes,
 hydrology, and village layouts. Rich resource economies, enemies, quests, and the
 full technological progression remain design work. Furniture models and sleep

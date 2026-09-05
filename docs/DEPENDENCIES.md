@@ -9,7 +9,7 @@ with `-` or `+`.
 
 | Dependency | Path | Revision |
 |---|---|---|
-| FishGfx | `thirdparty/FishGfx` | `f8f7f9afe994d41e27d6f551b79116bf134bb9e9` |
+| FishGfx | `thirdparty/FishGfx` | `302661197f4d52e8ac2f479e41348142a78b4855` |
 | FishUI | `thirdparty/FishGfx/thirdparty/FishUI` | `18285683769e38ac0842af1f63efc9d033b5bacd` |
 | miniaudio | `thirdparty/miniaudio` | `9634bedb5b5a2ca38c1ee7108a9358a4e233f14d` |
 

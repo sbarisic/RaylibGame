@@ -66,4 +66,9 @@ unavailable checks separately and retain them as open acceptance work.
 See the dated [hardening report](HARDENING_REPORT.md) for measured workloads,
 validation evidence and the limits of that evidence.
 
+The [voxel performance report](VOXEL_PERFORMANCE.md) adds generation fingerprints,
+worker-count equivalence, meshing/lighting deadlines, conservative face merging,
+stable page grouping and retained-draw reclamation checks. Greedy meshing remains
+disabled by default until its full quality and frame-time gates pass.
+
 The documentation gate now includes first-party FishGfx/FishUI local links and the current nested FishUI revision. For the graphics-specific suite, real-context probes and filtered benchmarks, see [FishGfx hardening validation](../thirdparty/FishGfx/HARDENING.md). Run nested suites sequentially before the parent integration gate.

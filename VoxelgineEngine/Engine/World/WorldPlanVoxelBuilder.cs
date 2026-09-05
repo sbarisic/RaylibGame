@@ -19,18 +19,31 @@ internal sealed class WorldPlanVoxelBuilder
 		volumeSampler = WorldPlanGenerator.CreateVolumeSampler(plan);
 	}
 
-	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, CeramicVillageCatalog ceramicFish, CancellationToken cancellationToken)
+	internal static WorldPlanBuildResult Build(WorldPlan plan, StructureBlueprintCatalog catalog, CeramicVillageCatalog ceramicFish, CancellationToken cancellationToken, int terrainWorkers = 4, Action<string, TimeSpan> stageCompleted = null)
 	{
 		WorldPlanVoxelBuilder builder = new(plan);
-		builder.BuildTerrain(cancellationToken);
+		long stageStart = System.Diagnostics.Stopwatch.GetTimestamp();
+		void Report(string stage)
+		{
+			stageCompleted?.Invoke(stage, System.Diagnostics.Stopwatch.GetElapsedTime(stageStart));
+			stageStart = System.Diagnostics.Stopwatch.GetTimestamp();
+		}
+		builder.BuildTerrain(cancellationToken, terrainWorkers);
+		Report("Terrain");
 		builder.BuildHydrology();
+		Report("Hydrology");
 		WorldFeaturePlan features = catalog is null ? WorldFeaturePlan.Empty : ConvertFeatures(plan, catalog);
 		System.Diagnostics.Stopwatch stampTimer = System.Diagnostics.Stopwatch.StartNew();
 		if (catalog is not null) builder.StampFeatures(catalog, features, cancellationToken);
 		if (ceramicFish is not null) builder.StampVillages(ceramicFish, cancellationToken);
+		Report("Structures and villages");
 		builder.StampTrees(cancellationToken);
+		Report("Trees");
 		builder.StampFoliage(features, cancellationToken);
-		return new(builder.CreateColumns(), features, new(TimeSpan.Zero, TimeSpan.Zero, stampTimer.Elapsed));
+		Report("Foliage");
+		ChunkColumnSnapshot[] columns = builder.CreateColumns();
+		Report("Column snapshots");
+		return new(columns, features, new(TimeSpan.Zero, TimeSpan.Zero, stampTimer.Elapsed));
 	}
 
 	private void StampVillages(CeramicVillageCatalog catalog, CancellationToken cancellationToken)
@@ -240,21 +253,40 @@ internal sealed class WorldPlanVoxelBuilder
 		}
 	}
 
-	private void BuildTerrain(CancellationToken cancellationToken)
+	private void BuildTerrain(CancellationToken cancellationToken, int workers)
 	{
-		for (int x = 0; x < plan.Width; x++)
+		if (workers is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(workers));
+		int columnsX = (plan.Width + 15) / 16, columnsZ = (plan.Length + 15) / 16;
+		BlockValue[][][] terrain = new BlockValue[columnsX * columnsZ][][];
+		Parallel.For(0, terrain.Length, new ParallelOptions { CancellationToken = cancellationToken, MaxDegreeOfParallelism = workers }, index =>
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-			for (int z = 0; z < plan.Length; z++)
+			int originX = index / columnsZ * 16, originZ = index % columnsZ * 16;
+			BlockValue[][] columnChunks = new BlockValue[(plan.WorldHeight + 15) / 16][];
+			for (int z = originZ; z < Math.Min(originZ + 16, plan.Length); z++)
+			for (int x = originX; x < Math.Min(originX + 16, plan.Width); x++)
 			{
-				if (!plan.IsLand(x, z)) continue;
-				int surface = plan.GetHeight(x, z);
-				for (int y = 0; y <= surface; y++)
+				if (!volumeSampler.TryGetColumn(x, z, out WorldTerrainColumn column)) continue;
+				BlockValue surface = new(SurfaceBlock(column.Biome));
+				BlockValue layer = new(column.Biome == WorldBiome.Sand ? BlockType.Sand : BlockType.Dirt);
+				BlockValue stone = new(BlockType.Stone);
+				int depth = column.Biome == WorldBiome.Rocky ? 0 : column.Biome == WorldBiome.Sand
+					? 3 + (int)Math.Round(Math.Clamp((column.Radius - 0.72) / 0.24, 0, 1) * 2)
+					: Math.Clamp((int)Math.Round(2 + 12 * SmoothStep(Math.Clamp((column.Radius - 0.18) / 0.20, 0, 1))
+						* (1 - SmoothStep(Math.Clamp((column.Radius - 0.74) / 0.22, 0, 1)))), 2, 14);
+				for (int y = column.Underside; y <= column.Surface; y++)
 				{
-					if (!volumeSampler.IsSolid(x, y, z)) continue;
-					SetBlock(x, y, z, TerrainBlock(x, y, z, surface));
+					BlockValue[] blocks = columnChunks[y >> 4] ??= new BlockValue[4096];
+					blocks[(x & 15) + 16 * ((y & 15) + 16 * (z & 15))] = y == column.Surface
+						? surface : column.Surface - y <= depth ? layer : stone;
 				}
 			}
+			terrain[index] = columnChunks;
+		});
+		for (int index = 0; index < terrain.Length; index++)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			for (int y = 0; y < terrain[index].Length; y++)
+				if (terrain[index][y] is { } blocks) chunks.Add((index / columnsZ, y, index % columnsZ), blocks);
 		}
 	}
 
@@ -424,32 +456,6 @@ internal sealed class WorldPlanVoxelBuilder
 		int localX = x & 15, localY = y & 15, localZ = z & 15;
 		return (x >> 4, y >> 4, z >> 4, localX + Chunk.ChunkSize * (localY + Chunk.ChunkSize * localZ));
 	}
-	private BlockType TerrainBlock(int x, int y, int z, int surface)
-	{
-		WorldBiome biome = plan.GetBiome(x, z);
-		if (y == surface) return SurfaceBlock(biome);
-		int depth = surface - y;
-		if (biome == WorldBiome.Rocky) return BlockType.Stone;
-		double radial = NormalizedRadius(x, z);
-		if (biome == WorldBiome.Sand)
-		{
-			int sandDepth = 3 + (int)Math.Round(Math.Clamp((radial - 0.72) / 0.24, 0, 1) * 2);
-			return depth <= sandDepth ? BlockType.Sand : BlockType.Stone;
-		}
-
-		double mountainFade = SmoothStep(Math.Clamp((radial - 0.18) / 0.20, 0, 1));
-		double rimFade = 1 - SmoothStep(Math.Clamp((radial - 0.74) / 0.22, 0, 1));
-		int dirtDepth = Math.Clamp((int)Math.Round(2 + 12 * mountainFade * rimFade), 2, 14);
-		return depth <= dirtDepth ? BlockType.Dirt : BlockType.Stone;
-	}
-
-	private double NormalizedRadius(int x, int z)
-	{
-		double nx = (x + 0.5 - plan.Width * 0.5) / (plan.Width * 0.5);
-		double nz = (z + 0.5 - plan.Length * 0.5) / (plan.Length * 0.5);
-		return Math.Sqrt(nx * nx + nz * nz);
-	}
-
 	private static double SmoothStep(double value) => value * value * (3 - 2 * value);
 	private static BlockType SurfaceBlock(WorldBiome biome) => biome switch { WorldBiome.Sand => BlockType.Sand, WorldBiome.Rocky => BlockType.Stone, _ => BlockType.Grass };
 

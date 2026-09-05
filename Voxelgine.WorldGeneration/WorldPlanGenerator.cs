@@ -58,18 +58,17 @@ public static class WorldPlanGenerator
 		CeramicVillagePlanningResult villagePlanning = ceramicFishDefinition is null
 			? new([], [])
 			: CeramicVillagePlanner.Plan(settings, villages, ceramicFishDefinition, cancellationToken);
+		FeatureExclusionMask featureExclusions = BuildFeatureExclusions(settings.Width, settings.Length,
+			hydrology, sites, routes, villages, villagePlanning.Layouts.SelectMany(static layout => layout.GateRoadCells));
 		progress?.Report(new("Hills", 0.68));
-		GenerateHills(settings, terrain, heights, mask, hillMask, hydrology, sites, routes, villages,
-			villagePlanning.Layouts.SelectMany(static layout => layout.GateRoadCells), cancellationToken);
+		GenerateHills(settings, terrain, heights, mask, hillMask, featureExclusions, cancellationToken);
 		progress?.Report(new("Biomes", 0.78));
 		ClassifyBiomes(settings, moisture, shoreline, heights, mask, hydrology, biomes, cancellationToken);
 		progress?.Report(new("Tree density", 0.88));
-		GenerateTreeDensity(settings, vegetation, biomes, density, hydrology, sites, routes, villages,
-			villagePlanning.Layouts.SelectMany(static layout => layout.GateRoadCells), cancellationToken);
+		GenerateTreeDensity(settings, vegetation, biomes, density, featureExclusions, cancellationToken);
 		progress?.Report(new("Validation", 0.94));
 		WorldPlan plan = new(settings, heights, biomes, density, mask, hillMask, hydrology, sites, routes, villages,
 			structureCatalogHash, villagePlanning.Layouts, ceramicFishDefinitionHash, villagePlanning.Failures);
-		_ = DeriveTrees(plan, cancellationToken);
 		progress?.Report(new("Complete", 1));
 		return plan;
 	}
@@ -77,7 +76,7 @@ public static class WorldPlanGenerator
 	public static PlannedTree[] DeriveTrees(WorldPlan plan, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(plan);
-		HashSet<PlanPoint> excluded = BuildExclusions(plan);
+		FeatureExclusionMask excluded = BuildExclusions(plan);
 		SeededNoise selector = new(plan.Seed ^ 0x13A7D);
 		List<(uint Rank, int X, int Z)> candidates = [];
 		for (int x = 4; x < plan.Width - 4; x++)
@@ -286,16 +285,11 @@ public static class WorldPlanGenerator
 		byte[] heights,
 		byte[] mask,
 		byte[] hillMask,
-		IReadOnlyList<PlannedPond> hydrology,
-		IReadOnlyList<PlannedWorldSite> sites,
-		IReadOnlyList<PlannedWorldRoute> routes,
-		IReadOnlyList<PlannedVillageArea> villages,
-		IEnumerable<PlanPoint> villageGateRoads,
+		FeatureExclusionMask reserved,
 		CancellationToken token)
 	{
 		int minimumDimension = Math.Min(settings.Width, settings.Length);
 		if (minimumDimension < 192) return;
-		HashSet<PlanPoint> reserved = BuildFeatureExclusions(hydrology, sites, routes, villages, villageGateRoads);
 		ushort[] featureDistances = BuildFeatureDistanceField(settings, reserved);
 		SeededNoise picker = new(settings.Seed ^ 0x41115EED);
 		double regionalFrequency = 5.25 / minimumDimension;
@@ -481,14 +475,9 @@ public static class WorldPlanGenerator
 		SeededNoise noise,
 		byte[] biomes,
 		byte[] density,
-		PlannedPond[] ponds,
-		PlannedWorldSite[] sites,
-		PlannedWorldRoute[] routes,
-		PlannedVillageArea[] villages,
-		IEnumerable<PlanPoint> villageGateRoads,
+		FeatureExclusionMask excluded,
 		CancellationToken token)
 	{
-		HashSet<PlanPoint> excluded = BuildFeatureExclusions(ponds, sites, routes, villages, villageGateRoads);
 		for (int x = 0; x < settings.Width; x++)
 		{
 			token.ThrowIfCancellationRequested();
@@ -861,20 +850,22 @@ public static class WorldPlanGenerator
 
 	private static int RouteHeuristic(int x, int z, int endX, int endZ) => (Math.Abs(endX - x) + Math.Abs(endZ - z)) * 10;
 
-	private static HashSet<PlanPoint> BuildExclusions(WorldPlan plan)
+	private static FeatureExclusionMask BuildExclusions(WorldPlan plan)
 	{
-		return BuildFeatureExclusions(plan.Ponds, plan.Sites, plan.Routes, plan.Villages,
+		return BuildFeatureExclusions(plan.Width, plan.Length, plan.Ponds, plan.Sites, plan.Routes, plan.Villages,
 			plan.VillageLayouts.SelectMany(static layout => layout.GateRoadCells));
 	}
 
-	private static HashSet<PlanPoint> BuildFeatureExclusions(
+	private static FeatureExclusionMask BuildFeatureExclusions(
+		int width, int length,
 		IEnumerable<PlannedPond> ponds,
 		IEnumerable<PlannedWorldSite> sites,
 		IEnumerable<PlannedWorldRoute> routes,
 		IEnumerable<PlannedVillageArea> villages,
 		IEnumerable<PlanPoint>? villageGateRoads = null)
 	{
-		HashSet<PlanPoint> excluded = ponds.SelectMany(p => p.Cells).Select(c => new PlanPoint(c.X, c.Z)).ToHashSet();
+		FeatureExclusionMask excluded = new(width, length);
+		foreach (var pond in ponds) foreach (var cell in pond.Cells) excluded.Add(new(cell.X, cell.Z));
 		foreach (PlannedWorldSite site in sites)
 			for (int x = site.Reservation.MinimumX; x <= site.Reservation.MaximumX; x++)
 				for (int z = site.Reservation.MinimumZ; z <= site.Reservation.MaximumZ; z++) excluded.Add(new(x, z));
@@ -1001,14 +992,23 @@ public sealed class WorldPlanVolumeSampler
 
 	public bool IsSolid(int x, int y, int z)
 	{
-		if ((uint)x >= (uint)plan.Width || (uint)z >= (uint)plan.Length || y < 0 || y >= plan.WorldHeight || !plan.IsLand(x, z)) return false;
+		return y >= 0 && y < plan.WorldHeight && TryGetColumn(x, z, out WorldTerrainColumn column)
+			&& y >= column.Underside && y <= column.Surface;
+	}
+
+	/// <summary>Computes the solid interval and radial profile once for an entire vertical column.</summary>
+	public bool TryGetColumn(int x, int z, out WorldTerrainColumn column)
+	{
+		column = default;
+		if ((uint)x >= (uint)plan.Width || (uint)z >= (uint)plan.Length || !plan.IsLand(x, z)) return false;
 		int surface = plan.GetHeight(x, z);
-		if (y > surface) return false;
 		double radialX = (x + 0.5 - plan.Width * 0.5) / (plan.Width * 0.5), radialZ = (z + 0.5 - plan.Length * 0.5) / (plan.Length * 0.5);
 		double radial = Math.Sqrt(radialX * radialX + radialZ * radialZ);
 		double interior = Math.Pow(Math.Clamp(1 - radial / 0.98, 0, 1), 1.35);
 		int thickness = 12 + (int)Math.Round(interior * (plan.WorldHeight - 16));
-		int underside = Math.Max(0, surface - thickness + 1);
-		return y >= underside;
+		column = new(surface, Math.Max(0, surface - thickness + 1), radial, plan.GetBiome(x, z));
+		return true;
 	}
 }
+
+public readonly record struct WorldTerrainColumn(int Surface, int Underside, double Radius, WorldBiome Biome);

@@ -417,7 +417,7 @@ public sealed class VoxelMaterialPreviewState : GameStateImpl
 		fishWindow.Assets.ReloadCompleted -= OnAssetReloadCompleted;
 		saveReloadSuppression?.Dispose();
 		editorTextureLease.Dispose();
-		renderQueue.Clear();
+		renderQueue.Dispose();
 		voxelScene.Dispose();
 		gui.Dispose();
 	}

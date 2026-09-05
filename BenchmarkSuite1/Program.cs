@@ -6,6 +6,7 @@ namespace BenchmarkSuite1
     {
         static void Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--voxel-generation") { VoxelGenerationProbe.Run(args); return; }
             var _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
         }
     }

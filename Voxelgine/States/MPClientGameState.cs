@@ -718,6 +718,9 @@ namespace Voxelgine.States
 		protected override void DisposeCore()
 		{
 			Cleanup();
+#if WINDOWS
+			_fishRenderQueue.Dispose();
+#endif
 			_worldStream?.Dispose();
 			_worldStream = null;
 		}

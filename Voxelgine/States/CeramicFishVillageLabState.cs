@@ -226,7 +226,7 @@ public sealed class CeramicFishVillageLabState : GameStateImpl
 	}
 	public override void RenderOverlay(RenderPass pass, in FrameTiming timing) => gui.Render(pass, timing.DeltaTime, timing.TotalTime);
 	public override void OnResize(IGameWindow window) { base.OnResize(window); gui.OnResize(window.Width, window.Height); Layout(); }
-	protected override void DisposeCore() { renderQueue.Clear(); voxelScene.Dispose(); gui.Dispose(); }
+	protected override void DisposeCore() { renderQueue.Dispose(); voxelScene.Dispose(); gui.Dispose(); }
 
 	private void RebuildPrefabList()
 	{

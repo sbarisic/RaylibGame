@@ -152,3 +152,8 @@ Do not run timed comparisons concurrently with builds or test suites.
 Protocol 2 requires clients and servers to upgrade together; archive format 6 is
 preserved. Test isolated runtime roots so fresh identity profiles, server pins,
 and legacy backups cannot affect normal developer saves.
+
+Generation, meshing, scheduling, page grouping and retention probes are documented
+in [Voxel performance](VOXEL_PERFORMANCE.md). Run generation from the repository
+root so `--features` loads the checked-in structure and CeramicFish assets. GPU
+probes open real windows; keep their captures and JSON under ignored artifacts.

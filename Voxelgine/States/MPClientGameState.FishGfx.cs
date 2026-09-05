@@ -133,7 +133,8 @@ public unsafe partial class MPClientGameState
 			config.ChunkMeshUploadBudget,
 			config.VolumetricFogQuality,
 			synchronizeExisting,
-			_simulation.WorldObjects
+			_simulation.WorldObjects,
+			(FishGfx.Voxels.VoxelCubeMeshingMode)config.VoxelMeshing
 		);
 		_fishVoxelScene.GpuProfilingEnabled = _rendererProfilingEnabled;
 		_fishVoxelScene.PreparedColumnApplied += OnPreparedRenderColumnApplied;

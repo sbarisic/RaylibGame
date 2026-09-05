@@ -28,7 +28,9 @@ public static class WorldPlanMaterializer
 		WorldPlan plan,
 		StructureBlueprintCatalog catalog,
 		CancellationToken cancellationToken = default,
-		CeramicVillageCatalog ceramicFish = null)
+		CeramicVillageCatalog ceramicFish = null,
+		int terrainWorkers = 4,
+		Action<string, TimeSpan> stageCompleted = null)
 	{
 		ArgumentNullException.ThrowIfNull(destination); ArgumentNullException.ThrowIfNull(plan);
 		plan.Validate(); cancellationToken.ThrowIfCancellationRequested();
@@ -47,7 +49,7 @@ public static class WorldPlanMaterializer
 				throw new InvalidDataException("World plan CeramicFish definition does not match the active definition.");
 		}
 
-		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, ceramicFish, cancellationToken);
+		WorldPlanBuildResult result = WorldPlanVoxelBuilder.Build(plan, catalog, ceramicFish, cancellationToken, terrainWorkers, stageCompleted);
 		cancellationToken.ThrowIfCancellationRequested();
 		destination.ReplaceAllColumns(result.Columns);
 		destination.RestoreGeneratedFeatures(result.Features);

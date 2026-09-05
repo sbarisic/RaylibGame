@@ -1,5 +1,15 @@
 # Aurora Falls - Completed Items
 
+## Voxel performance foundations (2026-09-05)
+
+Terrain materialization now uses shared column profiles and bounded workers with
+baseline voxel fingerprint regressions. Meshing caches visibility and corner
+samples; rendering has resumable column application, lighting deadlines, focused
+work diagnostics, stable page grouping and retained-draw-aware page reclamation.
+Conservative greedy meshing is available as an opt-in. Default promotion and full
+visual acceptance remain in [TODO](TODO.md); measured results and limitations are
+recorded in [Voxel performance](docs/VOXEL_PERFORMANCE.md).
+
 ## Gameplay and multiplayer hardening (2026-09-05)
 
 Focused regressions verify authenticated identity/UDP handling, persistent policy

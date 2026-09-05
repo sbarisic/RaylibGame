@@ -1,0 +1,52 @@
+name: Publish testing release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: read
+concurrency:
+  group: game-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: Validate tag and dependency pins
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') { throw 'Expected vMAJOR.MINOR.PATCH' }
+          ./scripts/Test-SubmodulePins.ps1
+          ./scripts/Test-Documentation.ps1
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet build RaylibGame.sln -c Release -p:Platform=x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          foreach ($project in @('VoxelgineEngine.Tests', 'UnitTest', 'Voxelgine.Audio.Tests', 'AuroraFalls.Update.Tests')) {
+            dotnet test "$project/$project.csproj" -c Release -p:Platform=x64
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+      - name: Package and audit
+        shell: pwsh
+        run: ./scripts/New-ReleasePackage.ps1 -Version $env:GITHUB_REF_NAME
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: artifacts/releases/*
+          if-no-files-found: error
+      - name: Publish verified release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Publish-GitHubRelease.ps1 -Version $env:GITHUB_REF_NAME

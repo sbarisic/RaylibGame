@@ -29,6 +29,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(BuildVoxelAudioNative)' == 'true'">
+    <_VoxelAudioNativeBuildInput Include="$(MSBuildProjectFullPath)" />
+    <_VoxelAudioNativeBuildInput Include="$(MSBuildProjectDirectory)\..\scripts\Build-NativeAudio.ps1" />
     <_VoxelAudioNativeBuildInput Include="$(NativeAudioSourceDirectory)\CMakeLists.txt" />
     <_VoxelAudioNativeBuildInput Include="$(NativeAudioSourceDirectory)\src\**\*.c" />
     <_VoxelAudioNativeBuildInput Include="$(NativeAudioSourceDirectory)\include\**\*.h" />
@@ -36,21 +38,18 @@
     <_VoxelAudioNativeBuildInput Include="$(MiniaudioRoot)\miniaudio.h" />
   </ItemGroup>
 
-  <Target Name="ConfigureVoxelAudioNative"
-          Condition="'$(BuildVoxelAudioNative)' == 'true' and '$(DesignTimeBuild)' != 'true'"
-          Inputs="$(NativeAudioSourceDirectory)\CMakeLists.txt"
-          Outputs="$(NativeAudioBuildDirectory)\CMakeCache.txt">
-    <MakeDir Directories="$(NativeAudioBuildDirectory)" />
-    <Exec Command="cmake -S &quot;$(NativeAudioSourceDirectory)&quot; -B &quot;$(NativeAudioBuildDirectory)&quot; -A x64 -DMINIAUDIO_ROOT=&quot;$(MiniaudioRoot)&quot;" />
+  <Target Name="ResolveVoxelAudioToolchain"
+          Condition="'$(BuildVoxelAudioNative)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Build-NativeAudio.ps1&quot; -Configuration &quot;$(Configuration)&quot; -CMakeExecutable &quot;$(CMakeExecutable)&quot; -OutputFile &quot;$(NativeAudioBinary)&quot; -BuildDirectory &quot;$(NativeAudioBuildDirectory)&quot; -ResolveOnly" />
   </Target>
 
   <Target Name="BuildVoxelAudioNative"
           BeforeTargets="PrepareForBuild;Publish"
-          DependsOnTargets="ConfigureVoxelAudioNative"
-          Inputs="@(_VoxelAudioNativeBuildInput);$(NativeAudioBuildDirectory)\CMakeCache.txt"
+          DependsOnTargets="ResolveVoxelAudioToolchain"
+          Inputs="@(_VoxelAudioNativeBuildInput);$(NativeAudioBuildDirectory)\native-toolchain.json"
           Outputs="$(NativeAudioBinary)"
           Condition="'$(BuildVoxelAudioNative)' == 'true' and '$(DesignTimeBuild)' != 'true'">
-    <Exec Command="cmake --build &quot;$(NativeAudioBuildDirectory)&quot; --config &quot;$(Configuration)&quot; --target VoxelAudioNative --parallel" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\Build-NativeAudio.ps1&quot; -Configuration &quot;$(Configuration)&quot; -CMakeExecutable &quot;$(CMakeExecutable)&quot; -OutputFile &quot;$(NativeAudioBinary)&quot; -BuildDirectory &quot;$(NativeAudioBuildDirectory)&quot;" />
   </Target>
 
 </Project>

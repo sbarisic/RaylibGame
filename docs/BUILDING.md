@@ -7,9 +7,13 @@ The Windows x64 client requires:
 - Git with recursive submodule support;
 - .NET 10 SDK and the .NET 9 targeting pack (the pinned nested FishUI project
   still targets `net9.0`);
-- CMake available on `PATH`; and
-- Visual Studio 2022 Build Tools or Visual Studio 2022 with the Desktop
+- Compatible CMake on `PATH` or the Visual Studio C++ CMake tools; and
+- Visual Studio 2022 or 2026 (including Build Tools) with the Desktop
   development with C++ workload and the MSVC x64 compiler.
+
+Native audio discovers the installed toolchain automatically, including bundled
+CMake when it is absent from PATH. Set `-p:CMakeExecutable=<full path>` to
+override discovery. CMake 3.24+ supports VS 2022; VS 2026 needs CMake 4.2+.
 
 The dedicated server and portable engine require only Git and the .NET 10 SDK.
 They must build and publish on Windows and Linux without a graphics or audio
@@ -81,6 +85,10 @@ non-clear pixels. It needs an interactive Windows desktop and is therefore a
 manual or desktop-runner check, not a headless GitHub-hosted runner step.
 
 ## Publish and audit
+
+For a self-contained portable ZIP with automatic GitHub updates, follow
+[RELEASE.md](../RELEASE.md). Ordinary builds and the framework-dependent publish
+below do not enable automatic updates.
 
 Publish the Windows x64 client:
 

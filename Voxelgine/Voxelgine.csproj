@@ -11,6 +11,11 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ReleasePackage Condition="'$(ReleasePackage)' == ''">false</ReleasePackage>
+    <OutputType Condition="'$(ReleasePackage)' == 'true'">WinExe</OutputType>
+    <DefineConstants Condition="'$(ReleasePackage)' == 'true'">$(DefineConstants);AURORAFALLS_RELEASE_PACKAGE</DefineConstants>
+    <!-- Keep packaged binaries out of normal F5/Ctrl+F5 output directories. -->
+    <OutputPath Condition="'$(ReleasePackage)' == 'true'">bin\Package\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

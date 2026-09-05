@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Client', 'Server')]
+    [ValidateSet('Client', 'Server', 'Release')]
     [string] $Kind,
 
     [Parameter(Mandatory)]
@@ -16,6 +16,29 @@ if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
 }
 
 $publishRoot = (Resolve-Path -LiteralPath $Path).Path
+
+if ($Kind -eq 'Release') {
+    $pointer = Get-Content -LiteralPath (Join-Path $publishRoot 'current.json') -Raw | ConvertFrom-Json
+    if ($pointer.schemaVersion -ne 1 -or $pointer.current -notmatch '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') { throw 'Invalid release pointer.' }
+    $versionRoot = Join-Path $publishRoot "versions/$($pointer.current)"
+    $manifest = Get-Content -LiteralPath "$versionRoot/manifest.json" -Raw | ConvertFrom-Json
+    if ($manifest.schemaVersion -ne 1 -or $manifest.bootstrapProtocol -ne 1 -or $manifest.version -ne $pointer.current -or $manifest.platform -ne 'win-x64') { throw 'Invalid release manifest.' }
+    foreach ($required in @('AuroraFalls.exe', "versions/$($pointer.current)/updater/AuroraFalls.Updater.exe", "versions/$($pointer.current)/updater/coreclr.dll", "versions/$($pointer.current)/game/coreclr.dll")) {
+        if (!(Test-Path -LiteralPath (Join-Path $publishRoot $required) -PathType Leaf)) { throw "Release missing $required" }
+    }
+    $actual = @(Get-ChildItem -LiteralPath $versionRoot -Recurse -File | Where-Object { $_.FullName -ne [IO.Path]::GetFullPath("$versionRoot/manifest.json") })
+    $inventory = @($manifest.files.PSObject.Properties)
+    if ($actual.Count -ne $inventory.Count) { throw 'Release inventory file count mismatch.' }
+    foreach ($file in $inventory) {
+        if ($file.Name -notmatch '^(game|updater)/' -or $file.Name -match '\.\.|\\|:') { throw 'Unsafe manifest path.' }
+        if ((Get-FileHash -LiteralPath (Join-Path $versionRoot $file.Name) -Algorithm SHA256).Hash -ne $file.Value) { throw "Release checksum mismatch: $($file.Name)" }
+    }
+    & $PSCommandPath -Kind Client -Path "$versionRoot/game"
+    & "$PSScriptRoot/Test-NativeDependencies.ps1" -Path "$versionRoot/game"
+    & "$PSScriptRoot/Test-NativeDependencies.ps1" -Path "$versionRoot/updater"
+    Write-Host "Release $($pointer.current) verified."
+    return
+}
 
 function Assert-File {
     param([Parameter(Mandatory)][string] $RelativePath)

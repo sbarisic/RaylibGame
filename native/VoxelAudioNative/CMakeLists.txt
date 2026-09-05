@@ -29,7 +29,7 @@ target_compile_definitions(VoxelAudioNative PRIVATE VA_BUILD_DLL)
 if(MSVC)
     target_compile_options(VoxelAudioNative PRIVATE /W4 /wd4100 /wd4244 /wd4267)
     set_property(TARGET VoxelAudioNative PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()
     target_compile_options(VoxelAudioNative PRIVATE -Wall -Wextra -Wpedantic)
 endif()

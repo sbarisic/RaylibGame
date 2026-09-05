@@ -72,8 +72,10 @@ Do not use `git submodule update --remote`. The parent repositories deliberately
 pin exact dependency commits.
 
 Windows client requirements are the .NET 10 SDK, the .NET 9 targeting pack for
-the pinned nested FishUI project, CMake, and the Visual Studio
-2022 MSVC x64 C/C++ toolchain. Build and run the FishGfx client with:
+the pinned nested FishUI project, and Visual Studio 2022 or 2026 with the MSVC
+x64 C/C++ toolchain and Windows SDK. CMake can be on PATH or installed through
+Visual Studio's C++ CMake tools; the build discovers it automatically.
+Build and run the FishGfx client with:
 
 ```powershell
 dotnet build Voxelgine/Voxelgine.csproj -c Release `
@@ -94,6 +96,7 @@ The complete toolchain, publish, test, and package-audit commands are in
 
 ## Documentation
 
+- [Standalone downloads, automatic updates, and releasing](RELEASE.md)
 - [Architecture and migration invariants](docs/ARCHITECTURE.md)
 - [Dependency pins and upstream workflow](docs/DEPENDENCIES.md)
 - [Audio architecture and cue bank](docs/AUDIO.md)
